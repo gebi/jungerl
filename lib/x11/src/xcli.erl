@@ -131,6 +131,8 @@ setup(Creator,Host,Socket,DpyN,DefScr,Length32,MajorVersion, MinorVersion) ->
 	    store(Display, D),
 	    store(Display, #xPrivate { id = resource_id, value = 0}),
 	    store(Display, #xPrivate { id = request_id, value = 0}),
+	    store(Display, #xPrivate { id = atom_to_num, value = dict:new()}),
+	    store(Display, #xPrivate { id = num_to_atom, value = dict:new()}),
 	    Data2 = setup_formats(Display, 0, NumFormats, Data1),
 	    Data3 = setup_screens(Display, 0, NumRoots, Data2),
 	    Creator ! {self(), {ok, Display}},

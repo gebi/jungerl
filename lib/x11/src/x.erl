@@ -317,6 +317,77 @@ createPixmap(Display, D, Width, Height, Depth) ->
 freePixmap(Display, Pixmap) ->
     xcli:send(Display, xproto:freePixmap(Pixmap)).
 
+%% Okay, this is not how it should be done. Mapping from erlang atoms
+%% to X11 atoms should be transparent. The display should cache it.
+%% How do I use the ets table? 
+%% I added 
+%%	    store(Display, #xPrivate { id = atom_to_num, value = dict:new()}),
+%%	    store(Display, #xPrivate { id = num_to_atom, value = dict:new()}),
+%% in xcli.erl
+%% Use these to cache lookups?
+
+cache_lookup_atom(Display, Atom) when integer(Atom) ->
+    nyi;
+cache_lookup_atom(Display, Atom) when atom(Atom);list(Atom) ->
+    nyi.
+
+cache_insert_atom(Display, Atom, N) ->
+    nyi.
+
+internAtom(Display, OnlyIfExist, Atom) when atom(Atom) ->
+    case cache_lookup_atom(Display, Atom) of
+	{ok, {Name, N}} ->
+	    {ok, N};
+	Else ->
+	    {ok, N} = internAtom(Display, OnlyIfExist, atom_to_list(Atom)),
+	    cache_insert_atom(Display, Atom, N),
+	    {ok, N}
+    end;
+internAtom(Display, OnlyIfExist, Atom) when list(Atom) ->
+    Only = case OnlyIfExist of 
+	       false -> 0;
+	       Else -> 1 
+	   end,
+    case xcli:call(Display, xproto:internAtom(Only,length(Atom), Atom)) of
+	Bin when binary(Bin) ->
+	    {Rep, _ } = ?xInternAtomReply_dec(Bin),
+	    {ok, Rep#xInternAtomReply.atom};
+	Error ->
+	    Error
+    end.
+
+getAtomName(Display, N) when integer(N) ->
+    case cache_lookup_atom(Display, N) of
+	{ok, {Name, N}} ->
+	    {ok, Name};
+	Else ->
+	    case xcli:call(Display, xproto:getAtomName(N)) of
+		Bin when binary(Bin) ->
+		    {Rep, Bin1} = ?xGetAtomNameReply_dec(Bin),
+		    N = Rep#xGetAtomNameReply.nameLength,
+		    <<_:32/binary, BinAtom:N/binary, _/binary>> = Bin1,
+		    Atom = list_to_atom(binary_to_list(BinAtom)),
+		    cache_insert_atom(Display, Atom, N),
+		    {ok, Atom};
+		Error ->
+		    Error
+	    end
+    end.
+
+%% to be implemented:
+
+%% changeProperty(Display, Window, Mode, Property, Type, Format, Data)
+
+%% deleteProperty(Display, Window, Property)
+
+%% getProperty(Display, Window, DeleteBool, Property, Type, Offset, Len)
+
+%% listProperties(Display, Window)
+
+%% convenience routine for setting in one go: (see ICCCM)
+%% WM_NAME, WM_ICON_NAME, WM_NORMAL_HINTS, WM_HINTS, WM_CLASS, 
+%% WM_PROTOCOLS, WM_CLIENT_MACHINE
+
 createGC(Display, D, ValueMask, Values) ->
     Gc = xcli:allocId(Display),
     xcli:send(Display, xproto:createGC(Gc, D, ValueMask, Values)),

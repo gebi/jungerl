@@ -33,6 +33,8 @@ xev0(DisplayName) ->
     x:selectInput(D, W, 
 		  ?OwnerGrabButtonMask-1 bor ?OwnerGrabButtonMask),
     x:mapWindow(D, W),
+    {ok, N} = x:internAtom(D, true, 'WM_NAME'),
+    io:format("WM_NAME: ~p\n", [N]),
     xev0(D,W).
 
 xev0(D, State) ->

@@ -92,7 +92,17 @@ getGeometry(Window) ->
     req(?X_GetGeometry, 0, 
 	<<?xResourceReq(Window)>>).
 
-    
+%% 16
+internAtom(OnlyIfExist, NBytes, Atom) ->
+    req(?X_InternAtom, OnlyIfExist,
+	<<?xInternAtomReq(NBytes, 0), 
+	 (list_to_binary(Atom))/binary>>).
+
+%% 17
+getAtomName(N) ->
+    req(?X_GetAtomName, 0,
+	<<?ATOM(N)>>).
+
 %% 45
 openFont(Fid, Name) ->
     NBytes = length(Name),

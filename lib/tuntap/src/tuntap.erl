@@ -14,8 +14,6 @@
 	 open_tun/0, open_tap/0, open_tuntap/2,
 	 device_name/1, write/2]).
 
--compile(export_all).
-
 -define(REPLY_ERROR, 0).
 -define(REPLY_OK, 1).
 

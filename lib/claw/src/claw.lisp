@@ -17,15 +17,20 @@
 
 (defpackage :|erlang|
   (:nicknames :bif)
-  (:shadow :< :> :* :- :+ :and :or)
-  (:export :< :> :* :- :+ :and :or
-           :display)
+  (:shadow :< :> :>= :* :- :+)
+  (:export :< :> :>= :* :- :+ :=< :++ :|and| :|or| :|==| :|=:=|
+           :|is_list| :|is_integer|
+           :|display|)
   (:use :common-lisp)
   (:documentation "Erlang built-in-functions (BIFs.)"))
 
 (in-package :claw)
 
 (declaim (inline atom? variable?))
+
+(defvar *claw-readtable* nil)
+(defvar *claw-symbol-readtable* nil
+  "Readtable for atoms and variables - case sensitive.")
 
 ;; ----------------------------------------------------------------------
 ;; Scanning and parsing
@@ -553,6 +558,12 @@
           (when (and ,test (eq ,guard 'atom::|true|))
             ,body))))))
 
+(defun pprint-match-case (stream list &rest noise)
+  (declare (ignore noise))
+  (format stream
+          "~:<~W ~3I~:_~W~1I~@{ ~_~:<~^~:/PP:PPRINT-FILL/~^~@{ ~_~W~}~:>~}~:>"
+          list))
+
 (defmacro call (mod fun &rest args)
   `(funcall (remote-fname ,mod ,fun) ,@args))
 
@@ -591,10 +602,6 @@
 ;; Atom syntax:     @foo <=> 'atom::foo
 ;; Variable syntax: $foo <=> var::foo
 ;; ----------------------------------------------------------------------
-
-(defvar *claw-readtable* nil)
-(defvar *claw-symbol-readtable* nil
-  "Readtable for atoms and variables - case sensitive.")
 
 (setq *claw-symbol-readtable* (copy-readtable))
 (setf (readtable-case *claw-symbol-readtable*) :preserve)
@@ -642,7 +649,8 @@
   (set-pprint-dispatch 'erlang-variable    #'print-variable)
   ;; too confusing?
 ;  (set-pprint-dispatch 'erlang-atom        #'print-atom)
-  (set-pprint-dispatch 'quoted-erlang-atom #'print-quoted-atom))
+  (set-pprint-dispatch 'quoted-erlang-atom #'print-quoted-atom)
+  (set-pprint-dispatch '(cons (eql match-case) cons) #'pprint-match-case))
 
 (customize-syntax)
 
@@ -658,21 +666,36 @@
 ;; wrappers to enforce number of arguments
 (defun < (x y) (true/false (cl:< x y)))
 (defun > (x y) (true/false (cl:> x y)))
+(defun =< (x y) (true/false (<= x y)))
+(defun >= (x y) (true/false (cl:>= x y)))
 (defun + (x y) (cl:+ x y))
 (defun - (x y) (cl:- x y))
 (defun * (x y) (cl:* x y))
 (defun display (x)
   (print x))
-(defun and (x y)
-  (unless (member x (list *true* *false*)) (error "badarg ~s" x))
-  (unless (member y (list *true* *false*)) (error "badarg ~s" x))
-  (true/false (cl:and (eq x *true*) (eq y *true*))))
+(defun |and| (x y)
+  (true/false! x y)
+  (true/false (and (true? x) (true? y))))
+(defun |or| (x y)
+  (true/false! x y)
+  (true/false (or (true? x) (true? y))))
+(defun ++ (x y)
+  (append x y))
+(defun |==| (x y)
+  (equalp x y))
+(defun |=:=| (x y)
+  (and (typep x (type-of y))
+       (|==| x y)))
 
 ;; support
 
 (defun true/false (x) (if x *true* *false*))
-(defun true?  (x) (eq x 'atom::|true|))
-(defun false? (x) (eq x 'atom::|true|))
+(defun true/false! (&rest objs)
+  (dolist (x objs)
+    (unless (or (eq x *true*) (eq x *false*))
+      (error "badarg: ~s is not an erlang boolean" x))))
+(defun true?  (x) (eq x *true*))
+(defun false? (x) (eq x *false*))
 
 ;; for ilisp
 (in-package :claw)

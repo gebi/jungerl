@@ -12,6 +12,7 @@ if ( `echo $SELF_PATH | grep '/\.$'`  != "" ) then
     set SELF_PATH = $SELF_PATH:h
 endif
 
+set PAN_TOP = `dirname $SELF_PATH`
 set SNAME = pan
 set U1 = "usage: $0 [-setcookie <cookie>] [-nocookie]"
 set U2 = "[-pa <path>] [-tick <netticktime>] [-name <node name>] [-spawn]"
@@ -64,7 +65,7 @@ echo tick $tick
 echo cookie $cookie
 
 set CMD1 = "$OTP_ROOT/bin/erl -hidden -boot start_sasl -sasl errlog_type error"
-set CMD2 = "-pa $SELF_PATH $xpat -sname $SNAME $cookie $tick"
+set CMD2 = "-pa $PAN_TOP/ebin $xpat -sname $SNAME $cookie $tick"
 set CMD = "$CMD1 $CMD2"
 if ( $?spawn ) then
     xterm -sb -sl 9999 -geometry 80x24 -bg lightcyan -T $SNAME -e $CMD &

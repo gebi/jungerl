@@ -1,0 +1,277 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Module erl_tidy</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body bgcolor="white">
+<h1>Module erl_tidy</h1>
+<ul><li>
+<a href="#index">Function index</a></li><li>
+<a href="#exported">Exported functions</a></li></ul>
+
+<h2>Description</h2>
+Tidies Erlang source code, removing unused functions, updating
+  obsolete constructs and function calls, etc.
+ 
+  <p>Caveats: It is possible that in some intricate uses of macros,
+  the automatic addition or removal of parentheses around uses or
+  arguments could cause the resulting program to be rejected by the
+  compiler; however, we have found no such case in existing
+  code. Programs defining strange macros can usually not be read by
+  this program, and in those cases, no changes will be made.</p>
+ 
+  <p>If you really, really want to, you may call it "Inga".</p>
+ 
+  <p>Disclaimer: The author accepts no responsibility for errors
+  introduced in code that has been processed by the program. It has
+  been reasonably well tested, but the possibility of errors remains.
+  Keep backups of your original code safely stored, until you feel
+  confident that the new, modified code can be trusted.</p>
+
+<h2><a name="index">Function Index</a></h2>
+
+<table width="100%" border="1"><tr><th colspan="2" align="left">Exported Functions</th></tr>
+<tr><td><a href="#dir-0">dir/0</a></td><td><a href="#dir-1">See <code>dir/1</code>.</a></td></tr>
+<tr><td><a href="#dir-1">dir/1</a></td><td><a href="#dir-2">See <code>dir/2</code>.</a></td></tr>
+<tr><td><a href="#dir-2">dir/2</a></td><td>Tidies Erlang source files in a directory and its
+  subdirectories.</td></tr>
+<tr><td><a href="#file-1">file/1</a></td><td><a href="#file-2">See <code>file/2</code>.</a></td></tr>
+<tr><td><a href="#file-2">file/2</a></td><td>Tidies an Erlang source code file.</td></tr>
+<tr><td><a href="#module-1">module/1</a></td><td><a href="#module-2">See <code>module/2</code>.</a></td></tr>
+<tr><td><a href="#module-2">module/2</a></td><td>Tidies a syntax tree representation of a module
+  definition.</td></tr>
+</table>
+
+<h2><a name="exported">Exported Functions</a></h2>
+
+<h3><a name="dir-0">dir/0</a></h3>
+
+<p><code>dir() -> ok</code></p>
+<p>Equivalent to <a href="#dir-1"><code>dir("")</code></a>.</p>
+
+<h3><a name="dir-1">dir/1</a></h3>
+
+<p><code>dir(Dir) -> ok</code></p>
+<p>Equivalent to <a href="#dir-2"><code>dir(Dir, [])</code></a>.</p>
+
+<h3><a name="dir-2">dir/2</a></h3>
+
+<p><code>dir(Directory::<a href="#type-filename">filename()</a>, Options::[term()]) -> ok<ul><li><a name="type-filename">filename()</a> = <a href="file.html#type-filename">file:filename()</a></li></ul></code></p>
+<p>Tidies Erlang source files in a directory and its
+  subdirectories.
+ 
+  <p>Available options:
+  <dl>
+    <dt>{follow_links, bool()}</dt>
+ 
+        <dd>If the value is <code>true</code>, symbolic directory
+        links will be followed.  The default value is
+        <code>false</code>.</dd>
+ 
+    <dt>{recursive, bool()}</dt>
+ 
+        <dd>If the value is <code>true</code>, subdirectories will be
+        visited recursively.  The default value is
+        <code>true</code>.</dd>
+ 
+    <dt>{regexp, string()}</dt>
+ 
+        <dd>The value denotes a regular expression (see module
+        <code>regexp</code>).  Tidying will only be applied to those
+        regular files whose names match this pattern. The default
+        value is <code>".*\\.erl$"</code>, which matches normal
+        Erlang source file names.</dd>
+ 
+    <dt>{test, bool()}</dt>
+ 
+        <dd>If the value is <code>true</code>, no files will be
+        modified. The default value is <code>false</code>.</dd>
+ 
+    <dt>{verbose, bool()}</dt>
+ 
+        <dd>If the value is <code>true</code>, progress messages will
+        be output while the program is running, unless the
+        <code>quiet</code> option is <code>true</code>. The default
+        value when calling <code>dir/2</code> is
+        <code>true</code>.</dd>
+ 
+  </dl></p>
+ 
+  <p>See the function <code>file/2</code> for further options.</p>
+ </p>
+<p>See also: <a href="regexp.html"><code>regexp</code></a>, <a href="#file-2"><code>file/2</code></a>.</p>
+
+<h3><a name="file-1">file/1</a></h3>
+
+<p><code>file(Name) -> ok</code></p>
+<p>Equivalent to <a href="#file-2"><code>file(Name, [])</code></a>.</p>
+
+<h3><a name="file-2">file/2</a></h3>
+
+<p><code>file(Name::<a href="#type-filename">filename()</a>, Options::[term()]) -> ok</code></p>
+<p>Tidies an Erlang source code file.
+ 
+  <p>Available options are:
+  <dl>
+    <dt>{backup_suffix, string()}</dt>
+ 
+        <dd>Specifies the file name suffix to be used when a backup
+        file is created; the default value is <code>".bak"</code>
+        (cf. the <code>backups</code> option).</dd>
+ 
+    <dt>{backups, bool()}</dt>
+ 
+        <dd>If the value is <code>true</code>, existing files will be
+        renamed before new files are opened for writing. The new
+        names are formed by appending the string given by the
+        <code>backup_suffix</code> option to the original name. The
+        default value is <code>true</code>.</dd>
+ 
+    <dt>{dir, filename()}</dt>
+ 
+        <dd>Specifies the name of the directory in which the output
+        file is to be written. By default, the current directory is
+        used. If the value is an empty string, the current directory
+        is used. </dd>
+ 
+    <dt>{outfile, filename()}</dt>
+ 
+        <dd>Specifies the name of the file (without suffix) to which
+        the resulting source code is to be written. If this option is
+        not specified, the <code>Name</code> argument is used.</dd>
+ 
+    <dt>{printer, Function}</dt>
+        <dd><ul>
+          <li>Function = (syntaxTree()) -> string()</li>
+        </ul>
+ 
+        <p>Specifies a function for prettyprinting Erlang syntax
+        trees. This is used for outputting the resulting module
+        definition, as well as for creating stub files. The function
+        is assumed to return formatted text for the passed syntax
+        tree, and should raise an exception if an error occurs. The
+        default formatting function calls
+        <code>erl_prettypr:format/2</code>.</p></dd>
+ 
+    <dt>{test, bool()}</dt>
+ 
+        <dd>If the value is <code>true</code>, no files will be
+        modified; this is typically most useful if the
+        <code>verbose</code> flag is enabled, to generate reports
+        about the program files without affecting them. The default
+        value is <code>false</code>.</dd>
+  </dl></p>
+ 
+  <p>See the function <code>module/2</code> for further options.</p>
+ </p>
+<p>See also: <a href="#module-2"><code>module/2</code></a>, <a href="erl_prettypr.html#format-2"><code>erl_prettypr:format/2</code></a>.</p>
+
+<h3><a name="module-1">module/1</a></h3>
+
+<p><code>module(Forms) -> <a href="#type-syntaxTree">syntaxTree()</a></code></p>
+<p>Equivalent to <a href="#module-2"><code>module(Forms, [])</code></a>.</p>
+
+<h3><a name="module-2">module/2</a></h3>
+
+<p><code>module(Forms, Options::[term()]) -> <a href="#type-syntaxTree">syntaxTree()</a><ul><li>Forms = <a href="#type-syntaxTree">syntaxTree()</a> | [<a href="#type-syntaxTree">syntaxTree()</a>]</li><li><a name="type-syntaxTree">syntaxTree()</a> = <a href="erl_syntax.html#type-syntaxTree">erl_syntax:syntaxTree()</a></li></ul></code></p>
+<p>Tidies a syntax tree representation of a module
+  definition. The given <code>Forms</code> may be either a single
+  syntax tree of type <code>form_list</code>, or a list of syntax
+  trees representing "program forms". In either case,
+  <code>Forms</code> must represents a single complete module
+  definition. The returned syntax tree has type
+  <code>form_list</code> and represents a tidied-up version of the
+  same source code.
+ 
+  <p>Available options are:
+  <dl>
+    <dt>{auto_export_vars, bool()}</dt>
+ 
+        <dd>If the value is <code>true</code>, all matches
+        "<code>{V1, ..., Vn} = E</code>" where <code>E</code> is a
+        case-, if- or receive-expression whose branches all return
+        n-tuples (or explicitly throw exceptions) will be rewritten
+        to bind and export the variables <code>V1</code>, ...,
+        <code>Vn</code> directly. The default value is
+        <code>false</code>.
+ 
+        <p>For example:
+        <pre>
+                 {X, Y} = case ... of
+                              ... -> {17, foo()};
+                              ... -> {42, bar()}
+                          end
+        </pre>
+        will be rewritten to:
+        <pre>
+                 case ... of
+                     ... -> X = 17, Y = foo(), {X, Y};
+                     ... -> X = 42, Y = bar(), {X, Y}
+                 end
+        </pre></p></dd>
+ 
+    <dt>{file, string()}</dt>
+ 
+        <dd>Specifies the name of the file from which the source code
+        was taken. This is only used for generation of error
+        reports. The default value is the empty string.</dd>
+ 
+    <dt>{keep_unused, bool()}</dt>
+ 
+        <dd>If the value is <code>true</code>, unused functions will
+        not be removed from the code. The default value is
+        <code>false</code>.</dd>
+ 
+    <dt>{no_imports, bool()}</dt>
+ 
+        <dd>If the value is <code>true</code>, all import statements
+        will be removed and calls to imported functions will be
+        expanded to explicit remote calls. The default value is
+        <code>false</code>.</dd>
+ 
+    <dt>{old_guard_tests, bool()}</dt>
+ 
+        <dd>If the value is <code>true</code>, guard tests will use
+        the old names instead of the new ones,
+        e.g. "<code>integer(X)</code>" instead of
+        "<code>is_integer(X)</code>". The default value is
+        <code>false</code>.</dd>
+ 
+    <dt>{quiet, bool()}</dt>
+ 
+        <dd>If the value is <code>true</code>, all information
+        messages and warning messages will be suppressed. The default
+        value is <code>false</code>.</dd>
+ 
+    <dt>{rename, [{{atom(), atom(), integer()},
+                   {atom(), atom()}}]}</dt>
+ 
+        <dd>The value is a list of pairs, associating tuples
+        <code>{Module, Name, Arity}</code> with tuples
+        <code>{NewModule, NewName}</code>, specifying renamings of
+        calls to remote functions. By default, the value is the empty
+        list.
+ 
+        <p>The renaming affects only remote calls (also when
+        disguised by import declarations); local calls within a
+        module are not affected, and no function definitions are
+        renamed. Since the arity cannot change, the new name is
+        represented by <code>{NewModule, NewName}</code> only. Only
+        calls matching the specified arity will match; multiple
+        entries are necessary for renaming calls to functions that
+        have the same module and function name, but different
+        arities.</p>
+ 
+        <p>This option can also be used to override the default
+        renaming of calls which use obsolete function names.</p></dd>
+ 
+    <dt>{verbose, bool()}</dt>
+ 
+        <dd>If the value is <code>true</code>, progress messages
+        will be output while the program is running, unless the
+        <code>quiet</code> option is <code>true</code>. The default
+        value is <code>false</code>.</dd>
+ 
+  </dl></p></p></body>
+</html>

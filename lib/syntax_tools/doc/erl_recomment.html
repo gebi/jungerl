@@ -1,0 +1,105 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Module erl_recomment</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body bgcolor="white">
+<h1>Module erl_recomment</h1>
+<ul><li>
+<a href="#index">Function index</a></li><li>
+<a href="#exported">Exported functions</a></li></ul>
+
+<h2>Description</h2>
+Inserting comments into abstract Erlang syntax trees
+ 
+  <p>This module contains functions for inserting comments, described
+  by position, indentation and text, as attachments on an abstract
+  syntax tree, at the correct places.</p>
+
+<h2><a name="index">Function Index</a></h2>
+
+<table width="100%" border="1"><tr><th colspan="2" align="left">Exported Functions</th></tr>
+<tr><td><a href="#recomment_forms-2">recomment_forms/2</a></td><td>Attaches comments to the syntax tree/trees representing a
+  program.</td></tr>
+<tr><td><a href="#recomment_tree-2">recomment_tree/2</a></td><td>Attaches comments to a syntax tree.</td></tr>
+</table>
+
+<h2><a name="exported">Exported Functions</a></h2>
+
+<h3><a name="recomment_forms-2">recomment_forms/2</a></h3>
+
+<p><code>recomment_forms(Forms, Comments::[Comment]) -> <a href="#type-syntaxTree">syntaxTree()</a><ul><li><a name="type-syntaxTree">syntaxTree()</a> = <a href="erl_syntax.html#type-syntaxTree">erl_syntax:syntaxTree()</a></li><li>Forms = <a href="#type-syntaxTree">syntaxTree()</a> | [<a href="#type-syntaxTree">syntaxTree()</a>]</li><li>Comment = {Line, Column, Indentation, Text}</li><li>Line = integer()</li><li>Column = integer()</li><li>Indentation = integer()</li><li>Text = [string()]</li></ul></code></p>
+<p>Attaches comments to the syntax tree/trees representing a
+  program. The given <code>Forms</code> should be a single syntax tree
+  of type <code>form_list</code>, or a list of syntax trees
+  representing "program forms". The syntax trees must contain valid
+  position information (for details, see
+  <code>recomment_tree/2</code>). The result is a corresponding syntax
+  tree of type <code>form_list</code> in which all comments in the list
+  <code>Comments</code> have been attached at the proper places.
+ 
+  <p>Assuming <code>Forms</code> represents a program (or any sequence
+  of "program forms"), any comments whose first lines are not directly
+  associated with a specific program form will become standalone
+  comments inserted between the neighbouring program forms.
+  Furthermore, comments whose column position is less than or equal to
+  one will not be attached to a program form that begins at a
+  conflicting line number (this can happen with preprocessor-generated
+  <code>line</code>-attributes).</p>
+ 
+  <p>If <code>Forms</code> is a syntax tree of some other type than
+  <code>form_list</code>, the comments will be inserted directly using
+  <code>recomment_tree/2</code>, and any comments left over from that
+  process are added as postcomments on the result.</p>
+ 
+  <p>Entries in <code>Comments</code> represent multi-line comments.
+  For each entry, <code>Line</code> is the line number and
+  <code>Column</code> the left column of the comment (the column of the
+  first comment-introducing "<code>%</code>" character).
+  <code>Indentation</code> is the number of character positions between
+  the last non-whitespace character before the comment (or the left
+  margin) and the left column of the comment. <code>Text</code> is a
+  list of strings representing the consecutive comment lines in
+  top-down order, where each string contains all characters following
+  (but not including) the comment-introducing "<code>%</code>" and up
+  to (but not including) the terminating newline. (Cf. module
+  <code>erl_comment_scan</code>.)</p>
+ 
+  <p>Evaluation exits with reason <code>{bad_position, Pos}</code> if
+  the associated position information <code>Pos</code> of some subtree
+  in the input does not have a recognizable format, or with reason
+  <code>{bad_tree, L, C}</code> if insertion of a comment at line
+  <code>L</code>, column <code>C</code>, fails because the tree
+  structure is ill-formed.</p>
+ </p>
+<p>See also: <a href="erl_comment_scan.html"><code>erl_comment_scan</code></a>, <a href="#recomment_tree-2"><code>recomment_tree/2</code></a>.</p>
+
+<h3><a name="recomment_tree-2">recomment_tree/2</a></h3>
+
+<p><code>recomment_tree(Tree::<a href="#type-syntaxTree">syntaxTree()</a>, Comments::[Comment]) -> {<a href="#type-syntaxTree">syntaxTree()</a>, [Comment]}<ul><li>Comment = {Line, Column, Indentation, Text}</li><li>Line = integer()</li><li>Column = integer()</li><li>Indentation = integer()</li><li>Text = [string()]</li></ul></code></p>
+<p>Attaches comments to a syntax tree. The result is a pair
+  <code>{NewTree, Remainder}</code> where <code>NewTree</code> is the
+  given <code>Tree</code> where comments from the list
+  <code>Comments</code> have been attached at the proper places.
+  <code>Remainder</code> is the list of entries in
+  <code>Comments</code> which have not been inserted, because their
+  line numbers are greater than those of any node in the tree. The
+  entries in <code>Comments</code> are inserted in order; if two
+  comments become attached to the same node, they will appear in the
+  same order in the program text.
+ 
+  <p>The nodes of the syntax tree must contain valid position
+  information. This can be single integers, assumed to represent a line
+  number, or 2- or 3-tuples where the first or second element is an
+  integer, in which case the leftmost integer element is assumed to
+  represent the line number. Line numbers less than one are ignored
+  (usually, the default line number for newly created nodes is
+  zero).</p>
+ 
+  <p>For details on the <code>Line</code>, <code>Column</code> and
+  <code>Indentation</code> fields, and the behaviour in case of errors,
+  see <code>recomment_forms/2</code>.</p>
+ </p>
+<p>See also: <a href="#recomment_forms-2"><code>recomment_forms/2</code></a>.</p></body>
+</html>

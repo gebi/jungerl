@@ -1,0 +1,235 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Module erl_prettypr</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body bgcolor="white">
+<h1>Module erl_prettypr</h1>
+<ul><li>
+<a href="#index">Function index</a></li><li>
+<a href="#exported">Exported functions</a></li><li>
+<a href="#types">Data Types</a></li></ul>
+
+<h2>Description</h2>
+Pretty printing of abstract Erlang syntax trees.
+ 
+  <p>This module is a front end to the pretty-printing library module
+  <code>prettypr</code>, for text formatting of abstract syntax trees
+  defined by the module <code>erl_syntax</code>.</p>
+
+<h2><a name="index">Function Index</a></h2>
+
+<table width="100%" border="1"><tr><th colspan="2" align="left">Exported Functions</th></tr>
+<tr><td><a href="#best-1">best/1</a></td><td><a href="#best-2">See <code>best/2</code>.</a></td></tr>
+<tr><td><a href="#best-2">best/2</a></td><td>Creates a fixed "best" abstract layout for a syntax tree.</td></tr>
+<tr><td><a href="#format-1">format/1</a></td><td><a href="#format-2">See <code>format/2</code>.</a></td></tr>
+<tr><td><a href="#format-2">format/2</a></td><td>Prettyprint-formats an abstract Erlang syntax tree as text.</td></tr>
+<tr><td><a href="#get_ctxt_hook-1">get_ctxt_hook/1</a></td><td>Returns the hook function field of the prettyprinter context.</td></tr>
+<tr><td><a href="#get_ctxt_linewidth-1">get_ctxt_linewidth/1</a></td><td>Returns the line widh field of the prettyprinter context.</td></tr>
+<tr><td><a href="#get_ctxt_paperwidth-1">get_ctxt_paperwidth/1</a></td><td>Returns the paper widh field of the prettyprinter context.</td></tr>
+<tr><td><a href="#get_ctxt_precedence-1">get_ctxt_precedence/1</a></td><td>Returns the operator precedence field of the prettyprinter
+  context.</td></tr>
+<tr><td><a href="#get_ctxt_user-1">get_ctxt_user/1</a></td><td>Returns the user data field of the prettyprinter context.</td></tr>
+<tr><td><a href="#layout-1">layout/1</a></td><td><a href="#layout-2">See <code>layout/2</code>.</a></td></tr>
+<tr><td><a href="#layout-2">layout/2</a></td><td>Creates an abstract document layout for a syntax tree.</td></tr>
+<tr><td><a href="#set_ctxt_hook-2">set_ctxt_hook/2</a></td><td>Updates the hook function field of the prettyprinter context.</td></tr>
+<tr><td><a href="#set_ctxt_linewidth-2">set_ctxt_linewidth/2</a></td><td>Updates the line widh field of the prettyprinter context.</td></tr>
+<tr><td><a href="#set_ctxt_paperwidth-2">set_ctxt_paperwidth/2</a></td><td>Updates the paper widh field of the prettyprinter context.</td></tr>
+<tr><td><a href="#set_ctxt_precedence-2">set_ctxt_precedence/2</a></td><td>Updates the operator precedence field of the prettyprinter
+  context.</td></tr>
+<tr><td><a href="#set_ctxt_user-2">set_ctxt_user/2</a></td><td>Updates the user data field of the prettyprinter context.</td></tr>
+</table>
+
+<h2><a name="types">Data Types</a></h2>
+
+<h3><a name="type-hook">hook()</a> = (<a href="#type-syntaxTree">syntaxTree()</a>, <a href="#type-context">context()</a>, Continuation) -> <a href="#type-document">document()</a><ul><li>Continuation = (<a href="#type-syntaxTree">syntaxTree()</a>, <a href="#type-context">context()</a>) -> <a href="#type-document">document()</a></li></ul></h3>
+
+
+ 
+  A call-back function for user-controlled formatting. See <a href="#format-2"><code>format/2</code></a>.
+ 
+
+<h3><a name="type-context">context()</a></h3>
+
+ A representation of the current context of the
+  pretty-printer. Can be accessed in hook functions.
+ 
+
+<h2><a name="exported">Exported Functions</a></h2>
+
+<h3><a name="best-1">best/1</a></h3>
+
+<p><code>best(Node) -> empty | <a href="#type-document">document()</a></code></p>
+<p>Equivalent to <a href="#best-2"><code>best(Node, [])</code></a>.</p>
+
+<h3><a name="best-2">best/2</a></h3>
+
+<p><code>best(Node::<a href="#type-syntaxTree">syntaxTree()</a>, Options::[term()]) -> empty | <a href="#type-document">document()</a></code></p>
+<p>Creates a fixed "best" abstract layout for a syntax tree. This
+  is similar to the <code>layout/2</code> function, except that here,
+  the final layout has been selected with respect to the given options.
+  The atom <code>empty</code> is returned if no such layout could be
+  produced. For information on the options, see the
+  <code>format/2</code> function.
+ </p>
+<p>See also: <a href="#best-1"><code>best/1</code></a>, <a href="#format-2"><code>format/2</code></a>, <a href="#layout-2"><code>layout/2</code></a>, <a href="prettypr.html#best-2"><code>prettypr:best/2</code></a>.</p>
+
+<h3><a name="format-1">format/1</a></h3>
+
+<p><code>format(Node) -> string()</code></p>
+<p>Equivalent to <a href="#format-2"><code>format(Node, [])</code></a>.</p>
+
+<h3><a name="format-2">format/2</a></h3>
+
+<p><code>format(Node::<a href="#type-syntaxTree">syntaxTree()</a>, Options::[term()]) -> string()<ul><li><a name="type-syntaxTree">syntaxTree()</a> = <a href="erl_syntax.html#type-syntaxTree">erl_syntax:syntaxTree()</a></li></ul></code></p>
+<p>Prettyprint-formats an abstract Erlang syntax tree as text.
+ 
+  <p>Available options:
+  <dl>
+    <dt>{hook, none | <a href="#type-hook">hook()</a>}</dt>
+        <dd>Unless the value is <code>none</code>, the given function
+        is called for each node whose list of annotations is not empty;
+        see below for details. The default value is
+        <code>none</code>.</dd>
+ 
+    <dt>{paper, integer()}</dt>
+        <dd>Specifies the preferred maximum number of characters on any
+        line, including indentation. The default value is 80.</dd>
+ 
+    <dt>{ribbon, integer()}</dt>
+        <dd>Specifies the preferred maximum number of characters on any
+        line, not counting indentation. The default value is 65.</dd>
+ 
+    <dt>{user, term()}</dt>
+        <dd>User-specific data for use in hook functions. The default
+        value is <code>undefined</code>.</dd>
+  </dl></p>
+ 
+  <p>A hook function (cf. the
+  <a href="#type-hook"><code>hook()</code></a> type) is passed the
+  current syntax tree node, the context, and a continuation. The
+  context can be examined and manipulated by functions such as
+  <code>get_ctxt_user/1</code> and <code>set_ctxt_user/2</code>. The
+  hook must return a "document" data structure (see
+  <code>layout/2</code> and <code>best/2</code>); this may be
+  constructed in part or in whole by applying the continuation
+  function. For example, the following is a trivial hook:
+  <pre>
+      fun (Node, Ctxt, Cont) -> Cont(Node, Xtxt) end
+  </pre>
+  which yields the same result as if no hook was given.
+  The following, however:
+  <pre>
+      fun (Node, Ctxt, Cont) ->
+          Doc = Cont(Node, Xtxt),
+          prettypr:beside(prettypr:text("&lt;b>"),
+                          prettypr:beside(Doc,
+                                          prettypr:text("&lt;/b>")))
+      end
+  </pre>
+  will place the text of any annotated node (regardless of the
+  annotation data) between HTML "boldface begin" and "boldface end"
+  tags.</p>
+ </p>
+<p>See also: <a href="erl_syntax.html"><code>erl_syntax</code></a>, <a href="#best-2"><code>best/2</code></a>, <a href="#format-1"><code>format/1</code></a>, <a href="#get_ctxt_user-1"><code>get_ctxt_user/1</code></a>, <a href="#layout-2"><code>layout/2</code></a>, <a href="#set_ctxt_user-2"><code>set_ctxt_user/2</code></a>.</p>
+
+<h3><a name="get_ctxt_hook-1">get_ctxt_hook/1</a></h3>
+
+<p><code>get_ctxt_hook(<a href="#type-context">context()</a>) -> <a href="#type-hook">hook()</a></code></p>
+<p>Returns the hook function field of the prettyprinter context.</p>
+<p>See also: <a href="#set_ctxt_hook-2"><code>set_ctxt_hook/2</code></a>.</p>
+
+<h3><a name="get_ctxt_linewidth-1">get_ctxt_linewidth/1</a></h3>
+
+<p><code>get_ctxt_linewidth(<a href="#type-context">context()</a>) -> integer()</code></p>
+<p>Returns the line widh field of the prettyprinter context.</p>
+<p>See also: <a href="#set_ctxt_linewidth-2"><code>set_ctxt_linewidth/2</code></a>.</p>
+
+<h3><a name="get_ctxt_paperwidth-1">get_ctxt_paperwidth/1</a></h3>
+
+<p><code>get_ctxt_paperwidth(<a href="#type-context">context()</a>) -> integer()</code></p>
+<p>Returns the paper widh field of the prettyprinter context.</p>
+<p>See also: <a href="#set_ctxt_paperwidth-2"><code>set_ctxt_paperwidth/2</code></a>.</p>
+
+<h3><a name="get_ctxt_precedence-1">get_ctxt_precedence/1</a></h3>
+
+<p><code>get_ctxt_precedence(<a href="#type-context">context()</a>) -> <a href="#type-context">context()</a></code></p>
+<p>Returns the operator precedence field of the prettyprinter
+  context.
+ </p>
+<p>See also: <a href="#set_ctxt_precedence-2"><code>set_ctxt_precedence/2</code></a>.</p>
+
+<h3><a name="get_ctxt_user-1">get_ctxt_user/1</a></h3>
+
+<p><code>get_ctxt_user(<a href="#type-context">context()</a>) -> term()</code></p>
+<p>Returns the user data field of the prettyprinter context.</p>
+<p>See also: <a href="#set_ctxt_user-2"><code>set_ctxt_user/2</code></a>.</p>
+
+<h3><a name="layout-1">layout/1</a></h3>
+
+<p><code>layout(Node) -> <a href="#type-document">document()</a></code></p>
+<p>Equivalent to <a href="#layout-2"><code>layout(Node, [])</code></a>.</p>
+
+<h3><a name="layout-2">layout/2</a></h3>
+
+<p><code>layout(Node::<a href="#type-syntaxTree">syntaxTree()</a>, Options::[term()]) -> <a href="#type-document">document()</a><ul><li><a name="type-document">document()</a> = <a href="prettypr.html#type-document">prettypr:document()</a></li></ul></code></p>
+<p>Creates an abstract document layout for a syntax tree. The
+  result represents a set of possible layouts (cf. module
+  <code>prettypr</code>). For information on the options, see
+  <code>format/2</code>; note, however, that the <code>paper</code> and
+  <code>ribbon</code> options are ignored by this function.
+ 
+  <p>This function provides a low-level interface to the pretty
+  printer, returning a flexible representation of possible layouts,
+  independent of the paper width eventually to be used for formatting.
+  This can be included as part of another document and/or further
+  processed directly by the functions in the <code>prettypr</code>
+  module, or used in a hook function (see <code>format/2</code> for
+  details).</p>
+ </p>
+<p>See also: <a href="prettypr.html"><code>prettypr</code></a>, <a href="#format-2"><code>format/2</code></a>, <a href="#layout-1"><code>layout/1</code></a>.</p>
+
+<h3><a name="set_ctxt_hook-2">set_ctxt_hook/2</a></h3>
+
+<p><code>set_ctxt_hook(<a href="#type-context">context()</a>, <a href="#type-hook">hook()</a>) -> <a href="#type-context">context()</a></code></p>
+<p>Updates the hook function field of the prettyprinter context.</p>
+<p>See also: <a href="#get_ctxt_hook-1"><code>get_ctxt_hook/1</code></a>.</p>
+
+<h3><a name="set_ctxt_linewidth-2">set_ctxt_linewidth/2</a></h3>
+
+<p><code>set_ctxt_linewidth(<a href="#type-context">context()</a>, integer()) -> <a href="#type-context">context()</a></code></p>
+<p>Updates the line widh field of the prettyprinter context.
+ 
+  <p> Note: changing this value (and passing the resulting context to a
+  continuation function) does not affect the normal formatting, but may
+  affect user-defined behaviour in hook functions.</p>
+ </p>
+<p>See also: <a href="#get_ctxt_linewidth-1"><code>get_ctxt_linewidth/1</code></a>.</p>
+
+<h3><a name="set_ctxt_paperwidth-2">set_ctxt_paperwidth/2</a></h3>
+
+<p><code>set_ctxt_paperwidth(<a href="#type-context">context()</a>, integer()) -> <a href="#type-context">context()</a></code></p>
+<p>Updates the paper widh field of the prettyprinter context.
+ 
+  <p> Note: changing this value (and passing the resulting context to a
+  continuation function) does not affect the normal formatting, but may
+  affect user-defined behaviour in hook functions.</p>
+ </p>
+<p>See also: <a href="#get_ctxt_paperwidth-1"><code>get_ctxt_paperwidth/1</code></a>.</p>
+
+<h3><a name="set_ctxt_precedence-2">set_ctxt_precedence/2</a></h3>
+
+<p><code>set_ctxt_precedence(<a href="#type-context">context()</a>, integer()) -> <a href="#type-context">context()</a></code></p>
+<p>Updates the operator precedence field of the prettyprinter
+  context. See the <code>erl_parse</code> module for operator
+  precedences.
+ </p>
+<p>See also: <a href="erl_parse.html"><code>erl_parse</code></a>, <a href="#get_ctxt_precedence-1"><code>get_ctxt_precedence/1</code></a>.</p>
+
+<h3><a name="set_ctxt_user-2">set_ctxt_user/2</a></h3>
+
+<p><code>set_ctxt_user(<a href="#type-context">context()</a>, term()) -> <a href="#type-context">context()</a></code></p>
+<p>Updates the user data field of the prettyprinter context.</p>
+<p>See also: <a href="#get_ctxt_user-1"><code>get_ctxt_user/1</code></a>.</p></body>
+</html>

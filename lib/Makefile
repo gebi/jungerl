@@ -1,10 +1,12 @@
 LIBS := \
+        edoc \
 	enfs \
 	ermacs \
 	slang \
 	lersp \
 	msc \
 	rpc \
+        syntax_tools \
 	tuntap \
         wumpus \
         www_tools \

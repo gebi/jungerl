@@ -1,0 +1,56 @@
+                        Syntax tools 1.2
+                        ----------------
+
+(For full documentation, see doc/index.html.)
+
+This package contains modules for handling abstract Erlang syntax trees,
+in a way that is compatible with the "parse trees" of the standard
+library module `erl_parse', together with utilities for reading source
+files in unusual ways and pretty-printing syntax trees. Also included is
+an amazing automatic code-cleaner.
+
+The abstract layer (defined in `erl_syntax') is nicely structured and
+the node types are context-independent. The layer makes it possible to
+transparently attach source-code comments and user annotations to nodes
+of the tree. Using the abstract layer makes applications less sensitive
+to changes in the `erl_parse' data structures, only requiring the
+`erl_syntax' module to be up-to-date.
+
+The pretty printer (`erl_prettypr') is implemented on top of the library
+module `prettypr': this is a powerful and flexible generic pretty
+printing library, which is also distributed separately, and is not
+documented here.
+
+For a short demonstration of parsing and pretty-printing, simply compile
+the included module `demo.erl', and execute `demo:run()' from the Erlang
+shell. It will compile the remaining modules and give you further
+instructions.
+
+Also try the `erl_tidy' module, as follows:
+
+    erl_tidy:dir("any-erlang-source-dir", [test, old_guard_tests]).
+
+(`test' assures that no files are modified).
+
+
+News in 1.2:
+
+  - HTML Documentation (generated with EDoc).
+
+  - A few bug fixes and some minor interface changes (sorry for any
+    inconvenience).
+
+News in 1.1:
+
+  - Module `erl_tidy': check or tidy either a single module, or a
+    whole directory tree recursively. Rewrites and reformats the code
+    without losing comments or expanding macros. Safe mode allows
+    generating reports without modifying files.
+
+  - Module `erl_syntax_lib': contains support functions for easier
+    analysis of the source code structure.
+
+  - Module `epp_dodger': Bypasses the Erlang preprocessor - avoids
+    macro expansion, file inclusion, conditional compilation, etc.
+    Allows you to find/modify particular definitions/applications of
+    macros, and other things previously not possible.

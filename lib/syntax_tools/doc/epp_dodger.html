@@ -1,0 +1,82 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Module epp_dodger</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body bgcolor="white">
+<h1>Module epp_dodger</h1>
+<ul><li>
+<a href="#index">Function index</a></li><li>
+<a href="#exported">Exported functions</a></li></ul>
+
+<h2>Description</h2>
+<code>epp_dodger</code> - bypasses the Erlang preprocessor.
+ 
+  <p>This module tokenises and parses most Erlang source code without
+  expanding preprocessor directives and macro applications, as long as
+  these are syntactically "well-behaved". Because the normal parse
+  trees of the <code>erl_parse</code> module cannot represent these
+  things (normally, they are expanded by the Erlang preprocessor
+  "<code>epp</code>" before the parser sees them), an extended syntax
+  tree is created, using the <code>erl_syntax</code> module.</p>
+ 
+
+<h2><a name="index">Function Index</a></h2>
+
+<table width="100%" border="1"><tr><th colspan="2" align="left">Exported Functions</th></tr>
+<tr><td><a href="#format_error-1">format_error/1</a></td><td>Callback function for formatting error descriptors.</td></tr>
+<tr><td><a href="#parse-1">parse/1</a></td><td><a href="#parse-2">See <code>parse/2</code>.</a></td></tr>
+<tr><td><a href="#parse-2">parse/2</a></td><td>Reads and parses program text from an I/O stream.</td></tr>
+<tr><td><a href="#parse_file-1">parse_file/1</a></td><td>Reads and parses a file.</td></tr>
+<tr><td><a href="#parse_form-2">parse_form/2</a></td><td>Reads and parses a single program form from an I/O stream.</td></tr>
+</table>
+
+<h2><a name="exported">Exported Functions</a></h2>
+
+<h3><a name="format_error-1">format_error/1</a></h3>
+
+<p><code>format_error(term()) -> string()</code></p>
+<p>Callback function for formatting error descriptors.</p>
+
+<h3><a name="parse-1">parse/1</a></h3>
+
+<p><code>parse(IODevice) -> {ok, Forms} | {error, ErrorInfo}</code></p>
+<p>Equivalent to <a href="#parse-2"><code>parse(IODevice, 1)</code></a>.</p>
+
+<h3><a name="parse-2">parse/2</a></h3>
+
+<p><code>parse(IODevice, StartLine) -> {ok, Forms} | {error, ErrorInfo}<ul><li>IODevice = pid()</li><li>StartLine = integer()</li><li>Forms = [<a href="erl_syntax.html#type-syntaxTree">erl_syntax:syntaxTree()</a>]</li><li>ErrorInfo = term()</li></ul></code></p>
+<p>Reads and parses program text from an I/O stream. Characters are
+  read from <code>IODevice</code> until end-of-file; apart from this,
+  the behaviour is the same as for <code>parse_file/1</code>.
+  <code>StartLine</code> is the initial line number, which should be a
+  positive integer.
+ </p>
+<p>See also: <a href="#parse_file-1"><code>parse_file/1</code></a>.</p>
+
+<h3><a name="parse_file-1">parse_file/1</a></h3>
+
+<p><code>parse_file(File) -> {ok, Forms} | {error, ErrorInfo}<ul><li>File = <a href="file.html#type-filename">file:filename()</a></li><li>Forms = [<a href="erl_syntax.html#type-syntaxTree">erl_syntax:syntaxTree()</a>]</li><li>ErrorInfo = term()</li></ul></code></p>
+<p>Reads and parses a file. If successful, <code>{ok, Forms}</code>
+  is returned, where <code>Forms</code> is a list of abstract syntax
+  trees representing the "program forms" of the file (cf.
+  <code>erl_syntax:is_form/1</code>). Otherwise, <code>{error,
+  ErrorInfo}</code> is returned, where <code>ErrorInfo</code> is an
+  Erlang I/O ErrorInfo structure (see module <code>io</code>.)
+ </p>
+<p>See also: <a href="io.html"><code>io</code></a>, <a href="erl_syntax.html#is_form-1"><code>erl_syntax:is_form/1</code></a>.</p>
+
+<h3><a name="parse_form-2">parse_form/2</a></h3>
+
+<p><code>parse_form(IODevice, StartLine) -> {ok, Forms, LineNo} | {eof, LineNo} | {error, ErrorInfo, LineNo}<ul><li>IODevice = pid()</li><li>StartLine = integer()</li><li>Forms = [<a href="erl_syntax.html#type-syntaxTree">erl_syntax:syntaxTree()</a>]</li><li>ErrorInfo = term()</li><li>LineNo = integer()</li></ul></code></p>
+<p>Reads and parses a single program form from an I/O stream.
+  Characters are read from <code>IODevice</code> until an end-of-form
+  marker is found (a period character followed by whitespace), or until
+  end-of-file; apart from this, the behaviour is similar to that of
+  <code>parse/2</code>, except that the return values also contain the
+  final line number, given that <code>StartLine</code> is the initial
+  line number, and that <code>{eof, LineNo}</code> may be returned.
+ </p>
+<p>See also: <a href="#parse-2"><code>parse/2</code></a>.</p></body>
+</html>

@@ -1,0 +1,11 @@
+{name, "edoc"}.
+{vsn, {0,1}}.
+{summary, "Erlang program documentation generator."}.
+{author, "Richard Carlsson", "richardc@csd.uu.se", "020322"}.
+{keywords, ["documentation", "source code", "comments", "markup",
+            "HTML", "XHTML"]}.
+{needs, [{syntax_tools,{1,2}},{xmerl,{0,17}}]}.
+{abstract, "Lets you write the documentation of an Erlang program as
+            comments in the source code, Javadoc-style. This is still
+            in the early beta stages, but is already quite usable.
+            Requires syntax_tools 1.2 and xmerl 0.17."}.

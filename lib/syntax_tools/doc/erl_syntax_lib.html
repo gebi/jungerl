@@ -1,0 +1,738 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Module erl_syntax_lib</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body bgcolor="white">
+<h1>Module erl_syntax_lib</h1>
+<ul><li>
+<a href="#index">Function index</a></li><li>
+<a href="#exported">Exported functions</a></li><li>
+<a href="#types">Data Types</a></li></ul>
+
+<h2>Description</h2>
+Support library for abstract Erlang syntax trees.
+ 
+  <p> This module contains utility functions for working with the
+  abstract data type defined in the module <a href="erl_syntax.html"><code>erl_syntax</code></a>.</p>
+ 
+
+<h2><a name="index">Function Index</a></h2>
+
+<table width="100%" border="1"><tr><th colspan="2" align="left">Exported Functions</th></tr>
+<tr><td><a href="#analyze_application-1">analyze_application/1</a></td><td>Returns the name of a called function.</td></tr>
+<tr><td><a href="#analyze_attribute-1">analyze_attribute/1</a></td><td>Analyzes an attribute node.</td></tr>
+<tr><td><a href="#analyze_export_attribute-1">analyze_export_attribute/1</a></td><td>Returns the list of function names declared by an export
+  attribute.</td></tr>
+<tr><td><a href="#analyze_file_attribute-1">analyze_file_attribute/1</a></td><td>Returns the file name and line number of a <code>file</code>
+  attribute.</td></tr>
+<tr><td><a href="#analyze_form-1">analyze_form/1</a></td><td>Analyzes a "source code form" node.</td></tr>
+<tr><td><a href="#analyze_forms-1">analyze_forms/1</a></td><td>Analyzes a sequence of "program forms".</td></tr>
+<tr><td><a href="#analyze_function-1">analyze_function/1</a></td><td>Returns the name and arity of a function definition.</td></tr>
+<tr><td><a href="#analyze_function_name-1">analyze_function_name/1</a></td><td>Returns the function name represented by a syntax tree.</td></tr>
+<tr><td><a href="#analyze_implicit_fun-1">analyze_implicit_fun/1</a></td><td>Returns the name of an implicit fun expression "<code>fun
+  <em>F</em></code>".</td></tr>
+<tr><td><a href="#analyze_import_attribute-1">analyze_import_attribute/1</a></td><td>Returns the module name and list of function names declared by
+  an import attribute.</td></tr>
+<tr><td><a href="#analyze_module_attribute-1">analyze_module_attribute/1</a></td><td>Returns the module name declared by a module attribute.</td></tr>
+<tr><td><a href="#analyze_record_attribute-1">analyze_record_attribute/1</a></td><td>Returns the name and the list of fields of a record declaration
+  attribute.</td></tr>
+<tr><td><a href="#analyze_record_field-1">analyze_record_field/1</a></td><td>Returns the label and value-expression of a record field
+  specifier.</td></tr>
+<tr><td><a href="#analyze_rule-1">analyze_rule/1</a></td><td>Returns the name and arity of a Mnemosyne rule.</td></tr>
+<tr><td><a href="#analyze_wild_attribute-1">analyze_wild_attribute/1</a></td><td>Returns the name and value of a "wild" attribute.</td></tr>
+<tr><td><a href="#annotate_bindings-1">annotate_bindings/1</a></td><td>Adds or updates annotations on nodes in a syntax tree.</td></tr>
+<tr><td><a href="#annotate_bindings-2">annotate_bindings/2</a></td><td>Adds or updates annotations on nodes in a syntax tree.</td></tr>
+<tr><td><a href="#fold-3">fold/3</a></td><td>Folds a function over all nodes of a syntax tree.</td></tr>
+<tr><td><a href="#fold_subtrees-3">fold_subtrees/3</a></td><td>Folds a function over the immediate subtrees of a syntax tree.</td></tr>
+<tr><td><a href="#foldl_listlist-3">foldl_listlist/3</a></td><td>Like <code>lists:foldl/3</code>, but over a list of lists.</td></tr>
+<tr><td><a href="#function_name_expansions-1">function_name_expansions/1</a></td><td>Creates a mapping from corresponding short names to full
+  function names.</td></tr>
+<tr><td><a href="#is_fail_expr-1">is_fail_expr/1</a></td><td>Returns <code>true</code> if <code>Tree</code> represents an
+  expression which never terminates normally.</td></tr>
+<tr><td><a href="#limit-2">limit/2</a></td><td>Equivalent to <code>limit(Tree, Depth, Text)</code> using the
+  text <code>"..."</code> as default replacement.</td></tr>
+<tr><td><a href="#limit-3">limit/3</a></td><td>Limits a syntax tree to a specified depth.</td></tr>
+<tr><td><a href="#map-2">map/2</a></td><td>Applies a function to each node of a syntax tree.</td></tr>
+<tr><td><a href="#map_subtrees-2">map_subtrees/2</a></td><td>Applies a function to each immediate subtree of a syntax tree.</td></tr>
+<tr><td><a href="#mapfold-3">mapfold/3</a></td><td>Combines map and fold in a single operation.</td></tr>
+<tr><td><a href="#mapfold_subtrees-3">mapfold_subtrees/3</a></td><td>Does a mapfold operation over the immediate subtrees of a syntax
+  tree.</td></tr>
+<tr><td><a href="#mapfoldl_listlist-3">mapfoldl_listlist/3</a></td><td>Like <code>lists:mapfoldl/3</code>, but over a list of lists.</td></tr>
+<tr><td><a href="#new_variable_name-1">new_variable_name/1</a></td><td>Returns an atom which is not already in the set
+  <code>Used</code>.</td></tr>
+<tr><td><a href="#new_variable_name-2">new_variable_name/2</a></td><td>Returns a user-named atom which is not already in the set
+  <code>Used</code>.</td></tr>
+<tr><td><a href="#new_variable_names-2">new_variable_names/2</a></td><td>Like <code>new_variable_name/1</code>, but generates a list of
+  <code>N</code> new names.</td></tr>
+<tr><td><a href="#new_variable_names-3">new_variable_names/3</a></td><td>Like <code>new_variable_name/2</code>, but generates a list of
+  <code>N</code> new names.</td></tr>
+<tr><td><a href="#strip_comments-1">strip_comments/1</a></td><td>Removes all comments from all nodes of a syntax tree.</td></tr>
+<tr><td><a href="#to_comment-1">to_comment/1</a></td><td><a href="#to_comment-2">See <code>to_comment/2</code>.</a></td></tr>
+<tr><td><a href="#to_comment-2">to_comment/2</a></td><td>Equivalent to <code>to_comment(Tree, Prefix, F)</code> for a
+  default formatting function <code>F</code>.</td></tr>
+<tr><td><a href="#to_comment-3">to_comment/3</a></td><td>Transforms a syntax tree into an abstract comment.</td></tr>
+<tr><td><a href="#variables-1">variables/1</a></td><td>Returns the names of variables occurring in a syntax tree, The
+  result is a set of variable names represented by atoms.</td></tr>
+</table>
+
+<h2><a name="types">Data Types</a></h2>
+
+<h3><a name="type-syntaxTree">syntaxTree()</a> = <a href="erl_syntax.html#type-syntaxTree">erl_syntax:syntaxTree()</a></h3>
+
+ An abstract syntax
+  tree. See the <code>erl_syntax</code> module for details.
+
+<h2><a name="exported">Exported Functions</a></h2>
+
+<h3><a name="analyze_application-1">analyze_application/1</a></h3>
+
+<p><code>analyze_application(Node::<a href="#type-syntaxTree">syntaxTree()</a>) -> FunctionName | Arity<ul><li>FunctionName = {atom(), Arity} | {ModuleName, FunctionName}</li><li>Arity = integer()</li><li>ModuleName = atom()</li></ul></code></p>
+<p>Returns the name of a called function. The result is a
+  representation of the name of the applied function <code>F/A</code>,
+  if <code>Node</code> represents a function application
+  "<code><em>F</em>(<em>X_1</em>, ..., <em>X_A</em>)</code>". If the
+  function is not explicitly named (i.e., <code>F</code> is given by
+  some expression), only the arity <code>A</code> is returned.
+ 
+  <p>The evaluation throws <code>syntax_error</code> if
+  <code>Node</code> does not represent a well-formed application
+  expression.</p>
+ </p>
+<p>See also: <a href="#analyze_function_name-1"><code>analyze_function_name/1</code></a>.</p>
+
+<h3><a name="analyze_attribute-1">analyze_attribute/1</a></h3>
+
+<p><code>analyze_attribute(Node::<a href="#type-syntaxTree">syntaxTree()</a>) -> preprocessor | {atom(), atom()}</code></p>
+<p>Analyzes an attribute node. If <code>Node</code> represents a
+  preprocessor directive, the atom <code>preprocessor</code> is
+  returned. Otherwise, if <code>Node</code> represents a module
+  attribute "<code>-<em>Name</em>...</code>", a tuple <code>{Name,
+  Info}</code> is returned, where <code>Info</code> depends on
+  <code>Name</code>, as follows:
+  <dl>
+      <dt><code>{module, Info}</code></dt>
+ 
+  	    <dd>where <code>Info =
+  	    analyze_module_attribute(Node)</code>.</dd>
+ 
+      <dt><code>{export, Info}</code></dt>
+ 
+  	    <dd>where <code>Info =
+  	    analyze_export_attribute(Node)</code>.</dd>
+ 
+      <dt><code>{import, Info}</code></dt>
+ 
+  	    <dd>where <code>Info =
+  	    analyze_import_attribute(Node)</code>.</dd>
+ 
+      <dt><code>{file, Info}</code></dt>
+ 
+  	    <dd>where <code>Info =
+  	    analyze_file_attribute(Node)</code>.</dd>
+ 
+      <dt><code>{record, Info}</code></dt>
+ 
+  	    <dd>where <code>Info =
+  	    analyze_record_attribute(Node)</code>.</dd>
+ 
+      <dt><code>{Name, Info}</code></dt>
+ 
+  	    <dd>where <code>{Name, Info} =
+  	    analyze_wild_attribute(Node)</code>.</dd>
+  </dl>
+  The evaluation throws <code>syntax_error</code> if <code>Node</code>
+  does not represent a well-formed module attribute.
+ </p>
+<p>See also: <a href="#analyze_export_attribute-1"><code>analyze_export_attribute/1</code></a>, <a href="#analyze_file_attribute-1"><code>analyze_file_attribute/1</code></a>, <a href="#analyze_import_attribute-1"><code>analyze_import_attribute/1</code></a>, <a href="#analyze_module_attribute-1"><code>analyze_module_attribute/1</code></a>, <a href="#analyze_record_attribute-1"><code>analyze_record_attribute/1</code></a>, <a href="#analyze_wild_attribute-1"><code>analyze_wild_attribute/1</code></a>.</p>
+
+<h3><a name="analyze_export_attribute-1">analyze_export_attribute/1</a></h3>
+
+<p><code>analyze_export_attribute(Node::<a href="#type-syntaxTree">syntaxTree()</a>) -> [FunctionName]<ul><li>FunctionName = atom() | {atom(), integer()} | {ModuleName, FunctionName}</li><li>ModuleName = atom()</li></ul></code></p>
+<p>Returns the list of function names declared by an export
+  attribute. Duplicates may occur in the result, and the order of
+  listing is not defined.
+ 
+  <p>The evaluation throws <code>syntax_error</code> if
+  <code>Node</code> does not represent a well-formed export
+  attribute.</p>
+ </p>
+<p>See also: <a href="#analyze_attribute-1"><code>analyze_attribute/1</code></a>.</p>
+
+<h3><a name="analyze_file_attribute-1">analyze_file_attribute/1</a></h3>
+
+<p><code>analyze_file_attribute(Node::<a href="#type-syntaxTree">syntaxTree()</a>) -> {string(), integer()}</code></p>
+<p>Returns the file name and line number of a <code>file</code>
+  attribute. The result is the pair <code>{File, Line}</code> if
+  <code>Node</code> represents "<code>-file(File, Line).</code>".
+ 
+  <p>The evaluation throws <code>syntax_error</code> if
+  <code>Node</code> does not represent a well-formed <code>file</code>
+  attribute.</p>
+ </p>
+<p>See also: <a href="#analyze_attribute-1"><code>analyze_attribute/1</code></a>.</p>
+
+<h3><a name="analyze_form-1">analyze_form/1</a></h3>
+
+<p><code>analyze_form(Node::<a href="#type-syntaxTree">syntaxTree()</a>) -> {atom(), term()} | atom()</code></p>
+<p>Analyzes a "source code form" node. If <code>Node</code> is a
+  "form" type (cf. <code>erl_syntax:is_form/1</code>), the returned
+  value is a tuple <code>{Type, Info}</code> where <code>Type</code> is
+  the node type and <code>Info</code> depends on <code>Type</code>, as
+  follows:
+  <dl>
+    <dt><code>{attribute, Info}</code></dt>
+ 
+       <dd>where <code>Info = analyze_attribute(Node)</code>.</dd>
+ 
+    <dt><code>{error_marker, Info}</code></dt>
+ 
+  	<dd>where <code>Info =
+  	erl_syntax:error_marker_info(Node)</code>.</dd>
+ 
+    <dt><code>{function, Info}</code></dt>
+ 
+  	    <dd>where <code>Info = analyze_function(Node)</code>.</dd>
+ 
+    <dt><code>{rule, Info}</code></dt>
+ 
+  	    <dd>where <code>Info = analyze_rule(Node)</code>.</dd>
+ 
+    <dt><code>{warning_marker, Info}</code></dt>
+ 
+  	    <dd>where <code>Info =
+  	    erl_syntax:warning_marker_info(Node)</code>.</dd>
+  </dl>
+  For other types of forms, only the node type is returned.
+ 
+  <p>The evaluation throws <code>syntax_error</code> if
+  <code>Node</code> is not well-formed.</p>
+ </p>
+<p>See also: <a href="#analyze_attribute-1"><code>analyze_attribute/1</code></a>, <a href="#analyze_function-1"><code>analyze_function/1</code></a>, <a href="#analyze_rule-1"><code>analyze_rule/1</code></a>, <a href="erl_syntax.html#error_marker_info-1"><code>erl_syntax:error_marker_info/1</code></a>, <a href="erl_syntax.html#is_form-1"><code>erl_syntax:is_form/1</code></a>, <a href="erl_syntax.html#warning_marker_info-1"><code>erl_syntax:warning_marker_info/1</code></a>.</p>
+
+<h3><a name="analyze_forms-1">analyze_forms/1</a></h3>
+
+<p><code>analyze_forms(Forms) -> [{Key, term()}]<ul><li>Forms = <a href="#type-syntaxTree">syntaxTree()</a> | [<a href="#type-syntaxTree">syntaxTree()</a>]</li><li>Key = attributes | errors | exports | functions | imports | module | records | rules | warnings</li></ul></code></p>
+<p>Analyzes a sequence of "program forms". The given
+  <code>Forms</code> may be a single syntax tree of type
+  <code>form_list</code>, or a list of "program form" syntax trees. The
+  returned value is a list of pairs <code>{Key, Info}</code>, where
+  each value of <code>Key</code> occurs at most once in the list; the
+  absence of a particular key indicates that there is no well-defined
+  value for that key.
+ 
+  <p>Each entry in the resulting list contains the following
+  corresponding information about the program forms:
+  <dl>
+      <dt><code>{attributes, Attributes}</code></dt>
+        <dd><ul>
+  	   <li><code>Attributes = [{atom(), term()}]</code></li>
+        </ul>
+  	 <code>Attributes</code> is a list of pairs representing the
+  	 names and corresponding values of all so-called "wild"
+  	 attributes (as e.g. "<code>-compile(...)</code>") occurring in
+  	 <code>Forms</code> (cf. <code>analyze_wild_attribute/1</code>).
+  	 Each name may occur more than once in the list, with possibly
+  	 different values for each occurrence. The order of listing is
+  	 not defined.</dd>
+ 
+      <dt><code>{errors, Errors}</code></dt>
+        <dd><ul>
+  	   <li><code>Errors = [term()]</code></li>
+        </ul>
+  	 <code>Errors</code> is the list of error descriptors of all
+  	 <code>error_marker</code> nodes that occur in
+  	 <code>Forms</code>. The order of listing is not defined.</dd>
+ 
+      <dt><code>{exports, Exports}</code></dt>
+        <dd><ul>
+  	    <li><code>Exports = [FunctionName]</code></li>
+  	    <li><code>FunctionName = atom()
+                     | {atom(), integer()}
+  		      | {ModuleName, FunctionName}</code></li>
+  	    <li><code>ModuleName = atom()</code></li>
+        </ul>
+  	 <code>Exports</code> is a list of representations of those
+  	 function names that are listed by export declaration attributes
+  	 in <code>Forms</code> (cf.
+  	 <code>analyze_export_attribute/1</code>). Note that duplicates
+  	 may occur in the list, and that the order of listing is not
+  	 defined.</dd>
+ 
+      <dt><code>{functions, Functions}</code></dt>
+        <dd><ul>
+  	    <li><code>Functions = [{atom(), integer()}]</code></li>
+        </ul>
+  	 <code>Functions</code> is a list of the names of the functions
+  	 that are defined in <code>Forms</code> (cf.
+  	 <code>analyze_function/1</code>). Note that duplicates may
+  	 occur in the list, and that the order of listing is not
+  	 defined.</dd>
+ 
+      <dt><code>{imports, Imports}</code></dt>
+        <dd><ul>
+  	    <li><code>Imports = [{Module, Names}]</code></li>
+  	    <li><code>Module = atom()</code></li>
+  	    <li><code>Names = [FunctionName]</code></li>
+  	    <li><code>FunctionName = atom()
+                     | {atom(), integer()}
+  		      | {ModuleName, FunctionName}</code></li>
+  	    <li><code>ModuleName = atom()</code></li>
+        </ul>
+  	 <code>Imports</code> is a list of pairs representing those
+  	 module names and corresponding function names that are listed
+  	 by import declaration attributes in <code>Forms</code> (cf.
+  	 <code>analyze_import_attribute/1</code>), where each
+  	 <code>Module</code> occurs at most once in
+  	 <code>Imports</code>. Note that duplicates may occur in the
+  	 lists of function names, and that the order of the lists is not
+  	 defined.</dd>
+ 
+      <dt><code>{module, ModuleName}</code></dt>
+        <dd><ul>
+  	    <li><code>ModuleName = atom()</code></li>
+        </ul>
+  	 <code>ModuleName</code> is the name declared by a module
+  	 attribute in <code>Forms</code>. If the module name is not
+  	 uniquely defined in <code>Forms</code>, the result will contain
+  	 no entry for the <code>module</code> key. Multiple declarations
+  	 using the same name are however allowed.</dd>
+ 
+      <dt><code>{records, Records}</code></dt>
+        <dd><ul>
+  	    <li><code>Records = [{atom(), Fields}]</code></li>
+  	    <li><code>Fields = [{atom(), Default}]</code></li>
+  	    <li><code>Default = none | syntaxTree()</code></li>
+        </ul>
+  	 <code>Records</code> is a list of pairs representing the names
+  	 and corresponding field declarations of all record declaration
+  	 attributes occurring in <code>Forms</code>. For fields declared
+  	 without a default value, the corresponding value for
+  	 <code>Default</code> is the atom <code>none</code> (cf.
+  	 <code>analyze_record_attribute/1</code>). Each record name
+  	 could occur more than once in the list, with possibly different
+  	 fields for each occurrence. The order of listing is not
+  	 defined.</dd>
+ 
+      <dt><code>{rules, Rules}</code></dt>
+        <dd><ul>
+  	    <li><code>Rules = [{atom(), integer()}]</code></li>
+        </ul>
+  	 <code>Rules</code> is a list of the names of the rules that are
+  	 defined in <code>Forms</code> (cf.
+  	 <code>analyze_rule/1</code>). Note that duplicates may occur in
+  	 the list, and that the order of listing is not defined.</dd>
+ 
+      <dt><code>{warnings, Warnings}</code></dt>
+        <dd><ul>
+  	    <li><code>Warnings = [term()]</code></li>
+        </ul>
+  	 <code>Warnings</code> is the list of error descriptors of all
+  	 <code>warning_marker</code> nodes that occur in
+  	 <code>Forms</code>. The order of listing is not defined.</dd>
+  </dl></p>
+ 
+  <p>The evaluation throws <code>syntax_error</code> if an ill-formed
+  Erlang construct is encountered.</p>
+ </p>
+<p>See also: <a href="#analyze_export_attribute-1"><code>analyze_export_attribute/1</code></a>, <a href="#analyze_function-1"><code>analyze_function/1</code></a>, <a href="#analyze_import_attribute-1"><code>analyze_import_attribute/1</code></a>, <a href="#analyze_record_attribute-1"><code>analyze_record_attribute/1</code></a>, <a href="#analyze_rule-1"><code>analyze_rule/1</code></a>, <a href="#analyze_wild_attribute-1"><code>analyze_wild_attribute/1</code></a>, <a href="erl_syntax.html#error_marker_info-1"><code>erl_syntax:error_marker_info/1</code></a>, <a href="erl_syntax.html#warning_marker_info-1"><code>erl_syntax:warning_marker_info/1</code></a>.</p>
+
+<h3><a name="analyze_function-1">analyze_function/1</a></h3>
+
+<p><code>analyze_function(Node::<a href="#type-syntaxTree">syntaxTree()</a>) -> {atom(), integer()}</code></p>
+<p>Returns the name and arity of a function definition. The result
+  is a pair <code>{Name, A}</code> if <code>Node</code> represents a
+  function definition "<code>Name(<em>P_1</em>, ..., <em>P_A</em>) ->
+  ...</code>".
+ 
+  <p>The evaluation throws <code>syntax_error</code> if
+  <code>Node</code> does not represent a well-formed function
+  definition.</p>
+ </p>
+<p>See also: <a href="#analyze_rule-1"><code>analyze_rule/1</code></a>.</p>
+
+<h3><a name="analyze_function_name-1">analyze_function_name/1</a></h3>
+
+<p><code>analyze_function_name(Node::<a href="#type-syntaxTree">syntaxTree()</a>) -> FunctionName<ul><li>FunctionName = atom() | {atom(), integer()} | {ModuleName, FunctionName}</li><li>ModuleName = atom()</li></ul></code></p>
+<p>Returns the function name represented by a syntax tree. If
+  <code>Node</code> represents a function name, such as
+  "<code>foo/1</code>" or "<code>bloggs:fred/2</code>", a uniform
+  representation of that name is returned. Different nestings of arity
+  and module name qualifiers in the syntax tree does not affect the
+  result.
+ 
+  <p>The evaluation throws <code>syntax_error</code> if
+  <code>Node</code> does not represent a well-formed function name.</p></p>
+
+<h3><a name="analyze_implicit_fun-1">analyze_implicit_fun/1</a></h3>
+
+<p><code>analyze_implicit_fun(Node::<a href="#type-syntaxTree">syntaxTree()</a>) -> FunctionName<ul><li>FunctionName = atom() | {atom(), integer()} | {ModuleName, FunctionName}</li><li>ModuleName = atom()</li></ul></code></p>
+<p>Returns the name of an implicit fun expression "<code>fun
+  <em>F</em></code>". The result is a representation of the function
+  name <code>F</code>. (Cf. <code>analyze_function_name/1</code>.)
+ 
+  <p>The evaluation throws <code>syntax_error</code> if
+  <code>Node</code> does not represent a well-formed implicit fun.</p>
+ </p>
+<p>See also: <a href="#analyze_function_name-1"><code>analyze_function_name/1</code></a>.</p>
+
+<h3><a name="analyze_import_attribute-1">analyze_import_attribute/1</a></h3>
+
+<p><code>analyze_import_attribute(Node::<a href="#type-syntaxTree">syntaxTree()</a>) -> {atom(), [FunctionName]}<ul><li>FunctionName = atom() | {atom(), integer()} | {ModuleName, FunctionName}</li><li>ModuleName = atom()</li></ul></code></p>
+<p>Returns the module name and list of function names declared by
+  an import attribute. The returned value is a pair <code>{Module,
+  Names}</code>, where <code>Names</code> is a list of function names
+  declared as imported from the module named by <code>Module</code>.
+  Duplicates may occur in <code>Names</code>, and the order of listing
+  is not defined.
+ 
+  <p>The evaluation throws <code>syntax_error</code> if
+  <code>Node</code> does not represent a well-formed import
+  attribute.</p>
+ </p>
+<p>See also: <a href="#analyze_attribute-1"><code>analyze_attribute/1</code></a>.</p>
+
+<h3><a name="analyze_module_attribute-1">analyze_module_attribute/1</a></h3>
+
+<p><code>analyze_module_attribute(Node::<a href="#type-syntaxTree">syntaxTree()</a>) -> atom()</code></p>
+<p>Returns the module name declared by a module attribute.
+ 
+  <p>The evaluation throws <code>syntax_error</code> if
+  <code>Node</code> does not represent a well-formed module
+  attribute.</p>
+ </p>
+<p>See also: <a href="#analyze_attribute-1"><code>analyze_attribute/1</code></a>.</p>
+
+<h3><a name="analyze_record_attribute-1">analyze_record_attribute/1</a></h3>
+
+<p><code>analyze_record_attribute(Node::<a href="#type-syntaxTree">syntaxTree()</a>) -> {atom(), Fields}<ul><li>Fields = [{atom(), Tree}]</li><li>Tree = none | <a href="#type-syntaxTree">syntaxTree()</a></li></ul></code></p>
+<p>Returns the name and the list of fields of a record declaration
+  attribute. The result is a pair <code>{Name, Fields}</code>, if
+  <code>Node</code> represents "<code>-record(Name, {...}).</code>",
+  where <code>Fields</code> is a list of pairs <code>{Label,
+  Tree}</code> for each field "<code>Label</code>" or "<code>Label =
+  <em>Tree</em></code>" in the declaration, listed in left-to-right
+  order. If no default value is declared, the value for
+  <code>Tree</code> will be the atom <code>none</code> (cf.
+  <code>analyze_record_field/1</code>). Multiple occurrences of the
+  same label could occur in the list, with possibly different values
+  for <code>Tree</code>.
+ 
+  <p>The evaluation throws <code>syntax_error</code> if
+  <code>Node</code> does not represent a well-formed record declaration
+  attribute.</p>
+ </p>
+<p>See also: <a href="#analyze_attribute-1"><code>analyze_attribute/1</code></a>, <a href="#analyze_record_field-1"><code>analyze_record_field/1</code></a>.</p>
+
+<h3><a name="analyze_record_field-1">analyze_record_field/1</a></h3>
+
+<p><code>analyze_record_field(Node::<a href="#type-syntaxTree">syntaxTree()</a>) -> {atom(), Tree}<ul><li>Tree = none | <a href="#type-syntaxTree">syntaxTree()</a></li></ul></code></p>
+<p>Returns the label and value-expression of a record field
+  specifier. The result is a pair <code>{Label, Tree}</code>, if
+  <code>Node</code> represents "<code>Label = <em>Tree</em></code>" or
+  "<code>Label</code>", where in the former case, <code>Tree</code> is
+  a syntax tree, and in the latter case <code>Tree</code> is
+  <code>none</code>.
+ 
+  <p>The evaluation throws <code>syntax_error</code> if
+  <code>Node</code> does not represent a well-formed record field
+  specifier.</p>
+ </p>
+<p>See also: <a href="#analyze_record_attribute-1"><code>analyze_record_attribute/1</code></a>.</p>
+
+<h3><a name="analyze_rule-1">analyze_rule/1</a></h3>
+
+<p><code>analyze_rule(Node::<a href="#type-syntaxTree">syntaxTree()</a>) -> {atom(), integer()}</code></p>
+<p>Returns the name and arity of a Mnemosyne rule. The result is a
+  pair <code>{Name, A}</code> if <code>Node</code> represents a rule
+  "<code>Name(<em>P_1</em>, ..., <em>P_A</em>) :- ...</code>".
+ 
+  <p>The evaluation throws <code>syntax_error</code> if
+  <code>Node</code> does not represent a well-formed Mnemosyne
+  rule.</p>
+ </p>
+<p>See also: <a href="#analyze_function-1"><code>analyze_function/1</code></a>.</p>
+
+<h3><a name="analyze_wild_attribute-1">analyze_wild_attribute/1</a></h3>
+
+<p><code>analyze_wild_attribute(Node::<a href="#type-syntaxTree">syntaxTree()</a>) -> {atom(), term()}</code></p>
+<p>Returns the name and value of a "wild" attribute. The result is
+  the pair <code>{Name, Value}</code>, if <code>Node</code> represents
+  "<code>-Name(Value)</code>".
+ 
+  <p>Note that no checking is done whether <code>Name</code> is a
+  reserved attribute name such as <code>module</code> or
+  <code>export</code>: it is assumed that the attribute is "wild".</p>
+ 
+  <p>The evaluation throws <code>syntax_error</code> if
+  <code>Node</code> does not represent a well-formed wild
+  attribute.</p>
+ </p>
+<p>See also: <a href="#analyze_attribute-1"><code>analyze_attribute/1</code></a>.</p>
+
+<h3><a name="annotate_bindings-1">annotate_bindings/1</a></h3>
+
+<p><code>annotate_bindings(Tree::<a href="#type-syntaxTree">syntaxTree()</a>) -> <a href="#type-syntaxTree">syntaxTree()</a></code></p>
+<p>Adds or updates annotations on nodes in a syntax tree.
+  Equivalent to <code>annotate_bindings(Tree, Bindings)</code> where
+  the top-level environment <code>Bindings</code> is taken from the
+  annotation <code>{env, Bindings}</code> on the root node of
+  <code>Tree</code>. An exception is thrown if no such annotation
+  should exist.
+ </p>
+<p>See also: <a href="#annotate_bindings-2"><code>annotate_bindings/2</code></a>.</p>
+
+<h3><a name="annotate_bindings-2">annotate_bindings/2</a></h3>
+
+<p><code>annotate_bindings(Tree::<a href="#type-syntaxTree">syntaxTree()</a>, Bindings::<a href="#type-ordset">ordset(atom())</a>) -> <a href="#type-syntaxTree">syntaxTree()</a><ul><li><a name="type-ordset">ordset(T)</a> = <a href="ordsets.html#type-ordset">ordsets:ordset(T)</a></li></ul></code></p>
+<p>Adds or updates annotations on nodes in a syntax tree.
+  <code>Bindings</code> specifies the set of bound variables in the
+  environment of the top level node. The following annotations are
+  affected:
+  <ul>
+      <li><code>{env, Vars}</code>, representing the input environment
+      of the subtree.</li>
+ 
+      <li><code>{bound, Vars}</code>, representing the variables that
+      are bound in the subtree.</li>
+ 
+      <li><code>{free, Vars}</code>, representing the free variables in
+      the subtree.</li>
+  </ul>
+  <code>Bindings</code> and <code>Vars</code> are ordered-set lists
+  (cf. module <code>ordsets</code>) of atoms representing variable
+  names.
+ </p>
+<p>See also: <a href="ordsets.html"><code>ordsets</code></a>, <a href="#annotate_bindings-1"><code>annotate_bindings/1</code></a>.</p>
+
+<h3><a name="fold-3">fold/3</a></h3>
+
+<p><code>fold(Function, Start::term(), Tree::<a href="#type-syntaxTree">syntaxTree()</a>) -> term()<ul><li>Function = (<a href="#type-syntaxTree">syntaxTree()</a>, term()) -> term()</li></ul></code></p>
+<p>Folds a function over all nodes of a syntax tree. The result is
+  the value of <code>Function(X1, Function(X2, ... Function(Xn, Start)
+  ... ))</code>, where <code>[X1, X2, ..., Xn]</code> are the nodes of
+  <code>Tree</code> in a post-order traversal.
+ </p>
+<p>See also: <a href="#fold_subtrees-3"><code>fold_subtrees/3</code></a>, <a href="#foldl_listlist-3"><code>foldl_listlist/3</code></a>.</p>
+
+<h3><a name="fold_subtrees-3">fold_subtrees/3</a></h3>
+
+<p><code>fold_subtrees(Function, Start::term(), Tree::<a href="#type-syntaxTree">syntaxTree()</a>) -> term()<ul><li>Function = (<a href="#type-syntaxTree">syntaxTree()</a>, term()) -> term()</li></ul></code></p>
+<p>Folds a function over the immediate subtrees of a syntax tree.
+  This is similar to <code>fold/3</code>, but only on the immediate
+  subtrees of <code>Tree</code>, in left-to-right order; it does not
+  include the root node of <code>Tree</code>.
+ </p>
+<p>See also: <a href="#fold-3"><code>fold/3</code></a>.</p>
+
+<h3><a name="foldl_listlist-3">foldl_listlist/3</a></h3>
+
+<p><code>foldl_listlist(Function, Start::term(), [[term()]]) -> term()<ul><li>Function = (term(), term()) -> term()</li></ul></code></p>
+<p>Like <code>lists:foldl/3</code>, but over a list of lists.
+ </p>
+<p>See also: <a href="#fold-3"><code>fold/3</code></a>, <a href="lists.html#foldl-3"><code>lists:foldl/3</code></a>.</p>
+
+<h3><a name="function_name_expansions-1">function_name_expansions/1</a></h3>
+
+<p><code>function_name_expansions(Names::[Name]) -> [{ShortName, Name}]<ul><li>Name = ShortName | {atom(), Name}</li><li>ShortName = atom() | {atom(), integer()}</li></ul></code></p>
+<p>Creates a mapping from corresponding short names to full
+  function names. Names are represented by nested tuples of atoms and
+  integers (cf. <code>analyze_function_name/1</code>). The result is a
+  list containing a pair <code>{ShortName, Name}</code> for each
+  element <code>Name</code> in the given list, where the corresponding
+  <code>ShortName</code> is the rightmost-innermost part of
+  <code>Name</code>. The list thus represents a finite mapping from
+  unqualified names to the corresponding qualified names.
+ 
+  <p>Note: the resulting list can contain more than one tuple
+  <code>{ShortName, Name}</code> for the same <code>ShortName</code>,
+  possibly with different values for <code>Name</code>, depending on
+  the given list.</p>
+ </p>
+<p>See also: <a href="#analyze_function_name-1"><code>analyze_function_name/1</code></a>.</p>
+
+<h3><a name="is_fail_expr-1">is_fail_expr/1</a></h3>
+
+<p><code>is_fail_expr(Tree::<a href="#type-syntaxTree">syntaxTree()</a>) -> bool()</code></p>
+<p>Returns <code>true</code> if <code>Tree</code> represents an
+  expression which never terminates normally. Note that the reverse
+  does not apply. Currently, the detected cases are calls to
+  <code>exit/1</code>, <code>throw/1</code>,
+  <code>erlang:fault/1</code> and <code>erlang:fault/2</code>.
+ </p>
+<p>See also: <a href="erlang.html#exit-1"><code>erlang:exit/1</code></a>, <a href="erlang.html#fault-1"><code>erlang:fault/1</code></a>, <a href="erlang.html#fault-2"><code>erlang:fault/2</code></a>, <a href="erlang.html#throw-1"><code>erlang:throw/1</code></a>.</p>
+
+<h3><a name="limit-2">limit/2</a></h3>
+
+<p><code>limit(Tree, Depth) -> <a href="#type-syntaxTree">syntaxTree()</a></code></p>
+<p>Equivalent to <code>limit(Tree, Depth, Text)</code> using the
+  text <code>"..."</code> as default replacement.
+ </p>
+<p>See also: <a href="#limit-3"><code>limit/3</code></a>, <a href="erl_syntax.html#text-1"><code>erl_syntax:text/1</code></a>.</p>
+
+<h3><a name="limit-3">limit/3</a></h3>
+
+<p><code>limit(Tree::<a href="#type-syntaxTree">syntaxTree()</a>, Depth::integer(), Node::<a href="#type-syntaxTree">syntaxTree()</a>) -> <a href="#type-syntaxTree">syntaxTree()</a></code></p>
+<p>Limits a syntax tree to a specified depth. Replaces all non-leaf
+  subtrees in <code>Tree</code> at the given <code>Depth</code> by
+  <code>Node</code>. If <code>Depth</code> is negative, the result is
+  always <code>Node</code>, even if <code>Tree</code> has no subtrees.
+ 
+  <p>When a group of subtrees (as e.g., the argument list of an
+  <code>application</code> node) is at the specified depth, and there
+  are two or more subtrees in the group, these will be collectively
+  replaced by <code>Node</code> even if they are leaf nodes. Groups of
+  subtrees that are above the specified depth will be limited in size,
+  as if each subsequent tree in the group were one level deeper than
+  the previous. E.g., if <code>Tree</code> represents a list of
+  integers "<code>[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]</code>", the result
+  of <code>limit(Tree, 5)</code> will represent <code>[1, 2, 3, 4,
+  ...]</code>.</p>
+ 
+  <p>The resulting syntax tree is typically only useful for
+  pretty-printing or similar visual formatting.</p>
+ </p>
+<p>See also: <a href="#limit-2"><code>limit/2</code></a>.</p>
+
+<h3><a name="map-2">map/2</a></h3>
+
+<p><code>map(Function, Tree::<a href="#type-syntaxTree">syntaxTree()</a>) -> <a href="#type-syntaxTree">syntaxTree()</a><ul><li>Function = (<a href="#type-syntaxTree">syntaxTree()</a>) -> <a href="#type-syntaxTree">syntaxTree()</a></li></ul></code></p>
+<p>Applies a function to each node of a syntax tree. The result of
+  each application replaces the corresponding original node. The order
+  of traversal is bottom-up.
+ </p>
+<p>See also: <a href="#map_subtrees-2"><code>map_subtrees/2</code></a>.</p>
+
+<h3><a name="map_subtrees-2">map_subtrees/2</a></h3>
+
+<p><code>map_subtrees(Function, <a href="#type-syntaxTree">syntaxTree()</a>) -> <a href="#type-syntaxTree">syntaxTree()</a><ul><li>Function = (Tree) -> Tree1</li></ul></code></p>
+<p>Applies a function to each immediate subtree of a syntax tree.
+  The result of each application replaces the corresponding original
+  node.
+ </p>
+<p>See also: <a href="#map-2"><code>map/2</code></a>.</p>
+
+<h3><a name="mapfold-3">mapfold/3</a></h3>
+
+<p><code>mapfold(Function, Start::term(), Tree::<a href="#type-syntaxTree">syntaxTree()</a>) -> {<a href="#type-syntaxTree">syntaxTree()</a>, term()}<ul><li>Function = (<a href="#type-syntaxTree">syntaxTree()</a>, term()) -> {<a href="#type-syntaxTree">syntaxTree()</a>, term()}</li></ul></code></p>
+<p>Combines map and fold in a single operation. This is similar to
+  <code>map/2</code>, but also propagates an extra value from each
+  application of the <code>Function</code> to the next, while doing a
+  post-order traversal of the tree like <code>fold/3</code>. The value
+  <code>Start</code> is passed to the first function application, and
+  the final result is the result of the last application.
+ </p>
+<p>See also: <a href="#fold-3"><code>fold/3</code></a>, <a href="#map-2"><code>map/2</code></a>.</p>
+
+<h3><a name="mapfold_subtrees-3">mapfold_subtrees/3</a></h3>
+
+<p><code>mapfold_subtrees(Function, Start::term(), Tree::<a href="#type-syntaxTree">syntaxTree()</a>) -> {<a href="#type-syntaxTree">syntaxTree()</a>, term()}<ul><li>Function = (<a href="#type-syntaxTree">syntaxTree()</a>, term()) -> {<a href="#type-syntaxTree">syntaxTree()</a>, term()}</li></ul></code></p>
+<p>Does a mapfold operation over the immediate subtrees of a syntax
+  tree. This is similar to <code>mapfold/3</code>, but only on the
+  immediate subtrees of <code>Tree</code>, in left-to-right order; it
+  does not include the root node of <code>Tree</code>.
+ </p>
+<p>See also: <a href="#mapfold-3"><code>mapfold/3</code></a>.</p>
+
+<h3><a name="mapfoldl_listlist-3">mapfoldl_listlist/3</a></h3>
+
+<p><code>mapfoldl_listlist(Function, State, [[term()]]) -> {[[term()]], term()}<ul><li>Function = (term(), term()) -> {term(), term()}</li></ul></code></p>
+<p>Like <code>lists:mapfoldl/3</code>, but over a list of lists.
+  The list of lists in the result has the same structure as the given
+  list of lists.</p>
+
+<h3><a name="new_variable_name-1">new_variable_name/1</a></h3>
+
+<p><code>new_variable_name(Used::<a href="#type-set">set(atom())</a>) -> atom()</code></p>
+<p>Returns an atom which is not already in the set
+  <code>Used</code>. This is equivalent to
+  <code>new_variable_name(Function, Used)</code>, where
+  <code>Function</code> maps a given integer <code>N</code> to the atom
+  whose name consists of "<code>V</code>" followed by the numeral for
+  <code>N</code>.
+ </p>
+<p>See also: <a href="#new_variable_name-2"><code>new_variable_name/2</code></a>.</p>
+
+<h3><a name="new_variable_name-2">new_variable_name/2</a></h3>
+
+<p><code>new_variable_name(Function, Used::<a href="#type-set">set(atom())</a>) -> atom()<ul><li>Function = (integer()) -> atom()</li></ul></code></p>
+<p>Returns a user-named atom which is not already in the set
+  <code>Used</code>. The atom is generated by applying the given
+  <code>Function</code> to a generated integer. Integers are generated
+  using an algorithm which tries to keep the names randomly distributed
+  within a reasonably small range relative to the number of elements in
+  the set.
+ 
+  <p>This function uses the module <code>random</code> to generate new
+  keys. The seed it uses may be initialized by calling
+  <code>random:seed/0</code> or <code>random:seed/3</code> before this
+  function is first called.</p>
+ </p>
+<p>See also: <a href="random.html"><code>random</code></a>, <a href="sets.html"><code>sets</code></a>, <a href="#new_variable_name-1"><code>new_variable_name/1</code></a>.</p>
+
+<h3><a name="new_variable_names-2">new_variable_names/2</a></h3>
+
+<p><code>new_variable_names(N::integer(), Used::<a href="#type-set">set(atom())</a>) -> [atom()]</code></p>
+<p>Like <code>new_variable_name/1</code>, but generates a list of
+  <code>N</code> new names.
+ </p>
+<p>See also: <a href="#new_variable_name-1"><code>new_variable_name/1</code></a>.</p>
+
+<h3><a name="new_variable_names-3">new_variable_names/3</a></h3>
+
+<p><code>new_variable_names(N::integer(), Function, Used::<a href="#type-set">set(atom())</a>) -> [atom()]<ul><li>Function = (integer()) -> atom()</li></ul></code></p>
+<p>Like <code>new_variable_name/2</code>, but generates a list of
+  <code>N</code> new names.
+ </p>
+<p>See also: <a href="#new_variable_name-2"><code>new_variable_name/2</code></a>.</p>
+
+<h3><a name="strip_comments-1">strip_comments/1</a></h3>
+
+<p><code>strip_comments(Tree::<a href="#type-syntaxTree">syntaxTree()</a>) -> <a href="#type-syntaxTree">syntaxTree()</a></code></p>
+<p>Removes all comments from all nodes of a syntax tree. All other
+  attributes (such as position information) remain unchanged.</p>
+
+<h3><a name="to_comment-1">to_comment/1</a></h3>
+
+<p><code>to_comment(Tree) -> <a href="#type-syntaxTree">syntaxTree()</a></code></p>
+<p>Equivalent to <a href="#to_comment-2"><code>to_comment(Tree, "% ")</code></a>.</p>
+
+<h3><a name="to_comment-2">to_comment/2</a></h3>
+
+<p><code>to_comment(Tree::<a href="#type-syntaxTree">syntaxTree()</a>, Prefix::string()) -> <a href="#type-syntaxTree">syntaxTree()</a></code></p>
+<p>Equivalent to <code>to_comment(Tree, Prefix, F)</code> for a
+  default formatting function <code>F</code>. The default
+  <code>F</code> simply calls <code>erl_prettypr:format/1</code>.
+ </p>
+<p>See also: <a href="#to_comment-3"><code>to_comment/3</code></a>, <a href="erl_prettypr.html#format-1"><code>erl_prettypr:format/1</code></a>.</p>
+
+<h3><a name="to_comment-3">to_comment/3</a></h3>
+
+<p><code>to_comment(Tree::<a href="#type-syntaxTree">syntaxTree()</a>, Prefix::string(), Printer) -> <a href="#type-syntaxTree">syntaxTree()</a><ul><li>Printer = (<a href="#type-syntaxTree">syntaxTree()</a>) -> string()</li></ul></code></p>
+<p>Transforms a syntax tree into an abstract comment. The lines of
+  the comment contain the text for <code>Node</code>, as produced by
+  the given <code>Printer</code> function. Each line of the comment is
+  prefixed by the string <code>Prefix</code> (this does not include the
+  initial "<code>%</code>" character of the comment line).
+ 
+  <p>For example, the result of
+  <code>to_comment(erl_syntax:abstract([a,b,c]))</code> represents
+  <pre>
+          %% [a,b,c]</pre>
+  (cf. <code>to_comment/1</code>).</p>
+ 
+  <p>Note: the text returned by the formatting function will be split
+  automatically into separate comment lines at each line break. No
+  extra work is needed.</p>
+ </p>
+<p>See also: <a href="#to_comment-1"><code>to_comment/1</code></a>, <a href="#to_comment-2"><code>to_comment/2</code></a>.</p>
+
+<h3><a name="variables-1">variables/1</a></h3>
+
+<p><code>variables(<a href="#type-syntaxTree">syntaxTree()</a>) -> <a href="#type-set">set(atom())</a><ul><li><a name="type-set">set(T)</a> = <a href="sets.html#type-set">sets:set(T)</a></li></ul></code></p>
+<p>Returns the names of variables occurring in a syntax tree, The
+  result is a set of variable names represented by atoms.
+ </p>
+<p>See also: <a href="sets.html"><code>sets</code></a>.</p></body>
+</html>

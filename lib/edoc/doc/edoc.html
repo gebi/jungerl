@@ -1,0 +1,357 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Module edoc</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body bgcolor="white">
+<h1>Module edoc</h1>
+<ul><li>
+<a href="#index">Function index</a></li><li>
+<a href="#exported">Exported functions</a></li></ul>
+
+<h2>Description</h2>
+Erlang program documentation generator.
+ 
+  <p>This program allows you to write the documentation of an Erlang
+  program as comments in the source code itself, using tags on the form
+  "<code>@Name ...</code>".</p>
+ 
+  <p>A tag must be the first thing on a comment line, apart from
+  leading <code>%</code> characters and whitespace. The comment must be
+  between program declarations, and not on the same line as any program
+  text. All following comment text, up to the end of the comment or the
+  next tagged line, is taken as the value of the tag.</p>
+ 
+  <p>Tags are associated with the nearest following program construct
+  "of significance" (module name declarations and function
+  definitions). Other constructs are ignored, e.g.:
+  <pre>
+    %% @doc Prints X.
+ 
+    -record(foo, {x, y, z}).
+ 
+    print(X) -> ...</pre>
+ 
+  associates the <code>@doc</code> tag with the function
+  <code>print/1</code>.</p>
+ 
+  <p>Note that in a comment such as:
+  <pre>
+    % % @doc ...</pre>
+ 
+  the tag is ignored, because only the first <code>%</code> character
+  is considered "leading". This allowes tags to be "commented out".</p>
+ 
+  <h3>Module tags</h3>
+ 
+  <p>The following tags can be used before a module declaration:
+  <dl>
+    <dt><code>@doc</code></dt>
+        <dd>Describes the module, using well-formed XHTML text. The
+        first sentence is used as a summary (see <code>@doc</code>
+        function tags below for details). E.g.:
+  <pre>
+     %% @doc This is a very useful module. It is a ...
+     -module(fred).</pre></dd>
+ 
+    <dt><code>@type</code></dt>
+        <dd>Documents an abstract data type or type alias. The text
+        consists of a type declaration or definition, optionally
+        followed by a period ("<code>.</code>") separator and XHTML
+        text describing the type (i.e., its purpose, use, etc.). The
+        first part has a form such as e.g.
+        "<code>myList(X::integer())</code>" or "<code>mytype() = foo |
+        bar</code>" (for a truly abstract data type, no equivalence is
+        specified), and may be followed by further definitions
+        (generally used for local type variables). Examples:
+  <pre>    %% @type myList(X). A special kind of lists ...</pre>
+  <pre>    %% @type filename() = string(). Atoms not allowed!</pre>
+  <pre>
+    %% @type thing(A) = {thong, A}
+    %%           A = term().
+    %%   A kind of wrapper type thingy.</pre>
+ 
+       All data type descriptions are placed in a separate section of
+       the document, regardless of where the tags are put.</dd>
+ 
+    <dt><code>@end</code></dt>
+        <dd>The text following this tag is always ignored. Use this to
+        mark the end of the previous tag, when necessary, as e.g. in:
+  <pre>
+     %% ----------------------------------
+     %% ...
+     %% @doc ...
+     %% ...
+     %% @end
+     %% ----------------------------------</pre>
+ 
+        to avoid including the last "ruler" line in the
+        <code>@doc</code> tag. <em>Note: using some other "dummy"
+        <code>@</code>-tag for the same purpose might work in a
+        particular implementation of EDoc, but is not guaranteed to.
+        Always use <code>@end</code> to ensure portability.</em></dd>
+ 
+  </dl>
+  </p>
+ 
+  <h3>Function tags</h3>
+ 
+  <p>The following tags can be used before a function definition:
+  <dl>
+    <dt><code>@spec</code></dt>
+        <dd>Used to specify the function type; see below for syntax. If
+        the function name is included in the specification, it must
+        match the name in the actual code.</dd>
+ 
+    <dt><code>@doc</code></dt>
+        <dd>XHTML text describing a function or module. The first
+        sentence of the text is used as a quick summary; this ends at
+        the first period character ("<code>.</code>") that is followed
+        by a whitespace character, a line break, or the end of the tag
+        text, and is not within XML markup.</dd>
+ 
+    <dt><code>@see</code></dt>
+        <dd>Make a reference to another function or module. Allowed
+        forms are "<code>Module</code>", "<code>Function/Arity</code>"
+        and "<code>Module:Function/Arity</code>".</dd>
+ 
+    <dt><code>@equiv</code></dt>
+        <dd>Specify equivalence to another function call/expression.
+        Must be a proper Erlang expression. (Replaces
+        <code>@doc</code>.)</dd>
+ 
+    <dt><code>@type</code></dt>
+        <dd>See module tags above. Placing a <code>@type</code> tag by
+        a function definition may be convenient, but does not affect
+        where the description is placed in the document.</dd>
+ 
+    <dt><code>@end</code></dt>
+        <dd>See module tags above.</dd>
+  </dl>
+  </p>
+ 
+  <h3>Function type specification syntax</h3>
+ 
+  <table valign="top">
+    <tr valign="top">
+      <td><code>Spec</code></td>
+      <td>::=</td>
+      <td><code>Atom FunSpec Defs
+  	   <br>| FunSpec Defs</code></td>
+    </tr>
+    <tr valign="top">
+      <td><code>FunSpec</code></td>
+      <td>::=</td>
+      <td><code>"(" ParamSpecs ? ")" "->" TypeSpec</code></td>
+    </tr>
+    <tr valign="top">
+      <td><code>ParamSpecs</code></td>
+      <td>::=</td>
+      <td><code>ParamSpec
+  	   <br>| ParamSpec "," ParamSpecs</code></td>
+    </tr>
+    <tr valign="top">
+      <td><code>ParamSpec</code></td>
+      <td>::=</td>
+      <td><code>TypeSpec
+  	   <br>| Variable "::" TypeSpec</code></td>
+    </tr>
+    <tr valign="top">
+      <td><code>TypeSpec</code></td>
+      <td>::=</td>
+      <td><code>Type
+  	   <br>| Type "|" TypeSpec
+  	   <br>| Type "+" TypeSpec</code></td>
+    </tr>
+    <tr valign="top">
+      <td><code>Type</code></td>
+      <td>::=</td>
+      <td><code>Variable
+  	   <br>| Atom
+  	   <br>| Integer
+  	   <br>| Float
+  	   <br>| "{" TypeSpecs ? "}"
+  	   <br>| "[" "]"
+  	   <br>| "[" TypeSpec "]"
+  	   <br>| FunSpec
+  	   <br>| Atom "(" TypeSpecs ? ")"
+  	   <br>| Atom ":" Atom "(" TypeSpecs ? ")"</code></td>
+    </tr>
+    <tr valign="top">
+      <td><code>TypeSpecs</code></td>
+      <td>::=</td>
+      <td><code>TypeSpec
+  	   <br>| TypeSpec "," TypeSpecs</code></td>
+    </tr>
+    <tr valign="top">
+      <td><code>Defs</code></td>
+      <td>::=</td>
+      <td><code>""
+  	   <br>| Def Defs</code></td>
+    </tr>
+    <tr valign="top">
+      <td><code>Def</code></td>
+      <td>::=</td>
+      <td><code>Variable "=" TypeSpec
+  	   <br>| Atom "(" TypeSpecs ? ")" "=" TypeSpec</code></td>
+    </tr>
+  </table>
+ 
+  <p>Examples:
+  <pre>    %% @spec my_function(X::integer()) -> integer()</pre>
+  <pre>    %% @spec (X::integer()) -> integer()</pre>
+  <pre>    %% @spec sqrt(float()) -> float()</pre>
+  <pre>    %% @spec pair(S, T) -> {S, T}</pre>
+  <pre>
+    %% @spec append(List, List) -> List
+    %%           List = [term()]</pre>
+  <pre>
+    %% @spec append(A::List, B::List) -> List
+    %%           List = [term()]</pre>
+  <pre>
+    %% @spec open(File::filename()) -> file_descriptor()
+    %%           filename() = string() | atom()</pre>
+  <pre>
+    %% @spec close(graphics:window()) -> ok</pre>
+ 
+  In the above examples, <code>X</code>, <code>A</code>, <code>B</code>
+  and <code>File</code> are parameter names, used for referring to the
+  parameters from the documentation text. The <em>type variables</em>
+  <code>S</code>, <code>T</code> and <code>List</code> are used to
+  simplify the type specifications, and may be supplied with
+  definitions. It is also possible to give definitions for named types,
+  which means that the name is simply an alias. (Use the
+  <code>@type</code> tag to document abstract data types.) If a named
+  type is defined in another module, it can be referred to as
+  <code>Module:TypeName(...)</code>.</p>
+ 
+  <p>If only a type variable is given for a parameter, as in
+  "<code>pair(S, T) -> ...</code>", the same variable name may
+  implicitly be used as the parameter name; there is no need to write
+  "<code>pair(S::S, T::T) -> ...</code>".</p>
+ 
+  <p>Both the "<code>|</code>" and the "<code>+</code>" character may
+  be used to separate alternatives in union types; there is no semantic
+  difference. </p>
+
+<h2><a name="index">Function Index</a></h2>
+
+<table width="100%" border="1"><tr><th colspan="2" align="left">Exported Functions</th></tr>
+<tr><td><a href="#file-1">file/1</a></td><td><a href="#file-2">See <code>file/2</code>.</a></td></tr>
+<tr><td><a href="#file-2">file/2</a></td><td>Reads a source code file and outputs documentation text to a
+  corresponding <code>.html</code>-file.</td></tr>
+<tr><td><a href="#forms-3">forms/3</a></td><td>Like <code>file/2</code>, but operates directly on source code
+  syntax trees, and returns the resulting text instead of writing to a
+  file.</td></tr>
+<tr><td><a href="#forms-4">forms/4</a></td><td>Like <code>forms/3</code>, but first inserts the given comments
+  in the syntax trees.</td></tr>
+<tr><td><a href="#read_comments-1">read_comments/1</a></td><td><a href="#read_comments-2">See <code>read_comments/2</code>.</a></td></tr>
+<tr><td><a href="#read_comments-2">read_comments/2</a></td><td>Extracts comments from an Erlang source code file.</td></tr>
+<tr><td><a href="#read_module-1">read_module/1</a></td><td><a href="#read_module-2">See <code>read_module/2</code>.</a></td></tr>
+<tr><td><a href="#read_module-2">read_module/2</a></td><td>Reads an Erlang source file and returns the list of "source code
+  form" syntax trees.</td></tr>
+</table>
+
+<h2><a name="exported">Exported Functions</a></h2>
+
+<h3><a name="file-1">file/1</a></h3>
+
+<p><code>file(Name) -> ok</code></p>
+<p>Equivalent to <a href="#file-2"><code>file(Name, [])</code></a>.</p>
+
+<h3><a name="file-2">file/2</a></h3>
+
+<p><code>file(File::<a href="#type-filename">filename()</a>, Options::<a href="#type-option_list">option_list()</a>) -> ok<ul><li><a name="type-filename">filename()</a> = <a href="file.html#type-filename">file:filename()</a></li><li><a name="type-option_list">option_list()</a> = [term()]</li></ul></code></p>
+<p>Reads a source code file and outputs documentation text to a
+  corresponding <code>.html</code>-file. Possible options are:
+  <dl>
+   <dt><code>{dir, filename()}</code></dt>
+     <dd>Specifies the output directory for the created file. (By
+     default, the output is written to the directory of the source
+     file.)</dd>
+   <dt><code>{xml_export, atom()}</code></dt>
+     <dd>Specifies the callback module used for formatting the internal
+     XML representation as text; see <code>xmerl</code> for
+     details. The default is <code>xmerl_html</code>.</dd>
+   <dt><code>{index_columns, integer()}</code></dt>
+     <dd>Specifies the number of column pairs used for the function
+     index tables. The default value is 1.</dd>
+   <dt><code>{stylesheet, string() | none}</code></dt>
+     <dd>Specifies the name of the stylesheet file used. If the value
+     is <code>none</code>, no stylesheet link will be generated.</dd>
+   <dt><code>{preprocess, bool()}</code></dt>
+     <dd>If the value is <code>true</code>, the source file will be
+     read via the Erlang preprocessor (<code>epp</code>). The default
+     value is <code>false</code>. Normally, preprocessing is not
+     necessary for EDoc to work, but if a file contains too exotic
+     definitions or uses of macros, it will not be possible to read it
+     without preprocessing. <em>Note: comments in included files will
+     not be available to EDoc.</em></dd>
+   <dt><code>{includes, [string()]}</code></dt>
+     <dd>Specifies a list of directory names to be searched for include
+     files, if the <code>preprocess</code> option is turned on. The
+     default value is the empty list. The directory of the source file
+     is always automatically appended to the search path.</dd>
+   <dt><code>{macros, [{atom(), term()}]}</code></dt>
+     <dd>Specifies a list of pre-defined preprocessor macro
+     definitions, used if the <code>preprocess</code> option is turned
+     on. The default value is the empty list.</dd>
+  </dl></p>
+<p>See also: <a href="epp.html"><code>epp</code></a>, <a href="xmerl.html"><code>xmerl</code></a>, <a href="#forms-3"><code>forms/3</code></a>.</p>
+
+<h3><a name="forms-3">forms/3</a></h3>
+
+<p><code>forms(Forms, File::<a href="#type-filename">filename()</a>, Options::<a href="#type-option_list">option_list()</a>) -> string()<ul><li>Forms = <a href="#type-syntaxTree">syntaxTree()</a> | [<a href="#type-syntaxTree">syntaxTree()</a>]</li></ul></code></p>
+<p>Like <code>file/2</code>, but operates directly on source code
+  syntax trees, and returns the resulting text instead of writing to a
+  file. The given <code>Forms</code> must be a single syntax tree of
+  type <code>form_list</code>, or a list of syntax trees representing
+  "program forms". The syntax trees are assumed to be already annotated
+  with comments (cf. <code>forms/4</code>). The <code>File</code>
+  argument is used for error reporting and output file name generation
+  only.
+ </p>
+<p>See also: <a href="erl_recomment.html"><code>erl_recomment</code></a>, <a href="#file-2"><code>file/2</code></a>, <a href="#forms-4"><code>forms/4</code></a>.</p>
+
+<h3><a name="forms-4">forms/4</a></h3>
+
+<p><code>forms(Forms, Comments::[<a href="#type-comment">comment()</a>], File::<a href="#type-filename">filename()</a>, Options::<a href="#type-option_list">option_list()</a>) -> string()<ul><li>Forms = <a href="#type-syntaxTree">syntaxTree()</a> | [<a href="#type-syntaxTree">syntaxTree()</a>]</li></ul></code></p>
+<p>Like <code>forms/3</code>, but first inserts the given comments
+  in the syntax trees. <code>Forms</code> must be a single syntax tree
+  of type <code>form_list</code>, or a list of syntax trees
+  representing "program forms". The syntax trees must contain valid
+  position information. (Cf. <code>read_comments/2</code>.)
+ </p>
+<p>See also: <a href="#forms-3"><code>forms/3</code></a>, <a href="#read_comments-2"><code>read_comments/2</code></a>, <a href="#read_module-2"><code>read_module/2</code></a>.</p>
+
+<h3><a name="read_comments-1">read_comments/1</a></h3>
+
+<p><code>read_comments(File) -> [<a href="#type-comment">comment()</a>]</code></p>
+<p>Equivalent to <a href="#read_comments-2"><code>read_comments(File, [])</code></a>.</p>
+
+<h3><a name="read_comments-2">read_comments/2</a></h3>
+
+<p><code>read_comments(File::<a href="#type-filename">filename()</a>, Options::<a href="#type-option_list">option_list()</a>) -> [<a href="#type-comment">comment()</a>]<ul><li><a name="type-comment">comment()</a> = {Line, Column, Indentation, Text}</li><li>Line = integer()</li><li>Column = integer()</li><li>Indentation = integer()</li><li>Text = [string()]</li></ul></code></p>
+<p>Extracts comments from an Erlang source code file. See the
+  module <code>erl_comment_scan</code> for details on the
+  representation of comments.
+ 
+  <p>Currently, no options are avaliable.</p>
+ </p>
+<p>See also: <a href="erl_comment_scan.html"><code>erl_comment_scan</code></a>.</p>
+
+<h3><a name="read_module-1">read_module/1</a></h3>
+
+<p><code>read_module(File) -> [<a href="#type-syntaxTree">syntaxTree()</a>]</code></p>
+<p>Equivalent to <a href="#read_module-2"><code>read_module(File, [])</code></a>.</p>
+
+<h3><a name="read_module-2">read_module/2</a></h3>
+
+<p><code>read_module(File::<a href="#type-filename">filename()</a>, Options::<a href="#type-option_list">option_list()</a>) -> [<a href="#type-syntaxTree">syntaxTree()</a>]<ul><li><a name="type-syntaxTree">syntaxTree()</a> = <a href="erl_syntax.html#type-syntaxTree">erl_syntax:syntaxTree()</a></li></ul></code></p>
+<p>Reads an Erlang source file and returns the list of "source code
+  form" syntax trees. See <code>file/2</code> for options pertaining to
+  reading source code files.
+ </p>
+<p>See also: <a href="erl_syntax.html"><code>erl_syntax</code></a>, <a href="#file-2"><code>file/2</code></a>.</p></body>
+</html>

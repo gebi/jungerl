@@ -1,0 +1,33 @@
+
+		EDoc 0.1
+		--------
+
+(See edoc.html for the full documentation.)
+
+EDoc lets you write the documentation of an Erlang program as comments
+in the source code, using Javadoc-style tags and XHTML markup.
+
+This program is still in the early beta stages, but is already quite
+usable. Some parts of the syntax for certain tags may be subject to
+changes, but most of the current interface and syntax can be regarded as
+stable. For example, the whole of the syntax_tools package (v. 1.2) has
+been documented using EDoc, as well as of course EDoc itself.
+
+EDoc requires syntax_tools 1.2 and xmerl 0.17, or later versions; these
+can be downloaded from www.erlang.org.
+
+Ideas and help are welcome; the time I have available for hacking on
+EDoc is rather limited, so don't expect me to implement your favourite
+ideas while you are waiting - you are welcome to do it yourselves.
+However, I don't want features to be added in a too ad-hoc way - this
+should be a great tool that can be used by every Erlang programmer, and
+features that don't work well will get thrown out without any mercy on
+the poor sods that are already using them.
+
+A prototype style sheet "stylesheet.css" for EDoc-generated HTML files
+is included in the distribution. This is also open for improvements.
+
+Enjoy!
+
+	Richard Carlsson
+	richardc@csd.uu.se

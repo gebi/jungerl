@@ -6,7 +6,7 @@
 -module(video_mpeg).
 
 -include("erl_img.hrl").
--inlcude("api.hrl").
+-include("api.hrl").
 
 magic(_) -> false.
 

@@ -10,7 +10,7 @@ OBJS = 	$(EBIN)/image_bmp.beam \
 	$(EBIN)/image_jpeg.beam \
 	$(EBIN)/image_tiff.beam \
 	$(EBIN)/image_undef.beam \
-	$(EBIN)/video_mpg.beam \
+	$(EBIN)/video_mpeg.beam \
 	$(EBIN)/exif.beam \
 	$(EBIN)/lzw.beam \
 	$(EBIN)/zlib.beam \

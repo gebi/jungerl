@@ -81,7 +81,8 @@ magic_info(File) ->
 	    file:close(Fd),
 	    case Res of 
 		{ok,IMG} ->
-		    {ok,IMG#erl_image { filename = File }};
+		    {ok,IMG#erl_image { filename = File,
+					name = filename:basename(File) }};
 		Error ->
 		    Error
 	    end;
@@ -168,7 +169,7 @@ dir_info(Dir) ->
     end.
 
 dir_list([File|Fs], Dir) ->
-    case read_magic_info(filename:join(Dir, File)) of
+    case read_file_info(filename:join(Dir, File)) of
 	{ok,IMG} ->
 	    [IMG|dir_list(Fs, Dir)];
 	Error ->

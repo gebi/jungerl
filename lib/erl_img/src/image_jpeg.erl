@@ -12,7 +12,8 @@
 -include("exif.hrl").
 
 -include("api.hrl").
-
+%% -define(debug, true).
+-include("dbg.hrl").
 
 %% YCbCr => RGB
 -define(R(Y,Cb,Cr), (Y + (1.402)*((Cr)-128))).
@@ -121,45 +122,83 @@ process_sofn(<<Depth:8,Height:16,Width:16,Components:8,Bin/binary>>, IMG) ->
 
 %% Maker OLYMP
 collect_olymp(Fd, T, St) ->
-    Key = image_file:hex16(T#tiff_entry.tag),
-    io:format("OLYMP(~s) ~p ~p ~p\n", 
-	      [T#tiff_entry.ifd,Key,T#tiff_entry.type, T#tiff_entry.value]),
+    Key = erl_img:hex16(T#tiff_entry.tag),
+    ?dbg("OLYMP(~s) ~p ~p ~p\n", 
+	[T#tiff_entry.ifd,Key,T#tiff_entry.type, T#tiff_entry.value]),
     St.
 
 %% Maker Nikon
 collect_nikon(Fd, T, St) ->
-    Key = image_file:hex16(T#tiff_entry.tag),
-    io:format("Nikon(~s) ~p ~p ~p\n", 
-	      [T#tiff_entry.ifd,Key,T#tiff_entry.type, T#tiff_entry.value]),
+    Key = erl_img:hex16(T#tiff_entry.tag),
+    ?dbg("Nikon(~s) ~p ~p ~p\n", 
+	[T#tiff_entry.ifd,Key,T#tiff_entry.type, T#tiff_entry.value]),
     St.
 
 %% Maker FUJIFILM
 collect_fujifilm(Fd, T, St) ->
-    Key = image_file:hex16(T#tiff_entry.tag),
-    io:format("Fujifilm(~s) ~p ~p ~p\n", 
-	      [T#tiff_entry.ifd,Key,T#tiff_entry.type, T#tiff_entry.value]),
+    Key = erl_img:hex16(T#tiff_entry.tag),
+    ?dbg("Fujifilm(~s) ~p ~p ~p\n", 
+	[T#tiff_entry.ifd,Key,T#tiff_entry.type, T#tiff_entry.value]),
     St.
 
 %% Maker Sony DSC
 collect_sony(Fd, T, St) ->
-    Key = image_file:hex16(T#tiff_entry.tag),
-    io:format("Sony(~s) ~p ~p ~p\n", 
-	      [T#tiff_entry.ifd,Key,T#tiff_entry.type, T#tiff_entry.value]),
+    Key = erl_img:hex16(T#tiff_entry.tag),
+    ?dbg("Sony(~s) ~p ~p ~p\n", 
+	[T#tiff_entry.ifd,Key,T#tiff_entry.type, T#tiff_entry.value]),
     St.    
 
 %% Maker other
-collect_maker(Fd, T, St) ->
-    Key = image_file:hex16(T#tiff_entry.tag),
-    io:format("Maker(~s) ~p ~p ~p\n", 
-	      [T#tiff_entry.ifd,Key,T#tiff_entry.type, T#tiff_entry.value]),
+collect_other(Fd, T, St) ->
+    Key = erl_img:hex16(T#tiff_entry.tag),
+    ?dbg("Maker(~s) ~p ~p ~p\n", 
+	[T#tiff_entry.ifd,Key,T#tiff_entry.type, T#tiff_entry.value]),
     St.
 
+collect_maker(Fd, T, St) ->
+    {ok, St}.
+
+collect_maker_fixme(Fd, T, St) ->
+    ?dbg("Tif entry=~p\n", [T]),
+    MakerBin = T#tiff_entry.value,
+    case MakerBin of
+	<<"OLYMP",0,1,0,_/binary>> ->
+	    image_tiff:scan_ifd(Fd,
+				[$0,$:|T#tiff_entry.ifd],
+				T#tiff_entry.offs+8,
+				T#tiff_entry.endian,
+				fun collect_olymp/3, St);
+	<<"Nikon",0,1,0,_/binary>> ->
+	    image_tiff:scan_ifd(Fd,
+				[$0,$:|T#tiff_entry.ifd],
+				T#tiff_entry.offs+8,
+				T#tiff_entry.endian,
+				fun collect_nikon/3, St);
+	<<"SONY DSC ",0,0,0,_/binary>> ->
+	    %% NOT working - what is SONY doing ?
+	    image_tiff:scan_ifd(Fd,
+				[$0,$:|T#tiff_entry.ifd],
+				T#tiff_entry.offs+14,
+				T#tiff_entry.endian,
+				fun collect_sony/3, St);
+	<<"FUJIFILM",Offset:32/little>> ->
+	    image_tiff:scan_ifd_bin(MakerBin, 
+				    [$0,$:|T#tiff_entry.ifd],
+				    Offset, little,
+				    fun collect_fujifilm/3, St);
+	_ ->
+	    image_tiff:scan_ifd(Fd,
+				[$0,$:|T#tiff_entry.ifd],
+				T#tiff_entry.offs+8,
+				T#tiff_entry.endian,
+				fun collect_other/3, St)
+    end.
 
 
 collect_exif(Fd, T, St) ->
-    Key = image_exif:decode_tag(T#tiff_entry.tag),
-    io:format("EXIF(~s) ~p ~p ~p\n", 
-	      [T#tiff_entry.ifd,Key,T#tiff_entry.type, T#tiff_entry.value]),
+    Key = exif:decode_tag(T#tiff_entry.tag),
+    ?dbg("EXIF(~s) ~p ~p ~p\n", 
+	[T#tiff_entry.ifd,Key,T#tiff_entry.type, T#tiff_entry.value]),
     case T#tiff_entry.tag of
 	?ExifInteroperabilityOffset ->
 	    [Offset] = T#tiff_entry.value,
@@ -173,42 +212,7 @@ collect_exif(Fd, T, St) ->
 		    St
 	    end;
 	?MakerNote ->
-	    MakerBin = T#tiff_entry.value,
-	    %% FIXME:
-	    MakerRes = 
-		case MakerBin of
-		    <<"OLYMP",0,1,0,_/binary>> ->
-			image_tiff:scan_ifd(Fd,
-					    [$0,$:|T#tiff_entry.ifd],
-					    T#tiff_entry.offs+8,
-					    T#tiff_entry.endian,
-					    fun collect_olymp/3, St);
-		    <<"Nikon",0,1,0,_/binary>> ->
-			image_tiff:scan_ifd(Fd,
-					    [$0,$:|T#tiff_entry.ifd],
-					    T#tiff_entry.offs+8,
-					    T#tiff_entry.endian,
-					    fun collect_nikon/3, St);
-		    <<"SONY DSC ",0,0,0,_/binary>> ->
-			%% NOT working - what is SONY doing ?
-			image_tiff:scan_ifd(Fd,
-					    [$0,$:|T#tiff_entry.ifd],
-					    T#tiff_entry.offs+14,
-					    T#tiff_entry.endian,
-					    fun collect_sony/3, St);
-		    <<"FUJIFILM",Offset:32/little>> ->
-			image_tiff:scan_ifd_bin(MakerBin, 
-						[$0,$:|T#tiff_entry.ifd],
-						Offset, little,
-						fun collect_fujifilm/3, St);
-		    _ ->
-			image_tiff:scan_ifd(Fd,
-					    [$0,$:|T#tiff_entry.ifd],
-					    T#tiff_entry.offs+8,
-					    T#tiff_entry.endian,
-					    fun collect_maker/3, St)
-		end,
-	    case MakerRes of
+	    case collect_maker(Fd, T, St) of
 		{ok,St1} ->
 		    St1;
 		Error ->
@@ -222,8 +226,8 @@ collect_exif(Fd, T, St) ->
 %% Image info collector functions
 collect_tiff(Fd, T, St) ->
     Key = image_tiff:decode_tag(T#tiff_entry.tag),
-    io:format("TIFF(~s) ~p ~p ~p\n", 
-	      [T#tiff_entry.ifd,Key,T#tiff_entry.type, T#tiff_entry.value]),
+    ?dbg("TIFF(~s) ~p ~p ~p\n", 
+	[T#tiff_entry.ifd,Key,T#tiff_entry.type, T#tiff_entry.value]),
     case T#tiff_entry.tag of
 	?ImageWidth ->
 	    [Width] = T#tiff_entry.value,

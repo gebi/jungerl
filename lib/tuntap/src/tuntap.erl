@@ -68,7 +68,7 @@ open_tuntap(Type, Dev) ->
 	     end,
     open_port({spawn, "tun_drv "++TypeName++DevArg}, [binary]).
 
-%% Returns: {ok, Device}
+%% Returns: string() (e.g. "tun0" or "tap42")
 device_name(Port) ->
     [?REPLY_OK|Name] = erlang:port_control(Port, ?REQUEST_GET_DEVICE, []),
     Name.

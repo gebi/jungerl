@@ -1,0 +1,21 @@
+Cellicium contribution (http://www.cellicium.com/erlang/contribs/)
+
+gregexp: Regular expressions with submatches
+
+This module extends the regexp module in OTP R7B-1 with support for submatches
+(the \(...\) syntax in SED regular expressions). This makes it possible to
+retrieve several components of a match with a single evaluation of a regexp.
+For example:
+
+    Eshell V5.0.1.1  (abort with ^G)
+    1> RE_URL="\\(.+\\)://\\(.+\\)\\(/.+\\)(\\?\\(.*\\)(&\\(.*\\))*)?".
+    "\\(.+\\)://\\(.+\\)\\(/.+\\)(\\?\\(.*\\)(&\\(.*\\))*)?"
+  
+    2> gregexp:groups("http://localhost:81/script?arg", RE_URL).
+    {match,["http","localhost:81","/script","arg"]}
+  
+    3> gregexp:groups("http://localhost:81/script?arg&arg2&arg3", RE_URL).
+    {match,["http","localhost:81","/script","arg","arg2","arg3"]}
+      
+
+Initially comes from: gregexp-1.9.2.tar.gz

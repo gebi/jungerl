@@ -1,0 +1,202 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Module edoc_lib</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body bgcolor="white">
+<h1>Module edoc_lib</h1>
+Utility functions for EDoc.<p>Copyright © 2001-2003 Richard Carlsson</p>
+<ul><li><a href="#description">Description</a></li><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul><p><b>Authors:</b> Richard Carlsson (<a href="mailto:richardc@csd.uu.se"><tt>richardc@csd.uu.se</tt></a>).</p>
+<p><b>See also:</b> <a href="edoc.html">edoc</a>.</p>
+<h2><a name="description">Description</a></h2>Utility functions for EDoc.
+<h2><a name="types">Data Types</a></h2>
+
+<h3><a name="type-edoc_env">edoc_env()</a></h3>
+<p><b>abstract datatype</b>: <tt>edoc_env()</tt></p>
+<p>Environment information needed by EDoc for
+  generating references. The data representation is not documented.
+ </p>
+
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1"><tr><td valign="top"><a href="#copy_dir-2">copy_dir/2</a></td><td/></tr>
+<tr><td valign="top"><a href="#copy_file-2">copy_file/2</a></td><td/></tr>
+<tr><td valign="top"><a href="#count-2">count/2</a></td><td/></tr>
+<tr><td valign="top"><a href="#escape_uri-1">escape_uri/1</a></td><td/></tr>
+<tr><td valign="top"><a href="#filename-1">filename/1</a></td><td/></tr>
+<tr><td valign="top"><a href="#find_doc_dirs-0">find_doc_dirs/0</a></td><td/></tr>
+<tr><td valign="top"><a href="#find_file-3">find_file/3</a></td><td/></tr>
+<tr><td valign="top"><a href="#find_sources-2">find_sources/2</a></td><td/></tr>
+<tr><td valign="top"><a href="#find_sources-3">find_sources/3</a></td><td>See <a href="edoc.html#run-3"><code>edoc:run/3</code></a> for a description of the options
+  <code>subpackages</code>, <code>source_suffix</code> and <code>exclude_packages</code>.</td></tr>
+<tr><td valign="top"><a href="#get_doc_env-1">get_doc_env/1</a></td><td><p>Equivalent to <a href="#get_doc_env-4"><tt>get_doc_env([], [], [], Opts)</tt></a>.</p>
+</td></tr>
+<tr><td valign="top"><a href="#get_doc_env-4">get_doc_env/4</a></td><td>Creates an environment data structure used by parts of EDoc for
+  generating references, etc.</td></tr>
+<tr><td valign="top"><a href="#get_first_sentence-1">get_first_sentence/1</a></td><td/></tr>
+<tr><td valign="top"><a href="#is_name-1">is_name/1</a></td><td/></tr>
+<tr><td valign="top"><a href="#is_relative_uri-1">is_relative_uri/1</a></td><td/></tr>
+<tr><td valign="top"><a href="#is_space-1">is_space/1</a></td><td/></tr>
+<tr><td valign="top"><a href="#join_uri-2">join_uri/2</a></td><td/></tr>
+<tr><td valign="top"><a href="#lines-1">lines/1</a></td><td/></tr>
+<tr><td valign="top"><a href="#read_info_file-1">read_info_file/1</a></td><td/></tr>
+<tr><td valign="top"><a href="#run_doclet-2">run_doclet/2</a></td><td>See <a href="edoc.html#run-3"><code>edoc:run/3</code></a> for a description of the <code>doclet</code> option.</td></tr>
+<tr><td valign="top"><a href="#run_layout-2">run_layout/2</a></td><td>See <a href="edoc.html#layout-2"><code>edoc:layout/2</code></a> for a description of the <code>layout</code>
+  option.</td></tr>
+<tr><td valign="top"><a href="#segment-2">segment/2</a></td><td/></tr>
+<tr><td valign="top"><a href="#simplify_path-1">simplify_path/1</a></td><td/></tr>
+<tr><td valign="top"><a href="#split_at-2">split_at/2</a></td><td/></tr>
+<tr><td valign="top"><a href="#split_at_stop-1">split_at_stop/1</a></td><td/></tr>
+<tr><td valign="top"><a href="#strip_space-1">strip_space/1</a></td><td/></tr>
+<tr><td valign="top"><a href="#transpose-1">transpose/1</a></td><td/></tr>
+<tr><td valign="top"><a href="#try_subdir-2">try_subdir/2</a></td><td/></tr>
+<tr><td valign="top"><a href="#unique-1">unique/1</a></td><td/></tr>
+<tr><td valign="top"><a href="#uri_get-1">uri_get/1</a></td><td/></tr>
+<tr><td valign="top"><a href="#write_file-3">write_file/3</a></td><td>Write the given <code>Text</code> to the file named by <code>Name</code> in directory
+  <code>Dir</code>.</td></tr>
+<tr><td valign="top"><a href="#write_file-4">write_file/4</a></td><td>Like <a href="#write_file-3"><code>write_file/3</code></a>, but adds path components to the target
+  directory corresponding to the specified package.</td></tr>
+<tr><td valign="top"><a href="#write_info_file-4">write_info_file/4</a></td><td/></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3><a name="copy_dir-2">copy_dir/2</a></h3>
+<tt>copy_dir(From, To) -&gt; term()
+</tt>
+
+<h3><a name="copy_file-2">copy_file/2</a></h3>
+<tt>copy_file(From, To) -&gt; term()
+</tt>
+
+<h3><a name="count-2">count/2</a></h3>
+<tt>count(X, Xs) -&gt; term()
+</tt>
+
+<h3><a name="escape_uri-1">escape_uri/1</a></h3>
+<tt>escape_uri(Cs) -&gt; term()
+</tt>
+
+<h3><a name="filename-1">filename/1</a></h3>
+<tt>filename(T) -&gt; term()
+</tt>
+
+<h3><a name="find_doc_dirs-0">find_doc_dirs/0</a></h3>
+<tt>find_doc_dirs() -&gt; term()
+</tt>
+
+<h3><a name="find_file-3">find_file/3</a></h3>
+<tt>find_file(Ps, Pkg, Name) -&gt; term()
+</tt>
+
+<h3><a name="find_sources-2">find_sources/2</a></h3>
+<tt>find_sources(Path, Opts) -&gt; term()
+</tt>
+
+<h3><a name="find_sources-3">find_sources/3</a></h3>
+<tt>find_sources(Path, Pkg, Opts) -&gt; term()
+</tt><p>See <a href="edoc.html#run-3"><code>edoc:run/3</code></a> for a description of the options
+  <code>subpackages</code>, <code>source_suffix</code> and <code>exclude_packages</code>.</p>
+
+<h3><a name="get_doc_env-1">get_doc_env/1</a></h3>
+<p><tt>get_doc_env(Options::<a href="edoc.html#type-option_list">edoc:option_list()</a>) -&gt; <a href="#type-edoc_env">edoc_env()</a></tt></p>
+<p>Equivalent to <a href="#get_doc_env-4"><tt>get_doc_env([], [], [], Opts)</tt></a>.</p>
+
+
+<h3><a name="get_doc_env-4">get_doc_env/4</a></h3>
+<p><tt>get_doc_env(App, Packages, Modules, Options::<a href="edoc.html#type-option_list">edoc:option_list()</a>) -&gt; <a href="#type-edoc_env">edoc_env()</a></tt>
+<ul><li><tt>App = [] | atom()</tt></li><li><tt>Packages = [atom()]</tt></li><li><tt>Modules = [atom()]</tt></li></ul></p>
+<p>Creates an environment data structure used by parts of EDoc for
+  generating references, etc. See <a href="edoc.html#run-3"><code>edoc:run/3</code></a> for a description
+  of the options <code>file_suffix</code>, <code>app_default</code> and <code>doc_path</code>.
+ </p>
+<p><b>See also:</b> <a href="edoc.html#get_doc-3">edoc:get_doc/3</a>, <a href="edoc_extract.html#source-4">edoc_extract:source/4</a>.</p>
+
+<h3><a name="get_first_sentence-1">get_first_sentence/1</a></h3>
+<tt>get_first_sentence(Es) -&gt; term()
+</tt>
+
+<h3><a name="is_name-1">is_name/1</a></h3>
+<tt>is_name(Cs) -&gt; term()
+</tt>
+
+<h3><a name="is_relative_uri-1">is_relative_uri/1</a></h3>
+<tt>is_relative_uri(Cs) -&gt; term()
+</tt>
+
+<h3><a name="is_space-1">is_space/1</a></h3>
+<tt>is_space(Cs) -&gt; term()
+</tt>
+
+<h3><a name="join_uri-2">join_uri/2</a></h3>
+<tt>join_uri(Base, Path) -&gt; term()
+</tt>
+
+<h3><a name="lines-1">lines/1</a></h3>
+<tt>lines(Cs) -&gt; term()
+</tt>
+
+<h3><a name="read_info_file-1">read_info_file/1</a></h3>
+<tt>read_info_file(Dir) -&gt; term()
+</tt>
+
+<h3><a name="run_doclet-2">run_doclet/2</a></h3>
+<tt>run_doclet(Fun, Opts) -&gt; term()
+</tt><p>See <a href="edoc.html#run-3"><code>edoc:run/3</code></a> for a description of the <code>doclet</code> option.</p>
+
+<h3><a name="run_layout-2">run_layout/2</a></h3>
+<tt>run_layout(Fun, Opts) -&gt; term()
+</tt><p>See <a href="edoc.html#layout-2"><code>edoc:layout/2</code></a> for a description of the <code>layout</code>
+  option.</p>
+
+<h3><a name="segment-2">segment/2</a></h3>
+<tt>segment(Es, N) -&gt; term()
+</tt>
+
+<h3><a name="simplify_path-1">simplify_path/1</a></h3>
+<tt>simplify_path(P) -&gt; term()
+</tt>
+
+<h3><a name="split_at-2">split_at/2</a></h3>
+<tt>split_at(Cs, K) -&gt; term()
+</tt>
+
+<h3><a name="split_at_stop-1">split_at_stop/1</a></h3>
+<tt>split_at_stop(Cs) -&gt; term()
+</tt>
+
+<h3><a name="strip_space-1">strip_space/1</a></h3>
+<tt>strip_space(Cs) -&gt; term()
+</tt>
+
+<h3><a name="transpose-1">transpose/1</a></h3>
+<tt>transpose(Xss) -&gt; term()
+</tt>
+
+<h3><a name="try_subdir-2">try_subdir/2</a></h3>
+<tt>try_subdir(Dir, Subdir) -&gt; term()
+</tt>
+
+<h3><a name="unique-1">unique/1</a></h3>
+<tt>unique(Xs) -&gt; term()
+</tt>
+
+<h3><a name="uri_get-1">uri_get/1</a></h3>
+<tt>uri_get(URI) -&gt; term()
+</tt>
+
+<h3><a name="write_file-3">write_file/3</a></h3>
+<p><tt>write_file(Text::deep_string(), Dir::<a href="edoc.html#type-filename">edoc:filename()</a>, Name::<a href="edoc.html#type-filename">edoc:filename()</a>) -&gt; ok</tt></p>
+<p>Write the given <code>Text</code> to the file named by <code>Name</code> in directory
+  <code>Dir</code>. If the target directory does not exist, it will be created.</p>
+
+<h3><a name="write_file-4">write_file/4</a></h3>
+<p><tt>write_file(Text::deep_string(), Dir::<a href="edoc.html#type-filename">edoc:filename()</a>, Name::<a href="edoc.html#type-filename">edoc:filename()</a>, Package::atom() | string()) -&gt; ok</tt></p>
+<p>Like <a href="#write_file-3"><code>write_file/3</code></a>, but adds path components to the target
+  directory corresponding to the specified package.</p>
+
+<h3><a name="write_info_file-4">write_info_file/4</a></h3>
+<tt>write_info_file(App, Packages, Modules, Dir) -&gt; term()
+</tt>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Module edoc_layout</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body bgcolor="white">
+<h1>Module edoc_layout</h1>
+The standard HTML layout module for EDoc.<p>Copyright © 2001-2002 Richard Carlsson</p>
+<ul><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul><p><b>Authors:</b> Richard Carlsson (<a href="mailto:richardc@csd.uu.se"><tt>richardc@csd.uu.se</tt></a>).</p>
+<p><b>See also:</b> <a href="edoc.html">edoc</a>.</p>
+<h2><a name="description">Description</a></h2>The standard HTML layout module for EDoc. See the <a href="edoc.html"><code>edoc</code></a>
+  module for details on usage.
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1"><tr><td valign="top"><a href="#module-2">module/2</a></td><td>The layout function.</td></tr>
+<tr><td valign="top"><a href="#overview-2">overview/2</a></td><td/></tr>
+<tr><td valign="top"><a href="#package-2">package/2</a></td><td/></tr>
+<tr><td valign="top"><a href="#type-1">type/1</a></td><td/></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3><a name="module-2">module/2</a></h3>
+<tt>module(Element, Options) -&gt; term()
+</tt><p>The layout function.
+ 
+  <p>Options to the standard layout:
+  <dl>
+   <dt><code>{index_columns, integer()}</code>
+   </dt>
+   <dd>Specifies the number of column pairs used for the function
+       index tables. The default value is 1.
+   </dd>
+   <dt><code>{stylesheet, string()}</code>
+   </dt>
+   <dd>Specifies the URI used for referencing the stylesheet. The
+       default value is <code>"stylesheet.css"</code>. If an empty string is
+       specified, no stylesheet reference will be generated.
+   </dd>
+   <dt><code>{xml_export, Module::atom()}</code>
+   </dt>
+   <dd>Specifies an <a href="/usr/local/home/richardc/hipe/otp/lib/xmerl/doc/index.html" target="_top"><code>xmerl</code></a> callback module to be
+       used for exporting the documentation. See <a href="/usr/local/home/richardc/hipe/otp/lib/xmerl/doc/xmerl.html#export_simple-3"><code>//xmerl/xmerl:export_simple/3</code></a> for details.
+   </dd>
+  </dl></p>
+ </p>
+<p><b>See also:</b> <a href="edoc.html#layout-2">edoc:layout/2</a>.</p>
+
+<h3><a name="overview-2">overview/2</a></h3>
+<tt>overview(E, Options) -&gt; term()
+</tt>
+
+<h3><a name="package-2">package/2</a></h3>
+<tt>package(E, Options) -&gt; term()
+</tt>
+
+<h3><a name="type-1">type/1</a></h3>
+<tt>type(E) -&gt; term()
+</tt>
+</body>
+</html>

@@ -1,0 +1,3 @@
+{application,edoc}.
+{packages,[]}.
+{modules,[edoc,edoc_doclet,edoc_extract,edoc_layout,edoc_run]}.

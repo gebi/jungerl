@@ -6,352 +6,413 @@
 </head>
 <body bgcolor="white">
 <h1>Module edoc</h1>
-<ul><li>
-<a href="#index">Function index</a></li><li>
-<a href="#exported">Exported functions</a></li></ul>
+EDoc - the Erlang program documentation generator.<p>Copyright © 2001-2003 Richard Carlsson</p>
+<ul><li><a href="#description">Description</a></li><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul><p><b>Version:</b> 0.6a (Jungerl)</p>
+<p><b>Authors:</b> Richard Carlsson (<a href="mailto:richardc@csd.uu.se"><tt>richardc@csd.uu.se</tt></a>) [<em>web site:</em> <tt><a href="http://www.csd.uu.se/~richardc/" target="_top">http://www.csd.uu.se/~richardc/</a></tt>].</p>
+<h2><a name="description">Description</a></h2>EDoc - the Erlang program documentation generator.
+ 
+  <p>This module provides the main user interface to EDoc.
+  <ul>
+    <li><a href="overview-summary.html">EDoc User Manual</a></li>
+    <li><a href="overview-summary.html#usage">Running EDoc</a></li>
+  </ul></p>
+<h2><a name="types">Data Types</a></h2>
 
-<h2>Description</h2>
-Erlang program documentation generator.
- 
-  <p>This program allows you to write the documentation of an Erlang
-  program as comments in the source code itself, using tags on the form
-  "<code>@Name ...</code>".</p>
- 
-  <p>A tag must be the first thing on a comment line, apart from
-  leading <code>%</code> characters and whitespace. The comment must be
-  between program declarations, and not on the same line as any program
-  text. All following comment text, up to the end of the comment or the
-  next tagged line, is taken as the value of the tag.</p>
- 
-  <p>Tags are associated with the nearest following program construct
-  "of significance" (module name declarations and function
-  definitions). Other constructs are ignored, e.g.:
-  <pre>
-    %% @doc Prints X.
- 
-    -record(foo, {x, y, z}).
- 
-    print(X) -> ...</pre>
- 
-  associates the <code>@doc</code> tag with the function
-  <code>print/1</code>.</p>
- 
-  <p>Note that in a comment such as:
-  <pre>
-    % % @doc ...</pre>
- 
-  the tag is ignored, because only the first <code>%</code> character
-  is considered "leading". This allowes tags to be "commented out".</p>
- 
-  <h3>Module tags</h3>
- 
-  <p>The following tags can be used before a module declaration:
-  <dl>
-    <dt><code>@doc</code></dt>
-        <dd>Describes the module, using well-formed XHTML text. The
-        first sentence is used as a summary (see <code>@doc</code>
-        function tags below for details). E.g.:
-  <pre>
-     %% @doc This is a very useful module. It is a ...
-     -module(fred).</pre></dd>
- 
-    <dt><code>@type</code></dt>
-        <dd>Documents an abstract data type or type alias. The text
-        consists of a type declaration or definition, optionally
-        followed by a period ("<code>.</code>") separator and XHTML
-        text describing the type (i.e., its purpose, use, etc.). The
-        first part has a form such as e.g.
-        "<code>myList(X::integer())</code>" or "<code>mytype() = foo |
-        bar</code>" (for a truly abstract data type, no equivalence is
-        specified), and may be followed by further definitions
-        (generally used for local type variables). Examples:
-  <pre>    %% @type myList(X). A special kind of lists ...</pre>
-  <pre>    %% @type filename() = string(). Atoms not allowed!</pre>
-  <pre>
-    %% @type thing(A) = {thong, A}
-    %%           A = term().
-    %%   A kind of wrapper type thingy.</pre>
- 
-       All data type descriptions are placed in a separate section of
-       the document, regardless of where the tags are put.</dd>
- 
-    <dt><code>@end</code></dt>
-        <dd>The text following this tag is always ignored. Use this to
-        mark the end of the previous tag, when necessary, as e.g. in:
-  <pre>
-     %% ----------------------------------
-     %% ...
-     %% @doc ...
-     %% ...
-     %% @end
-     %% ----------------------------------</pre>
- 
-        to avoid including the last "ruler" line in the
-        <code>@doc</code> tag. <em>Note: using some other "dummy"
-        <code>@</code>-tag for the same purpose might work in a
-        particular implementation of EDoc, but is not guaranteed to.
-        Always use <code>@end</code> to ensure portability.</em></dd>
- 
-  </dl>
-  </p>
- 
-  <h3>Function tags</h3>
- 
-  <p>The following tags can be used before a function definition:
-  <dl>
-    <dt><code>@spec</code></dt>
-        <dd>Used to specify the function type; see below for syntax. If
-        the function name is included in the specification, it must
-        match the name in the actual code.</dd>
- 
-    <dt><code>@doc</code></dt>
-        <dd>XHTML text describing a function or module. The first
-        sentence of the text is used as a quick summary; this ends at
-        the first period character ("<code>.</code>") that is followed
-        by a whitespace character, a line break, or the end of the tag
-        text, and is not within XML markup.</dd>
- 
-    <dt><code>@see</code></dt>
-        <dd>Make a reference to another function or module. Allowed
-        forms are "<code>Module</code>", "<code>Function/Arity</code>"
-        and "<code>Module:Function/Arity</code>".</dd>
- 
-    <dt><code>@equiv</code></dt>
-        <dd>Specify equivalence to another function call/expression.
-        Must be a proper Erlang expression. (Replaces
-        <code>@doc</code>.)</dd>
- 
-    <dt><code>@type</code></dt>
-        <dd>See module tags above. Placing a <code>@type</code> tag by
-        a function definition may be convenient, but does not affect
-        where the description is placed in the document.</dd>
- 
-    <dt><code>@end</code></dt>
-        <dd>See module tags above.</dd>
-  </dl>
-  </p>
- 
-  <h3>Function type specification syntax</h3>
- 
-  <table valign="top">
-    <tr valign="top">
-      <td><code>Spec</code></td>
-      <td>::=</td>
-      <td><code>Atom FunSpec Defs
-  	   <br>| FunSpec Defs</code></td>
-    </tr>
-    <tr valign="top">
-      <td><code>FunSpec</code></td>
-      <td>::=</td>
-      <td><code>"(" ParamSpecs ? ")" "->" TypeSpec</code></td>
-    </tr>
-    <tr valign="top">
-      <td><code>ParamSpecs</code></td>
-      <td>::=</td>
-      <td><code>ParamSpec
-  	   <br>| ParamSpec "," ParamSpecs</code></td>
-    </tr>
-    <tr valign="top">
-      <td><code>ParamSpec</code></td>
-      <td>::=</td>
-      <td><code>TypeSpec
-  	   <br>| Variable "::" TypeSpec</code></td>
-    </tr>
-    <tr valign="top">
-      <td><code>TypeSpec</code></td>
-      <td>::=</td>
-      <td><code>Type
-  	   <br>| Type "|" TypeSpec
-  	   <br>| Type "+" TypeSpec</code></td>
-    </tr>
-    <tr valign="top">
-      <td><code>Type</code></td>
-      <td>::=</td>
-      <td><code>Variable
-  	   <br>| Atom
-  	   <br>| Integer
-  	   <br>| Float
-  	   <br>| "{" TypeSpecs ? "}"
-  	   <br>| "[" "]"
-  	   <br>| "[" TypeSpec "]"
-  	   <br>| FunSpec
-  	   <br>| Atom "(" TypeSpecs ? ")"
-  	   <br>| Atom ":" Atom "(" TypeSpecs ? ")"</code></td>
-    </tr>
-    <tr valign="top">
-      <td><code>TypeSpecs</code></td>
-      <td>::=</td>
-      <td><code>TypeSpec
-  	   <br>| TypeSpec "," TypeSpecs</code></td>
-    </tr>
-    <tr valign="top">
-      <td><code>Defs</code></td>
-      <td>::=</td>
-      <td><code>""
-  	   <br>| Def Defs</code></td>
-    </tr>
-    <tr valign="top">
-      <td><code>Def</code></td>
-      <td>::=</td>
-      <td><code>Variable "=" TypeSpec
-  	   <br>| Atom "(" TypeSpecs ? ")" "=" TypeSpec</code></td>
-    </tr>
-  </table>
- 
-  <p>Examples:
-  <pre>    %% @spec my_function(X::integer()) -> integer()</pre>
-  <pre>    %% @spec (X::integer()) -> integer()</pre>
-  <pre>    %% @spec sqrt(float()) -> float()</pre>
-  <pre>    %% @spec pair(S, T) -> {S, T}</pre>
-  <pre>
-    %% @spec append(List, List) -> List
-    %%           List = [term()]</pre>
-  <pre>
-    %% @spec append(A::List, B::List) -> List
-    %%           List = [term()]</pre>
-  <pre>
-    %% @spec open(File::filename()) -> file_descriptor()
-    %%           filename() = string() | atom()</pre>
-  <pre>
-    %% @spec close(graphics:window()) -> ok</pre>
- 
-  In the above examples, <code>X</code>, <code>A</code>, <code>B</code>
-  and <code>File</code> are parameter names, used for referring to the
-  parameters from the documentation text. The <em>type variables</em>
-  <code>S</code>, <code>T</code> and <code>List</code> are used to
-  simplify the type specifications, and may be supplied with
-  definitions. It is also possible to give definitions for named types,
-  which means that the name is simply an alias. (Use the
-  <code>@type</code> tag to document abstract data types.) If a named
-  type is defined in another module, it can be referred to as
-  <code>Module:TypeName(...)</code>.</p>
- 
-  <p>If only a type variable is given for a parameter, as in
-  "<code>pair(S, T) -> ...</code>", the same variable name may
-  implicitly be used as the parameter name; there is no need to write
-  "<code>pair(S::S, T::T) -> ...</code>".</p>
- 
-  <p>Both the "<code>|</code>" and the "<code>+</code>" character may
-  be used to separate alternatives in union types; there is no semantic
-  difference. </p>
+<h3><a name="type-edoc_module">edoc_module()</a></h3>
+<p><b>abstract datatype</b>: <tt>edoc_module()</tt></p>
+<p>The EDoc documentation data for a module,
+  expressed as an XML document in <a href="/usr/local/home/richardc/hipe/otp/lib/xmerl/doc/index.html" target="_top">XMerL</a> format. See
+  the file <a href="../priv/edoc.dtd"><code>edoc.dtd</code></a> for details.
+ </p>
+
+<h3><a name="type-filename">filename()</a></h3>
+<p><tt>filename() = <a href="/usr/local/home/richardc/hipe/otp/lib/kernel/doc/file.html#type-filename">//kernel/file:filename()</a></tt></p>
+
+
+<h3><a name="type-option_list">option_list()</a></h3>
+<p><tt>option_list() = [term()]</tt></p>
+
+
+<h3><a name="type-package">package()</a></h3>
+<p><tt>package() = atom() | string()</tt></p>
+
+
+<h3><a name="type-syntaxTree">syntaxTree()</a></h3>
+<p><tt>syntaxTree() = <a href="/usr/local/home/richardc/hipe/otp/lib/syntax_tools/doc/erl_syntax.html#type-syntaxTree">//syntax_tools/erl_syntax:syntaxTree()</a></tt></p>
+
 
 <h2><a name="index">Function Index</a></h2>
-
-<table width="100%" border="1"><tr><th colspan="2" align="left">Exported Functions</th></tr>
-<tr><td><a href="#file-1">file/1</a></td><td><a href="#file-2">See <code>file/2</code>.</a></td></tr>
-<tr><td><a href="#file-2">file/2</a></td><td>Reads a source code file and outputs documentation text to a
-  corresponding <code>.html</code>-file.</td></tr>
-<tr><td><a href="#forms-3">forms/3</a></td><td>Like <code>file/2</code>, but operates directly on source code
-  syntax trees, and returns the resulting text instead of writing to a
-  file.</td></tr>
-<tr><td><a href="#forms-4">forms/4</a></td><td>Like <code>forms/3</code>, but first inserts the given comments
-  in the syntax trees.</td></tr>
-<tr><td><a href="#read_comments-1">read_comments/1</a></td><td><a href="#read_comments-2">See <code>read_comments/2</code>.</a></td></tr>
-<tr><td><a href="#read_comments-2">read_comments/2</a></td><td>Extracts comments from an Erlang source code file.</td></tr>
-<tr><td><a href="#read_module-1">read_module/1</a></td><td><a href="#read_module-2">See <code>read_module/2</code>.</a></td></tr>
-<tr><td><a href="#read_module-2">read_module/2</a></td><td>Reads an Erlang source file and returns the list of "source code
+<table width="100%" border="1"><tr><td valign="top"><a href="#application-1">application/1</a></td><td><p>Equivalent to <a href="#application-2"><tt>application(Application, [])</tt></a>.</p>
+</td></tr>
+<tr><td valign="top"><a href="#application-2">application/2</a></td><td>Run EDoc on an application in its default app-directory.</td></tr>
+<tr><td valign="top"><a href="#application-3">application/3</a></td><td>Run EDoc on an application located in the specified directory.</td></tr>
+<tr><td valign="top"><a href="#file-1">file/1</a></td><td><p>Equivalent to <a href="#file-2"><tt>file(Name, [])</tt></a>.</p>
+</td></tr>
+<tr><td valign="top"><a href="#file-2">file/2</a></td><td>Reads a source code file and outputs formatted documentation to
+  a corresponding file.</td></tr>
+<tr><td valign="top"><a href="#files-1">files/1</a></td><td><p>Equivalent to <a href="#packages-2"><tt>packages(Packages, [])</tt></a>.</p>
+</td></tr>
+<tr><td valign="top"><a href="#files-2">files/2</a></td><td>Runs EDoc on a given set of source files.</td></tr>
+<tr><td valign="top"><a href="#get_doc-1">get_doc/1</a></td><td><p>Equivalent to <a href="#get_doc-2"><tt>get_doc(File, [])</tt></a>.</p>
+</td></tr>
+<tr><td valign="top"><a href="#get_doc-2">get_doc/2</a></td><td>Reads a source code file and extracts EDoc documentation data.</td></tr>
+<tr><td valign="top"><a href="#get_doc-3">get_doc/3</a></td><td>Like <a href="#get_doc-2"><code>get_doc/2</code></a>, but for a given environment
+  parameter.</td></tr>
+<tr><td valign="top"><a href="#layout-1">layout/1</a></td><td><p>Equivalent to <a href="#layout-2"><tt>layout(Doc, [])</tt></a>.</p>
+</td></tr>
+<tr><td valign="top"><a href="#layout-2">layout/2</a></td><td>Transforms EDoc module documentation data to text.</td></tr>
+<tr><td valign="top"><a href="#packages-1">packages/1</a></td><td><p>Equivalent to <a href="#packages-2"><tt>packages(Packages, [])</tt></a>.</p>
+</td></tr>
+<tr><td valign="top"><a href="#packages-2">packages/2</a></td><td>Runs EDoc on a set of packages.</td></tr>
+<tr><td valign="top"><a href="#read-1">read/1</a></td><td><p>Equivalent to <a href="#read-2"><tt>read(File, [])</tt></a>.</p>
+</td></tr>
+<tr><td valign="top"><a href="#read-2">read/2</a></td><td>Reads and processes a source file and returns the resulting
+  EDoc-text as a string.</td></tr>
+<tr><td valign="top"><a href="#read_comments-1">read_comments/1</a></td><td><p>Equivalent to <a href="#read_comments-2"><tt>read_comments(File, [])</tt></a>.</p>
+</td></tr>
+<tr><td valign="top"><a href="#read_comments-2">read_comments/2</a></td><td>Extracts comments from an Erlang source code file.</td></tr>
+<tr><td valign="top"><a href="#read_source-1">read_source/1</a></td><td><p>Equivalent to <a href="#read_source-2"><tt>read_source(File, [])</tt></a>.</p>
+</td></tr>
+<tr><td valign="top"><a href="#read_source-2">read_source/2</a></td><td>Reads an Erlang source file and returns the list of "source code
   form" syntax trees.</td></tr>
+<tr><td valign="top"><a href="#run-3">run/3</a></td><td>Runs EDoc on a given set of source files and/or packages.</td></tr>
 </table>
 
-<h2><a name="exported">Exported Functions</a></h2>
+<h2><a name="functions">Function Details</a></h2>
+
+<h3><a name="application-1">application/1</a></h3>
+<p><tt>application(Application::atom()) -&gt; ok</tt></p>
+<p>Equivalent to <a href="#application-2"><tt>application(Application, [])</tt></a>.</p>
+
+
+<h3><a name="application-2">application/2</a></h3>
+<p><tt>application(Application::atom(), Options::<a href="#type-option_list">option_list()</a>) -&gt; ok</tt></p>
+<p>Run EDoc on an application in its default app-directory. See
+  <a href="#application-3"><code>application/3</code></a> for details.</p>
+<p><b>See also:</b> <a href="#application-1">application/1</a>.</p>
+
+<h3><a name="application-3">application/3</a></h3>
+<p><tt>application(Application::atom(), Dir::<a href="#type-filename">filename()</a>, Options::<a href="#type-option_list">option_list()</a>) -&gt; ok</tt></p>
+<p>Run EDoc on an application located in the specified directory.
+  Tries to automatically set up good defaults. Unless the user
+  specifies otherwise:
+  <ul>
+    <li>The <code>doc</code> subdirectory will be used as the target directory, if
+    it exists; otherwise the application directory is used.
+    </li>
+    <li>The source code is assumed to be located in the <code>src</code>
+    subdirectory, if it exists, or otherwise in the application
+    directory itself.
+    </li>
+    <li>The <a href="#run-3"><code>subpackages</code></a> option is turned on. All found
+    source files will be processed.
+    </li>
+    <li>The <code>include</code> subdirectory is automatically added to the
+    include path. (Only important if <a href="#read_source-2">    preprocessing</a> is turned on.)
+    </li>
+  </ul>
+ 
+  <p>See <a href="#run-3"><code>run/3</code></a> for details.</p>
+ </p>
+<p><b>See also:</b> <a href="#application-2">application/2</a>.</p>
 
 <h3><a name="file-1">file/1</a></h3>
+<p><tt>file(Name::<a href="#type-filename">filename()</a>) -&gt; ok</tt></p>
+<p>Equivalent to <a href="#file-2"><tt>file(Name, [])</tt></a>.</p>
+<p><b>This function is deprecated:</b> See <a href="#file-2"><code>file/2</code></a> for details.</p>
 
-<p><code>file(Name) -> ok</code></p>
-<p>Equivalent to <a href="#file-2"><code>file(Name, [])</code></a>.</p>
 
 <h3><a name="file-2">file/2</a></h3>
-
-<p><code>file(File::<a href="#type-filename">filename()</a>, Options::<a href="#type-option_list">option_list()</a>) -> ok<ul><li><a name="type-filename">filename()</a> = <a href="file.html#type-filename">file:filename()</a></li><li><a name="type-option_list">option_list()</a> = [term()]</li></ul></code></p>
-<p>Reads a source code file and outputs documentation text to a
-  corresponding <code>.html</code>-file. Possible options are:
+<p><tt>file(Name::<a href="#type-filename">filename()</a>, Options::<a href="#type-option_list">option_list()</a>) -&gt; ok</tt></p>
+<p><b>This function is deprecated:</b> This is part of the old interface to EDoc and is mainly
+  kept for backwards compatibility. The preferred way of generating
+  documentation is through one of the functions <a href="#application-2"><code>application/2</code></a>,
+  <a href="#packages-2"><code>packages/2</code></a> and <a href="#files-2"><code>files/2</code></a>.
+ </p>
+<p>Reads a source code file and outputs formatted documentation to
+  a corresponding file.
+ 
+  <p>Options:
   <dl>
-   <dt><code>{dir, filename()}</code></dt>
-     <dd>Specifies the output directory for the created file. (By
-     default, the output is written to the directory of the source
-     file.)</dd>
-   <dt><code>{xml_export, atom()}</code></dt>
-     <dd>Specifies the callback module used for formatting the internal
-     XML representation as text; see <code>xmerl</code> for
-     details. The default is <code>xmerl_html</code>.</dd>
-   <dt><code>{index_columns, integer()}</code></dt>
-     <dd>Specifies the number of column pairs used for the function
-     index tables. The default value is 1.</dd>
-   <dt><code>{stylesheet, string() | none}</code></dt>
-     <dd>Specifies the name of the stylesheet file used. If the value
-     is <code>none</code>, no stylesheet link will be generated.</dd>
-   <dt><code>{preprocess, bool()}</code></dt>
-     <dd>If the value is <code>true</code>, the source file will be
-     read via the Erlang preprocessor (<code>epp</code>). The default
-     value is <code>false</code>. Normally, preprocessing is not
-     necessary for EDoc to work, but if a file contains too exotic
-     definitions or uses of macros, it will not be possible to read it
-     without preprocessing. <em>Note: comments in included files will
-     not be available to EDoc.</em></dd>
-   <dt><code>{includes, [string()]}</code></dt>
-     <dd>Specifies a list of directory names to be searched for include
-     files, if the <code>preprocess</code> option is turned on. The
-     default value is the empty list. The directory of the source file
-     is always automatically appended to the search path.</dd>
-   <dt><code>{macros, [{atom(), term()}]}</code></dt>
-     <dd>Specifies a list of pre-defined preprocessor macro
-     definitions, used if the <code>preprocess</code> option is turned
-     on. The default value is the empty list.</dd>
+   <dt><code>{dir, <a href="#type-filename">filename()</a>}</code>
+   </dt>
+   <dd>Specifies the output directory for the created file. (By
+       default, the output is written to the directory of the source
+       file.)
+   </dd>
+   <dt><code>{source_suffix, string()}</code>
+   </dt>
+   <dd>Specifies the expected suffix of the input file. The default
+       value is <code>".erl"</code>.
+   </dd>
+   <dt><code>{file_suffix, string()}</code>
+   </dt>
+   <dd>Specifies the suffix for the created file. The default value is
+       <code>".html"</code>.
+   </dd>
   </dl></p>
-<p>See also: <a href="epp.html"><code>epp</code></a>, <a href="xmerl.html"><code>xmerl</code></a>, <a href="#forms-3"><code>forms/3</code></a>.</p>
-
-<h3><a name="forms-3">forms/3</a></h3>
-
-<p><code>forms(Forms, File::<a href="#type-filename">filename()</a>, Options::<a href="#type-option_list">option_list()</a>) -> string()<ul><li>Forms = <a href="#type-syntaxTree">syntaxTree()</a> | [<a href="#type-syntaxTree">syntaxTree()</a>]</li></ul></code></p>
-<p>Like <code>file/2</code>, but operates directly on source code
-  syntax trees, and returns the resulting text instead of writing to a
-  file. The given <code>Forms</code> must be a single syntax tree of
-  type <code>form_list</code>, or a list of syntax trees representing
-  "program forms". The syntax trees are assumed to be already annotated
-  with comments (cf. <code>forms/4</code>). The <code>File</code>
-  argument is used for error reporting and output file name generation
-  only.
+ 
+  <p>See <a href="#get_doc-2"><code>get_doc/2</code></a> and <a href="#layout-2"><code>layout/2</code></a> for further
+  options.</p>
+ 
+  <p>For running EDoc from a Makefile or similar, see
+  <a href="edoc_run.html#file-1"><code>edoc_run:file/1</code></a>.</p>
  </p>
-<p>See also: <a href="erl_recomment.html"><code>erl_recomment</code></a>, <a href="#file-2"><code>file/2</code></a>, <a href="#forms-4"><code>forms/4</code></a>.</p>
+<p><b>See also:</b> <a href="#read-2">read/2</a>.</p>
 
-<h3><a name="forms-4">forms/4</a></h3>
+<h3><a name="files-1">files/1</a></h3>
+<p><tt>files(Files::[<a href="#type-filename">filename()</a> | {<a href="#type-package">package()</a>, [<a href="#type-filename">filename()</a>]}]) -&gt; ok</tt></p>
+<p>Equivalent to <a href="#packages-2"><tt>packages(Packages, [])</tt></a>.</p>
 
-<p><code>forms(Forms, Comments::[<a href="#type-comment">comment()</a>], File::<a href="#type-filename">filename()</a>, Options::<a href="#type-option_list">option_list()</a>) -> string()<ul><li>Forms = <a href="#type-syntaxTree">syntaxTree()</a> | [<a href="#type-syntaxTree">syntaxTree()</a>]</li></ul></code></p>
-<p>Like <code>forms/3</code>, but first inserts the given comments
-  in the syntax trees. <code>Forms</code> must be a single syntax tree
-  of type <code>form_list</code>, or a list of syntax trees
-  representing "program forms". The syntax trees must contain valid
-  position information. (Cf. <code>read_comments/2</code>.)
+
+<h3><a name="files-2">files/2</a></h3>
+<p><tt>files(Files::[<a href="#type-filename">filename()</a> | {<a href="#type-package">package()</a>, [<a href="#type-filename">filename()</a>]}], Options::<a href="#type-option_list">option_list()</a>) -&gt; ok</tt></p>
+<p>Equivalent to <a href="#run-3"><tt>run([], Files, Options)</tt></a>.</p>
+<p>Runs EDoc on a given set of source files. See <a href="#run-3"><code>run/3</code></a> for
+  details.</p>
+
+<h3><a name="get_doc-1">get_doc/1</a></h3>
+<p><tt>get_doc(File::<a href="#type-filename">filename()</a>) -&gt; {ModuleName, <a href="#type-edoc_module">edoc_module()</a>}</tt></p>
+<p>Equivalent to <a href="#get_doc-2"><tt>get_doc(File, [])</tt></a>.</p>
+
+
+<h3><a name="get_doc-2">get_doc/2</a></h3>
+<p><tt>get_doc(File::<a href="#type-filename">filename()</a>, Options::<a href="#type-option_list">option_list()</a>) -&gt; {ModuleName, <a href="#type-edoc_module">edoc_module()</a>}</tt>
+<ul><li><tt>ModuleName = atom()</tt></li></ul></p>
+<p>Reads a source code file and extracts EDoc documentation data.
+  Note that without an environment parameter (see <a href="#get_doc-3"><code>get_doc/3</code></a>),
+  hypertext links may not be correct.
+ 
+  <p>Options:
+  <dl>
+   <dt><code>{def, Macros}</code>
+   </dt>
+   <dd><ul>
+        <li><code>Macros</code> = <code>Macro | [Macro]</code></li>
+        <li><code>Macro</code> = <code>{Name::atom(), Text::string()}</code></li>
+       </ul>
+     Specifies a set of EDoc macro definitions. See
+     <a href="overview-summary.html#macros">Inline macro expansion</a>
+     for details.
+   </dd>
+   <dt><code>{hidden, bool()}</code>
+   </dt>
+   <dd>If the value is <code>true</code>, documentation of hidden functions will
+       also be included. The default value is <code>false</code>.
+   </dd>
+   <dt><code>{private, bool()}</code>
+   </dt>
+   <dd>If the value is <code>true</code>, documentation of private functions will
+       also be included. The default value is <code>false</code>.
+   </dd>
+  </dl></p>
+ 
+  <p>See <a href="#read_source-2"><code>read_source/2</code></a>, <a href="#read_comments-2"><code>read_comments/2</code></a> and <a href="edoc_lib.html#get_doc_env-4"><code>edoc_lib:get_doc_env/4</code></a> for further options.</p>
  </p>
-<p>See also: <a href="#forms-3"><code>forms/3</code></a>, <a href="#read_comments-2"><code>read_comments/2</code></a>, <a href="#read_module-2"><code>read_module/2</code></a>.</p>
+<p><b>See also:</b> <a href="#get_doc-3">get_doc/3</a>, <a href="#layout-2">layout/2</a>, <a href="#read-2">read/2</a>, <a href="edoc_extract.html#source-5">edoc_extract:source/5</a>.</p>
+
+<h3><a name="get_doc-3">get_doc/3</a></h3>
+<p><tt>get_doc(File::<a href="#type-filename">filename()</a>, Env::<a href="edoc_lib.html#type-edoc_env">edoc_lib:edoc_env()</a>, Options::<a href="#type-option_list">option_list()</a>) -&gt; term()</tt></p>
+<p>Like <a href="#get_doc-2"><code>get_doc/2</code></a>, but for a given environment
+  parameter. <code>Env</code> is an environment created by <a href="edoc_lib.html#get_doc_env-4"><code>edoc_lib:get_doc_env/4</code></a>.</p>
+
+<h3><a name="layout-1">layout/1</a></h3>
+<p><tt>layout(Doc::<a href="#type-edoc_module">edoc_module()</a>) -&gt; string()</tt></p>
+<p>Equivalent to <a href="#layout-2"><tt>layout(Doc, [])</tt></a>.</p>
+
+
+<h3><a name="layout-2">layout/2</a></h3>
+<p><tt>layout(Doc::<a href="#type-edoc_module">edoc_module()</a>, Options::<a href="#type-option_list">option_list()</a>) -&gt; string()</tt></p>
+<p>Transforms EDoc module documentation data to text. The default
+  layout creates an HTML document.
+ 
+  <p>Options:
+  <dl>
+   <dt><code>{layout, Module::atom()}</code>
+   </dt>
+   <dd>Specifies a callback module to be used for formatting. The
+       module must export a function <code>module(Doc, Options)</code>. The
+       default callback module is <a href="edoc_layout.html"><code>edoc_layout</code></a>; see <a href="edoc_layout.html#module-2"><code>edoc_layout:module/2</code></a> for layout-specific options.
+   </dd>
+  </dl></p>
+ </p>
+<p><b>See also:</b> <a href="#file-2">file/2</a>, <a href="#layout-1">layout/1</a>, <a href="#read-2">read/2</a>.</p>
+
+<h3><a name="packages-1">packages/1</a></h3>
+<p><tt>packages(Packages::[<a href="#type-package">package()</a>]) -&gt; ok</tt></p>
+<p>Equivalent to <a href="#packages-2"><tt>packages(Packages, [])</tt></a>.</p>
+
+
+<h3><a name="packages-2">packages/2</a></h3>
+<p><tt>packages(Packages::[<a href="#type-package">package()</a>], Options::<a href="#type-option_list">option_list()</a>) -&gt; ok</tt></p>
+<p>Equivalent to <a href="#run-3"><tt>run(Packages, [], Options)</tt></a>.</p>
+<p>Runs EDoc on a set of packages. The <code>source_path</code> option is used
+  to locate the files; see <a href="#run-3"><code>run/3</code></a> for details. This function
+  automatically appends the current directory to the source path.
+ </p>
+
+<h3><a name="read-1">read/1</a></h3>
+<p><tt>read(File::<a href="#type-filename">filename()</a>) -&gt; string()</tt></p>
+<p>Equivalent to <a href="#read-2"><tt>read(File, [])</tt></a>.</p>
+
+
+<h3><a name="read-2">read/2</a></h3>
+<p><tt>read(File::<a href="#type-filename">filename()</a>, Options::<a href="#type-option_list">option_list()</a>) -&gt; string()</tt></p>
+<p>Reads and processes a source file and returns the resulting
+  EDoc-text as a string. See <a href="#get_doc-2"><code>get_doc/2</code></a> and <a href="#layout-2"><code>layout/2</code></a> for
+  options.
+ </p>
+<p><b>See also:</b> <a href="#file-2">file/2</a>.</p>
 
 <h3><a name="read_comments-1">read_comments/1</a></h3>
+<p><tt>read_comments(File) -&gt; [<a href="#type-comment">comment()</a>]</tt></p>
+<p>Equivalent to <a href="#read_comments-2"><tt>read_comments(File, [])</tt></a>.</p>
 
-<p><code>read_comments(File) -> [<a href="#type-comment">comment()</a>]</code></p>
-<p>Equivalent to <a href="#read_comments-2"><code>read_comments(File, [])</code></a>.</p>
 
 <h3><a name="read_comments-2">read_comments/2</a></h3>
-
-<p><code>read_comments(File::<a href="#type-filename">filename()</a>, Options::<a href="#type-option_list">option_list()</a>) -> [<a href="#type-comment">comment()</a>]<ul><li><a name="type-comment">comment()</a> = {Line, Column, Indentation, Text}</li><li>Line = integer()</li><li>Column = integer()</li><li>Indentation = integer()</li><li>Text = [string()]</li></ul></code></p>
+<p><tt>read_comments(File::<a href="#type-filename">filename()</a>, Options::<a href="#type-option_list">option_list()</a>) -&gt; [<a href="#type-comment">comment()</a>]</tt>
+<ul><li><tt><a name="type-comment">comment()</a> = {Line, Column, Indentation, Text}</tt></li><li><tt>Line = integer()</tt></li><li><tt>Column = integer()</tt></li><li><tt>Indentation = integer()</tt></li><li><tt>Text = [string()]</tt></li></ul></p>
 <p>Extracts comments from an Erlang source code file. See the
-  module <code>erl_comment_scan</code> for details on the
-  representation of comments.
- 
-  <p>Currently, no options are avaliable.</p>
- </p>
-<p>See also: <a href="erl_comment_scan.html"><code>erl_comment_scan</code></a>.</p>
+  module <a href="/usr/local/home/richardc/hipe/otp/lib/syntax_tools/doc/erl_comment_scan.html"><code>//syntax_tools/erl_comment_scan</code></a> for details on the
+  representation of comments. Currently, no options are avaliable.</p>
 
-<h3><a name="read_module-1">read_module/1</a></h3>
+<h3><a name="read_source-1">read_source/1</a></h3>
+<p><tt>read_source(Name::File) -&gt; [<a href="#type-syntaxTree">syntaxTree()</a>]</tt></p>
+<p>Equivalent to <a href="#read_source-2"><tt>read_source(File, [])</tt></a>.</p>
 
-<p><code>read_module(File) -> [<a href="#type-syntaxTree">syntaxTree()</a>]</code></p>
-<p>Equivalent to <a href="#read_module-2"><code>read_module(File, [])</code></a>.</p>
 
-<h3><a name="read_module-2">read_module/2</a></h3>
-
-<p><code>read_module(File::<a href="#type-filename">filename()</a>, Options::<a href="#type-option_list">option_list()</a>) -> [<a href="#type-syntaxTree">syntaxTree()</a>]<ul><li><a name="type-syntaxTree">syntaxTree()</a> = <a href="erl_syntax.html#type-syntaxTree">erl_syntax:syntaxTree()</a></li></ul></code></p>
+<h3><a name="read_source-2">read_source/2</a></h3>
+<p><tt>read_source(File::<a href="#type-filename">filename()</a>, Options::<a href="#type-option_list">option_list()</a>) -&gt; [<a href="#type-syntaxTree">syntaxTree()</a>]</tt></p>
 <p>Reads an Erlang source file and returns the list of "source code
-  form" syntax trees. See <code>file/2</code> for options pertaining to
-  reading source code files.
+  form" syntax trees.
+ 
+  <p>Options:
+  <dl>
+   <dt><code>{preprocess, bool()}</code>
+   </dt>
+   <dd>If the value is <code>true</code>, the source file will be read via the
+       Erlang preprocessor (<code>epp</code>). The default value is <code>false</code>.
+       <code>no_preprocess</code> is an alias for <code>{preprocess, false}</code>.
+ 
+       <p>Normally, preprocessing is not necessary for EDoc to work, but
+       if a file contains too exotic definitions or uses of macros, it
+       will not be possible to read it without preprocessing. <em>Note:
+       comments in included files will not be available to EDoc, even
+       with this option enabled.</em></p>
+   </dd>
+   <dt><code>{includes, Path::[string()]}</code>
+   </dt>
+   <dd>Specifies a list of directory names to be searched for include
+       files, if the <code>preprocess</code> option is turned on. The default
+       value is the empty list. The directory of the source file is
+       always automatically appended to the search path.
+   </dd>
+   <dt><code>{macros, [{atom(), term()}]}</code>
+   </dt>
+   <dd>Specifies a list of pre-defined Erlang preprocessor (<code>epp</code>)
+       macro definitions, used if the <code>preprocess</code> option is turned on.
+       The default value is the empty list.</dd>
+  </dl></p>
  </p>
-<p>See also: <a href="erl_syntax.html"><code>erl_syntax</code></a>, <a href="#file-2"><code>file/2</code></a>.</p></body>
+<p><b>See also:</b> <a href="/usr/local/home/richardc/hipe/otp/lib/syntax_tools/doc/erl_syntax.html">//syntax_tools/erl_syntax</a>, <a href="#get_doc-2">get_doc/2</a>.</p>
+
+<h3><a name="run-3">run/3</a></h3>
+<p><tt>run(Packages::[<a href="#type-package">package()</a>], Files::[<a href="#type-filename">filename()</a> | {<a href="#type-package">package()</a>, [<a href="#type-filename">filename()</a>]}], Options::<a href="#type-option_list">option_list()</a>) -&gt; ok</tt></p>
+<p>Runs EDoc on a given set of source files and/or packages. Note
+  that the doclet plugin module has its own particular options; see the
+  <code>doclet</code> option below.
+ 
+  <p>Also see <a href="edoc.html#layout-2"><code>edoc:layout/2</code></a> for layout-related options, and
+  <a href="edoc.html#get_doc-2"><code>edoc:get_doc/2</code></a> for options related to reading source
+  files.</p>
+ 
+  <p>Options:
+  <dl>
+   <dt><code>{app_default, string()}</code>
+   </dt>
+   <dd>Specifies the default base URI for unknown applications.
+   </dd>
+   <dt><code>{application, App::atom()}</code>
+   </dt>
+   <dd>Specifies that the generated documentation describes the
+       application <code>App</code>. This mainly affects generated references.
+   </dd>
+   <dt><code>{dir, <a href="#type-filename">filename()</a>}</code>
+   </dt>
+   <dd>Specifies the target directory for the generated documentation.
+   </dd>
+   <dt><code>{doc_path, [string()]}</code>
+   </dt>
+   <dd>Specifies a list of URI:s pointing to directories that contain
+       EDoc-generated documentation. URI without a <code>scheme://</code> part are
+       taken as relative to <code>file://</code>. (Note that such paths must use
+       <code>/</code> as separator, regardless of the host operating system.)
+   </dd>
+   <dt><code>{doclet, Module::atom()}</code>
+   </dt>
+   <dd>Specifies a callback module to be used for creating the
+       documentation. The module must export a function <code>run(Cmd, Ctxt)</code>.
+       The default doclet module is <a href="edoc_doclet.html"><code>edoc_doclet</code></a>; see <a href="edoc_doclet.html#run-2"><code>edoc_doclet:run/2</code></a> for doclet-specific options.
+   </dd>
+   <dt><code>{exclude_packages, [<a href="#type-package">package()</a>]}</code>
+   </dt>
+   <dd>Lists packages to be excluded from the documentation. Typically
+       used in conjunction with the <code>subpackages</code> option.
+   </dd>
+   <dt><code>{file_suffix, string()}</code>
+   </dt>
+   <dd>Specifies the suffix used for output files. The default value is
+       <code>".html"</code>. Note that this also affects generated references.
+   </dd>
+   <dt><code>{new, bool()}</code>
+   </dt>
+   <dd>If the value is <code>true</code>, any existing <code>edoc-info</code> file in the
+       target directory will be ignored and overwritten. The default
+       value is <code>false</code>.
+   </dd>
+   <dt><code>{packages, bool()}</code>
+   </dt>
+   <dd>If the value is <code>true</code>, it it assumed that packages (module
+       namespaces) are being used, and that the source code directory
+       structure reflects this. The default value is <code>true</code>. (Usually,
+       this does the right thing even if all the modules belong to the
+       top-level "empty" package.) <code>no_packages</code> is an alias for
+       <code>{packages, false}</code>. See the <code>subpackages</code> option below for
+       further details.
+ 
+       <p>If the source code is organized in a hierarchy of
+       subdirectories although it does not use packages, use
+       <code>no_packages</code> together with the recursive-search <code>subpackages</code>
+       option (on by default) to automatically generate documentation
+       for all the modules.</p>
+   </dd>
+   <dt><code>{source_path, [<a href="#type-filename">filename()</a>]}</code>
+   </dt>
+   <dd>Specifies a list of file system paths used to locate the source
+       code for packages.
+   </dd>
+   <dt><code>{source_suffix, string()}</code>
+   </dt>
+   <dd>Specifies the expected suffix of input files. The default
+       value is <code>".erl"</code>.
+   </dd>
+   <dt><code>{subpackages, bool()}</code>
+   </dt>
+   <dd>If the value is <code>true</code>, all subpackages of specified packages
+       will also be included in the documentation. The default value is
+       <code>false</code>. <code>no_subpackages</code> is an alias for <code>{subpackages,
+       false}</code>. See also the <code>exclude_packages</code> option.
+ 
+       <p>Subpackage source files are found by recursively searching
+       for source code files in subdirectories of the known source code
+       root directories. (Also see the <code>source_path</code> option.) Directory
+       names must begin with a lowercase letter and contain only
+       alphanumeric characters and underscore, or they will be ignored.
+       (For example, a subdirectory named <code>test-files</code> will not be
+       searched.)</p>
+   </dd>
+  </dl></p>
+ </p>
+<p><b>See also:</b> <a href="#application-2">application/2</a>, <a href="#files-2">files/2</a>, <a href="#packages-2">packages/2</a>.</p>
+</body>
 </html>

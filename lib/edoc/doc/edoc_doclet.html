@@ -1,0 +1,69 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Module edoc_doclet</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body bgcolor="white">
+<h1>Module edoc_doclet</h1>
+Standard doclet module for EDoc.<p>Copyright © 2003 Richard Carlsson</p>
+<ul><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul><p><b>Authors:</b> Richard Carlsson (<a href="mailto:richardc@csd.uu.se"><tt>richardc@csd.uu.se</tt></a>).</p>
+<p><b>See also:</b> <a href="edoc.html">edoc</a>.</p>
+<h2><a name="description">Description</a></h2>Standard doclet module for EDoc.
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1"><tr><td valign="top"><a href="#run-2">run/2</a></td><td>Main doclet entry point.</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3><a name="run-2">run/2</a></h3>
+<tt>run(Cmd, Ctxt) -&gt; term()
+</tt><p>Main doclet entry point. See the file <a href="../include/edoc_doclet.hrl"><code>edoc_doclet.hrl</code></a> for the data
+  structures used for passing parameters.
+ 
+  <p>Also see <a href="edoc.html#layout-2"><code>edoc:layout/2</code></a> for layout-related options, and
+  <a href="edoc.html#get_doc-2"><code>edoc:get_doc/2</code></a> for options related to reading source
+  files.</p>
+ 
+  <p>Options:
+  <dl>
+   <dt><code>{file_suffix, string()}</code>
+   </dt>
+   <dd>Specifies the suffix used for output files. The default value is
+       <code>".html"</code>.
+   </dd>
+   <dt><code>{hidden, bool()}</code>
+   </dt>
+   <dd>If the value is <code>true</code>, documentation of hidden modules and
+       functions will also be included. The default value is <code>false</code>.
+   </dd>
+   <dt><code>{overview, <a href="edoc.html#type-filename">edoc:filename()</a>}</code>
+   </dt>
+   <dd>Specifies the name of the overview-file. By default, this doclet
+       looks for a file <code>"overview.edoc"</code> in the target directory.
+   </dd>
+   <dt><code>{private, bool()}</code>
+   </dt>
+   <dd>If the value is <code>true</code>, documentation of private modules and
+       functions will also be included. The default value is <code>false</code>.
+   </dd>
+   <dt><code>{stylesheet, string()}</code>
+   </dt>
+   <dd>Specifies the URI used for referencing the stylesheet. The
+       default value is <code>"stylesheet.css"</code>. If an empty string is
+       specified, no stylesheet reference will be generated.
+   </dd>
+   <dt><code>{stylesheet_file, <a href="edoc.html#type-filename">edoc:filename()</a>}</code>
+   </dt>
+   <dd>Specifies the name of the stylesheet file. By default, this
+       doclet uses the file <code>"stylesheet.css"</code> in the <code>priv</code>
+       subdirectory of the EDoc installation directory. The named file
+       will be copied to the target directory.
+   </dd>
+   <dt><code>{title, string()}</code>
+   </dt>
+   <dd>Specifies the title of the overview-page.
+   </dd>
+  </dl></p></p>
+</body>
+</html>

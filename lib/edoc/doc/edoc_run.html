@@ -1,0 +1,59 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Module edoc_run</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body bgcolor="white">
+<h1>Module edoc_run</h1>
+Interface for calling EDoc from Erlang startup options.<p>Copyright © 2003 Richard Carlsson</p>
+<ul><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul><p><b>Authors:</b> Richard Carlsson (<a href="mailto:richardc@csd.uu.se"><tt>richardc@csd.uu.se</tt></a>).</p>
+<p><b>See also:</b> <a href="edoc.html">edoc</a>.</p>
+<h2><a name="description">Description</a></h2>Interface for calling EDoc from Erlang startup options.
+ 
+  <p>The following is an example of typical usage in a Makefile:
+  <pre>     docs:
+             erl -noshell -run edoc_run application "'$(APP_NAME)'" \
+               '"."' '[{def,{vsn,"$(VSN)"}}]' -s init stop</pre>
+  (note the single-quotes to avoid shell expansion, and the
+  double-quotes enclosing the strings).</p>
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1"><tr><td valign="top"><a href="#application-1">application/1</a></td><td/></tr>
+<tr><td valign="top"><a href="#file-1">file/1</a></td><td>Calls <a href="edoc.html#file-2"><code>edoc:file/2</code></a> with the corresponding arguments.</td></tr>
+<tr><td valign="top"><a href="#files-1">files/1</a></td><td/></tr>
+<tr><td valign="top"><a href="#packages-1">packages/1</a></td><td/></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3><a name="application-1">application/1</a></h3>
+<tt>application(Args) -&gt; term()
+</tt>
+
+<h3><a name="file-1">file/1</a></h3>
+<p><tt>file(Args::[string()]) -&gt; ok | error</tt></p>
+<p><b>This function is deprecated:</b> This is part of the old interface to EDoc and is mainly
+  kept for backwards compatibility. The preferred way of generating
+  documentation is through one of the functions <a href="#application-1"><code>application/1</code></a>,
+  <a href="#packages-1"><code>packages/1</code></a> and <a href="#files-1"><code>files/1</code></a>.
+ </p>
+<p>Calls <a href="edoc.html#file-2"><code>edoc:file/2</code></a> with the corresponding arguments. The
+  strings in the list are parsed as Erlang constant terms. The list can
+  be either <code>[File]</code> or <code>[File, Options]</code>. In the first case, an empty
+  list of options is passed to <a href="edoc.html#file-2"><code>edoc:file/2</code></a>.
+ 
+  <p>The following is an example of typical usage in a Makefile:
+  <pre>     $(DOCDIR)/%.html:%.erl
+             erl -noshell -run edoc_run file '"$&lt;"' '[{dir,"$(DOCDIR)"}]' \
+               -s init stop</pre>
+  </p></p>
+
+<h3><a name="files-1">files/1</a></h3>
+<tt>files(Args) -&gt; term()
+</tt>
+
+<h3><a name="packages-1">packages/1</a></h3>
+<tt>packages(Args) -&gt; term()
+</tt>
+</body>
+</html>

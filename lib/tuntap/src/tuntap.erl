@@ -6,6 +6,11 @@
 %%%
 %%% Created : 10 Nov 2001 by Luke Gorrie <luke@bluetail.com>
 %%%-------------------------------------------------------------------
+
+%% Note: if you want to be able to create tunnels as some user other
+%% than root, you should chmod "/dev/net/tun" to be read/write by the
+%% appropriate user.
+
 -module(tuntap).
 
 -author('luke@bluetail.com').

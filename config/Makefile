@@ -1,17 +1,19 @@
 MK_INCLUDE=../support/include.mk
+JERL=../bin/jerl
 
-all: config.status $(MK_INCLUDE)
+all: config.status $(MK_INCLUDE) $(JERL)
 
-config.status: configure ../support/include.mk.in
+config.status: configure
 	./configure
 
-$(MK_INCLUDE): config.status
+$(JERL) $(MK_INCLUDE): config.status ../support/include.mk.in ../bin/jerl.in
 	./config.status
+	chmod +x $(JERL)
 
 configure: configure.in
 	autoconf
 
 clean:
 	-rm -f config.cache config.log config.status configure \
-               $(MK_INCLUDE)
+               $(MK_INCLUDE) $(JERL)
 

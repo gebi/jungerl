@@ -24,9 +24,12 @@
 %%% - The function containing the extended_receive wrapper should
 %%%   have exactly one argument -- the 'State'.
 %%%
-
+-export([spawn_link/0]).
 -compile(export_all).
 -include("plain_fsm.hrl").
+
+data_vsn() ->
+    5.
 
 spawn_link() ->
     plain_fsm:spawn_link(?MODULE, fun() ->
@@ -41,7 +44,7 @@ idle(S) ->
       receive
 	  a ->
 	      io:format("going to state a~n", []),
-	      a(S);
+	      plain_fsm:hibernate(?MODULE,a,[S]);
 	  b ->
 	      io:format("going to state b~n", []),
 	      b(S)
@@ -55,13 +58,13 @@ a(S) ->
     receive
 	b ->
 	    io:format("going to state b~n", []),
-	    b(S);
- 	idle ->
+	    plain_fsm:hibernate(?MODULE,b,[S]);
+	idle ->
 	    io:format("going to state idle~n", []),
 	    idle(S)
-   after 10000 ->
-	    io:format("timeout in a~n", []),
-	    idle(S)
+%       after 10000 ->
+% 	      io:format("timeout in a~n", []),
+% 	      idle(S)
     end.
 
 b(S) ->
@@ -78,6 +81,6 @@ b(S) ->
     end.
 
 code_change(OldVsn, State, Extra) ->
-    {ok, newstate}.
+    {ok, {newstate, data_vsn()}}.
  
 	     

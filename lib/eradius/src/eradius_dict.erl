@@ -150,6 +150,12 @@ emit([A|T], Hrl, Map) when record(A, attribute) ->
     io:format(Map, "{attribute, ~w, ~w, \"~s\"}.~n", 
 	      [A#attribute.id, A#attribute.type, A#attribute.name]),
     emit(T, Hrl, Map);
+emit([V|T], Hrl, Map) when record(V, vendor) ->
+    io:format(Hrl, "-define( ~s , ~w ).~n", 
+	      [V#vendor.name, V#vendor.type]),
+    io:format(Map, "{vendor, ~w, \"~s\"}.~n", 
+	      [V#vendor.type, V#vendor.name]),
+    emit(T, Hrl, Map);
 emit([_|T], Hrl, Map) ->
     emit(T, Hrl, Map);
 emit([], _, _) ->
@@ -179,12 +185,18 @@ parse_dict(File) when list(File) ->
     lists:foldl(F,[],string:tokens(b2l(B),"\n")).
 
 pd(["VENDOR", Name, Id]) -> 
-    put({vendor,Name}, l2i(Id));
+    put({vendor,Name}, l2i(Id)),
+    {ok, #vendor{type = l2i(Id), name = Name}};
 pd(["ATTRIBUTE", Name, Id, Type]) -> 
     {ok,#attribute{name = d2u(Name), id = id2i(Id), type = l2a(Type)}};
 pd(["ATTRIBUTE", Name, Id, Type, Vendor]) -> 
-    VendId = get({vendor,Vendor}),
-    {ok,#attribute{name = d2u(Name), id = {VendId,id2i(Id)},type = l2a(Type)}};
+    case get({vendor,Vendor}) of
+	undefined -> 
+	    %% No vendor defined, line must have some other "crap" after Type.
+	    {ok,#attribute{name = d2u(Name), id = id2i(Id), type = l2a(Type)}};
+	VendId ->
+	    {ok,#attribute{name = d2u(Name), id = {VendId,id2i(Id)},type = l2a(Type)}}
+    end;
 pd(X) -> 
     %%io:format("Skipping: ~p~n", [X]),
     false.

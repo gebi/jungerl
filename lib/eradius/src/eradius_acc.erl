@@ -17,11 +17,12 @@
 
 %%--------------------------------------------------------------------
 %% External exports
--export([start_link/0, acc_start/1, acc_stop/1, 
-	 set_user/2, set_nas_ip_address/1, set_nas_ip_address/2,
-	 set_login_time/1, set_logout_time/1, set_session_id/2, new/0,
-	 set_radacct/1, set_attr/3, set_vend_attr/3, acc_update/1,
-	 set_servers/2, set_timeout/2, set_login_time/2, set_vendor_id/2,
+-export([start_link/0, start/0, acc_start/1, acc_stop/1, 
+	 set_user/2, set_nas_ip_address/2, new/0, acc_update/1,
+	 set_login_time/1, set_logout_time/1, set_session_id/2, 
+	 set_radacct/1, set_attr/3, 
+	 set_vend_attrs/2, append_vend_attrs/2,
+	 set_servers/2, set_timeout/2, set_login_time/2, 
 	 set_logout_time/2, set_tc_ureq/1, set_tc_itimeout/1,
 	 set_tc_areset/1, set_tc_areboot/1, set_tc_nasreboot/1]).
 
@@ -29,9 +30,6 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, 
 	 terminate/2, code_change/3]).
 
--ifdef(debug).
--export([test/0,test/1,test_stop/0]).
--endif.
 
 %% The State record
 -record(s, {
@@ -43,91 +41,6 @@
 -define(PORT,       1813).     % standard port for Radius Accounting
 -define(TIMEOUT,    10).       
 
-
-%%% ====================================================================
-%%% Example: Radius Accounting
-%%% ====================================================================
-
-%acc_start(XnetId, User, CacheKey) ->
-%    case radacct_p(XnetId) of
-%	true ->
-%	    {value, Srvs} = radacct_servers(XnetId),
-%	    R = set_session_id(
-%		  set_user(
-%		    set_servers(
-%		      set_nas_ip_address(new()),
-%		      Srvs),
-%		    User),
-%		  CacheKey),
-%	    oaml_radacct:acc_start(R);
-%	false ->
-%	    false
-%    end.
-
-%acc_stop(XnetId, User, CacheKey, Login, Reason) ->
-%    case radacct_p(XnetId) of
-%	true ->
-%	    {value, Srvs} = radacct_servers(XnetId),
-%	    Logout = erlang:now(),
-%	    R = set_stop_reason(
-%		  set_logout_time(
-%		    set_login_time(
-%		      set_session_id(
-%			set_user(
-%			  set_servers(
-%			    set_nas_ip_address(new()),
-%			    Srvs),
-%			  User),
-%			CacheKey),
-%		      Login),
-%		    Logout),
-%		  Reason),
-%	    oaml_radacct:acc_stop(R);
-%	false ->
-%	    false
-%    end.
-%
-%set_stop_reason(R, ?REASON_LOGOUT)    -> set_tc_ureq(R);
-%set_stop_reason(R, ?REASON_TIMEOUT)   -> set_tc_itimeout(R);
-%set_stop_reason(R, ?REASON_RESET)     -> set_tc_areset(R);
-%set_stop_reason(R, ?REASON_REBOOT)    -> set_tc_areboot(R);
-%set_stop_reason(R, ?REASON_TERMINATE) -> set_tc_nasreboot(R).
-
-%%% Example, on how to set vendor attributes: 
-%%%
-%%%   acc_update('1', 
-%%%              <<"tobbe">>, 
-%%%              <<"cache-key">>, 
-%%%              [{2, <</main/starttrace>>])
-%%%
-%acc_update(XnetId, User, CacheKey, VendAttrs) ->
-%    case radacct_p(XnetId) of
-%	true ->
-%	    {value, Srvs} = radacct_servers(XnetId),
-%	    R = set_session_id(
-%		  set_user(
-%		    set_servers(
-%		      set_nas_ip_address(new()),
-%		      Srvs),
-%		    User),
-%		  CacheKey),
-%	    F = fun({Type,Bin}, Acc) -> 
-%			set_vend_attr(Acc, Type, Bin)
-%		end,
-%	    Rv = lists:foldl(F, R, VendAttrs),
-%	    oaml_radacct:acc_update(Rv);
-%	false ->
-%	    false
-%    end.
-%
-%radacct_servers(XnetId) ->
-%    reg:value(?RadacctServers(XnetId)).
-%
-%radacct_p(XnetId) ->
-%    case reg:value(?Radacct(XnetId)) of
-%	{value, on}  -> true;
-%	{value, off} -> false
-%    end.
 
 
 %%% ====================================================================
@@ -143,24 +56,19 @@ set_attr(R, Type, Bval) when record(R,rad_accreq),integer(Type),binary(Bval)->
     R#rad_accreq{std_attrs = [{Type, Bval} | StdAttrs]}.
 
 %%% Vendor Attributes
-set_vend_attr(R, Type, Bval) when record(R,rad_accreq),
-				  integer(Type),binary(Bval)->
-    VendAttrs = R#rad_accreq.vend_attrs,
-    R#rad_accreq{vend_attrs = [{Type, Bval} | VendAttrs]}.
+set_vend_attrs(R, Vas) ->
+    R#rad_accreq{vend_attrs = Vas}.
 
-%%% User
-set_vendor_id(R, VendId) when record(R, rad_accreq),integer(VendId) ->
-    R#rad_accreq{vend_id = VendId}.
+append_vend_attrs(R, Vas) -> 
+    VendAttrs = R#rad_accreq.vend_attrs,
+    R#rad_accreq{vend_attrs = Vas ++ VendAttrs}.
 
 %%% User
 set_user(R, User) when record(R, rad_accreq) ->
     R#rad_accreq{user = any2bin(User)}.
 
 %%% NAS-IP
-set_nas_ip_address(R) when record(R, rad_accreq) ->
-    R#rad_accreq{nas_ip = nas_ip_address()}.
-
-set_nas_ip_address(R, Ip) when record(R, rad_accreq),list(Ip) ->
+set_nas_ip_address(R, Ip) when record(R, rad_accreq) ->
     R#rad_accreq{nas_ip = Ip}.
 
 %%% Login / Logout
@@ -219,13 +127,10 @@ set_radacct(Radacct) when record(Radacct,radacct) ->
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
-%%-----------------------------------------------------------------
-%% Func: auth(User, Passwd, AuthSpec)
-%% Types: 
-%% Purpose: 
-%%-----------------------------------------------------------------
+start() ->
+    gen_server:start({local, ?SERVER}, ?MODULE, [], []).
 
-%%acc_start(XnetId, User, SessId) ->
+
 acc_start(Req) when record(Req,rad_accreq) ->
     gen_server:cast(?SERVER, {acc_start, Req}).
 
@@ -378,7 +283,9 @@ do_punch([[Ip,Port,Shared] | Rest], Timeout, Req) ->
 send_recv_msg(Ip, Port, Timeout, Req) ->
     {ok, S} = gen_udp:open(0, [binary]),
     gen_udp:send(S, Ip, Port, Req),
+    %%io:format("Sent Request to: ~p:~p !~n",[Ip,Port]),
     Resp = recv_wait(S, Timeout),
+    %%io:format("Received Response: ~p~n",[Resp]),
     gen_udp:close(S),
     Resp.
 
@@ -396,9 +303,6 @@ compute_session_time(Login, Logout) ->
     calendar:datetime_to_gregorian_seconds(calendar:now_to_local_time(Logout)) -
 	calendar:datetime_to_gregorian_seconds(calendar:now_to_local_time(Login)).
 
-
-nas_ip_address() ->
-    oam_isd:node2ip(node()).
 
 any2bin(I) when integer(I) -> list_to_binary(integer_to_list(I));
 any2bin(L) when list(L)    -> list_to_binary(L);

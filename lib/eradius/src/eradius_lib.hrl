@@ -90,9 +90,8 @@
 	  login_time,      % erlang:now/0
 	  logout_time,     % erlang:now/0
 	  session_id,
-	  vend_id = 1872,  % Alteon
-	  vend_attrs = [], % list of {Type, Bin}
-	  std_attrs  = [], % list of {Type, Bin}
+	  vend_attrs = [], % list_of( {VendorId, list_of( {Id, Val} ) } )
+	  std_attrs  = [], % list_of( {Id, Val} )
 	  user,
 	  nas_ip,
 	  servers,         % overrides the #radacct{} content

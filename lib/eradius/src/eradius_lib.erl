@@ -82,22 +82,31 @@ enc_attrib(Pos, R, Def, AttrName, Type) ->
     if  V == element(Pos, Def) ->
 	    [];
 	true -> 
-	    Val =
-		case Type of
-		    binary -> V;
-		    int32 -> <<V:32>>;
-		    ip -> {A,B,C,D} = V,
-			  <<A:8, B:8, C:8, D:8>>
-	        end,
-	    <<AttrName, (size(Val) + 2):8, Val/binary>>
+	    enc_attrib(AttrName, V, Type)
     end.
-			 
+
+enc_attrib(AttrName, V, Type) ->
+    Val = type_conv(V, Type),
+    Id = strip_vendor(AttrName), 
+    <<Id, (size(Val) + 2):8, Val/binary>>.
+
+strip_vendor({_Vendor, Id}) -> Id;
+strip_vendor(Id)            -> Id.
+
+type_conv(V, binary)         -> V;
+type_conv(V, integer)        -> <<V:32>>;
+type_conv({A,B,C,D}, ipaddr) -> <<A:8, B:8, C:8, D:8>>;
+type_conv(V, string)         -> list_to_binary(V);
+type_conv(V, octets)         -> list_to_binary(V);
+type_conv(V, date)           -> list_to_binary(V).  %% FIXME !!
+
+
 enc_cmd(R) when record(R, rad_request) ->
     Def = #rad_request{},
     {?RAccess_Request,
      [enc_attrib(#rad_request.user,      R, Def, ?RUser_Name,       binary),
       enc_attrib(#rad_request.passwd,    R, Def, ?RUser_Passwd,     binary),
-      enc_attrib(#rad_request.nas_ip,    R, Def, ?RNAS_Ip_Address,  ip),
+      enc_attrib(#rad_request.nas_ip,    R, Def, ?RNAS_Ip_Address,  ipaddr),
       enc_attrib(#rad_request.state,     R, Def, ?RState,           binary)
      ]};
 enc_cmd(R) when record(R, rad_accept) ->
@@ -124,32 +133,38 @@ enc_cmd(R) when record(R, rad_reject) ->
 enc_cmd(R) when record(R, rad_accreq) ->
     Def = #rad_accreq{},
     {?RAccounting_Request,
-     [enc_attrib(#rad_accreq.status_type, R, Def, ?RStatus_Type,     int32),
-      enc_attrib(#rad_accreq.session_time,R, Def, ?RSession_Time,    int32),
+     [enc_attrib(#rad_accreq.status_type, R, Def, ?RStatus_Type,     integer),
+      enc_attrib(#rad_accreq.session_time,R, Def, ?RSession_Time,    integer),
       enc_attrib(#rad_accreq.session_id,  R, Def, ?RSession_Id,      binary),
-      enc_attrib(#rad_accreq.term_cause,  R, Def, ?RTerminate_Cause, int32),
+      enc_attrib(#rad_accreq.term_cause,  R, Def, ?RTerminate_Cause, integer),
       enc_attrib(#rad_accreq.user,        R, Def, ?RUser_Name,       binary),
-      enc_attrib(#rad_accreq.nas_ip,      R, Def, ?RNAS_Ip_Address,  ip),
-      enc_vendor_info(R,Def)
+      enc_attrib(#rad_accreq.nas_ip,      R, Def, ?RNAS_Ip_Address,  ipaddr),
+      enc_std_attrs(R),
+      enc_vendor_attrs(R)
      ]}. 
 
-enc_vendor_info(R,Def) ->
-    case {R#rad_accreq.vend_attrs,Def#rad_accreq.vend_attrs} of
-	{X,X}  -> [];
-	{As,_} ->
-	    Vid = R#rad_accreq.vend_id,
-	    {Vbin, Size} = enc_vendor_attrs(As),
-	    Tsz = Size + 6,
-	    [<<?RVendor_Specific:8, Tsz:8, Vid:32 >> | Vbin]
-    end.
+enc_std_attrs(R) ->
+    enc_attributes(R#rad_accreq.std_attrs).
 
-enc_vendor_attrs(Vas) ->
-    F = fun({Type,Bin}, {Acc,Size}) ->
-		Z = size(Bin) + 2,
-		{[<<Type:8,Z:8,Bin/binary>> | Acc],
-		  Size + Z}
+enc_vendor_attrs(R) ->
+    F = fun({Vid, Vs}, Acc) ->
+		Vbins = enc_attributes(Vs),
+		Size = io_list_len(Vbins),
+		Tsz = Size + 6,
+		[[<<?RVendor_Specific:8, Tsz:8, Vid:32 >> | Vbins] | Acc]
+    end,
+    lists:foldl(F, [], R#rad_accreq.vend_attrs).
+
+enc_attributes(As) ->
+    F = fun({Id, Val}, Acc) ->
+		case eradius_dict:lookup(Id) of
+		    [A] when record(A, attribute) ->
+			[enc_attrib(Id, Val, A#attribute.type) | Acc];
+		    _ ->
+			Acc
+		end
 	end,
-    lists:foldl(F, {[],0}, Vas).
+    lists:foldl(F, [], As).
 
 
 io_list_len(L) -> io_list_len(L, 0).

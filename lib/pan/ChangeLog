@@ -1,0 +1,16 @@
+2003-03-26  Mats Cronqvist  <etxmacr@cbe2077>
+
+	* src/panEts.erl (Module): changed from server to table owner strategy
+
+	* src/panScan.erl (Module): new panEts
+
+	* src/panHost.erl (Module): new panEts
+
+	* src/panCpu2.erl (Module): new panEts
+
+	* src/panCpu1.erl (Module): new panEts
+
+	* src/panTarg.erl: cpu_timestamp bug workaround
+
+
+

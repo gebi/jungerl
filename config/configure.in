@@ -7,7 +7,7 @@ AC_PROG_CC
 AC_PATH_PROG(ERL, erl, erl)
 AC_PATH_PROG(ERLC, erlc, erlc)
 
-ERLDIR=$(dirname $(dirname $ERL))
+ERLDIR=`awk -F= '/ROOTDIR=/ { print [$]2; exit; }' $ERL`;;
 AC_SUBST(ERLDIR)
 
 dnl C header files

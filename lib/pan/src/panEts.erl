@@ -9,6 +9,7 @@
 
 -export([new/1,new/2]).
 -export([kill/1]).
+-export([upd/2,upd/3]).
 
 new(Tab) -> new(Tab, []).
 new(Tab, Opts) ->
@@ -28,4 +29,11 @@ kill(Tab) ->
     case catch (list_to_atom(atom_to_list(Tab)++"_tab") ! {quit, self()}) of
 	{'EXIT', _} -> ok;
 	{quit,_} -> receive Tab -> ok end
+    end.
+
+upd(Tab, Key) -> upd(Tab, Key, 1).
+upd(Tab, Key, Inc) ->
+    case catch ets:update_counter(Tab, Key, Inc) of
+        {'EXIT', _ } -> ets:insert(Tab, {Key, Inc}), Inc;
+        O -> O
     end.

@@ -46,10 +46,15 @@ apply(Module, Function, Args) ->
     end.
 
 parse_transform(ParseTree, Options) ->
-    P1 = add_export(ParseTree, ?EXPORTER, 0),
-    Fs = functions(P1),
-    F = exporter_function(Fs),
-    insert_function(P1, F).
+    case functions(ParseTree) of
+	[] ->
+	    %% No functions in this module. Leave it alone.
+	    ParseTree;
+	Fs ->
+	    P1 = add_export(ParseTree, ?EXPORTER, 0),
+	    F = exporter_function(Fs),
+	    insert_function(P1, F)
+    end.
 
 %% add_export(ParseTree, Function, Arity) -> ParseTree'
 add_export([{attribute, Line, export, Es}|T], Function, Arity) ->

@@ -8,6 +8,6 @@ clean:
 	rm esp_cat.o
 
 $(ESP_CAT):	esp_cat.o
-	$(CC) -o$@ esp_cat.o $(SOCKET_LIBS)
+	$(CC) -o $@ esp_cat.o $(SOCKET_LIBS)
 
 

@@ -1,0 +1,120 @@
+
+Use GNU make to compile the programs in this directory.
+"gmake" should suffice.  If you don't have gmake available,
+you'll have to mangle the Makefile or compile by hand.
+Here's what I see:
+
+	% gmake
+	erlc -bbeam  -W  -o../ebin unixdom.erl
+	erlc -bbeam  -W  -o../ebin exp1.erl
+	erlc -bbeam  -W  -o../ebin unixdom2.erl
+	gcc -g -I/usr/local/lib/erlang/usr/include -DNEED_EXTRA_FUNCS -Wall -pedantic -o unixdom_echosrv unixdom_echosrv.c `./Is-Solaris-link.sh`
+	gcc -g -I/usr/local/lib/erlang/usr/include -DNEED_EXTRA_FUNCS -Wall -pedantic -o unixdom_cat unixdom_cat.c `./Is-Solaris-link.sh`
+	gcc -g -I/usr/local/lib/erlang/usr/include -DNEED_EXTRA_FUNCS -Wall -pedantic -o tcp_echoserv tcp_echoserv.c `./Is-Solaris-link.sh`
+	gcc -g -I/usr/local/lib/erlang/usr/include -DNEED_EXTRA_FUNCS -Wall -pedantic -fpic -shared -o unixdom_drv.so unixdom_drv.c
+	gcc -g -I/usr/local/lib/erlang/usr/include -DNEED_EXTRA_FUNCS -Wall -pedantic -fpic -shared -o exp1_drv.so exp1_drv.c
+
+So, What Is What?
+=================
+
+exp1.erl, exp1_drv.c:
+	My first experiment in creating an async, thread-aware driver.
+	See comments at the top of each file for more info.
+
+tcp_echoserv.c:
+	A very simple TCP echo server.  Use with Netcat ("nc") for
+	testing code.  I think I wrote it because I wanted to know
+	exactly what the code was doing, and I didn't have the source
+	for Solaris's "inetd".  {shrug}
+
+unixdom.erl:
+	My first stab at a UNIX domain socket driver.  It uses the
+	communications model used in R6B's TCP driver: there's an
+	Erlang process (a "descriptor process") between the process
+	that own's the port (the "controlling process") and the port
+	itself.  If you want to use it, you'll have to rummage through
+	the RCS version of xdom_drv.c, unixdom_drv.c,v that goes 
+	driver stub because I don't remember which revision uses it.
+	Sorry!  I don't recommend that anyone use this stub.
+
+unixdom2.erl:
+	This is a descriptor-process-less version of unixdom.erl.
+	It's the latest and greatest {cough} version of the driver
+	stub.  Sample usage:
+
+		[In another terminal, run "./unixdom_echoserv -v /tmp/u"]
+
+		{ok, P2} = unixdom2:start_link().       
+		unixdom2:connect(P2, "/tmp/u", [binary]).
+		unixdom2:send(P2, "Hello, world!\n").    
+		unixdom2:close(P2).
+	or
+		{ok, P3} = unixdom2:start_link().       
+		unixdom2:listen(P3, "/tmp/u", [binary, unlink_sock]).
+		{ok, P4} = unixdom2:accept(P3).
+
+		[In another terminal, run "./unixdom_cat /tmp/u",
+		 then type a line of text.]
+
+		{ok, Text} = unixdom2:recv(P4, 1024).                             
+		io:format(binary_to_list(Text)).
+
+	I didn't do a very good job of documenting the setsockopt
+	options.  You'll have to dig through the code to see what's
+	supported and what isn't.
+
+	If I recall correctly, both active and passive behavior is
+	supported.  Whether both modes work correctly is another
+	question altogether....
+
+	I saved implementing timeouts to last, since that introduced
+	a fair bit of complexity, and I was trying to limit the
+	amount of stuff I needed to understand in order to get the
+	basics done.  As a result, the timeout-related code almost
+	certainly has more bugs in it than the rest of the buggy
+	code.  :-)
+
+unixdom_cat:
+	A simple Netcat-like utility for testing the accept() and
+	read() code in the driver.  See the example above (or the
+	source code) for usage details.
+
+unixdom_drv.c:
+	This is the C code for the UNIX domain socket driver.  It
+	also contains a few non-socket-related bits of code.  See
+	the comments in unixdom2.erl for explanations of the endian
+	test and the Knuth hash function.  Derived from inet_drv.c
+	from the Erlang R7B source distribution and the only source
+	file that doesn't fall under the BAMS TECHNOLOGY LICENSE
+	from Sendmail, Inc.
+
+unixdom_echoserv:
+	A simple echo server for testing the connect() and write()
+	and read() code in the driver.  See the example above (or
+	the source code) for usage details.
+
+Copyright infomation
+====================
+
+See the file "COPYRIGHT" at the top level of this source
+distribution for copyright details.
+
+Sendmail, Inc.'s Role
+=====================
+
+Sendmail, Inc. was my employer when this code was written.  With the
+exception of unixdom_drv.c, it is the sole copyright holder for the
+source files in this distribution (version 0.1).  In May 2001, Sendmail
+cancelled the BAMS project, for which this code was written.  A week
+later, Sendmail had a large "reduction in force" that caught me and
+several other members of the BAMS team.
+
+Shortly thereafter, Sendmail released much of the code developed by the
+BAMS team under an open source license that borrows ideas from both the
+GPL and the Berkeley License.  I never got around to finishing the driver
+code, but hopefully wider distribution and dissemination of this code will
+help someone, somewhere in the world.
+
+-Scott Lystig Fritchie, <fritchie@mr.net>
+19 September 2001
+

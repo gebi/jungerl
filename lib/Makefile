@@ -8,6 +8,7 @@ LIBS := \
 	ex11 \
 	slang \
 	lersp \
+	measurement \
 	msc \
         pan \
         pico \
@@ -39,6 +40,7 @@ ce: edoc
 edoc: syntax_tools xmerl
 ermacs: slang msc
 enfs: rpc
+measurement: edoc
 wiki: pico
 wumpus: edoc
 xmlrpc: xmerl

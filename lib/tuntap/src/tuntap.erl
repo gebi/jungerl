@@ -36,6 +36,8 @@ open_tap() -> open_tuntap(tap, undefined).
 
 %% open_tuntap(tun|tap, undefined|string()) -> port()
 open_tuntap(Type, Dev) ->
+    %% It seems to be okay to init() multiple times..
+    ok = init(),
     TypeName = case Type of
 		   tun -> "tun";
 		   tap -> "tap"

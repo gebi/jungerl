@@ -1731,11 +1731,21 @@ string_literal(Node) ->
 atom(Name) when atom(Name) ->
     tree(atom, Name);
 atom(Name) ->
-    tree(atom, list_to_atom(Name)).
+    tree(atom, my_list_to_atom(Name)).
 
 revert_atom(Node) ->
     Pos = get_pos(Node),
     {atom, Pos, atom_value(Node)}.
+
+my_list_to_atom(Name) when is_list(Name), is_atom(hd(Name)) ->
+  my_list_to_atom(Name, []);
+my_list_to_atom(Name) ->
+  list_to_atom(Name).
+  
+my_list_to_atom([Last], Acc) ->
+  list_to_atom(Acc ++ atom_to_list(Last));
+my_list_to_atom([Head | Tail], Acc) ->
+  my_list_to_atom(Tail, Acc ++ atom_to_list(Head) ++ ".").
 
 
 %% =====================================================================
@@ -2947,11 +2957,15 @@ attribute_arguments(Node) ->
 		       list(unfold_function_names(Data, Pos)),
 		       Pos)];
 		import ->
-		    {Module, Imports} = Data,
-		    [set_pos(atom(Module), Pos),
-		     set_pos(
-		       list(unfold_function_names(Imports, Pos)),
-		       Pos)];
+		    case Data of
+		       {Module, Imports} ->
+		           [set_pos(atom(Module), Pos),
+		           set_pos(
+		              list(unfold_function_names(Imports, Pos)),
+		           Pos)];
+		       _ ->
+		           [set_pos(atom(Data), Pos)]
+		    end;
 		file ->
 		    {File, Line} = Data,
 		    [set_pos(string(File), Pos),

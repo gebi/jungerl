@@ -1361,6 +1361,13 @@ analyze_import_attribute(Node) ->
                         _ ->
                             throw(syntax_error)
                     end;
+		[M] ->
+                    case erl_syntax:type(M) of
+                        atom ->
+                            {erl_syntax:atom_value(M), []};
+                        _ ->
+                            throw(syntax_error)
+                    end;		    
                 _ ->
                     throw(syntax_error)
             end;

@@ -130,7 +130,8 @@ parse_form(Dev, L0) ->
     case io:scan_erl_form(Dev, "", L0) of
         {ok, Ts, L1} ->
             case catch rewrite_form(parse_tokens(scan_form(Ts))) of
-                {'EXIT', _} ->
+                {'EXIT', Why} ->
+		    io:fwrite("rewrite_form exited: ~p~n", [Why]),
                     {error, {L1, ?MODULE, unknown}, L1};
                 {error, R} ->
                     {error, R, L1};

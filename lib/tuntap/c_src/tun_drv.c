@@ -130,6 +130,7 @@ static int tun_ctl(ErlDrvData data,
                    int rsize)
 {
     struct tun_state *state = (struct tun_state *)data;
+    int read_len;
     switch (cmd) {
     case REQUEST_GET_DEVICE:
         return ctl_reply(REPLY_OK, state->dev, strlen(state->dev), rbuf, rsize);
@@ -146,8 +147,21 @@ static int tun_ctl(ErlDrvData data,
             set_input(state, 0);
             break;
         case ACTIVE_TRUE:
-        case ACTIVE_ONCE:
             set_input(state, 1);
+            break;
+        case ACTIVE_ONCE:
+            /* optimization: try to read a packet immediately if it
+               exists, to avoid going back to select() */
+            read_len = read(state->fd, state->buf, TUNNEL_BUF_SIZE);
+            if (read_len > 0) {
+                /* got a packet */
+                driver_output(state->port, state->buf, read_len);
+                state->active = ACTIVE_FALSE;
+                set_input(state, 0);
+            } else {
+                /* no packet available yet  */
+                set_input(state, 1);
+            }
             break;
         default:
             assert(0);

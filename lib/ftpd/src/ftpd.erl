@@ -1,27 +1,71 @@
 %%% File    : ftpd.erl
 %%% Maintainer: <davidw@eidetix.com>
 %%% Author  :  <tony@RIOJA>
-%%% Purpose : FTP SERVER (RFC 765) (must update to 959)
+%%% Purpose : FTP SERVER, rfc959/rfc1123 compliant
+%%%           Implements:
+%%%              rfc959 - basic rfc
+%%%              rfc1123 - updates/clarifies rfc959
+%%%              rfc2389 - Feature negotiation mechanism (FEAT and OPTS)
+%%%              rfc2640 - i18n (only the utf8 part, not LANG)
+%%%              draft-ietf-ftpext-utf-8-option-00 - OTPS UTF-8, updates rfc2640
+%%%              draft-ietf-ftpext-mlst-16 - SIZE, MDTM, and REST in STREAM mode
+%%%
+%%%           Follows most recommendations at http://cr.yp.to/ftp.html
+%%%           
+
 %%% Created : 29 Jan 1998 by  <tony@RIOJA>
 
 %%% $Id$
 
 %%% Updates by David N. Welton <davidw@eidetix.com> May 2004.
+%%% Updates by Martin Bjorklund <mbj@bluetail.com>  Dec 2004.
+
+%%% To support UTF-8, we use iconv.  In order to make use of this,
+%%% iconv must be started prior to starting ftpd.  iconv can (currently)
+%%% be found in esmb in jungerl.  If iconv is not started, ftpd will still
+%%% work just fine, but won't send UTF-8.
+%%%
+%%%
+%%% To start a simple server with read-only anonymous access do:
+%%%   ftpd:start([{root, "/tmp"}, {port, 2112}, {users, [anonymous]}]).
+%%%
+%%% Add a user test with passwd test:
+%%%   ftpd:start([{root, "/tmp"}, {port, 2112},
+%%%               {users, [anonymous,
+%%%               {"test", "test", [{"/",[read,write,delete]}]}]}]).
+
+
+%%% TODO
+%%%    o  implement max connections, reply w/ 421 greeting and close
+%%%    o  start as root, fork to different user after authenticaion (?)
+%%%       (configurable!)
+%%%    o  implement real ascii mode(?)
+%%%    o  implement logging (use common log format). could re-use yaws_log.
+%%%    o  add greeting file
+%%%    o  finish STAT command implementation
 
 -module(ftpd).
 -author('tony@RIOJA').
+-behaviour(gen_server).
 
+-ifdef(debug).
 -compile(export_all).
+-endif.
 -export([start/1, start/0]).
--export([init/3, control/2]).
+-export([start_link/1]).
 
--import(lists, [reverse/1, map/2, append/1, foreach/2]).
+%% gen_server callbacks
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
+	 code_change/3]).
 
+%% internal exports
+-export([control/2]).
+-export([auth/2]).
+
+-import(lists, [reverse/1, map/2, append/1, foreach/2, foldl/3]).
+
+-include("ftpd.hrl").
 -include_lib("kernel/include/file.hrl").
-
--define(FTPD_PORT, 21).
--define(FTPD_MAX_CONN, 40).
--define(FTPD_LOGFILE, "ftpd.log").
 
 -define(is_ip(X), size(X)==4, 
 		   (element(1,X) bor element(2,X) bor 
@@ -30,19 +74,11 @@
 %% ftpd state record
 -record(state,
 	{
-	  ftp_port = ?FTPD_PORT,            %% port that ftpd listens on
-	  tcp_opts = [{active,false},{nodelay,true}], %% gen_tcp options
-	  max_connections = ?FTPD_MAX_CONN, %% max connections
-	  %% hosts allowed
-	  allow_hosts = [{{0,0,0,0},{0,0,0,0}}], %% all allowed
-	  %% hosts denied
-	  deny_hosts = [],                  %% none denied
-	  %% restricted users allowed
-	  allow_ruser = [anonymous,ftp,www],
-	  %% root directory
-	  rootwd = "",
-	  log_fd,                           %% log to file
-	  log_file = ""                     %% log file name
+	  listen,             % listen socket
+	  accept,             % pid of current accept process
+	  sconf,              % #sconf record
+	  iconv_cd_to_utf8,
+	  iconv_cd_from_utf8
 	 }).
 
 %% connection state record
@@ -52,214 +88,265 @@
 %% ident     - user is identified
 %% valid
 %%
+%% do not store configuration parameters in cstate if they are
+%% stored in state, unless the overhead of asking the server process is
+%% to high.
 -record(cstate,
 	{
 	  ust = invalid,              %% internal state
 	  user = "",
-	  password = "",
-	  account = "",
 	  rootwd = "",                 %% real root directory
 	  homewd = "",                 %% home working directory
 	  wd = "",                     %% current working directory
-	  structure = file,            %% file(F), record(R), page(P)
-	  mode = stream,               %% stream(S), block(B), compressed(C)
+	  client_ip,
+	  client = "",                 %% string from CLNT command
+%	  structure = file,            %% file(F), record(R), page(P)
+%	  mode = stream,               %% stream(S), block(B), compressed(C)
 	  type = {ascii,nonprint,8},   %% ascii(A),
 	  def_data_port,               %% default data port
 	  data_port = undefined,       %% set by port
-	  listen = undefined           %% listen socket for pasv
+	  listen = undefined,          %% listen socket for pasv
+	  idle_timeout,                %% copied from state - used all the time
+	  state = undefined,           %% state to be remembered between cmds
+	  iconv_cd_to_utf8,
+	  iconv_cd_from_utf8,
+	  use_utf8 = true
 	 }).
 
+-define(HAS_ICONV(St), ((St)#cstate.iconv_cd_from_utf8 /= undefined)).
+-define(USE_UTF8(St), ((St)#cstate.use_utf8 == true)).
+
 -define(CRNL, "\r\n").
--define(R_OKAY, 200).
 
 start() ->
     start([{root, "/tmp"}]).
 
-start(Opts) ->
-    Tag = make_ref(),
-    Pid = spawn(?MODULE, init, [self(), Tag, Opts]),
-    receive
-	{Tag,Reply} -> Reply
-    end.
-
-stop() ->
-    call(stop).
-
-call(Req) ->
-    call(ftpd, Req).
-call(Srv, Req) ->
-    Tag = make_ref(),
-    Srv ! {call,self(),Tag,Req},
-    receive
-	{Tag,Reply} ->
-	    Reply
-    end.
-
-reply(Pid,Tag,Reply) ->
-    Pid ! {Tag,Reply}.
-
-init(Pid,Tag,Opts) ->
-    case catch register(ftpd, self()) of
-	true ->
-	    case options(Opts, #state { }) of
-		{ok,St} ->
-		    case gen_tcp:listen(St#state.ftp_port,St#state.tcp_opts) of
-			{ok,Listen} ->
-			    process_flag(trap_exit, true),
-			    reply(Pid,Tag,{ok,ftpd}),
-			    server(Listen, St, 
-				   spawn_link(?MODULE,control,
-					      [self(),Listen]));
-			Error -> reply(Pid,Tag,Error)
-		    end; 
-		Error -> reply(Pid,Tag,Error)
-	    end;
-	{'EXIT', _} ->
-	    reply(Pid,Tag,{error, already_started});
+start(Opts) when list(Opts) ->
+    case options(Opts, #sconf{}) of
+	{ok, SConf} ->
+	    start(SConf);
 	Error ->
-	    reply(Pid,Tag,Error)
-    end.
-%%
-%% Valid options are:
-%%  {port,P}            -- the ftpd listen port other than ?DEFAULT_FTPD_PORT
-%%  {ip,Addr}           -- ip address to bind to {0,0,0,0} is the default
-%%  {allow, IP}
-%%  {deny, IP}
-%%  {root, Dir}         -- set the root diretory 
-%%  {max_connections,N} -- set max connections
-%%
-%%
-options([Opt | Opts], St) ->
+	    Error
+    end;
+start(SConf) when record(SConf, sconf) ->
+    gen_server:start(?MODULE, [SConf], []).
+
+start_link(SConf) ->
+    gen_server:start_link(?MODULE, [SConf], []).
+
+%% called by control channel process
+call(Req) ->
+    gen_server:call(get(ftpd), Req, infinity).
+
+%% FIXME: implement real logging
+log(Level, Fmt, Args) ->
+    error_logger:info_msg("ftpd: ~w:" ++ Fmt, [Level | Args]).
+
+
+options([Opt | Opts], S) ->
     case Opt of
 	{port,P} when P > 0, P < 65536 ->
-	    options(Opts, St#state { ftp_port = P });
-	
+	    options(Opts, S#sconf { port = P });
 	{ip,IP} when ?is_ip(IP) ->
-	    options(Opts, St#state { tcp_opts = 
-				     [{ip,IP} | St#state.tcp_opts] });
+	    options(Opts, S#sconf { ip = IP });
 	{allow, IP} when ?is_ip(IP) ->
-	    options(Opts, St#state { allow_hosts = 
+	    options(Opts, S#sconf { allow_hosts = 
 				     [{IP,{255,255,255,255}}|
-				      St#state.allow_hosts]});
+				      S#sconf.allow_hosts]});
 	{allow, {IP,Mask}} when ?is_ip(IP),?is_ip(Mask) ->
-	    options(Opts, St#state { allow_hosts = 
-				     [{IP,Mask}|St#state.allow_hosts]});
+	    options(Opts, S#sconf { allow_hosts = 
+				     [{IP,Mask}|S#sconf.allow_hosts]});
 	{deny, IP} when ?is_ip(IP) ->
-	    options(Opts, St#state { deny_hosts =
+	    options(Opts, S#sconf { deny_hosts =
 				     [{IP,{255,255,255,255}}|
-				      St#state.deny_hosts]});
+				      S#sconf.deny_hosts]});
 	{deny, {IP,Mask}} when ?is_ip(IP), ?is_ip(Mask) ->
-	    options(Opts, St#state { deny_hosts =
-				     [{IP,Mask}|St#state.deny_hosts]});
+	    options(Opts, S#sconf { deny_hosts =
+				     [{IP,Mask}|S#sconf.deny_hosts]});
+	{users, Users} when list(Users) ->
+	    %% Users = [{User,Passwd,[{Dir,[read|write|delete]}]} |
+	    %%          anonymous]
+	    %% NOTE: Dir must be sorted with deepest dir first!
+	    options(Opts, S#sconf{users=lists:flatmap(fun mk_user/1, Users)});
 	{max_connections,N} when integer(N), N >= 0 ->
-	    options(Opts, St#state { max_connections = N });
+	    options(Opts, S#sconf { max_connections = N });
 	{root, Dir} ->
-	    options(Opts, St#state { rootwd = Dir });
+	    options(Opts, S#sconf { rootdir = Dir });
+	{idle_timeout, Seconds} when integer(Seconds), Seconds > 0 ->
+	    options(Opts, S#sconf { idle_timeout = Seconds * 1000});
+	{use_utf8_by_default, Bool} ->
+	    options(Opts, S#sconf { use_utf8_by_default = Bool });
+	{greeting_file, File} ->
+	    options(Opts, S#sconf { greeting_file = File });
 	_ ->
 	    {error, {bad_option, Opt}}
     end;
-options([], St) ->
-    {ok, St}.
+options([], S) ->
+    {ok, S}.
 
-%%
-%% Server loop
-%%
-server(Listen, St, Accept) ->
-    receive
-	{call,From,Tag,Request} ->
-	    case handle_call(Request, St) of
-		{reply, Reply, St1} ->
-		    reply(From,Tag,Reply),
-		    server(Listen,St1,Accept);
-		{noreply, St1} ->
-		    server(Listen,St1,Accept);
-		{stop, St1} ->
-		    true
-	    end;
-	{accepted, Accept} ->
-	    unlink(Accept),
-	    server(Listen, St, spawn_link(?MODULE,control,[self(),Listen]));
+mk_user(anonymous) ->  % convenient shorthand
+    Anon = #user{passwd = email_addr, access = [{"/", ?AUTH_READ}]},
+    [Anon#user{name = "anonymous"},
+     Anon#user{name = "ftp"}];
+mk_user({UserName, Passwd, DirAccess}) ->
+    [#user{name = UserName,
+	   passwd = Passwd, 
+	   access = [{Dir, mk_acl_flags(ACL)} || {Dir, ACL} <- DirAccess]}].
 
-	{'EXIT',Accept,Reason} ->
-	    server(Listen, St, spawn_link(?MODULE,control,[self(),Listen]));
-	Other ->
-	    io:format("ftpd: got ~p~n", [Other]),
-	    server(Listen, St, Accept)
+mk_acl_flags(ACL) ->
+    foldl(fun(read, Flags) -> ?bit_set(Flags, ?AUTH_READ);
+	     (write, Flags) -> ?bit_set(Flags, ?AUTH_WRITE);
+	     (delete, Flags) -> ?bit_set(Flags, ?AUTH_DELETE)
+	  end, 0, ACL).
+
+%%====================================================================
+%% Server functions
+%%====================================================================
+init([SConf]) ->
+    TcpOpts = [{active,false},{nodelay,true},
+	       {reuseaddr,true},{ip,SConf#sconf.ip}],
+    case gen_tcp:listen(SConf#sconf.port, TcpOpts) of
+	{ok,Listen} ->
+	    process_flag(trap_exit, true),
+	    St = #state{sconf = SConf, listen = Listen},
+	    LocalCs = SConf#sconf.local_cs,
+	    St1 = 				
+		case catch {iconv:open("UTF-8", LocalCs),
+			    iconv:open(LocalCs, "UTF-8")} of
+		    {{ok, CdToUtf8}, {ok, CdFromUtf8}} ->
+			?dbg("using iconv", []),
+			St#state{iconv_cd_to_utf8=CdToUtf8,
+				 iconv_cd_from_utf8=CdFromUtf8};
+		    _ ->
+			log(info, "iconv not used", []),
+			St
+		end,
+	    Accept = proc_lib:spawn_link(?MODULE,control,[self(),Listen]),
+	    {ok, St1#state{accept = Accept}};
+	{error, Error} -> 
+	    {stop, Error}
     end.
 
-handle_call({is_allowed, Addr, Port}, St) ->
-    io:format("ftpd: is_allowed ? ~p:~p~n", [Addr,Port]),
+handle_call({is_allowed, Addr, _Port}, _From, St) ->
+    ?dbg("ftpd: is_allowed ? ~p:~p~n", [Addr,_Port]),
     %% 1. check if denied => false
     %% 2. check if allowed => true
     %% 3. => false
-    Deny = member_address(Addr, St#state.deny_hosts),
-    Allow = member_address(Addr, St#state.allow_hosts),
+    Deny = member_address(Addr, (St#state.sconf)#sconf.deny_hosts),
+    Allow = member_address(Addr, (St#state.sconf)#sconf.allow_hosts),
     Res = not Deny and Allow,
-    io:format("ftpd: deny=~p, allow=~p, res=~p~n", [Deny, Allow, Res]),
+    ?dbg("ftpd: deny=~p, allow=~p, res=~p~n", [Deny, Allow, Res]),
     {reply, Res, St};
-handle_call(rootwd, St) ->
-    {reply, St#state.rootwd, St};
-handle_call(stop, St) ->
-    {stop, St};
-handle_call(Req, St) ->
+handle_call({getcfg, Item}, _From, St) ->   % get from sconf record
+    {reply, element(Item, St#state.sconf), St};
+handle_call({getstate, Item}, _From, St) -> % get from state record
+    {reply, element(Item, St), St};
+handle_call(stop, _From, St) ->
+    {stop, stop, St};
+handle_call(Req, _from, St) ->
     {reply, {bad_request,Req}, St}.
+
+handle_cast(_, St) ->
+    {noreply, St}.
+
+handle_info({accepted, Accept}, St) when Accept == St#state.accept ->
+    unlink(Accept),
+    Accept1 = proc_lib:spawn_link(?MODULE,control,[self(),St#state.listen]),
+    {noreply, St#state{accept = Accept1}};
+handle_info({'EXIT',Accept,_Reason}, St) when Accept == St#state.accept ->
+    Accept1 = proc_lib:spawn_link(?MODULE,control,[self(),St#state.listen]),
+    {noreply, St#state{accept = Accept1}};
+handle_info(_Other, St) ->
+    ?dbg("ftpd: got ~p~n", [_Other]),
+    {noreply, St}.
+
+terminate(_, St) ->
+    St.
+
+code_change(_,_,_) ->
+    ok.
+
+%%
+%% Default authentication module callbacks
+%%
+auth(_User, _Pass) ->
+    false.
 
 %%
 %% Control channel setup
 %%
 control(Srv, Listen) ->
+    put(ftpd, Srv),
     case gen_tcp:accept(Listen) of
 	{ok,S} ->
 	    Srv ! {accepted, self()},
-	    control_init(Srv, S);
-	Error ->
+	    control_init(S);
+	_Error ->
 	    exit(bad_accept)
     end.
 
 %% 
 %% Control channel init
 %%
-control_init(Srv, Ctl) ->
+control_init(Ctl) ->
     case inet:peername(Ctl) of
 	{ok,{Addr,Port}} ->
 	    case call({is_allowed,Addr,Port}) of
 		true ->
-		    ctl_loop_init(Ctl, call(rootwd),{Addr,Port-1});
+		    ctl_loop_init(Ctl, {Addr,Port-1});
 		false ->
 		    gen_tcp:close(Ctl)
 	    end;
-	{error,Err} ->
-	    io:format("ftpd: error in inet:peername ~p~n",[Err]),
+	{error,_Err} ->
+	    ?dbg("ftpd: error in inet:peername ~p~n",[_Err]),
 	    gen_tcp:close(Ctl)
     end.
 
-ctl_loop_init(Ctl, Root, DefaultDataPort) ->
-    {ok,Name} = inet:gethostname(),
-    rsend(Ctl,220, Name ++ " Erlang Ftp server 1.0 ready."),
-    ctl_loop(Ctl, #cstate { rootwd = Root,
-			    data_port = DefaultDataPort,
-			    def_data_port = DefaultDataPort }, []).
+ctl_loop_init(Ctl, {ClientIP, _Port} = DefaultDataPort) ->
+    rsend(Ctl,220, [call({getcfg, #sconf.servername}),
+		    " Erlang Ftp server " ?FTPD_VSN " ready."]),
+    ctl_loop(Ctl,#cstate{rootwd = call({getcfg, #sconf.rootdir}),
+			 idle_timeout = call({getcfg, #sconf.idle_timeout}),
+			 use_utf8 = call({getcfg, #sconf.use_utf8_by_default}),
+			 iconv_cd_to_utf8 = call({getstate,
+						  #state.iconv_cd_to_utf8}),
+			 iconv_cd_from_utf8 = call({getstate,
+						    #state.iconv_cd_from_utf8}),
+			 client_ip = ClientIP,
+			 data_port = DefaultDataPort,
+			 def_data_port = DefaultDataPort }, []).
+
+-ifdef(debug).
+-define(dbg_save_line(Line), put(line, Line)).
+-else.
+-define(dbg_save_line(_), ok).
+-endif.
 
 ctl_loop(Ctl, St, Buf) ->
-    case ctl_line(Ctl,Buf) of
+    case ctl_line(Ctl,Buf,St#cstate.idle_timeout) of
 	{ok,Line,Buf1} ->
+	    ?dbg_save_line(Line),
+	    ?dbg("got <~s>\n", [Line]),
 	    case ctl_parse(Line) of
 		{Fun,Args} ->
 		    case catch Fun(Args,Ctl,St) of
 			failed -> ctl_loop(Ctl,St,Buf1);
 			quit -> true;
-			init -> ctl_loop_init(Ctl, St#cstate.rootwd,
-					      St#cstate.def_data_port);
+			init -> ctl_loop_init(Ctl, St#cstate.def_data_port);
 			St1 when record(St1, cstate) ->
 			    ctl_loop(Ctl,St1,Buf1);
-			_ -> %% Crash etc
-			    rsend(Ctl,501,"argument error: " ++ Line),
+			_Err -> %% Crash etc - e.g. bad input from client
+			    ?dbg("ftpd crash: ~p", [_Err]),
+			    rsend(Ctl,501,["argument error: ", Line]),
 			    ctl_loop(Ctl,St,Buf1)
 		    end;
 		error ->
-		    rsend(Ctl,500,"syntax error: " ++ Line),
+		    rsend(Ctl,500, ["syntax error: ", Line]),
 		    ctl_loop(Ctl, St, Buf1)
 	    end;
+	{error, timeout} ->
+	    rsend(Ctl,421,"Idle timeout; closing control connection"),
+	    true;
 	{error,closed} ->
 	    true
     end.
@@ -285,60 +372,127 @@ ctl_parse([L1,L2,L3 | T]) ->
 ctl_parse(_) -> error.
 
 
-ctl_parse(user, Arg) -> {fun user/3, Arg};
-ctl_parse(pass, Arg) -> {fun pass/3, Arg};
-ctl_parse(acct, Arg) -> {fun cni/3, Arg};
-ctl_parse(cwd, Arg) -> {fun cwd/3, Arg};
+ctl_parse(abor,Arg) -> {fun cni/3, Arg};    % might be implemented
+ctl_parse(acct, Arg) -> {fun cni/3, Arg};   % should probably not be implemented
+ctl_parse(allo,Arg) -> {fun allo/3, Arg};
+ctl_parse(appe,Arg) -> {fun appe/3, Arg};
 ctl_parse(cdup,Arg) -> {fun cdup/3, Arg};
-ctl_parse(smnt,Arg) -> {fun cni/3, Arg};
+ctl_parse(clnt,Arg) -> {fun clnt/3, Arg};
+ctl_parse(cwd, Arg) -> {fun cwd/3, Arg};
+ctl_parse(dele,Arg) -> {fun dele/3, Arg};
+ctl_parse(feat,Arg) -> {fun feat/3, Arg};
+ctl_parse(help,Arg) -> {fun help/3, Arg};
+ctl_parse(list,Arg) -> {fun lst/3, Arg};
+ctl_parse(mdtm,Arg)  -> {fun mdtm/3, Arg};
+ctl_parse(mkd,Arg)  -> {fun mkd/3, Arg};
+ctl_parse(mode,Arg) -> {fun mode/3, Arg};
+ctl_parse(nlst,Arg) -> {fun nlst/3, Arg};
+ctl_parse(noop,Arg) -> {fun noop/3, Arg};
+ctl_parse(opts,Arg) -> {fun opts/3, Arg};
+ctl_parse(pass, Arg) -> {fun pass/3, Arg};
+ctl_parse(pasv,Arg) -> {fun pasv/3, Arg};
+ctl_parse(port,Arg) -> {fun port/3, Arg};
+ctl_parse(pwd,Arg)  -> {fun pwd/3, Arg};
 ctl_parse(quit,Arg) -> {fun quit/3 ,Arg};
 ctl_parse(rein,Arg) -> {fun rein/3, Arg};
-ctl_parse(port,Arg) -> {fun port/3, Arg};
-ctl_parse(pasv,Arg) -> {fun pasv/3, Arg};
-ctl_parse(type,Arg) -> {fun type/3, Arg};
-ctl_parse(stru,Arg) -> {fun stru/3, Arg};
-ctl_parse(mode,Arg) -> {fun mode/3, Arg};
+ctl_parse(rest,Arg) -> {fun rest/3, Arg};
 ctl_parse(retr,Arg) -> {fun retr/3, Arg};
-ctl_parse(stor,Arg) -> {fun stor/3, Arg};
-ctl_parse(stou,Arg) -> {fun cni/3, Arg};
-ctl_parse(appe,Arg) -> {fun cni/3, Arg};
-ctl_parse(allo,Arg) -> {fun cni/3, Arg};
-ctl_parse(rest,Arg) -> {fun cni/3, Arg};
-ctl_parse(rnfr,Arg) -> {fun cni/3, Arg};
-ctl_parse(rnto,Arg) -> {fun cni/3, Arg};
-ctl_parse(abor,Arg) -> {fun cni/3, Arg};
-ctl_parse(dele,Arg) -> {fun dele/3, Arg};
 ctl_parse(rmd,Arg)  -> {fun rmd/3, Arg};
-ctl_parse(xrmd,Arg) -> {fun rmd/3, Arg};
-ctl_parse(pwd,Arg)  -> {fun pwd/3, Arg};
-ctl_parse(xpwd,Arg) -> {fun pwd/3, Arg};
-ctl_parse(mkd,Arg)  -> {fun mkd/3, Arg};
+ctl_parse(rnfr,Arg) -> {fun rnfr/3, Arg};
+ctl_parse(rnto,Arg) -> {fun rnto/3, Arg};
+ctl_parse(site,Arg) -> {fun cni/3, Arg};   % might be implemented (CHGRP, CHMOD)
+ctl_parse(size,Arg) -> {fun size/3, Arg};
+ctl_parse(smnt,Arg) -> {fun cni/3, Arg};   % should probably not be implemented
+ctl_parse(stat,Arg) -> {fun stat/3, Arg}; 
+ctl_parse(stor,Arg) -> {fun stor/3, Arg};
+ctl_parse(stou,Arg) -> {fun stou/3, Arg};
+ctl_parse(stru,Arg) -> {fun stru/3, Arg};
+ctl_parse(syst,Arg) -> {fun syst/3, Arg};
+ctl_parse(type,Arg) -> {fun type/3, Arg};
+ctl_parse(user, Arg) -> {fun user/3, Arg};
+ctl_parse(xcup,Arg) -> {fun cdup/3, Arg};
+ctl_parse(xcwd, Arg) -> {fun cwd/3, Arg};
 ctl_parse(xmkd,Arg) -> {fun mkd/3, Arg};
-ctl_parse(list,Arg) -> {fun lst/3, Arg};
-ctl_parse(nlst,Arg) -> {fun nlst/3, Arg};
-ctl_parse(site,Arg) -> {fun cni/3, Arg};
-ctl_parse(syst,Arg) -> {fun cni/3, Arg};
-ctl_parse(stat,Arg) -> {fun cni/3, Arg};
-ctl_parse(help,Arg) -> {fun help/3, Arg};
-ctl_parse(noop,Arg) -> {fun noop/3, Arg};
+ctl_parse(xpwd,Arg) -> {fun pwd/3, Arg};
+ctl_parse(xrmd,Arg) -> {fun rmd/3, Arg};
 ctl_parse(Cmd,Arg) ->  {fun cbad/3,{Cmd,Arg}}.
 
-%% Commands
-%% Reply wiht {ok, NewState}
-%% or {error, Code}
-%%
-user(Name, S, St) ->
-    rsend(S, 331),
-    St#cstate { ust = ident, user = Name, homewd = "/", wd = "/" }.
 
-pass(Password, S, St) ->
-    assert_ident(S, St),
+opts_parse([L1,L2,L3 | T]) ->
+    C1 = alpha(L1),
+    C2 = alpha(L2),
+    C3 = alpha(L3),
+    case T of
+	[] ->
+	    opts_parse(list_to_atom([C1,C2,C3]), []);
+	[$ | Arg] ->
+	    opts_parse(list_to_atom([C1,C2,C3]),Arg);
+	[C4] ->
+	    opts_parse(list_to_atom([C1,C2,C3,alnum(C4)]),[]);
+	[C4,$  | Arg] ->
+	    opts_parse(list_to_atom([C1,C2,C3,alnum(C4)]),Arg);
+	[C4,C5] ->
+	    opts_parse(list_to_atom([C1,C2,C3,alnum(C4),alnum(C5)]),[]);
+	[C4,C5,$  | Arg] ->
+	    opts_parse(list_to_atom([C1,C2,C3,alnum(C4),alnum(C5)]),Arg);
+	_ -> error
+    end;
+opts_parse(_) -> error.
+
+opts_parse(utf8, Arg) -> {fun opts_utf8/3, Arg};    % ms winwdows ftp 
+opts_parse('utf-8', Arg) -> {fun opts_utf8/3, Arg}. % utf-8-option-00
+ 
+
+%%%-----------------------------------------------------------------
+%%% Commands
+%%% Reply wiht NewState | failed | init | quit | exit(Error)
+%%%-----------------------------------------------------------------
+
+%%-----------------------------------------------------------------
+%% Access Control Commands
+%%-----------------------------------------------------------------
+user(Name, Ctl, St) ->
+    Users = call({getcfg, #sconf.users}),
+    User = 
+	case lists:keysearch(Name, #user.name, Users) of
+	    {value, U} when U#user.passwd == email_addr ->
+		rsend(Ctl, 331, "Anonymous login ok; send your email address"
+		                " as your password"),
+		U;
+	    {value, U} ->
+		rsend(Ctl, 331),
+		U;
+	    false ->
+		rsend(Ctl, 331),
+		Name
+	end,
+    St#cstate { ust = ident, user = User, homewd = "/", wd = "/" }.
+
+pass(Password, Ctl, St) ->
+    assert_ident(Ctl, St),
     %% check that we have executed user and need a password
     %% then that the password is valid
-    rsend(S, 230, "User " ++ St#cstate.user ++ " logged in, proceed"),
-    St#cstate { password = Password, ust = valid }.
-
-
+    case St#cstate.user of
+	U when U#user.passwd == email_addr ->
+	    rsend(Ctl, 230, ["User ", U#user.name, " logged in, proceed"]),
+	    St#cstate{ust = valid};
+	U when U#user.passwd == Password ->
+	    rsend(Ctl, 230, ["User ", U#user.name, " logged in, proceed"]),
+	    St#cstate{ust = valid};
+	U when record(U, user) ->
+	    rsend(Ctl, 530, "Login incorrect"),
+	    St;
+	UserName ->
+	    AuthMod = call({getcfg, #sconf.auth_mod}),
+	    case AuthMod:auth(St#cstate.user, Password) of
+		true ->
+		    rsend(Ctl, 230, ["User ", UserName, " logged in, proceed"]),
+		    St#cstate{ust = valid};
+		false ->
+		    rsend(Ctl, 530, "Login incorrect"),
+		    St
+	    end
+    end.
 
 %% Change working directory we must keep an absoulte path (emulated
 %% so that symbolic links are transparent).
@@ -346,313 +500,652 @@ cwd(Arg, Ctl, St) ->
     assert_valid(Ctl, St),
     Dir = rel_name(Arg, St#cstate.wd),
     assert_exists(Ctl, St#cstate.rootwd, Dir, directory),
-    rsend(Ctl, 250, "new directory \"" ++ abs_name(Dir) ++ "\""),
+    rsend(Ctl, 250, ["new directory \"", abs_name(Dir), "\""]),
     St#cstate { wd = Dir }.
 
-mkd(Arg, S, St) ->
-    assert_valid(S, St),
-    DirR = rel_name(Arg, St#cstate.wd),
-    DirA = abs_name(DirR),
-    Dir = filename:join(St#cstate.rootwd, DirR),
-    case file:make_dir(Dir) of
-	ok ->
-	    rsend(S, 257, " \"" ++ DirA ++ "\" directory created");
-	{error,eexist} ->
-	    rsend(S, 521, " \"" ++ DirA ++ "\" directory exists");
-	{error,Err} ->
-	    rsend(S, 521, " \"" ++ DirA ++ "\" " ++ 
-		  erl_posix_msg:message(Err))
-    end,
-    St.
-
-dele(Arg, S, St) ->
-    assert_valid(S, St),
-    FileR = rel_name(Arg, St#cstate.wd),
-    FileA = abs_name(FileR),
-    File =  filename:join(St#cstate.rootwd, FileR),
-    case file:delete(File) of
-	ok ->
-	    rsend(S, 250, "\"" ++ FileA ++ "\" deleted");
-	{error,Err} ->
-	    rsend(S, 550, "\"" ++ FileA ++ "\" " ++ 
-		  erl_posix_msg:message(Err))
-    end,
-    St. 
-
-rmd(Arg, S, St) ->
-    assert_valid(S, St),
-    DirR = rel_name(Arg, St#cstate.wd),
-    DirA = abs_name(DirR),
-    Dir =  filename:join(St#cstate.rootwd, DirR),
-    case file:del_dir(Dir) of
-	ok ->
-	    rsend(S, 250, " \"" ++ DirA ++ "\" removed");
-	{error,Err} ->
-	    rsend(S, 550, "\"" ++ DirA ++ "\" " ++ 
-		  erl_posix_msg:message(Err))
-    end,
-    St.    
-    
 %% Change to parent directory
-cdup(Arg, S, St) ->
-    assert_valid(S, St),
+cdup(_Arg, Ctl, St) ->
+    assert_valid(Ctl, St),
     DirR = rel_name("..", St#cstate.wd),
     DirA = abs_name(DirR),
-    assert_exists(S, St#cstate.rootwd, DirR, directory),
-    rsend(S, 250, "directory changed to \"" ++ DirA ++ "\""),
+    assert_exists(Ctl, St#cstate.rootwd, DirR, directory),
+    rsend(Ctl, 250, ["directory changed to \"", DirA, "\""]),
     St#cstate { wd = DirR }.
 
-pwd(Arg, S, St) ->
-    assert_valid(S, St),
-    rsend(S, 257, "\"" ++ abs_name(St#cstate.wd) ++ "\""),
+pwd(_Arg, Ctl, St) ->
+    assert_valid(Ctl, St),
+    rsend(Ctl, 257, ["\"", abs_name(St#cstate.wd), "\""]),
     St.
 
-quit(_, S, St) ->
-    rsend(S, 221),
-    gen_tcp:close(S),
+quit(_, Ctl, _St) ->
+    rsend(Ctl, 221),
+    gen_tcp:close(Ctl),
     quit.
 
-noop(_, S, St) ->
-    rsend(S, 200),
-    St.
-
-mode(Arg, S, St) ->
-    assert_valid(S, St),
-    Mode = case alpha(hd(Arg)) of
-	       $s -> stream;
-	       $b -> block;
-	       $c -> compressed
-	   end,
-    rsend(S, 200, "new mode " ++ atom_to_list(Mode)),
-    St#cstate { mode = Mode }.
-
-stru(Arg, S, St) ->    
-    assert_valid(S, St),
-    Stru = case alpha(hd(Arg)) of
-	       $f -> file;
-	       $r -> record;
-	       $p -> page
-	   end,
-    rsend(S, 200, "new file structure " ++ atom_to_list(Stru)),
-    St#cstate { structure = Stru }.    
-
-type(Arg, S, St) ->
-    assert_valid(S, St),
-    Type = case alpha(hd(Arg)) of
-	       $i -> {image,nonprint,8};
-	       $a -> {ascii,nonprint,8};
-	       _ -> rsend(S, 504), throw(St)
-	   end,
-    rsend(S,200,"new type " ++ atom_to_list(element(1,Type))),
-    St#cstate { type = Type }.
-		    
-rein(_, S, St) ->
+rein(_, _Ctl, St) ->
     close_listen(St),
     init.
 
-pasv(Arg, S, St) ->
-    assert_valid(S, St),
+clnt(Arg, Ctl, St) ->
+    assert_valid(Ctl, St),
+    rsend(Ctl, 200),
+    St#cstate{client = Arg}.
+
+%%-----------------------------------------------------------------
+%% Transfer Parameter Commands
+%%-----------------------------------------------------------------
+port(Arg, Ctl, St) ->
+    assert_valid(Ctl, St),
+    assert_arg(Ctl, Arg),
     St1 = close_listen(St),
-    {ok,{Addr,_}} = inet:sockname(S),
+    case parse_address(Arg) of
+	{ok, {Addr, Port} = AddrPort} when Addr == St#cstate.client_ip,
+	                                   Port >= 1024 ->
+	    rsend(Ctl,200),
+	    St1#cstate { data_port = AddrPort, listen = undefined };
+	{ok, {Addr, Port}} ->
+	    log(notice, "PORT to ~s:~p rejected, should have been from ~s "
+		"or port >= 1024",
+		[inet_parse:ntoa(Addr), Port,
+		 inet_parse:ntoa(St#cstate.client_ip)])
+    end.
+
+pasv(_Arg, Ctl, St) ->
+    assert_valid(Ctl, St),
+    St1 = close_listen(St),
+    {ok,{Addr,_}} = inet:sockname(Ctl),
     case gen_tcp:listen(0, [{active,false}, binary]) of
 	{ok,L} ->
 	    {ok,{_,Port}} = inet:sockname(L),
-	    rsend(S,227,"Entering Passive Mode (" ++
-		  format_address(Addr,Port) ++ ")."),
+	    rsend(Ctl,227,["Entering Passive Mode (",
+			   format_address(Addr,Port), ")."]),
 	    St1#cstate { listen = L };
 	{error,Err} ->
-	    rsend(S, 425, erl_posix_msg:message(Err)),
+	    rsend(Ctl, 425, erl_posix_msg:message(Err)),
 	    St1
     end.
 
-port(Arg, S, St) ->
-    assert_valid(S, St),
-    St1 = close_listen(St),
-    {ok,AddrPort} = parse_address(Arg),
-    rsend(S,200),
-    St1#cstate { data_port = AddrPort, listen = undefined }.
-
-
-lst(Arg, Ctl, St) ->
+type(Arg, Ctl, St) ->
     assert_valid(Ctl, St),
-    DirR = rel_name(Arg, St#cstate.wd),
-    assert_exists(Ctl, St#cstate.rootwd, DirR, directory),
-    Dir = filename:join(St#cstate.rootwd, DirR),
-    {S,St1} = open_data(Ctl, St),
-    dir_list(Ctl, S, Dir, DirR, list),
-    gen_tcp:close(S),
-    %% rsend(Ctl, 200),
-    St1.
-
-    
-nlst(Arg,Ctl,St) ->
+    Type = case alpha(hd(Arg)) of
+	       $i -> {image,nonprint,8};
+	       $a -> {ascii,nonprint,8};
+	       $l -> {image,nonprint,8}; % should really check that it's "L 8"
+	       _ -> rsend(Ctl, 504), throw(St)
+	   end,
+    rsend(Ctl,200,["new type ", atom_to_list(element(1,Type))]),
+    St#cstate { type = Type }.
+		    
+stru(Arg, Ctl, St) ->    
     assert_valid(Ctl, St),
-    DirR = rel_name(Arg, St#cstate.wd),
-    assert_exists(Ctl, St#cstate.rootwd, DirR, directory),
-    Dir = filename:join(St#cstate.rootwd, DirR),
-    {S,St1} = open_data(Ctl, St),
-    dir_list(Ctl, S, Dir, DirR, nlst),
-    gen_tcp:close(S),
-    %% rsend(Ctl, 200), 
-    St1.
-    
+    assert_arg(Ctl, Arg),
+    case alpha(hd(Arg)) of
+	$f ->
+	    rsend(Ctl, 200, ["new file structure ", [hd(Arg)]]);
+	Char when Char == $r; Char == $p ->
+	    %% proftpd, wu-ftpd and ms-ftp do not support R and P
+	    %% rfc1123 recommends against implementing P
+	    rsend(Ctl, 504, [hd(Arg) | " unsupported structure type"]);
+	_ ->
+	    rsend(Ctl, 501)
+    end,
+    St.
+
+mode(Arg, Ctl, St) ->
+    assert_valid(Ctl, St),
+    case alpha(hd(Arg)) of
+	$s -> 
+	    rsend(Ctl, 200, ["new mode ", [hd(Arg)]]);
+	Char when Char == $b; Char == $c ->
+	    %% proftpd and ms-ftp do not support B and C
+	    rsend(Ctl, 504, [hd(Arg) | " unsupported mode"]);
+	_ ->
+	    rsend(Ctl, 501)
+    end,
+    St.
+
+%%-----------------------------------------------------------------
+%% Ftp Service Commands
+%%-----------------------------------------------------------------
+%% retrieve a file over a data connection file name is given by Arg
+retr(Arg, Ctl, St) ->
+    assert_valid(Ctl, St),
+    assert_arg(Ctl, Arg),
+    NameR = rel_name(from_utf8(Arg,St), St#cstate.wd),
+    Name = filename:join(St#cstate.rootwd, NameR),
+    authorize(?AUTH_READ, abs_name(NameR), Ctl, St),
+    case file:open(Name, [read | file_mode(St)]) of
+	{ok,Fd} ->
+	    {ok, #file_info{size = FileSize}} = file:read_file_info(Name),
+	    case St#cstate.state of
+		{restart_pos, Pos} when Pos > FileSize ->
+		    rsend(Ctl, 554, "REST position invalid"),
+		    file:close(Fd),
+		    throw(failed);
+		{restart_pos, Pos} ->
+		    file:position(Fd, Pos);
+		_ ->
+		    ok
+	    end,
+	    {Data,St1} = open_data(Ctl, St#cstate{state = undefined}),
+	    case send_file(Fd, 1024, 0, Data) of
+		{ok,Count} ->
+		    rsend(Ctl,226, ["closing data connection, sent",
+				    integer_to_list(Count), " bytes"]);
+		    %%rsend(Ctl,200);
+
+		{error,Err} ->
+		    rsend(Ctl,226, "closing data connection, aborted"),
+		    rsend(Ctl,550, [" error ",  erl_posix_msg:message(Err)])
+	    end,
+	    gen_tcp:close(Data),
+	    file:close(Fd),
+	    St1;
+	{error,Err} ->
+	    rsend(Ctl,550, ["error ", erl_posix_msg:message(Err)]),
+	    St
+    end.
+
 %%
 %% store file from data connection onto file given by Arg
 %%
 stor(Arg, Ctl, St) ->
     assert_valid(Ctl, St),
-    NameR = rel_name(Arg, St#cstate.wd),
-    NameA = abs_name(NameR),
+    assert_arg(Ctl, Arg),
+    NameR = rel_name(from_utf8(Arg,St), St#cstate.wd),
+    authorize(?AUTH_WRITE, abs_name(NameR), Ctl, St),
     Name = filename:join(St#cstate.rootwd, NameR),
-    case file:open(Name, [write | file_mode(St)]) of
-	{ok,Fd} ->
-	    {S,St1} = open_data(Ctl, St),
-	    case recv_file(S, 1024, 0, Fd) of
-		{ok,Count} ->
-		    rsend(Ctl,226, "closing data connection," ++
-			  " recived " ++ 
-			  integer_to_list(Count) ++ " bytes");
-		    %%rsend(Ctl,200);
+    do_store(Name, Ctl, St, stor).
 
-		{error,Err} ->
-		    rsend(Ctl,226, "closing data connection," ++
-			  " aborted"),
-		    rsend(Ctl,550,
-			  " error " ++
-			  erl_posix_msg:message(Err))
-	    end,
-	    gen_tcp:close(S),
-	    file:close(Fd),
-	    St1;
-	{error,Err} ->
-	    rsend(Ctl,550,
-		  " error " ++
-		  erl_posix_msg:message(Err)),
-	    St
-    end.
-
-%%
-%% retrive a file over a data connection file name is given by Arg
-%%
-retr(Arg, Ctl, St) ->
+stou(_Arg, Ctl, St) ->
     assert_valid(Ctl, St),
-    NameR = rel_name(Arg, St#cstate.wd),
-    Name = filename:join(St#cstate.rootwd, NameR),
-    case file:open(Name, [read | file_mode(St)]) of
-	{ok,Fd} ->
-	    {S,St1} = open_data(Ctl, St),
-	    case send_file(Fd, 1024, 0, S) of
-		{ok,Count} ->
-		    rsend(Ctl,226, "closing data connection," ++
-			  " sent " ++ 
-			  integer_to_list(Count) ++ " bytes");
-		    %%rsend(Ctl,200);
+    authorize(?AUTH_WRITE, St#cstate.wd, Ctl, St),
+    Dir = filename:join(St#cstate.rootwd, St#cstate.wd),
+    Fd = generate_unique(call({getcfg, #sconf.unique_prefix}), Dir, Ctl, St),
+    do_store_fd(Fd, Ctl, St).
 
-		{error,Err} ->
-		    rsend(Ctl,226, "closing data connection," ++
-			  " aborted"),
-		    rsend(Ctl,550,
-			  " error " ++
-			  erl_posix_msg:message(Err))
+appe(Arg, Ctl, St) ->
+    assert_valid(Ctl, St),
+    assert_arg(Ctl, Arg),
+    NameR = rel_name(from_utf8(Arg,St), St#cstate.wd),
+    authorize(?AUTH_WRITE, abs_name(NameR), Ctl, St),
+    Name = filename:join(St#cstate.rootwd, NameR),
+    do_store(Name, Ctl, St, appe).
+    
+do_store(Name, Ctl, St, Cmd) ->
+    Mode = if Cmd == appe -> append;
+	      true -> write
+	   end,
+    case file:open(Name, [Mode | file_mode(St)]) of
+	{ok,Fd} ->
+	    {ok, #file_info{size = FileSize}} = file:read_file_info(Name),
+	    case St#cstate.state of
+		{restart_pos, Pos} when Pos > FileSize ->
+		    rsend(Ctl, 554, "REST position invalid"),
+		    file:close(Fd),
+		    throw(failed);
+		{restart_pos, Pos} ->
+		    file:position(Fd, Pos);
+		_ ->
+		    ok
 	    end,
-	    gen_tcp:close(S),
-	    file:close(Fd),
-	    St1;
+	    do_store_fd(Fd, Ctl, St);
 	{error,Err} ->
-	    rsend(Ctl,550,
-		  " error " ++
-		  erl_posix_msg:message(Err)),
+	    rsend(Ctl,550, ["error ", erl_posix_msg:message(Err)]),
 	    St
     end.
 
-%% command not implemented
-cni(_, S, St) ->
-    rsend(S, 502),    
+do_store_fd(Fd, Ctl, St) ->
+    {Data,St1} = open_data(Ctl, St),
+    case recv_file(Data, 1024, 0, Fd) of
+	{ok,Count} ->
+	    rsend(Ctl,226, ["closing data connection, received ",
+			    integer_to_list(Count), " bytes"]);
+	{error,Err} ->
+	    rsend(Ctl,226, "closing data connection, aborted"),
+	    rsend(Ctl,550, ["error ", erl_posix_msg:message(Err)])
+    end,
+    gen_tcp:close(Data),
+    file:close(Fd),
+    St1.
+
+allo(_Arg, Ctl, St) ->
+    assert_valid(Ctl, St),
+    rsend(Ctl, 202, "No storage allocation necessary"),
     St.
 
+rest(Arg, Ctl, St) -> 
+    assert_valid(Ctl, St),
+    assert_arg(Ctl, Arg),
+    case type(St) of
+	ascii ->
+	    rsend(Ctl, 501, "REST not allowed in ASCII mode"),
+	    St;
+	image ->
+	    case list_to_integer(Arg) of
+		Pos when integer(Pos), Pos >= 0 ->
+		    rsend(Ctl, 350, ["Restarting at ", integer_to_list(Pos),
+				     " send STOR or RETR to start transfer"]),
+		    St#cstate{state = {restart_pos, Pos}}
+	    end
+    end.
+
+rnfr(Arg, Ctl, St) ->
+    assert_valid(Ctl, St),
+    assert_arg(Ctl, Arg),
+    NameR = rel_name(from_utf8(Arg,St), St#cstate.wd),
+    authorize(?AUTH_DELETE, abs_name(NameR), Ctl, St),
+    Name = filename:join(St#cstate.rootwd, NameR),
+    case file:read_file_info(Name) of
+	{ok, _} ->
+	    rsend(Ctl, 350, "File ok, send RNTO to rename"),
+	    St#cstate{state = {rename_from, Name}};
+	{error, Err} ->
+	    rsend(Ctl, 550, ["error ", erl_posix_msg:message(Err)]),
+	    St
+    end.
+    
+rnto(Arg, Ctl, St) ->
+    assert_valid(Ctl, St),
+    assert_arg(Ctl, Arg),
+    NameR = rel_name(from_utf8(Arg,St), St#cstate.wd),
+    authorize(?AUTH_WRITE, abs_name(NameR), Ctl, St),
+    Name = filename:join(St#cstate.rootwd, NameR),
+    case St#cstate.state of
+	{rename_from, From} ->
+	    case file:rename(From, Name) of
+		ok ->
+		    rsend(Ctl, 250);
+		{error, exdev} ->
+		    case file:copy(From, Name) of
+			{ok, _} ->
+			    file:delete(From),
+			    rsend(Ctl, 250);
+			{error, Err} ->
+			    rsend(Ctl, 550, ["error ",
+					     erl_posix_msg:message(Err)])
+		    end;
+		{error, Err} ->
+		    rsend(Ctl, 550, ["error ", erl_posix_msg:message(Err)])
+	    end;
+	_ ->
+	    rsend(Ctl, 503)
+    end,
+    St#cstate{state = undefined}.
+
+%% abor(_Arg, Ctl, St)
+
+dele(Arg, Ctl, St) ->
+    assert_valid(Ctl, St),
+    assert_arg(Ctl, Arg),
+    FileR = rel_name(from_utf8(Arg,St), St#cstate.wd),
+    authorize(?AUTH_DELETE, abs_name(FileR), Ctl, St),
+    FileA = abs_name(FileR),
+    File = filename:join(St#cstate.rootwd, FileR),
+    case file:delete(File) of
+	ok ->
+	    rsend(Ctl, 250, ["\"", FileA, "\" deleted"]);
+	{error,Err} ->
+	    rsend(Ctl, 550, ["\"", FileA, "\" ",  erl_posix_msg:message(Err)])
+    end,
+    St. 
+
+rmd(Arg, Ctl, St) ->
+    assert_valid(Ctl, St),
+    assert_arg(Ctl, Arg),
+    DirR = rel_name(from_utf8(Arg,St), St#cstate.wd),
+    authorize(?AUTH_DELETE, abs_name(DirR), Ctl, St),
+    DirA = abs_name(DirR),
+    Dir = filename:join(St#cstate.rootwd, DirR),
+    case file:del_dir(Dir) of
+	ok ->
+	    rsend(Ctl, 250, [" \"", DirA, "\" removed"]);
+	{error,Err} ->
+	    rsend(Ctl, 550, ["\"", DirA, "\" ", erl_posix_msg:message(Err)])
+    end,
+    St.    
+
+mkd(Arg, Ctl, St) ->
+    assert_valid(Ctl, St),
+    assert_arg(Ctl, Arg),
+    DirR = rel_name(from_utf8(Arg,St), St#cstate.wd),
+    authorize(?AUTH_WRITE, abs_name(DirR), Ctl, St),
+    DirA = abs_name(DirR),
+    Dir = filename:join(St#cstate.rootwd, DirR),
+    case file:make_dir(Dir) of
+	ok ->
+	    rsend(Ctl, 257, [" \"", DirA, "\" directory created"]);
+	{error,eexist} ->
+	    rsend(Ctl, 521, [" \"", DirA, "\" directory exists"]);
+	{error,Err} ->
+	    rsend(Ctl, 521, [" \"", DirA, "\" ", 
+		  erl_posix_msg:message(Err)])
+    end,
+    St.
+
+lst(Arg, Ctl, St) ->
+    assert_valid(Ctl, St),
+    DirR = rel_name(from_utf8(Arg,St), St#cstate.wd),
+    authorize(?AUTH_READ, abs_name(DirR), Ctl, St),
+    assert_exists(Ctl, St#cstate.rootwd, DirR, directory),
+    Dir = filename:join(St#cstate.rootwd, DirR),
+    {Data,St1} = open_data(Ctl, St),
+    dir_list(Ctl, Data, Dir, DirR, St, list),
+    gen_tcp:close(Data),
+    St1.
+
+    
+nlst(Arg,Ctl,St) ->
+    assert_valid(Ctl, St),
+    DirR = rel_name(from_utf8(Arg,St), St#cstate.wd),
+    authorize(?AUTH_READ, abs_name(DirR), Ctl, St),
+    assert_exists(Ctl, St#cstate.rootwd, DirR, directory),
+    Dir = filename:join(St#cstate.rootwd, DirR),
+    {Data,St1} = open_data(Ctl, St),
+    dir_list(Ctl, Data, Dir, DirR, St, nlst),
+    gen_tcp:close(Data),
+    St1.
+    
+
+%% site    
+
+syst(_Arg, Ctl, St) ->
+    assert_valid(Ctl, St),
+    %% meaningless, but recommended and used by many servers
+    rsend(Ctl, 215, "UNIX Type: L8"),
+    St.
+
+stat(Arg, Ctl, St) ->
+    assert_valid(Ctl, St),
+    if Arg == [] ->
+	    rmsend(Ctl, 211,
+		   ["Status of ", call({getcfg, #sconf.servername})],
+		   [["  Connected from ", inet_parse:ntoa(St#cstate.client_ip)],
+		    ["  Logged in as ", username(St)],
+		    ["  TYPE: ",  upcase(atom_to_list(type(St))),
+		     ", STRUcture: File, MODE: Stream"]],
+		   "END");
+       true ->
+	    exit(nyi) %% FIXME
+    end,
+    St.
+
+size(Arg, Ctl, St) ->
+    assert_valid(Ctl, St),
+    assert_arg(Ctl, Arg),
+    case type(St) of
+	ascii ->
+	    rsend(Ctl, 550, "SIZE not allowed in ASCII mode");
+	image ->
+	    FileR = rel_name(from_utf8(Arg,St), St#cstate.wd),
+	    authorize(?AUTH_READ, abs_name(FileR), Ctl, St),
+	    File = filename:join(St#cstate.rootwd, FileR),
+	    case file:read_file_info(File) of
+		{ok, #file_info{type = regular, size = Size}} ->
+		    rsend(Ctl, 213, integer_to_list(Size));
+		{ok, _} ->
+		    rsend(Ctl, 550, ["\"", FileR, "\" is not a regular file"]);
+		{error,Err} ->
+		    rsend(Ctl, 550, ["\"", FileR, "\" ", 
+				     erl_posix_msg:message(Err)])
+	    end
+    end,
+    St. 
+
+%% File Modification Time
+mdtm(Arg, Ctl, St) ->
+    assert_valid(Ctl, St),
+    assert_arg(Ctl, Arg),
+    FileR = rel_name(from_utf8(Arg,St), St#cstate.wd),
+    authorize(?AUTH_READ, abs_name(FileR), Ctl, St),
+    File = filename:join(St#cstate.rootwd, FileR),
+    case file:read_file_info(File) of
+	{ok, #file_info{type = regular, mtime = MTime}} ->
+	    rsend(Ctl, 213, timeval(MTime));
+	{ok, _} ->
+	    rsend(Ctl, 550, ["\"" , FileR, "\" is not a regular file"]);
+	{error,Err} ->
+	    rsend(Ctl, 550, ["\"", FileR, "\" ", erl_posix_msg:message(Err)])
+    end,
+    St. 
+
+%% OPTS UTF8 ON|OFF
+opts_utf8(OptArg, Ctl, St) when ?HAS_ICONV(St) ->
+    case upcase(OptArg) of
+	"ON" ++ _ ->
+	    rsend(Ctl, 200, "Enabled UTF8"),
+	    St#cstate{use_utf8 = true};
+	"OFF" ++ _ ->
+	    rsend(Ctl, 200, "Disabled UTF8"),
+	    St#cstate{use_utf8 = false}
+    end.
+
+noop(_, Ctl, St) ->
+    rsend(Ctl, 200),
+    St.
+
+feat(_, Ctl, St) ->
+    rmsend(Ctl, 211,
+	   "Extensions supported:",
+	   ["  SIZE",
+	    "  MDTM",
+	    "  REST STREAM",
+	    "  CLNT"] ++
+	   if ?HAS_ICONV(St) ->
+		   ["  UTF8"];
+	      true ->
+		   []
+	   end,
+	   "END"),
+    St.
+
+%% opts must be implemented when feat is implemented.
+opts(Arg, Ctl, St) ->
+    case opts_parse(Arg) of
+	{OptFun, OptArgs} ->
+	    %% in case of a crash, we'll return 501
+	    OptFun(OptArgs, Ctl, St);
+	error ->
+	    rsend(Ctl, 501),
+	    St
+    end.
+
 %% help
-help(_, S, St) ->
-    rmsend(S, 214,
+%% idea: could implement the command: "help cmd" by calling the cmd fun like
+%% this: cmd_fun(help) -> [string()]
+help(_, Ctl, St) ->
+    rmsend(Ctl, 214,
 	   "The following commands are recognized (* =>'s unimplemented).",
-	   ["  USER    PORT    STOR    MSAM*   RNTO    NLST    MKD     CDUP",
-	    "  PASS    PASV    APPE    MRSQ*   ABOR    SITE    XMKD    XCUP",
-	    "  ACCT*   TYPE    MLFL*   MRCP*   DELE    SYST    RMD     STOU",
-	    "  SMNT*   STRU    MAIL*   ALLO    CWD     STAT    XRMD    SIZE",
-	    "  REIN*   MODE    MSND*   REST    XCWD    HELP    PWD     MDTM",
-	    "  QUIT    RETR    MSOM*   RNFR    LIST    NOOP    XPWD" ],
+	   ["  USER    PORT    STOR    RNTO    NLST    MKD     CDUP",
+	    "  PASS    PASV    APPE    ABOR*   SITE*   XMKD    XCUP",
+	    "  ACCT*   TYPE    DELE    SYST    RMD     STOU    SMNT*",
+	    "  STRU    ALLO    CWD     STAT    XRMD    SIZE    REIN",
+	    "  MODE    REST    XCWD    HELP    PWD     MDTM    QUIT",
+	    "  RETR    RNFR    LIST    NOOP    XPWD    FEAT    OPTS",
+	    "  CLNT"],
 	   "Direct comments to davidw@eidetix.com."),
     St.
 
+%% command not implemented
+cni(_, Ctl, St) ->
+    rsend(Ctl, 502),    
+    St.
+
 %% bad/unkown command
-cbad({Cmd,Arg},S, St) ->
-    rsend(S, 500, "command not understood " ++ atom_to_list(Cmd) ++
-	 " " ++ Arg),
+cbad({Cmd,Arg},Ctl, St) ->
+    rsend(Ctl, 500, ["command not understood ", atom_to_list(Cmd), " ", Arg]),
     St.
 
  %% Send a single line standard message
-rsend(S, Code) ->
-    gen_tcp:send(S, [rstr(Code)++ ?CRNL]).
+rsend(Ctl, Code) ->
+    send(Ctl, Code, [rstr(Code)++ ?CRNL]).
 
 %% Send a single line reply with CRNL
-rsend(S, Code, Mesg) when integer(Code) ->
-    gen_tcp:send(S, [integer_to_list(Code)," ",Mesg, ?CRNL]).
+rsend(Ctl, Code, Mesg) when integer(Code) ->
+    send(Ctl, Code, [integer_to_list(Code)," ",Mesg, ?CRNL]).
 
 %% send a multi line reply
-rmsend(S, Code, Mesg1, Lines, Mesg2) ->
-    gen_tcp:send(S, [integer_to_list(Code),"-",Mesg1, ?CRNL,
-		     map(fun(M) -> [" ", M, ?CRNL] end, Lines),
-		     integer_to_list(Code)," ", Mesg2, ?CRNL]).
+rmsend(Ctl, Code, Mesg1, Lines, Mesg2) ->
+    send(Ctl, Code, [integer_to_list(Code),"-",Mesg1, ?CRNL,
+	     map(fun(M) -> [" ", M, ?CRNL] end, Lines),
+	     integer_to_list(Code)," ", Mesg2, ?CRNL]).
+
+
+send(Ctl, Code, Bytes) ->
+%%    ?dbg("sending <~s>\n", [Bytes]),
+    if Code >= 400 ->
+	    ?dbg("error from <~s>\n", [get(line)]),
+	    ?dbg("sending <~s>\n", [Bytes]);
+       true ->
+	    ok
+    end,
+    gen_tcp:send(Ctl, Bytes).
 
 
 %% check that Name exist and is of type Type
-assert_exists(S, Root, Name, Type) ->
+assert_exists(Ctl, Root, Name, Type) ->
     case file:read_file_info(filename:join(Root,Name)) of
 	{ok, Info} ->
 	    if Info#file_info.type == Type ->
 		    true;
 	       true ->
-		    rsend(S, 550, "\"" ++ Name ++ "\" is not a " ++
-			  if Type == directory -> "directory";
-			     true -> "file"
-			  end),
+		    rsend(Ctl, 550, ["\"", Name, "\" is not a ",
+				     if Type == directory -> "directory";
+					true -> "file"
+				     end]),
 		    throw(failed)
 	    end;
 	{error,Err} ->
-	    rsend(S, 550, "\"" ++ Name ++ "\" " ++ erl_posix_msg:message(Err)),
+	    rsend(Ctl, 550, ["\"", Name, "\" ", erl_posix_msg:message(Err)]),
 	    throw(failed)
     end.
 	    
 
 %% check that a user has logged in and report errors
-assert_valid(S, St) ->
+assert_valid(Ctl, St) ->
     case St#cstate.ust of
-	invalid -> rsend(S, 530), throw(failed);
-	ident ->  rsend(S, 331), throw(failed);
+	invalid -> rsend(Ctl, 530), throw(failed);
+	ident ->  rsend(Ctl, 331), throw(failed);
 	valid -> true
     end.
 
-assert_ident(S, St) ->
+assert_ident(Ctl, St) ->
     case St#cstate.ust of
-	invalid -> rsend(S, 530), throw(failed);
+	invalid -> rsend(Ctl, 530), throw(failed);
 	ident ->   true;
-	valid ->   rsend(S, 503), throw(failed)
+	valid ->   rsend(Ctl, 503), throw(failed)
     end.
     
+assert_arg(Ctl, "") ->
+    rsend(Ctl, 501),
+    throw(failed);
+assert_arg(_Ctl, _Arg) ->
+    true.
+
+authorize(Op, FileName, Ctl, St) ->
+    case St#cstate.user of
+	{_UserName, _Passwd, DirAccess} ->
+	    case find_dir(DirAccess, FileName) of
+		{value, {_Dir, Flags}} ->
+		    if ?bit_is_set(Flags, Op) ->
+			    true;
+		       true ->
+			    ?dbg("Dir <~s> does not allow ~p", [_Dir, Flags]),
+			    rsend(Ctl, 550, "Permission denied"),
+			    throw(failed)
+		    end;
+		_ ->
+		    ?dbg("File <~s> not found", [FileName]),
+		    rsend(Ctl, 550, "Permission denied"),
+		    throw(failed)
+	    end;
+	_UserName ->  % leave decision to file system (must fork to work!)
+	    true
+    end.
+
+find_dir([{Dir, _Flags} = H | T], FileName) ->
+    case lists:prefix(Dir, FileName) of
+	true -> {value, H};
+	false -> find_dir(T, FileName)
+    end;
+find_dir(_, _) ->
+    false.
+    
+username(St) ->
+    case St#cstate.user of
+	#user{name = UserName} ->
+	    UserName;
+	UserName ->
+	    UserName
+    end.
+
 %% return lower letter space or ?		 
 alpha(X) when X >= $A, X =< $Z -> (X-$A)+$a;
 alpha(X) when X >= $a, X =< $z -> X;
 alpha(X) when X == $  -> X;
-alpha(X) -> $?.
+alpha(_X) -> $?.
+    
+alnum(X) when X >= $0, X =< $9 -> X;
+alnum($-) -> $-;
+alnum(X) -> alpha(X).
+     
+upcase([H|T]) ->
+    if H >= $a, H =< $z -> [(H-$a)+$A | upcase(T)];
+       true -> [H | upcase(T)]
+    end;
+upcase([]) ->
+    [].
+
+from_utf8(Str, St) when ?HAS_ICONV(St), ?USE_UTF8(St) ->
+    case iconv:conv(St#cstate.iconv_cd_from_utf8, Str) of
+	{ok, BinU} -> binary_to_list(BinU);
+	_ -> Str
+    end;
+from_utf8(Str, _) ->
+    Str.
+
+to_utf8(StrU, St) when ?HAS_ICONV(St), ?USE_UTF8(St) ->
+    case iconv:conv(St#cstate.iconv_cd_to_utf8, StrU) of
+	{ok, Bin} -> binary_to_list(Bin);
+	_ -> StrU
+    end;
+to_utf8(StrU, _) ->
+    StrU.
+
+generate_unique(Prefix, Dir, Ctl, St) ->
+    generate_unique(Prefix, Dir, file_mode(St), Ctl, 0, 1000).
+
+generate_unique(Prefix, Dir, Mode, Ctl, N, Max) when N < Max ->
+    {X,Y,Z} = now(),
+    PostFix = integer_to_list(X) ++ "-" ++ integer_to_list(Y) ++ "-" ++
+              integer_to_list(Z),
+    F = Dir ++ Prefix ++ [$. | PostFix],
+    case file:open(F, [read, raw]) of
+	{error, enoent} ->
+	    case file:open(F, [write | Mode]) of
+		{ok, Fd} -> Fd;
+		{error, Err} ->
+		    rsend(Ctl,550, ["error ", erl_posix_msg:message(Err)]),
+		    throw(failed)
+	    end;
+	{ok, Fd} ->
+	    file:close(Fd),
+	    generate_unique(Prefix, Dir, Mode, Ctl, N+1, Max);
+	_ ->
+	    generate_unique(Prefix, Dir, Mode, Ctl, N+1, Max)
+    end.
+
     
 
-ctl_line(S, Buf) ->
+
+ctl_line(S, Buf, IdleTimeout) ->
     case split_line(Buf) of
 	more ->
-	    case gen_tcp:recv(S,0) of
+	    case gen_tcp:recv(S,0,IdleTimeout) of
 		{ok,Cs} ->
 		    Buf1 = Buf++Cs,
 		    case split_line(Buf1) of
-			more -> ctl_line(S, Buf1);
+			more -> ctl_line(S, Buf1, IdleTimeout);
 			Done -> Done
 		    end;
 		Error -> Error
@@ -703,7 +1196,7 @@ rstr(450) -> "450 Requested file action not taken.";
 rstr(451) -> "451 Requested action not taken: local error in processing.";
 rstr(452) -> "452 Requested action not taken.";
 rstr(500) -> "500 Syntax error, command unrecognized.";  %% ADD INFO
-rstr(501) -> "501 Syntax error in paramters or arguments.";
+rstr(501) -> "501 Syntax error in parameters or arguments.";
 rstr(502) -> "502 Command not implemented.";
 rstr(503) -> "503 Bad sequence of commands.";
 rstr(504) -> "504 Command not implemented for that parameter.";
@@ -722,8 +1215,20 @@ open_data(Ctl, St) ->
     if St#cstate.listen =/= undefined ->
 	    case gen_tcp:accept(St#cstate.listen) of
 		{ok,S} ->
-		    gen_tcp:close(St#cstate.listen),
-		    {S, St#cstate {listen = undefined }};
+		    case inet:peername(S) of
+			{ok, {Addr, _Port}} when Addr == St#cstate.client_ip ->
+			    gen_tcp:close(St#cstate.listen),
+			    {S, St#cstate {listen = undefined }};
+			{ok, {Addr, _Port}} ->
+			    log(notice, "Data connection from ~s rejected, "
+				"should have been from ~s",
+				[inet_parse:ntoa(Addr),
+				 inet_parse:ntoa(St#cstate.client_ip)]),
+			    gen_tcp:close(S),
+			    open_data(Ctl, eaccess);
+			{error, Err} ->
+			    open_data_err(Ctl,Err)
+		    end;
 		{error,Err} ->
 		    open_data_err(Ctl,Err)
 	    end;
@@ -738,8 +1243,7 @@ open_data(Ctl, St) ->
     end.
 
 open_data_err(Ctl,Err) ->
-    rsend(Ctl, 421, "Can't open data connection " ++
-	  inet:format_error(Err)),
+    rsend(Ctl, 421, ["Can't open data connection ", inet:format_error(Err)]),
     throw(failed).
 
 close_listen(St) ->
@@ -778,10 +1282,13 @@ recv_file(S, Chunk, Count, Fd) ->
 %% file mode is binary or text
 file_mode(St) ->
     case St#cstate.type of
-	{ascii,_,_} -> [];
-	{image,_,_} -> [binary]
+	{ascii,_,_} -> [binary]; % no reason to not use binary...
+	{image,_,_} -> [raw,binary]
     end.
-	    
+
+type(St) ->
+    element(1, St#cstate.type).
+
 %%
 %% Check if an address is a member of a list of
 %% Mask addresses
@@ -807,9 +1314,9 @@ parse_address(Str) ->
     paddr(Str, 0, []).
 
 paddr([X|Xs],N,Acc) when X >= $0, X =< $9 -> paddr(Xs, N*10+(X-$0), Acc);
-paddr([X|Xs],N,Acc) when X >= $A, X =< $F -> paddr(Xs,(X-$A)+10, Acc);
-paddr([X|Xs],N,Acc) when X >= $a, X =< $f -> paddr(Xs, (X-$a)+10, Acc);
-paddr([$,,$,|Xs], N, Acc) -> error;
+paddr([X|Xs],_N,Acc) when X >= $A, X =< $F -> paddr(Xs,(X-$A)+10, Acc);
+paddr([X|Xs],_N,Acc) when X >= $a, X =< $f -> paddr(Xs, (X-$a)+10, Acc);
+paddr([$,,$,|_Xs], _N, _Acc) -> error;
 paddr([$,|Xs], N, Acc) -> paddr(Xs, 0, [N|Acc]);
 paddr([],P2,[P1,D4,D3,D2,D1]) -> {ok,{{D1,D2,D3,D4}, P1*256+P2}};
 paddr([],P2,[P1|As]) when length(As) == 32 ->
@@ -892,28 +1399,28 @@ rpath([], RP) -> filename:join(reverse(RP)).
 %% Generate a directory listing
 %% should normally go to the socket
 %%
-dir_list(Ctl, S, Dir1, Dir, Type) ->
+dir_list(Ctl, Data, Dir1, DirU, St, Type) ->
     case file:list_dir(Dir1) of
 	{ok, List} ->
 	    foreach(
 	      fun(E) when Type == nlst ->
-		      gen_tcp:send(S, E ++ ?CRNL);
+		      gen_tcp:send(Data, to_utf8(E, St) ++ ?CRNL);
 		 (E) when Type == list ->
-		      gen_tcp:send(S, list_info(Dir1, E) ++ ?CRNL)
+		      gen_tcp:send(Data, list_info(Dir1, E, St) ++ ?CRNL)
 	      end,
 	      List),
 	    rsend(Ctl, 226);
 
 	{error,Err} ->
-	    rsend(Ctl, 550, "\"" ++ Dir ++ "\" " ++
+	    rsend(Ctl, 550, "\"" ++ DirU ++ "\" " ++
 		  file:format_error(Err))
     end.
 
 
-list_info(Dir, File) ->
+list_info(Dir, File, St) ->
     case file:read_file_info(filename:join(Dir,File)) of
 	{ok, Info} ->
-	    finfo(Info) ++ " " ++ File;
+	    [finfo(Info), " ", to_utf8(File, St)];
 	{error,_} ->
 	    "???"
     end.
@@ -976,9 +1483,9 @@ ptime(Hours, Min) ->
 printdate({Date, Time}) ->
     {Year, Month, Day} = Date,
     {Hours, Min, _} = Time,
-    {LDate, LTime} = calendar:local_time(),
+    {LDate, _LTime} = calendar:local_time(),
     {LYear, _, _} = LDate,
-    Result = pmonth_day(Month, Day) ++
+    pmonth_day(Month, Day) ++
 	if LYear > Year ->
 		pyear(Year);
 	   true ->
@@ -997,3 +1504,12 @@ month(9) -> "Sep";
 month(10) -> "Oct";
 month(11) -> "Nov";
 month(12) -> "Dec".
+
+timeval(DateTime) ->
+    case calendar:local_time_to_universal_time_dst(DateTime) of
+	[] ->
+	    "00000000000000";
+	[{{Y,Mo,D},{H,Mi,S}}|_] ->
+	    io_lib:format("~4.4.0w~2.2.0w~2.2.0w~2.2.0w~2.2.0w~2.2.0w",
+			  [Y,Mo,D,H,Mi,S])
+    end.

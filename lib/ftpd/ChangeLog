@@ -1,3 +1,15 @@
+2004-11-30  Martin Bjorklund  <mbj@bluetail.com>
+
+	* src/ftpd.erl: Supports rfc959 and rfc1123.
+	Added support for rfc2389.
+	Added the commands SIZE and MDTM from draft-ietf-ftpext-mlst-16.
+	Added support for utf-8 (rfc2640).
+	Added support for an authenticaion module plugin.
+	Implemented an idle timer for connections.
+        Rewrote as a gen_server.
+	
+	* src/Makefile: Added debug target
+	
 2004-05-28  David N. Welton  <davidw@eidetix.com>
 
 	* src/ftpd.erl: Added ftpd module to jungerl repository.

@@ -1,4 +1,3 @@
-
 This is slang, an erlang interface to the amazing highly portable tty 
 interface that gave us such nice tty applications as mutt and slrn
 
@@ -23,10 +22,5 @@ $ (cd config; ./configure)
 $ make
 
 
+(By klacke@bluetail.com)
 
-
-
-
-
-
- 

@@ -4,11 +4,12 @@ How to use the Jungerl
 Simple! You just do 'make' to build all the erlang programs.
 
 If you want, you can add the bin/ directory to your $PATH, and use the
-useful program(s) in there!
+useful programs in there. One is 'jerl', a simple wrapper around 'erl'
+that adds all the Jungerl applications to the code path.
 
-If a program is giving you trouble, just put a file called SKIP in its
-top-level directory. For example, if you want to skip the 'tuntap'
-program, do:  touch lib/tuntap/SKIP
+If a program is giving you trouble, just put an empty file called SKIP
+in its top-level directory. For example, if you want to skip the
+'tuntap' program, you can do: touch lib/tuntap/SKIP
 
 
 How to add an application to the Jungerl
@@ -17,15 +18,11 @@ How to add an application to the Jungerl
 Each application has its own directory called lib/<appname>.
 
 The absolute minimum requirement for an application is to have a
-Makefile in the lib/<appname> directory with three targets:
+Makefile in the lib/<appname> directory with two targets:
 
   'all' should build the program.
 
   'clean' should delete any object files.
-
-  'conf' should do any necessary configuration. Most likely this is
-  nothing, but it can be used for e.g. application-specific autoconf
-  scripts.
 
 Realistically, your lib/<appname>/ dir should also have any of these
 subdirectories that are appropriate:
@@ -40,13 +37,13 @@ subdirectories that are appropriate:
 
   doc/   (not sure what this is for..)
 
-Once you have created your application, you should edit the top level
-Makefile like this:
+Once you have created your application, you should edit the 'lib/'
+directory Makefile like this:
 
   Add your <appname> to the "LIBS" variable.
 
-  If you depend on other applications, add a line that says so. For
-  example <none yet..>.
+  If you depend on other applications, add a line that says so. (These
+  are down near the bottom.)
 
 
 Makefile Helpers
@@ -56,9 +53,8 @@ The support/ directory contains a couple of useful include files for
 your Makefiles:
 
   subdirs.mk: Intended for your lib/<appname>/ directory, this defines
-  targets for 'all', 'clean', and 'config' that just cd into
-  $(SUBDIRS) (by default c_src and src) and does the same "make" in
-  each of them.
+    targets for 'all' and 'clean' that just cd into $(SUBDIRS) (by
+    default c_src and src) and does the same "make" in each of them.
 
   include.mk: This defines a bunch of useful things for building C and
     Erlang programs. For C it has 'configure'-detected CC and CFLAGS
@@ -73,5 +69,5 @@ your Makefiles:
     building ../ebin/*.beam from *.erl.
 
 That probably wasn't very clear, but if you look at how the 'tuntap'
-program's Makefiles are done then it should be obvious.
+program's Makefiles are done then it should be obvious!
 

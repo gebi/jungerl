@@ -8,13 +8,15 @@
 -module(nfs_procfs).
 -author('luke@bluetail.com').
 
--export([start_link/0, root/0, getattr/1, lookup/2, dirlist/1, read/1]).
+-export([start_link/0, root/0, getattr/1, lookup/2, dirlist/1, read/1,
+	 statfs/1]).
 
 start_link() ->
     {ok, Pid} = nfs_server:start_link(),
     nfs_server:add_mountpoint("/procfs", ?MODULE),
     {ok, Pid}.
 
+%% Returns: ID of root directory, any erlang term.
 root() ->
     root.
 
@@ -94,4 +96,19 @@ filesize(ID = {property, P, Name}) ->
 now_timestamp() ->
     {Mega, Sec, Micro} = now(),
     {((Mega * 1000000) + Sec) band 16#ffffffff, Micro}.
+
+%% Callback: statfs(ID) -> {ok, {Tsize, Bsize, Blocks, Bfree, Bavail}} |
+%%                         {error, Reason}
+%% Return values:
+%%       Tsize   The optimum transfer size of the server in bytes.  This is
+%%               the number of bytes the server would like to have in the
+%%               data part of READ and WRITE requests.
+%%       Bsize   The block size in bytes of the filesystem.
+%%       Blocks  The total number of "bsize" blocks on the filesystem.
+%%       Bfree   The number of free "bsize" blocks on the filesystem.
+%%       Bavail  The number of "bsize" blocks available to non-privileged
+%%               users.
+
+statfs(_) ->
+    {ok, {65535, 1024, 1024, 0, 0}}.	% pulled out of the air
 

@@ -244,9 +244,31 @@ handle_call({nfsproc_read_2, {FH, Offset, Count, _}, C}, From, State) ->
 	end,
     {reply, R, State};
 
+%% ----------------------------------------------------------------------
+%% NFSPROC_READ
+%% ----------------------------------------------------------------------
+
+handle_call({nfsproc_statfs_2, FH, C}, From, State) ->
+    R = case fh2id(FH) of
+	    {ok, ID} ->
+		Mod = fh2mod(FH),
+		case catch apply(Mod, statfs, [ID]) of
+		    {ok, Res = {Tsize, Bsize, Blocks, Bfree, Bavail}} ->
+			{'NFS_OK', Res};
+		    {error, Reason} ->
+			{error(Reason), void};
+		    Other ->
+			io:format("Bad return from ~p:statfs/1: ~p~n",
+				  [Mod, Other])
+		end;
+	    error ->
+		{'NFSERR_STALE', void}
+	end,
+    {reply, R, State};
+
 handle_call(Request, From, State) ->
     io:format("Undefined callback: ~p~n", [Request]),
-    Reply = ok,
+    Reply = {error, nocallback},
     {reply, Reply, State}.
 
 handle_cast(Msg, State) ->
@@ -365,6 +387,7 @@ new_fsid(Mod) ->
     [{next_fsid, N}] = ets:lookup(?misc_tab, next_fsid),
     ets:update_counter(?misc_tab, next_fsid, 1),
     ets:insert(?fsid_mod_tab, {N, Mod}),
+    ets:insert(?mod_fsid_tab, {Mod, N}),
     N.
 
 fsid2mod(FSID) ->

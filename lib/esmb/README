@@ -1,3 +1,26 @@
+
+###########################################
+###### Fri Oct 15 12:56:23 CEST 2004 ######
+###########################################
+
+Added support for doing DCE/RPC over SMB.
+
+This means that it is possible to retrieve
+the groups thet an authenticated user belongs 
+to. 
+
+By using this way of retrieving available
+shares, we avoid the old (LANMAN) restriction
+of only 12 characters in the share name.
+
+Look into the file esmb_rpc.erl to see examples
+on how to use this functionality.
+
+/Tobbe
+
+#########################
+##### Initial Text ######
+#########################
 	
 This is an implementation of a subset of the SMB protocol.
 

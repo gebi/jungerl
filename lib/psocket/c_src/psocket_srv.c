@@ -38,12 +38,6 @@
 #define CMD_JOIN  1
 #define CMD_DROP  2
 
-#ifndef SIOCSPACKETPREBRIDGE
-/* This ioctl is a special addition to our kernel. The constant is
-   defined here so that you can build against a normal kernel. */
-#define SIOCSPACKETPREBRIDGE 0x89D0  /* Make a PACKET socket run before the bridge */
-#endif
-
 
 /** Generic erlang-port-program helpers (mostly nicked off Klacke) */
 

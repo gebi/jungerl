@@ -14,6 +14,17 @@
 
 -define(FORM, "~s~n~s - ~p - ~p~n~p~n").
 -define(DEL, lists:duplicate(77, $=)).
+%%% default arguments
+-define(DEFTC, []).
+-define(DEFIPPORT, 9666).
+-define(DEFIPQUE, 4096).
+-define(DEFWRAPSIZE, 128*1024).
+-define(DEFWRAPCNT, 8).
+
+-define(MODULES, [panTarg, panLib]).
+-define(WAIT(N), receive after N*1000 -> ok end).
+
+-record(timer, {state, start, stop, timeout}).
 
 -export([start/0,start/1,start/2,start/3,start/4,start/5]).
 -export([mark/0]).
@@ -132,7 +143,7 @@ get_outdir(TestCaseName) ->
 	    ?DEFTC -> "pan-"++panLib:timestamp();
 	    _ -> atom_to_list(TestCaseName)
 	end,
-    OutDir = filename:join([?TMPDIR, "pan", FileName]),
+    OutDir = filename:join([panOpt:tmp_dir(), "pan", FileName]),
     panLib:delete_dir(OutDir),
     panLib:verify_dir(OutDir),
     OutDir.

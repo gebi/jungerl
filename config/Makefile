@@ -2,7 +2,7 @@ MK_INCLUDE=../support/include.mk
 
 all: config.status $(MK_INCLUDE)
 
-config.status: configure
+config.status: configure ../support/include.mk.in
 	./configure
 
 $(MK_INCLUDE): config.status

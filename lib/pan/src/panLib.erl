@@ -14,7 +14,7 @@
 
 -export([get_files/1]).
 -export([del_dir/1]).
-
+-export([grep/2]).
 -export([fname/0, fname/1]).
 -export([verify_dir/1]).
 -export([get_dir/1]).
@@ -39,6 +39,33 @@
 %%%-define(DBGLOG, empty)
 -define(DBGLOG, llogger).
 %%%---------------------------------------------------------------------------
+
+grep('', T) -> true;
+grep(P, T) when list(P) ->
+    case grp(P, T) of
+	[] -> true;
+	_ -> false
+    end;
+grep(P, T) -> grep([P], T).
+
+grp([], _) -> [];
+grp(P, []) -> P;
+grp(P, Fun) when function(Fun) -> grp(P, list_to_atom(erlang:fun_to_list(Fun)));
+grp(P, Port) when port(Port) -> grp(P, list_to_atom(erlang:port_to_list(Port)));
+grp(P, Rf) when reference(Rf) -> grp(P, list_to_atom(erlang:ref_to_list(Rf)));
+grp(P, Pid) when pid(Pid) -> grp(P, list_to_atom(pid_to_list(Pid)));
+grp(P, T) when tuple(T) -> 
+    case lists:member(T,P) of
+	true -> grp(P--[T], []);
+	false -> grp(P,tuple_to_list(T))
+    end;
+grp(P, L) when list(L) -> 
+    case lists:member(L, P) of
+	true -> grp(P--[L], []);
+	false -> grp(grp(P, hd(L)), tl(L))
+    end;
+grp(P, T) -> grp(P--[T], []).
+
 fname() -> fname(now()).
 fname(Now) -> atom_to_list(node())++"-"++timestamp(Now).
 

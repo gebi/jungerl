@@ -18,6 +18,7 @@ LIBS := \
         pico \
 	posix_drv \
 	quickcheck \
+	rdbms \
 	rpc \
 	smart_exceptions \
 	spread_drv \

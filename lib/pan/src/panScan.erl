@@ -124,7 +124,7 @@ do_do(Patt, end_of_trace, Out, Line, Stat) ->
     io:fwrite(Out, "~w - hits: ~w - scanned: ~w~n", 
 	      [?MODULE, Stat#state.hits, Line-1]);
 do_do(Patt, Ms, Out, Line, Stat) ->
-    case grep(Patt, Ms) of
+    case panLib:grep(Patt, Ms) of
 	false -> 
 	    Stat#state{line = Line+1};
 	true -> 
@@ -139,26 +139,6 @@ safe_cb(M, F, A, Ms, Line, Out, Internal) ->
 	Nint -> Nint
     end.
 
-grep('', T) -> true;
-grep(P, T) when list(P) ->
-    case grp(P, T) of
-	[] -> true;
-	_ -> false
-    end;
-grep(P, T) -> grep([P], T).
-
-grp([], _) -> [];
-grp(P, []) -> P;
-grp(P, T) when tuple(T) -> grp(P--[T], tuple_to_list(T));
-grp(P, Port) when port(Port) -> grp(P, list_to_atom(erlang:port_to_list(Port)));
-grp(P, Rf) when reference(Rf) -> grp(P, list_to_atom(erlang:ref_to_list(Rf)));
-grp(P, Pid) when pid(Pid) -> grp(P, list_to_atom(pid_to_list(Pid)));
-grp(P, L) when list(L) -> 
-    case lists:member(L, P) of
-	true -> grp(P--[L], []);
-	false -> grp(grp(P, hd(L)), tl(L))
-    end;
-grp(P, T) -> grp(P--[T], []).
 
 write(no_out, _, _) -> ok;
 write(Out, Line, Ms) -> io:fwrite(Out, "~8w ~s - ~w~n", [Line, ts(Ms), Ms]).

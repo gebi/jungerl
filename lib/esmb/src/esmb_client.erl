@@ -7,7 +7,11 @@
 %%% $Id$
 %%% --------------------------------------------------------------------
 -export([start/2, start/4, astart/2, istart/2, ustart/2]).
--export([swap/3]).
+-export([swap/3, to_ucs2/3, ucs2_to_charset/2]).
+
+-ifdef(tobbe).
+-export([trun/0,ttinit/6]). %%  testing !!
+-endif.
 
 -import(esmb, [ucase/1, lcase/1]).
 
@@ -22,6 +26,7 @@ start(Path, User) -> istart(Path, User).
 astart(Path, User) -> start(Path, User, "WORKGROUP", ?CSET_ASCII).
 istart(Path, User) -> start(Path, User, "WORKGROUP", ?CSET_ISO_8859_1).
 ustart(Path, User) -> start(Path, User, "WORKGROUP", ?CSET_UTF8).
+
 
 start(Path, User, Wgroup, Charset) ->
     md4:start(),
@@ -361,3 +366,67 @@ ascii_to_charset(Str, Cset) ->
 	    "" % not much else we can do here...
     end.
 
+
+%%%
+%%% This test case measures the performance, when retreiving a 20 MB file.
+%%% Start it as:
+%%%
+%%%     erl -pa ../ebin -noshell -s esmb_client trun
+%%%
+%%% It can be compared with: 
+%%%
+%%%     time smbclient //pungmes/tobbe <passwd> -U <user> -c 'get 20M.file'
+%%% 
+%%% To enable this, compile as: 
+%%%
+%%%     erlc -Dtobbe -o ../ebin esmb_client.erl
+%%%
+-ifdef(tobbe). 
+trun() -> 
+    tstart("//pungmes/tobbe", "tobbe", "WORKGROUP", ?CSET_ISO_8859_1, "20M.file").
+
+tstart(Path, User, Wgroup, Charset, Fname) ->
+    md4:start(),
+    iconv:start(),
+    case host_share(Path) of
+	{Host, Share} ->
+	    spawn(fun() -> tinit(Host, Share, User, Wgroup, Charset, Fname) end);
+	Else ->
+	    Else
+    end.
+
+tinit(Host, Share, User, Wgroup, Charset, Fname) ->
+    {Time, {ok, Size}} = timer:tc(esmb_client, ttinit, 
+				 [Host, Share, User, Wgroup, Charset, Fname]),
+    io:format("Read and Wrote ~p bytes (~p bytes/sec)~n", 
+	      [Size, Size/(Time/1000000)]).
+    
+ttinit(Host, Share, User, Wgroup, Charset, Fname) ->
+    put(charset, Charset),
+    {ok,S,Neg} = esmb:connect(Host),
+    Pw = "qwe123",
+    U = #user{pw = Pw, name = User, primary_domain = Wgroup},
+    Pdu0 = esmb:user_logon(S, Neg, U),
+    esmb:exit_if_error(Pdu0, "Login failed"),
+    WinPath = mk_winpath(Neg, "//"++Host++"/"++User, Charset),
+    Path = to_ucs2(Neg, WinPath, Charset),
+    Pdu1 = esmb:tree_connect(S, Neg, Pdu0, Path),
+    esmb:exit_if_error(Pdu1, "Tree connect failed"),
+    g20M(S, Neg, {Pdu1, "\\\\"}, Fname).
+
+g20M(S, Neg, State, Fname) ->
+    g20get_file(S, Neg, State, Fname, 
+	       fun(B, F) -> file:write_file(F,B) end).
+
+g20get_file(S, Neg, {Pdu0, Cwd}, Fname0, Fun) ->
+    Cset = get(charset),
+    File = rm_space(Fname0),
+    WinPath = mk_winpath(Neg, Cwd ++ slash(Cset) ++ File, Cset),
+    Fname = to_ucs2(Neg, WinPath, Cset),
+    Pdu1 = esmb:open_file_ro(S, Pdu0, Fname),
+    Finfo = #file_info{name = Fname, size = Pdu1#smbpdu.file_size},
+    {ok, Bin} = esmb:read_file(S, Pdu1, Finfo),
+    Fun(Bin, File),
+    Pdu = esmb:close_file(S, Pdu1),
+    {ok, size(Bin)}.
+-endif.

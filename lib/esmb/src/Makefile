@@ -10,7 +10,7 @@ EMULATOR=beam
 	$(ERLC) $(ERLC_FLAGS) -o ../ebin $<
 #	$(ERLC) -b $(EMULATOR) $(ERLC_FLAGS) -o ../ebin $<
 
-EFILES = esmb.erl esmb_client.erl md4.erl iconv.erl
+EFILES = esmb.erl esmb_client.erl esmb_rpc.erl md4.erl iconv.erl
 
 EBIN = ../ebin
 EBIN_FILES = $(EFILES:%.erl=$(EBIN)/%.$(EMULATOR))

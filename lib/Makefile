@@ -7,6 +7,7 @@ LIBS := \
 	slang \
 	lersp \
 	msc \
+        pan \
 	rpc \
         syntax_tools \
 	tuntap \

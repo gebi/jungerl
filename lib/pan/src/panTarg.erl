@@ -210,7 +210,7 @@ reg(Pid) when pid(Pid) ->
 stop_trc([{tracer, Port}|Flags] = OFlags) ->
     ?LOG(info, {flags, OFlags}),
     clear_trace_patterns(),
-    erlang:trace(all, false, OFlags),
+    erlang:trace(all, false, OFlags--[cpu_timestamp]), %bug in R9B-[01]
     tabi(Port),
     sysI(os:type(),Port),
     erlang:port_close(Port),

@@ -2,7 +2,7 @@
 %%% Author  : Tony Rogvall <tony@erix.ericsson.se>
 %%% Purpose : Port mapper interface
 %%% Created : 14 Aug 1997 by Tony Rogvall <tony@erix.ericsson.se>
-%%% Copyright (c) 2000, 2001 Sendmail, Inc.  All rights reserved.
+%%% Copyright (c) 2000 Sendmail, Inc.  All rights reserved.
 
 -module(pmap).
 -compile([verbose, report_errors, report_warnings, trace]).

@@ -1,4 +1,4 @@
-%%% Copyright (c) 2000, 2001 Sendmail, Inc.  All rights reserved.
+%%% Copyright (c) 2000 Sendmail, Inc.  All rights reserved.
 
 %%% ONC/RPC client-side server: takes RPC requests with XDR-encoded
 %%% arguments, transmits them over the network, and receives the reply.
@@ -448,16 +448,24 @@ make_call2(From, Size, Call, Timeout, S, Procedure, Timers0) ->
 	case Tm of
 	    infinity ->
 		Timers0;
+	    0 ->
+		Timers0;
 	    _ ->
 		Timer = erlang:send_after(Tm, self(), {timeout, S#state.xid}),
 		[Timer | Timers0]
 	end,
-    Pnew = #pending{from = From, start_time = now(),
-		    timers = Timers1,
-                    bytes_out = Size, xid = S#state.xid, packet = Call},
-    S1 = S#state{xid = S#state.xid+1, pending = [Pnew|Ps],
-		 pendinglen = Plen + 1},
-    {noreply, incr_call_stats(S1, Procedure)}.
+    case Tm of
+	0 ->
+	    {reply, {error, timeout}, S#state{xid = S#state.xid+1}};
+	_ ->
+	    Pnew = #pending{from = From, start_time = now(),
+			    timers = Timers1,
+			    bytes_out = Size,
+			    xid = S#state.xid, packet = Call},
+	    S1 = S#state{xid = S#state.xid+1, pending = [Pnew|Ps],
+			 pendinglen = Plen + 1},
+	    {noreply, incr_call_stats(S1, Procedure)}
+    end.
 
 %%% Process an RPC reply by extracting caller from pending queue, decoding
 %%% the reply RPC header, and updating the pending queue and statistics.

@@ -1,4 +1,4 @@
-%% Copyright (c) 2000, 2001 Sendmail, Inc.  All rights reserved.
+%% Copyright (c) 2000 Sendmail, Inc.  All rights reserved.
 %%
 %% Scanner for XDR specifications
 %%

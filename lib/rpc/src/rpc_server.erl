@@ -1,4 +1,3 @@
-%%% Copyright (c) 2000, 2001 Sendmail, Inc.  All rights reserved.
 %%%----------------------------------------------------------------------
 %%% File    : rpc_server.erl
 %%% Author  : Martin Bjorklund <mbj@bluetail.com>

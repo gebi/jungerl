@@ -1,14 +1,24 @@
+2003-05-08  Mats Cronqvist  <etxmacr@cbe2077>
+
+	* src/panTarg.erl: changed default/mandatory trace flags
+
+2003-04-14  Mats Cronqvist  <etxmacr@cbe2077>
+
+	* src/panScan.erl : made ports grepable in pan:scan
+
+	* src/panEts.erl : added upd function (update_counter)
+	
 2003-03-26  Mats Cronqvist  <etxmacr@cbe2077>
 
-	* src/panEts.erl (Module): changed from server to table owner strategy
+	* src/panEts.erl : changed from server to table owner strategy
 
-	* src/panScan.erl (Module): new panEts
+	* src/panScan.erl : new panEts
 
-	* src/panHost.erl (Module): new panEts
+	* src/panHost.erl : new panEts
 
-	* src/panCpu2.erl (Module): new panEts
+	* src/panCpu2.erl : new panEts
 
-	* src/panCpu1.erl (Module): new panEts
+	* src/panCpu1.erl : new panEts
 
 	* src/panTarg.erl: cpu_timestamp bug workaround
 

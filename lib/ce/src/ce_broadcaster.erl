@@ -47,8 +47,8 @@
 -copyright('Copyright (c)2003 Cat`s Eye Technologies. All rights reserved.').
 
 -export([start/0, loop/2]).
--export([subscribe/1, unsubscribe/1]).
--export([subscribe/2, unsubscribe/2]).
+-export([subscribe/1, subscribe/2, unsubscribe/1, unsubscribe/2]).
+-export([broadcast/2]).
 
 %% @spec start() -> {ok, pid()} | {error, Reason}
 %% @doc Starts a broadcasting service.
@@ -63,22 +63,22 @@ start() ->
 
 loop(Parent, Subscribers) ->
   receive
-    {?MODULE, {subscribe, Pid}} ->
+    {?MODULE, From, {subscribe, Pid}} ->
       case lists:member(Pid, Subscribers) of
         true ->
-          Pid ! {?MODULE, {error, already_subscribed}},
+          From ! {?MODULE, {error, already_subscribed}},
           loop(Parent, Subscribers);
         false ->
-          Pid ! {?MODULE, ok},
+          From ! {?MODULE, ok},
           loop(Parent, Subscribers ++ [Pid])
       end;
-    {?MODULE, {unsubscribe, Pid}} ->
+    {?MODULE, From, {unsubscribe, Pid}} ->
       case lists:member(Pid, Subscribers) of
         false ->
-          Pid ! {?MODULE, {error, not_subscribed}},
+          From ! {?MODULE, {error, not_subscribed}},
           loop(Parent, Subscribers);
         true ->
-          Pid ! {?MODULE, ok},
+          From ! {?MODULE, ok},
           loop(Parent, Subscribers -- [Pid])
       end;
     Else ->
@@ -98,7 +98,7 @@ subscribe(Broadcaster) ->
 %% @doc Subscribes to a broadcasting service.
   
 subscribe(Broadcaster, Pid) ->
-  Broadcaster ! {?MODULE, {subscribe, Pid}},
+  Broadcaster ! {?MODULE, self(), {subscribe, Pid}},
   receive
     {?MODULE, Reply} ->
       Reply
@@ -114,10 +114,17 @@ unsubscribe(Broadcaster) ->
 %% @doc Cancels subscription to a broadcasting service.
   
 unsubscribe(Broadcaster, Pid) ->
-  Broadcaster ! {?MODULE, {unsubscribe, Pid}},
+  Broadcaster ! {?MODULE, self(), {unsubscribe, Pid}},
   receive
     {?MODULE, Reply} ->
       Reply
   end.
+
+%% @spec broadcast(Broadcaster::pid(), Message::term()) -> ok
+%% @doc Broadcasts a message.
+  
+broadcast(Broadcaster, Message) ->
+  Broadcaster ! Message,
+  ok.
 
 %%% END of ce_broadcaster.erl %%%

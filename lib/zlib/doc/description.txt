@@ -1,0 +1,45 @@
+
+0. zlib interface for erlang
+
+
+1. exports
+
+load/0
+open/0
+close/1
+
+deflateInit/2
+deflateInit/6
+deflateSetDictionary/2
+deflateReset/1
+deflateParams/3
+deflate/3
+deflateEnd/1
+
+inflateInit/1
+inflateInit/2
+inflateSetDictionary/2
+inflateSync/1
+inflateReset/1
+inflateEnd/1
+
+2. specials
+setBufsz/2
+getBufsz/1
+crc32/1
+crc32/2
+crc32/3
+getQSize/1
+
+
+3. utils
+compress/1  uncompress/1
+
+zip/1 unzip/1
+
+gzip_file/1  gzip/1, gunzip_file/1 gunzip/1
+
+
+
+
+

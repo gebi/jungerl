@@ -1,0 +1,8 @@
+
+ZLIB interface
+
+for information read zlib.h file for a functional description.
+
+zlib implements rfc 1951
+
+some support for gzip (rfc 1952) is also present in this interface.

@@ -36,22 +36,22 @@ init(Host, Share, User, Wgroup) ->
     U = #user{pw = Pw, name = User, primary_domain = Wgroup},
     Pdu0 = esmb:user_logon(S, Neg, U),
     esmb:exit_if_error(Pdu0, "Login failed"),
-    Path = mk_path(Neg, Called, User),
+    Path = to_ucs2(Neg, mk_path(Called, User)),
     Pdu1 = esmb:tree_connect(S, Neg, Pdu0, Path),
     esmb:exit_if_error(Pdu1, "Tree connect failed"),
     shell(S, Neg, {Pdu1, "\\\\"}).
 
-mk_path(Neg, Called, User) when ?USE_UNICODE(Neg) ->
-    Path = "\\\\" ++ Called ++ "\\" ++ ucase(User),
-    iconv:start(),
-    {ok, Cd}    = iconv:open(?CSET_UCS2, ?CSET_ASCII),
-    {ok, Upath}  = iconv:conv(Cd, l2b(Path)),
-    iconv:close(Cd),
-    Upath;
-%%%
-mk_path(Neg, Called, User) ->
+mk_path(Called, User) ->
     "\\\\" ++ Called ++ "\\" ++ ucase(User).
 
+to_ucs2(Neg, Path) when ?USE_UNICODE(Neg) ->
+    iconv:start(),
+    {ok, Cd}    = iconv:open(?CSET_UCS2, ?CSET_ASCII),
+    {ok, Upath} = iconv:conv(Cd, l2b(Path)),
+    iconv:close(Cd),
+    Upath;
+to_ucs2(_, Path) ->
+    Path.
 
 shell(S, Neg, {_Pdu, Cwd} = State) ->
     shell(S, Neg, cmd(read_line(Cwd), S, Neg, State)).
@@ -107,9 +107,9 @@ fetch(S, Neg, State, Fname) ->
     get_file(S, Neg, State, Fname, 
 	     fun(B, F) -> file:write_file(F,B) end).
 
-get_file(S, _Neg, {Pdu0, Cwd}, Fname0, Fun) ->
+get_file(S, Neg, {Pdu0, Cwd}, Fname0, Fun) ->
     File = rm_space(Fname0),
-    Fname = Cwd ++ File,
+    Fname = to_ucs2(Neg, Cwd ++ File),
     Pdu1 = esmb:open_file_ro(S, Pdu0, Fname),
     Finfo = #file_info{name = Fname, size = Pdu1#smbpdu.file_size},
     io:format("Reading....~n", []),
@@ -123,7 +123,7 @@ get_file(S, _Neg, {Pdu0, Cwd}, Fname0, Fun) ->
 store(S, Neg, {Pdu0, Cwd}, Fname0) ->
     File = rm_space(Fname0),
     {ok, Bin} = file:read_file(File),
-    Fname = Cwd ++ File,
+    Fname = to_ucs2(Neg, Cwd ++ File),
     Pdu1 = esmb:open_file_rw(S, Pdu0, Fname),
     Finfo = #file_info{name = Fname, data = [Bin]},
     io:format("Writing....~n", []),
@@ -135,23 +135,23 @@ store(S, Neg, {Pdu0, Cwd}, Fname0) ->
 
 mkdir(S, Neg, {Pdu0, Cwd}, Fname0) ->
     Fname = rm_space(Fname0),
-    Pdu1 = esmb:mkdir(S, Pdu0, Cwd ++ Fname),
+    Pdu1 = esmb:mkdir(S, Pdu0, to_ucs2(Neg, Cwd ++ Fname)),
     Pdu = esmb:close_file(S, Pdu1),
     {Pdu, Cwd}.
 
 rmdir(S, Neg, {Pdu0, Cwd}, Dir0) ->
     Dir = rm_space(Dir0),
-    Pdu = esmb:rmdir(S, Pdu0, Cwd ++ Dir),
+    Pdu = esmb:rmdir(S, Pdu0, to_ucs2(Neg, Cwd ++ Dir)),
     {Pdu, Cwd}.
 
 delete(S, Neg, {Pdu0, Cwd}, File0) ->
     File = rm_space(File0),
-    Pdu = esmb:delete_file(S, Pdu0, Cwd ++ File),
+    Pdu = esmb:delete_file(S, Pdu0, to_ucs2(Neg, Cwd ++ File)),
     {Pdu, Cwd}.
 
 
-ls(S, _Neg, {Pdu, Cwd} = State) ->
-    Finfo = esmb:list_dir(S, Pdu, Cwd  ++ "*"),
+ls(S, Neg, {Pdu, Cwd} = State) ->
+    Finfo = esmb:list_dir(S, Pdu, to_ucs2(Neg, Cwd  ++ "*")),
     print_file_info(Finfo),
     State.
 

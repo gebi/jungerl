@@ -14,7 +14,10 @@
 	 foreach/2, member/2, sort/1, any/2]).
 
 %% Server-based interface
--export([apropos/1, describe/1, describe/2, describe/3, stop/0]).
+-export([apropos/1, get_apropos/1,
+	 describe/1, describe/2, describe/3,
+	 description/1, description/2, description/3,
+	 rescan/0, stop/0]).
 
 %% Function-based interface
 -export([describe_file/1, file/1, string/1]).
@@ -25,20 +28,28 @@
 %% ----------------------------------------------------------------------
 %% Server half. Calling these functions causes a server to be created,
 %% which scans the sources for all loaded modules. You can use stop()
-%% to shut it dow, so that the next request will rebuild the database.
+%% to shut it down, so that the next request will rebuild the database.
 %% ----------------------------------------------------------------------
 
 %% Interface
 
 %% Print apropos information by regexp.
 apropos(Regexp) ->
+    case get_apropos(Regexp) of
+	{ok, Matches} ->
+	    print_matches(Matches);
+	Err ->
+	    Err
+    end.
+
+get_apropos(Regexp) ->
     ensure_started(),
     case regexp:parse(Regexp) of
 	{ok, RE} ->
 	    fdoc ! {apropos, self(), RE},
 	    receive
 		{apropos, Matches} ->
-		    print_matches(Matches)
+		    {ok, Matches}
 	    end;
 	Err ->
 	    Err
@@ -46,16 +57,35 @@ apropos(Regexp) ->
 
 %% Print a description of all functions matching Module, Function, and
 %% Arity. Function and module arguments are optional.
-describe(Module) ->
-    describe(Module, '_', '_').
-describe(Module, Function) ->
-    describe(Module, Function, '_').
-describe(Module, Function, Arity) ->
-    ensure_started(),
-    fdoc ! {describe, self(), Module, Function, Arity},
-    receive
-	{describe, Matches} -> print_matches(Matches)
+
+describe(M) ->
+    describe(M, '_', '_').
+describe(M, F) ->
+    describe(M, F, '_').
+describe(M, F, A) ->
+    case description(M, F, A) of
+	{ok, Matches} ->
+	    print_matches(Matches);
+	Err ->
+	    Err
     end.
+
+description(M) ->
+    description(M, '_', '_').
+description(M, F) ->
+    description(M, F, '_').
+description(M, F, A) ->
+    ensure_started(),
+    fdoc ! {describe, self(), M, F, A},
+    receive
+	{describe, Matches} -> {ok, Matches}
+    end.
+
+%% Regenerate the documentation database.
+rescan() ->
+    ensure_started(),
+    fdoc ! {rescan, self()},
+    receive rescanned -> ok end.
 
 %% Stop the fdoc server. You can use this to flush the database.
 stop() ->
@@ -94,6 +124,11 @@ loop() ->
     receive
 	stop ->
 	    ok;
+	{rescan, From} ->
+	    ets:delete(?MODULE),
+	    init_db(),
+	    From ! rescanned,
+	    ?MODULE:loop();
 	{apropos, From, RE} ->
 	    Matches = [{M,F,A,D} || {M,F,A,D} <- ets:tab2list(?MODULE),
 				    any(fun(S) ->

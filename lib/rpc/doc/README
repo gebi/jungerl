@@ -1,0 +1,142 @@
+SUN ONC/RPC for erlang
+Copyright (c) 2000, 2001 Sendmail, Inc.  All rights reserved.
+----------------------
+
+0. Making the stuff
+-------------------
+
+Compile the erlang code into some nice location, or use the GNU
+makefile in src.
+
+Update KERNEL_VSN and STDLIB_VSN in src/Makefile to match your
+local Erlang version.  You need OTP R7 or later.
+
+
+1. Generating stub files from prot.x file
+-----------------------------------------
+
+The erpcgen:file(...) takes an rpc file as input and produces an
+erlang source file and hrl files as output.
+
+syntax: 
+    erpcgen:file(In)                 == erpcgen:file(In, In, [all])
+    erpcgen:file(In, Options)        == erpcgen:file(In, In, Options)
+    erpcgen:file(In, Out, Options)
+
+where In is an atom consisting of the file name WITHOUT the ".x"
+extension and Out is the basename for the output file(s).
+
+Options is a list of:
+    hrl           -- generate <Out>.hrl
+    clnt          -- generate <Out>_clnt.erl
+    svc           -- generate <Out>_svc.erl - gen_server logic
+    svc_callback  -- generate <Out>_svc.erl - rpc_server logic
+    xdr           -- generate <Out>_xdr.erl
+    xdr_inc       -- generate <Out>_xdr.hrl
+    client        -- [hrl,clnt,xdr]
+    server        -- [hrl,svc,xdr,svc_stub]
+    xdrlib        -- [hrl,xdr]
+    all           -- [hrl,clnt,svc,xdr,svc_stub]
+
+options recognised but not implemented:
+    svc_stub   -- generate server server.erl.stub
+
+You can also use the command-line shell script:
+    erpcgen -a '<option-list>' <protocol>
+
+
+2. Using the general client.
+----------------------------
+
+The module rpc_client implements a general rpc client. The interface
+is simple (see pmap.erl for an example).
+
+Functions:
+
+open(Host, Program, Version, Proto [,Port])
+
+  Start a client process connected to the Program/Version/Proto
+  service.  Returns {ok,Clnt} or {error,Reason}
+  Clnt is a linked pid.
+
+close(Clnt)
+
+  Stops the client process.
+
+call(Clnt, Proc, Params [,Timeout])
+
+  call is normally called from <x>_clnt.erl
+
+control(Clnt, Attr, Param) 
+
+  Is used for setting client parameters to values other values than default.
+  Attr is one of:
+       set_xid  
+       set_timeout
+       set_retry_timeout
+       set_queue_limit
+       set_auth
+
+control(Clnt, Attr)
+
+  Is used for reading value of a parameter
+  Attr is one of:
+       get_xid
+       get_vers
+       get_socket
+       get_timeout
+       get_retry_timeout
+       get_queue_limit
+       get_queue_length
+       get_stats
+       get_and_reset_stats
+
+
+3. Using the general server
+---------------------------
+
+...
+
+
+4. The <x>_svc.erl code
+------------------------
+
+The svc(s) files generated are designed to work with gen_servers or a
+callback module of behaviour 'rpc_server'. This means that a RPC CALL
+maps to a gen_server:call (see rpc/stack.erl for an example), or
+directly to a call to a user-defined module (see API.txt for more details).
+
+
+5. Examples
+-----------
+
+There are some working examples in the examples/ directory.
+
+
+6. TODO
+--------
+
+*  The only supported authentication methods are AUTH_NULL and
+   AUTH_SYS.  The AUTH_SYS method needs to have all of its arguments
+   supplied manually.  Look at xdr_auth for some initial crypto work.
+
+*  Implement flexible Authentication scheme, where the user can
+   plug in his/her own authentication modules.
+
+*  Implement AUTH_KERB and AUTH_DES
+
+*  Add option to generate xdr code which can be included, i.e.
+   w/o module and export declarations.
+   Option is added - optimize!  Currently it's just the same code
+   as for x_xdr.erl.  Could create macros for efficiency, which
+   then would generate less garbage.
+
+*  Implement svc_stub, i.e. generate a gen_server w/ a handle_call()
+   clause for each procedure.
+
+*  Write documentation!
+
+*  strings should be represented as lists, not binaries.
+
+7. HAVE FUN
+-----------

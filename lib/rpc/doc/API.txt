@@ -1,0 +1,495 @@
+Copyright (c) 2000, 2001 Sendmail, Inc.  All rights reserved.
+
+Introduction
+------------
+  
+  This document explains how the generated erlang modules work, and
+  the relationship between the different modules.  It also describes
+  the API to the rpc package.
+
+  The purpose of this document is to give an overview of the package.
+  It might not be completely correct and up-to-date; consult the code
+  for further details.
+
+  This package conforms to rfc1831 and rfc1832.  Note that not all rpc
+  generation packages implement the full RPC language.  For example,
+  some C packages does not allow a rpc procedure to take more than one
+  parameter.  This package does not have these limitations.  Keep that
+  in mind if your creating RPC specifications which should be
+  portable.
+
+
+Generating code
+---------------
+
+  see README
+
+
+XDR code
+--------
+
+1.  Representation
+
+  strings are represented as binaries.
+  structs are represented as tuples.
+  unions are represented as tuples where the first element
+    is the discriminant.
+  all arrays are represented as lists (i.e. w/o explicit size tag)
+  bools are represented as true | false.
+  everything else is straightforward, e.g. hyper as int etc.
+
+1.1. Example:
+
+Given the following contents of "xx.x":
+
+  enum eventtype {
+    EVENT_CREATE = 1,
+    EVENT_DELETE = 2
+  };
+
+  struct event_create {
+    int key;
+    string new;
+  };  
+
+  union regevent switch (eventtype type) {
+  case EVENT_CREATE:
+    event_create c;
+  case EVENT_DELETE:
+    int          key;
+  };
+
+Correct erlang representations:
+  
+  {'EVENT_CREATE', {2, <<"hi mom">>}}
+  {'EVENT_DELETE', 3}
+
+Given:
+
+  union regevent switch (int type) {
+  case 1:
+    event_create c;
+  default:
+    int          key;
+  };
+
+Correct erlang representations:
+  
+  {1, {2, <<"hi mom">>}}
+  {5, 3}
+
+
+2.  Encode routines
+
+  Each type in the .x file gets a enc_type/1 function:
+     enc_type(Term) -> IoList.
+
+2.1.  Example
+
+  xx_xdr:enc_regevent({'EVENT_DELETE', 3}) ->
+     [<<0,0,0,2>>, <<0,0,0,3>>]
+
+3.  Decode routines
+
+  Each type in the .x file gets a dec_type/2 function:
+     dec_type(Bin, Offset) -> {Term, NewOffset}
+
+  The Offset is an offset in the Binary where to start decoding.
+
+3.1.  Example
+
+  xx_xdr:dec_regevent(<<0,0,0,2,0,0,0,3>>, 0) ->
+     {{'EVENT_DELETE', 3}, 8}
+  xx_xdr:dec_regevent(<<1,2,3,4,0,0,0,2,0,0,0,3>>, 4) ->
+     {{'EVENT_DELETE', 3}, 12}
+
+4.  clnt routines
+
+  The library module rpc_client, and the generated xx_clnt module
+  provides complete client implementations for TCP and UDP.
+
+  The user must start a rpc_client process explicitly.  Each
+  rpc_client process handles one RPC protocol over one socket only.
+  Each rpc_client can handle many erlang clients though - all calls
+  are multiplexed over the socket.
+ 
+4.1. Diagram
+
+  The following diagram illustrates the processes and modules
+  involved:
+
+  A user calls xx_clnt:xx_proc1_1(Term) in some process.
+  xx_clnt:xx_proc1_1(Term) calls xx_xdr:enc() to encode the Term into
+  a io list.  This io list is passed to rpc_client:call(), which
+  performs a gen_server:call to the client process.
+
+  The client process constructs a rpc msg and sends it to the rpc
+  server over a socket.  The reply is decoded by xx_clnt before it is
+  returned to the user.
+
+
+      xx_clnt.erl        xx_xdr.erl         
+  +--------------+      +----------+
+  | xx_proc1_1() |  --> |   enc()  |         rpc_client 
+  |              |  <-- +----------+           process
+  |              |    gen_server:call      +--------------+
+  |              | --------------------->  | send rpc msg | ---> socket
+  |              | <--------------------   | reply        | <---
+  |              |       xx_xdr.erl        +--------------+
+  |              | -->  +----------+
+  |              | <--  | dec()    |
+  |              |      +----------+
+  |              |
+  | xx_proc2_1() | 
+  | ...          |
+  +--------------+
+
+4.2 API
+
+4.2.1.  rpc_client
+
+   open(Host, PrgNum, PrgVsn, Proto)
+   open(Host, PrgNum, PrgVsn, Proto, Port) ->
+       <suitable for a child to a supervisor>
+      Proto = tcp | udp
+
+      If no Port is given, the client contacts the port mapper daemon 
+      on the Host for the PrgNum and PrgVsn.
+
+      Note that this function returns a linked pid.  If the socket is
+      closed, the pid exits.
+
+   close(Pid)
+      Terminates the client.
+   
+   <lots of control and statistics functions, see the code for
+   details>
+
+
+5.  svc routines
+
+  The library module rpc_server, and the generated xx_svc module
+  provides server implementations for TCP and UDP.
+
+  The server logic can be implemented in two different ways, either as
+  a gen_server process which receives all rpc requests as gen_server
+  calls, or as a rpc_server behaviour callback module.  These variants
+  are described below.
+
+  The user must start the rpc_server process explicitly.  Each
+  rpc_server process is capable of handling both TCP and UDP at the
+  same time.
+
+5.1. Server Implementations
+
+5.1.1 gen_server implementation
+
+  The following diagram illustrates the processes and modules
+  involved:
+
+  A RPC client sends a RPC call on a socket.  The rpc_server process
+  recieves the messages and decodes it.  Then it calls the xx_svc
+  module, providing the procedure number and arguments.  The xx_svc
+  module translates the procedure number to an erlang atom, calls
+  xx_xdr to decode parameters, then performs a gen_server:call to
+  the user defined server implementation.
+
+          rpc_server
+           process         
+         +----------+     xx_svc.erl      xx_xdr.erl
+ socket  |          |    +----------+    +----------+     user's
+    ---> |          | -> | xx_prog  | -> | dec()    |     server
+         |          |    |          | <- +----------+     process
+         |          |    |          |   gen_server:call  +--------+
+         |          |    |          |   -------------->  |        |
+         |          |    |          |   <--------------  +--------+
+         |          |    |          |     xx_xdr.erl
+         |          |    |          | -> +----------+
+         |          |    |          | <- | enc()    |
+         |          |    |          |    +----------+
+         |          | <- |          |
+ socket  |          |    +----------+
+    <--  |          |
+         +----------+  
+
+ Division of labor (on a per-process basis) (follow the arrows upward):
+        ^^                                              ^^
+ [--A---][------------------------B---------------------][---C----]
+
+ ... where A is the socket port, B is the generic rpc_server, and C is
+ the user-defined gen_server.
+
+ This is the most generic and transparent way of implementing an rpc
+ server.  The drawback is that each rpc request (and its reply) is
+ sent as a message to the user's process.  Furthermore, the user's
+ server process is a gen_server.  By default, gen_servers can only
+ process one call at a time; this is a performance bottleneck when
+ dealing with multiple RPC clients simultaneously.
+
+5.1.2. rpc_server implementation
+
+  The following diagram illustrates the processes and modules
+  involved:
+
+  A RPC client sends a RPC call on a socket.  The rpc_server process
+  recieves the messages and decodes it.  Then it calls the xx_svc
+  module, providing the procedure number and arguments.  The xx_svc
+  module translates the procedure number to an erlang atom, calls
+  xx_xdr to decode parameters, then calls the user defined rpc_server
+  callback module.
+
+          rpc_server
+           process         
+         +----------+     xx_svc.erl      xx_xdr.erl
+ socket  |          |    +----------+    +----------+     user's
+    ---> |          | -> | xx_prog  | -> | dec()    |     rpc_server
+         |          |    |          | <- +----------+     module
+         |          |    |          |     apply          +--------+
+         |          |    |          |   ---------------> |        |
+         |          |    |          |   <--------------- +--------+
+         |          |    |          |     xx_xdr.erl
+         |          |    |          | -> +----------+
+         |          |    |          | <- | enc()    |
+         |          |    |          |    +----------+
+         |          | <- |          |
+ socket  |          |    +----------+
+    <--  |          |
+         +----------+  
+
+ Division of labor (on a per-process basis) (follow the arrows upward):
+        ^^                                                        ^^
+ [--A---][------------------------B-------------------------------]
+
+  ... where A is the socket port, B is the generic rpc_server.
+
+  The advantage of this model is that no copies are made for the rpc
+  requests.
+
+  The rpc_server behaviour is decribed in 5.2.2.2
+
+
+5.2.1.1  Multi-threaded rpc_server implementation
+
+  rpc_server allows the callback function return {noreply, S}.
+  This can be used to implement a multi-threaded rpc server:
+
+
+  This diagram extends the diagram above, not showing the leftmost
+  part. 
+
+         user's
+         rpc_server
+         module
+         +--------+
+         |        | -----------------------------> spawn new proc
+         |        |           
+         +--------+                                +------------+
+                                                   |            |
+                    xx_xdr.erl   rpc_server:reply  |            |
+                    +--------+ <----------------   |            |
+                    | enc()  |                     +------------+
+   sock   <-------- +--------+
+
+ Division of labor (on a per-process basis) (follow the arrows upward):
+        ^^        ^^                                            ^^
+ [---A---][---B---]
+                   [-------------------C------------------------]
+                   [-------------------D------------------------]
+                   [-------------------E------------------------]
+
+  ... where C,D, and E are dynamically spwawned processes for each, or
+  some, requests.
+
+  Note that the reply is sent directly to the socket, to via the
+  rpc_server process.
+
+
+5.2. API
+
+5.2.1  rpc_server API
+
+  start_link(Protos, PrgNum, PrgName, PrgVsnLo, PrgVsnHi, Mod, InitArgs)
+  start_link(Name, Protos, PrgName, PrgNum, PrgVsnLo, PrgVsnHi, Mod, InitArgs) ->
+       <suitable for a child to a supervisor>
+    Name      = see gen_server(3)
+    Protos    = [{tcp|udp, Ip, Port, Pmap_p, SockOpts}]
+	        XXX SLF Yes, putting the tuple inside a list is annoying,
+		but it's necessary unless I want to rip out the multiple
+		protocol-handling stuff in the bowels of the socket handler,
+		and since I don't fully understand how that stuff works,
+		I'll just leave it in for now.  XXX SLF
+    Pmap_p    = bool() if true, the server registers itself with
+                  the local port mapper.
+    SockOpts  = list of extra socket options (see the code)
+    PrgNum    = int() RPC Program number
+    PrgName   = atom() RPC Program name, used to construct the callback
+	        function name in Mod to handle a particular RPC call.
+    PrgVsnLo  = int()
+    PrgVsnHi  = int() The server handles vsns in the interval Lo - Hi
+    Mod       = atom() Dispatch module.
+    InitArgs  = list(), passed to Mod:init/1.
+    Clnt      = client()
+
+      Note that the client() datatype might contain temporary data
+      associated with the current client call, such as Xid.  Thus, it
+      can't directly be used to identify a client.  Use the access
+      functions described below to extract information from the
+      datatype.  For example, client_ip() can be used to identify a
+      client program.
+
+    NOTE: The callback module described here is usually not written
+    by the user.  Instead, give the name of the generated xx_svc
+    module here; it conforms to the interface defined above.  For a
+    description of how to implement a server using xx_svc, see 5.2.2.
+    For completeness, the dispatch module API is described in 5.2.1.1.
+
+    Note on PrgName: This atom is used to construct the function name
+    in module Mod to handle an RPC call.  That function is named
+    PrgNum_PrgVsn, e.g. name_4 for version RPC program version 4.
+    See 5.2.2.1 below for more information.
+  
+  client_ip(Clnt) -> {ok, {Ip, Port}} | {error, Reason}
+    Clnt      = client()
+
+    Can be used by a server implementation to get the Ip and Port of
+    the current client.
+ 
+  client_socket(Clnt) -> Socket
+    Clnt      = client()
+
+    Can be used by a server implementation to get the socket of the
+    current client.  Note that for UDP, one socket is used for all
+    clients.
+
+  reply(Clnt, Reply) -> void()
+    Clnt      = client()
+  
+    Used to asynchronously send a rpc reply to a client.  Can only be
+    used when a server is implemented with the rpc_server behaviour,
+    and a callback function returned {noreply, S'}.
+
+5.2.1.1  Dispatch module
+
+   This is the API the dispatch module must follow.  It's recommended
+   to use erpcgen to generate a xx_svc module (see 5.2.2), which is
+   used the dispatch module.  xx_svc conforms to the API described
+   here.
+
+      Mod:init/1, handle_call/3, handle_cast/2,
+                  handle_info/2, terminate/2  -- like gen_server
+              
+         These functions are called like the gen_server functions.
+         Specifically, the following functions are called:
+           Mod:handle_info({tcp_new, Sock}, State)
+           Mod:handle_info({tcp_closed, Sock}, State)
+         when a tcp client connects resp. disconnects.
+
+      Mod:ProgN(Proc,Bin,Offset,Clnt,State) ->
+          {success, Result, NState} |
+          {noreply, NState} | 
+          {error, NState} |
+          {garbage_args, Nstate} |
+          exit(Reason)
+       ProgN     = atom() on the form <program>_<program-vsn>
+       Result    = io_list()
+
+        This function is called when a request is received for the
+        program.
+
+
+5.2.2  xx_svc callback API
+ 
+5.2.2.1  gen_server implementation
+
+  If erpcgen is given the flag 'svc', the xx_svc module is generated
+  with functions that calls gen_server:call for each rpc request.
+
+  Thus, the user must define a gen_server process which must be
+  locally registered as xx_server.  The following calls are defined:
+
+   {Procedure_PrgVsn, Arg1, Arg2, ..., Clnt}
+         Called when a client makes a RPC request the reply value is
+         the erlang representation of the return value for the
+         procedure.  The reply is the return value of the rpc
+         procedure.
+
+	 The "Procedure" portion of the function name is taken from the
+	 "program" directive in the RPC specification file, e.g.
+		   program MOUNTPROG {
+			   version MOUNTVERS {
+				   ...
+			   } = 3;
+		   } = 100005;
+	 ... will create a callback function mountprog_3/5.
+
+  The following messages are sent directly to the process:
+
+   {tcp_new, Sock}
+         when a tcp client is connected
+
+   {tcp_closed, Sock}
+         when a tcp client closes it's socket
+
+  NOTE: The RPC server state variable State is not available to
+  gen_server implementations.
+
+5.2.2.2  rpc_server implementation
+
+  If erpcgen is given the flag 'svc_callback', the xx_svc module is
+  generated with functions that calls a callback module each rpc
+  request.
+
+  The rpc_server behaviour is like gen_server, with the follwoing
+  differences:
+
+    o  The process must not change the trap_exit process flag.  The
+       process traps exists.
+
+    o  The process must not open tcp or udp sockets in active mode,
+       since the messages will interfere with the rpc messages.
+  
+    o  The callback module must be prepared to handle the messages
+       {tcp_new, Sock}, {tcp_closed, Sock}, and {tcp_error, Sock} in
+       its handle_info/2 function.
+
+  The callback module must export a function for each rpc procedure it
+  implements, in addition to the normal gen_server callbacks:
+
+    Procedure_PrgVsn({Arg1, ..., ArgN}, Clnt, S) ->
+	 {reply, Reply, S'} | 
+         {noreply, S'}      | 
+         {error, S'}
+
+  If {noreply, S'} is returned, the function rpc_server:reply() must
+  be called, not necessarily by the same process, to reply to the rpc
+  request.
+
+  Typically, this method would be used by invoking erpcgen as:
+
+	erpcgen -a '[svc_callback,xdr]' foo.x
+
+  ... which will create foo_svc.erl and foo_xdr.erl.
+  rpc_server:start_link/7 would then be called with PrgName argument as
+  'ProgramDirective_PrgVsn'.  XXX SLF This is complicated.  Perhaps a
+  definition of terms at the beginning of this doc would help clear up which
+  name to use, the basename of the RPC spec file vs. the name specified by
+  the "program" directive inside the RPC spec file.  XXX SLF
+
+  The foo_svc.erl file provides a layer of code that 
+
+Writing a client
+----------------
+
+1. Generate xx_clnt.erl, xx_xdr.erl, xx.hrl
+
+2. Start the client:
+      rpc_client:open(Host, Program, Version, Proto)
+      rpc_client:open(Host, Program, Version, Proto, Port) ->
+         {ok, LinkedPid} | {error, Reason}
+
+   Note that the client pid is linked.  The client exits if
+   the socket is closed or if there is any socket error.
+
+3. 
+
+

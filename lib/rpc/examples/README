@@ -1,0 +1,60 @@
+Copyright (c) 2000, 2001 Sendmail, Inc.  All rights reserved.
+
+Each subdirectory contains an RPC definition ("*.x"), and possibly
+some Erlang or C application code which uses it.
+
+DISCLAIMER: some of these examples are known to be broken, either due
+to nonstandard RPC declarations, or limitations of this package.
+
+bootparam:
+
+epmd:
+ SUN/RPC version of  Erlang Port Mapper Daemon (with extensions)
+
+erl:
+ XDR flavor of Erlang(s) external format.
+
+klm:
+ A lock management protocol, used with NFS.
+
+mount:
+ NFS mount protocol.
+
+mount2:
+ Another NFS mount protocol.
+
+mount3:
+ Yet another NFS mount protocol.
+
+nfs2:
+ NFSv2.
+
+nfs3:
+ NFSv3.
+
+nlm:
+ Another lock management protocol, used with NFS.
+
+r-commands:
+ A set of "r-command" protocols for rex, rquota, rstat, and rusers.
+
+simple:
+ An example of an RPC file.
+
+sm_inter:
+
+
+spray:
+
+
+stack:
+ Very stupid usage of RPC, but in proto/stack there is both C
+ client/server and Erlang client/Server so it is possible to see
+ how they mix with SUN/RPC.
+
+test:
+ A simple but complete example of an RPC server in Erlang and an RPC client
+ application in C.  See the README file for compilation and usage details.
+
+yp:
+ Some tests with yp.

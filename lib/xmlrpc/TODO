@@ -1,0 +1,4 @@
+* SSL
+* SOAP
+* Integration into either the inets, jnets or yaws web server.
+* Implmentation of the function inspection protocol.

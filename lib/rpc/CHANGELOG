@@ -1,0 +1,138 @@
+1.1 - 010903 - release - Martin Björklund, Alteon WebSystems:
+
+- timeout fix.  the timeout specified is now RPC timeout, as it's
+  supposed to be.
+
+- pendinglen in rpc_client was not correctly calculated.
+
+- fixed xdr decoding of union of bool.
+
+- using catch ingenerated code to handle rpc errors.
+
+
+1.1 - 010830 - beta5 - Jim Larson, Sendmail, Inc.:
+
+- touchups for release
+
+
+1.1 - 010302 - beta4 - Martin Björklund, Alteon WebSystems:
+
+- fixed bug: xdr generation for unions of enum failed
+
+- added support for starting rpc_server with port 0, i.e.
+  it starts on a dynamic port, and uses pmap to register the port.
+
+- fixed bug from beta3: when decoding unions, {default, Val} was
+  returned, instead of real tag (e.g. {'REG_ERR', Val}
+
+- fixed bug from beta3: generated xx_svc w/ procs with more than one
+  argument didn't compile
+
+
+1.1 - 001123 - beta3 - Martin Björklund, Alteon WebSystems:
+
+- added doc/API.txt
+
+- added rpc_server behaviour; erpcgen can generate code in the old
+  gen_server style, or in a plain callback style
+
+- rpc_server dispatch module API changed - handles stateful callback
+  modules
+
+- added new option 'svc_callback' to erpcgen, to generate code in the
+  new style.
+
+- rpc_client uses BIF timers, and cancels unused timers
+
+- added explicit messages / callbacks to user's rpc_server
+  implementation to keep track of tcp connections (i.e. msgs
+  tcp_new and tcp_close).
+
+- TODO
+    o  examples not updated
+    o  more doc in API.txt
+
+
+1.1 - 001113 - beta2 - Martin Björklund, Alteon WebSystems:
+
+- from beta1: fixed bug in generated svc code
+
+- from beta1: udp didn't work at all in rpc_client
+
+- generate rpc.app from Makefile
+
+- NOTE: rpc_client:open returns a *linked* pid!
+
+- removed some debug printouts from rpc_client
+
+- using connected udp for rpc_client
+
+- rewrote rpc_client to use explicit timers for each pending call
+  instead of polling each second
+
+- corrected deviation count in rpc_client
+
+Q: rpc_client:controlling_process doesn't make any sense.  it's just a
+   link.  the owner is not stored in the state - remove this function!
+   
+
+
+1.1 - 001110 - beta1
+
+Martin Björklund, Alteon WebSystems:
+
+- Generated code, rpc_server and rpc_client use the new bit
+  syntax in R7.
+
+- Generated XDR code speedup approx. a factor 3.
+
+- reg_server handles UDP (as well as TCP).
+
+- Handles more than one version of the rpc program at the
+  time.
+
+- Uses less processes (just two); can handle code changes
+  better this way.
+
+- Changed callback interface; added a client reference,
+  so that the server can check client address with
+  client_ip/1.  The generated x_svc code can be used
+  directly as a dispatch module.
+
+- Added rpc.x.  rpc_server and rpc_client uses the generated rpc_xdr
+  module.
+
+- rpc_server handles errors from callback functions correctly.
+
+- API changed; start_link arguments changed.
+
+- Removed dead code; rpc_reg and xdrlib.
+
+- Needs R7 - if you don't like that; use rpc-1.0.
+
+
+1.0
+
+Scott Fritchie and Jim Larson of Sendmail, Inc. enhance Tony Rogvall's
+original work with the following enhancements:
+
+- Changed the XDR library to work with Binaries instead
+  of lists of bytes.  For code that handles large opaque<>
+  blocks, this improves the performance by an order of
+  magnitude or more.
+
+- Changed the RPC client-side server to work asynchronously
+  and handle several outstanding requests at the same time.
+
+- Made rpc_server: a stripped-down version of rpc_reg.
+
+- Statistics-gathering, failure-detection and load-shunting
+  in rpc_clnt.
+
+- AUTH_SYS support in rpc_clnt.
+
+- Include complete RPC server and RPC client example code in examples/test.
+
+Pre-1.0
+
+Tony Rogvall's original "xdr" package.

@@ -1,0 +1,14 @@
+{name, "rpc"}.
+{vsn, {1,1}}.
+{summary, "ONC/RPC stub generator and library"}.
+{author, "Tony Rogvall", "tony@bluetail.com", "000815"}.
+{author, "Scott Fritchie", "scott@sendmail.com", "000815"}.
+{author, "Jim Larson", "jim@sendmail.com", "000815"}.
+{author, "Martin Bjorklund", "mbj@bluetail.com", "001110"}.
+{keywords, ["ONC/RPC", "stub generator", "XDR", "RPC", "portmapper"]}.
+{needs, []}.
+{abstract,"This is a stub generator for the ONC/RPC protocol.  Given a
+protocol specification in the RPC syntax (RFC1831), the stub generator
+will create client-side and server-side code for encoding and decoding
+procedure calls into XDR-encoded network messages. Version 1.1 is rewritten
+for R7 - faster XDR routines which generates less garbage."}.

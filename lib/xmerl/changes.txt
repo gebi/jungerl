@@ -1,0 +1,415 @@
+TODO: 
+- Finish the validation! (Will I ever come around doing this?)
+- Improve support in xmerl for some common usage (by experience) of it.
+  xmerl as of today is written to try to be very generic. However, I have noted
+  that in many cases where xmerl is used only a subset of this is used.
+  Furthermore, it is used in a similar way. Thus, by giving better support for
+  particular usages, implementation could essentially be limited to a callback
+  module for each new DTD.
+
+
+KNOWN ISSUES:
+- When scanning entity references, a sublist is created (see scan_entity_ref/2)
+  to distinguish such references. The default behaviour is then to flatten this
+  in the acc/3 function to keep application-level unaware of this
+  implementation detail. However, entity references may occur elsewhere also
+  (attribute values). This information might sometimes also be useful for the
+  application to know about (e.g. when representing character not supported by
+  the current charset).
+- Instead of splitting up text in several xmlText records when entities are
+  found it might be better for the application if they are kept into a single
+  one. This given that the application is not interested to know if any entities
+  have been referenced etc.
+- What about documents with multiple defined character set encodings?
+- As reported by Oleg Kiselyov:
+  + Streamed-oriented parsing needs preprocessing. For example, in function
+    scan_cdata/5. Suppose the current string to parse contains "<![CDATA[aaa]" .
+    Suppose the continuation_fun, when invoked, will supply the rest of the
+    stream: "]>..." In other words, the character combination "]]>" happens to
+    be split across two chunks of the input stream.  As the logic of
+    scan_cdata/5 indicates, scan_cdata will not recognize that ']' in one chunk
+    and ']>' in the next chunk actually form a single token. The scanner will
+    misidentify the end of the CDATA section, and consequently fail to parse
+    the rest of the document stream.
+    See xmerl_eventp.erl for an example how a preprocessor can solve this.
+  + General entity references
+    * detect recursion in general entity references
+    * scan_entity_value/5 expands general entities even DTD, which it must
+      not do.
+  + Attribute value normalization
+    * scan_att_value/2 and scan_att_chars/4 don't do value normalization
+  + Merging of attributes declared in DTD with those specified in an
+    element
+
+
+Note that each character set defined in the XML encoding attribute must not
+contain the ':' character, but the IANA defined name might!
+
+
+Changes 0.16 -> 0.17
+--------------------
+xmerl.erl
+- Some code moved to xmerl_lib.erl.
+- Make callback calls to #text# method for text segments upon export.
+
+xmerl_lib.erl
+- New module containing utility functions.
+- Added help functions to export `<' and `&' in text-segments properly
+
+xmerl_xml.erl
+- Don't "pretty-print", i.e., no whitespace (including line breaks) is
+  inserted.
+- Some code moved to xmerl_lib.erl.
+- Exporting escapes '<' and '&' (and '"' in attribute values).
+
+xmerl_html.erl
+- No "pretty-printing"; cf. xmerl_xml.
+- "title" option removed. User must give complete HTML element. This
+  gives complete control over document content (declarations in HEAD, etc.).
+- New options "version" and "uri" for the DOCTYPE specification.
+- Don't inherit from xmerl_xml - this is a primitive export method.
+- Old version of this module moved to test_html.erl.
+- Contains the old code from xmerl_html.erl; a lot of it is nonfunctional.
+- Exporting escapes '<' and '&' (and '"' in attribute values).
+
+xmerl_text.erl
+- New export method for raw text output (stripping all tags).
+
+xmerl_scan.erl
+- Added detect_charset/1 and detect_charset/2 that tries to automatically
+  detect the character set of a XML document. Optionally transforms the 
+  document to a unicode, 'iso-10646-utf-1'representation (integers, of max
+  32 bit size). Transforming a document to 'iso-10646-utf-1'requires ucs.
+  Note that xmerl assumes the document is in Unicode (above character set) when
+  parsing.
+- CR not followed by LF is read as a LF.
+- Added option {line, L} to specify starting line for scanning.
+- Added option {space, (preserve|normalize)} to control behaviour when
+  scanning whitespace. Default is to preserve. "xml:space" declarations
+  should be obeyed properly.
+- Made string/1, string/2, file/1 and file/2 all return a tuple {Result,Tail}
+  after a successfull parse.
+- path_locate/3 didn't use paths in fetch_path
+- scan_doctype3/2, and scan_include/2 didn't invoke expand_pe_reference/2
+- scan_ext_subset/2 didn't try to fetch a scanned external PE reference.
+
+Changes 0.15 -> 0.16
+--------------------
+xmerl_scan.erl
+- Fixed problems in scan_element/12 when processing end tag, with no content.
+  Fix includes update of processed_whole_element/12  
+- Fixed bug scan_char_ref_hex/3, didn't convert properly to integers
+- Removed dead code in scan_entity_ref/2. Dead code because the case "&#" is
+  already checked in scan_reference/2
+
+
+New functionality in xmerl-0.16
+xmerl.erl
+- Added export_element/3 meant to be used to access callback modules whenever an
+  element is completely scanned, during the scanning process.
+  Additionally a user defined argument list may be supplied to the callback
+  module.
+
+xmerl_scan.erl
+- Added validation hook e.g.{validation,true}
+  Not fully implemented yet!!!
+- Added prolog hook e.g.{prolog,stop} to allow for a more flexible scanning of
+  the prolog of the XML document. This is to allow DTD specific content to be
+  supplied to the scanning (e.g. choose the right call-back module) and to
+  allow for possible conversion to unicode from character set given by the
+  xml declaration.
+  Possible values are:
+  - continue Scan the prolog and immediately afterwards scan the rest of the
+             document. This the default value.
+  - stop     Stop scanning after prolog and return a tuple {Cont,User_state}
+             where:
+             + Cont is the rest of the document after the prolog has been parsed
+             + User_state the user defined global state.
+  Note:
+  - xmerl_scan:string/2 (or xmerl_scan:file/2) can be reexecuted
+    directly on the returned Cont value.
+  - The prolog may contain
+    + XMLDecl, that is e.g. the XML version
+    + Various PI (Processing Instructions)
+    + DOCTYPE declaration, including e.g. DTD markup declarations (or reference
+      to it)
+
+xmerl.hrl
+- Added 'prolog' field to xmerl_scanner record
+- Added 'validation' field to xmerl_scanner record
+
+
+==================
+
+Changes 0.14 -> 0.15
+--------------------
+
+  xmerl_scan
+  ----------
+
+- some whitespace not scanned correctly
+- faulty return value from scan_attdef/3
+
+
+Changes 0.13 -> 0.14
+--------------------
+
+  xmerl_scan
+  ----------
+- xmlns and xml:space attributes were not processed correctly for 
+  empty elements (ending with />). This has been corrected.
+
+  xmerl.erl
+  ---------
+
+- callbacks/1 exported, and export/[2,3] modified to accept either a
+  callback module, or a list of callbacks, as returned by callbacks/1.
+
+
+Changes 0.12 -> 0.13
+--------------------
+
+  xmerl_scan
+  ----------
+
+- Added customization hooks for reading and writing to the rules table
+  When supplying hooks, do not use S#xmerl_scanner.rules (it may not be there)
+  but instead use xmerl_scan:rules_state(S) and xmerl_scan:rules_state(X, S)
+- Added an option, {fetch_path, [Dir]} to allow the default fetch_URI/2 to
+  search a "patch path" for documents; if the file is not found along the 
+  path, the URI is used as filename. {fetch_path, ["."]} should always fetch
+  documents from the current working directory.
+- Added some more support for parsing incomplete documents. The scanner can
+  now handle a break right before "/>" (an empty element)
+- scan_xml_vsn/2 and scan_pubid_literal/2 now return ?fatal/2 if an invalid
+  character is encountered.
+- is_pubid_char/1 now also accepts numbers, as it should.
+
+  xmerl.hrl
+  ---------
+
+- A new record, #xmlDocument{} has been added. Currently, it's used only by 
+  xmerl_xpath
+
+  xmerl_xpath
+  -----------
+
+- Before running a query, it now makes sure that the root node is an
+  #xmlDocument{} record. If one wasn't already there, it is added.
+
+
+Changes 0.11 -> 0.12
+-------------------
+
+  xmerl_scan
+  ---------
+
+- Arguments swapped on line 1677 (scan_pubid_literal/4). Fixed.
+
+
+Changes 0.10 -> 0.11
+-------------------
+
+  xmerl_eventp
+  ------------
+
+- Fixed bug related to binary splitting when not using the bitsyntax.
+
+
+Changes 0.9 -> 0.10
+-------------------
+
+  xmerl_scan
+  ----------
+
+- Added started event for comments
+- Inserted column information in the event records (the attribute was
+  already there, but never actually initialized)
+
+  xmerl_eventp
+  ------------
+
+- Fixed incorrect handling of files that didn't have trailing whitespace.
+
+
+Changes 0.8 -> 0.9
+------------------
+
+  General
+  -------
+
+- Implemented multiple state variables for xmerl_scan: one for each
+  customization fun which could be expected to want its own state
+  (i.e. all except acc_fun and close_fun)
+- Wrote some documentation (README.html)
+
+
+Changes 0.7 -> 0.8
+------------------
+
+  General
+  -------
+
+- Fixed version in xmerl.pub
+- xmerl_eventp never passed the event handler hook to xmerl_scan -- oops!
+- NOTE: xmerl_eventp.erl uses the bit syntax introduced in OTP R7.
+  It won't compile with an earlier version.
+
+Changes 0.6 -> 0.7
+------------------
+
+  General
+  -------
+
+- Added an example of an event-based processor front-end to xmerl_scan.erl
+- Fixed a number of xmerl_scanner bugs in the process
+
+  xmerl_scan.erl
+  --------------
+- Changed the semantics of the continuation fun: now called with user data
+  and returns new user data.
+- Chased down one of those terrible bugs where an old state instance was 
+  reused erroneously.
+- xmerl_scan now generates events for text-only contents.
+
+
+Changes 0.5 -> 0.6
+------------------
+
+  General
+  -------
+
+- Inserted EPL copyright statements
+- Removed -compile(export_all).
+- Added xmerl_xml.erl - a callback module for exporting to XML.
+
+  xmerl_scan.erl
+  --------------
+
+- If a rules table is specified by the caller via the option {rules, R},
+  the table will not be deleted after a completed scan; if no rules table
+  is specified, xmerl_scan will create a new (empty) table for the scan,
+  and delete it before returning to the caller.
+
+  xmerl.erl
+  ---------
+
+- Added return value {'#xml-alias#', NewTag} to allow definition of synonyms
+  (see for example p, para and 'P' in xmerl_html.erl)
+
+- The special tag '#root#' is now automatically called at the end of the
+  export, as if the data structure were wrapped in {'#root#', RootArgs, Data}.
+  RootArgs := [{Key, Value}] can be passed to the export function.
+  For examples, see xmerl_html.erl and xmerl_xml.erl
+
+
+Changes 0.4 -> 0.5
+------------------
+
+  General
+  -------
+
+- Added testdata: "All is well that ends well" by Shakespeare (in XML w/DTD)
+
+  xmerl_scan.erl
+  --------------
+
+- Scan_comment/2 was looking for the end tag "->" instead of "-->". Fixed.
+- Added fetch_fun/2, to fetch external DTDs. The default fetch function assumes
+  that the system identifier is a filename. If the filename is relative,
+  the value of #xmerl_scanner.directory will be prepended (defaults to the
+  directory of the XML file being scanned.)
+
+  fetch_fun({public, PublicIdentifier, SystemIdentifier}, S) -> FetchRet;
+  fetch_fun({system, SystemIdentifier}, S) -> FetchRet.
+
+    FetchRet : {ok, NewS}		% do not scan the DTD
+               | {ok, DataRet, NewS}	% scan contents of DataRet
+    DataRet  : {file, Filename} | {string, String}
+
+  The scanner will optionally parse the DTD with options derived from NewS:
+  All the modifier functions can be temporarily changed by altering their specs
+  in NewS; user_state can be changed, and the resulting user_state from the
+  DTD parse will be kept afterwards; everything else will stay as before.
+  The same 'rules' ETS table is used (cannot be changed here.)
+
+- Changed the return values of file/[1,2] and string/[1,2] to 
+  {ok, Result} | {error, Reason}
+
+- Changed the return values of most scanner functions to return 
+  {Result, Tail, NewState}. If no useful result was produced, {[], Tail, NewS}
+  is returned. This is so that just about any function can terminate the scan.
+
+
+  xmerl.hrl
+  ---------
+
+- Added debug macros
+- Added 'directory' and 'fetch_fun' to #xmerl_scanner{}
+
+
+
+Changes 0.3 -> 0.4
+------------------
+
+  xmerl_scan.erl
+  --------------
+
+- scan_enc_name/2 didn't work. Fixed.
+
+
+
+Changes 0.2 -> 0.3
+------------------
+
+  General:
+
+- Started dabbling with XLINK, created inc/xmerl_xlink.hrl
+- Removed xmerl_names.erl from Makefile (file already deleted)
+- Created test file, testdata/simple.xml, which should correspond to 
+  test:simple().
+- Created xmerl_xlate.erl, which was an experiment with transforming
+  a document already in a callback hook to the scanner. Problem: hooks
+  are called as the elements' end tags are found -- not in document order.
+
+  xmerl_scan.erl
+  --------------
+
+- A bug crashed the scanner if not all names where namespace prefixed
+  Big oops! Fixed.
+- Default value of #xmerl_scanner.namespace_conformant changed to false.
+
+
+
+Changes  0.1 -> 0.2
+-------------------
+  General:
+
+- Changed the directory structure, created src/ inc/ ebin/ priv/
+- Wrote a make file
+- compile_grammar.sh is called from make to compile the yecc grammar
+- Added some namespace complexity to priv/testdata/a_and_c.xml
+
+
+  xmerl.hrl:
+
+- Added attributes 'namespace', 'bindings', 'functions' to #xmlContext{}.
+
+
+  xmerl_scan.erl:
+
+- included auto-expansion of qualified names according to XML Names
+  (PIs, NOTATION, ENTITY names cannot have colons, if the scanner is run
+   as namespace-conformant.)
+
+
+  xmerl_xpath.erl:
+
+- The node tests were wrong, matching on the wrong token format -- fixed.
+- Context passed along to node_test/2 -> now node_test/3.
+- Name expansion incorporated in node_test/3.
+- string(Str, Doc) changed to string(Str, Doc, Options)
+    Options : [{Key, List}]
+    Key : namespace | bindings | functions
+    List : [{Key, Value}]  % {namespace, #xmlNamespace{}} is also allowed.
+

@@ -437,24 +437,21 @@ buffer.")
   (run-hook-with-args 'erl-nodeup-hook node fsm-process))
 
 (eval-and-compile
-  ;; Try to establish whether we have IEEE floating point.  In that
-  ;; case we can rely on exact floating point operations with enough
-  ;; of precision from the doubles used in Emacs floats.  Actually, we
-  ;; probably don't have non-IEEE FP on any platform, but I'm not sure
-  ;; what can happen if the systems's FP is set up to signal on
-  ;; divide-by-zero.  Note that `float_arith_driver' in data.c tests
-  ;; IEEE_FLOATING_POINT before dividing by zero, and signals an error
-  ;; in the non-IEEE case.
-  (if (string= "1.0e+INF" (format "%S" (condition-case ()
-                                           (/ 1.0 0)
-                                         (error nil))))
-      (defun derl-int32-to-decimal (s)
-        "Converts a 32-bit number (represented as a 4-byte string) into its
+  (defun derl-int32-to-decimal (s)
+    "Converts a 32-bit number (represented as a 4-byte string) into its
 decimal printed representation."
-        (format "%.0f" (+ (+ (aref s 3) (* 256 (aref s 2)))
-                          (* (+ 0.0 (aref s 1) (* 256 (aref s 0)))
-                             65536))))
-    (error "Can't use Emacs's floating-point for `derl-int32-to-decimal'.")))
+    (format "%.0f" (+ (+ (aref s 3) (* 256 (aref s 2)))
+		      (* (+ 0.0 (aref s 1) (* 256 (aref s 0)))
+			 65536)))))
+
+;; Try to establish whether we have enough precision in floating-point
+;; The test is pretty lame, even if it succeeds we cannot be sure
+;; it'll work for all int32's
+;; alas, i'm too ignorant to write a good test
+;; the previous version of the test was nicer, but FSFmacs-specific :<
+
+(unless (string= "1819634533" (derl-int32-to-decimal "luke"))
+  (error "Can't use Emacs's floating-point for `derl-int32-to-decimal'."))
 
 (defun derl-hexstring-to-binstring (s)
   "Convert the hexidecimal string S into a binary number represented

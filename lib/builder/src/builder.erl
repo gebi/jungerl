@@ -1004,13 +1004,21 @@ app_info(Apps, Dict) ->
 	     end, Apps),
     AppName = dict:fetch(app_name, Dict),
     case lists:keysearch(AppName, 1, Info) of
-	{value, {_A,V,D}} when V == MyVsn, D == MyEbin ->
-	    Info;
-	{value, Other} ->
-	    exit({conflicting_info_in_apps, {Other, {MyName,MyVsn,MyEbin}}});
+	{value, {Ai,Vi,Di}} ->
+	    [Version,Dir] = lists:foldr(
+			      fun({unknown,Vx}, Acc) -> [Vx|Acc];
+				 ({Vx,Vx}, Acc) -> [Vx|Acc];
+				 ({V1,V2},_) ->
+				      exit({conflicting_info_in_apps,
+					    {{Ai,Vi,Di},
+					     {MyName,MyVsn,MyEbin}}})
+			      end, [], [{Vi,MyVsn},{Di,MyEbin}]),
+	    lists:keyreplace(AppName, 1, Info,
+			     {AppName, Version, Dir});
 	false ->
 	    Info ++ [{AppName, dict:fetch(app_vsn, Dict), ebin_dir(Dict)}]
     end.
+
 	      
 
 search_apps(Apps, Dict, AppInfo, InitAcc) ->

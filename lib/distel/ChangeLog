@@ -1,3 +1,13 @@
+2005-02-20  Luke Gorrie  <luke@synap.se>
+
+	* doc/distel.texi (Conventions): Added a note that you need to
+	start the Erlang node yourself, to make Joe happy.
+
+2005-01-30  Luke Gorrie  <luke@synap.se>
+
+	* elisp/erl-service.el (erl-goto-end-of-call-name): Rewrote to
+	hopefully suck less badly.
+
 2004-10-27  Luke Gorrie  <luke@synap.se>
 
 	* elisp/erl-service.el (erl-refactor-subfunction): Strip text

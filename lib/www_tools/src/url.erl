@@ -64,7 +64,7 @@ raw_get_url(URL, Timeout) ->
 	{error, Why} ->
 	    {error, {badURL,URL}};
 	{http, HostName, Port, File} ->
-	    get_http(HostName, Port, File, [], Timeout)
+	    get_http(HostName, Port, File, ["Host: ", HostName], Timeout)
     end.
 
 raw_get_url(URL, Timeout, {IP, Port}) ->

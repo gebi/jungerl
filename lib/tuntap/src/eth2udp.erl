@@ -23,7 +23,6 @@ start_link(Port, EPs, Dev) ->
     spawn_link(?MODULE, init, [Port, EPs, Dev]).
 
 init(Port, EPs, Dev) ->
-    register(eth2udp, self()),
     {ok, Socket} = gen_udp:open(Port, [binary]),
     {ok, Tunnel} = init_tunnel(Dev),
     loop(Tunnel, Socket, EPs).

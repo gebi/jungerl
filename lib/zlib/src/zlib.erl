@@ -186,7 +186,7 @@ crc32(Z, Binary) ->
     call(Z, ?CRC32_1, Binary).
 
 crc32(Z, CRC, Binary) ->
-    call(Z, ?CRC32_1, <<CRC:32, Binary/binary>>).
+    call(Z, ?CRC32_2, <<CRC:32, Binary/binary>>).
     
 getQSize(Z) ->
     call(Z, ?GET_QSIZE, []).    

@@ -60,6 +60,12 @@
 %% <p>The <code>goat</code>, and everything that accesses it, is otherwise
 %% oblivious to whether it is active or not.</p>
 %%
+%% <p>For this reason, <code>goat</code>s should not identify themselves
+%% with a pid obtained from <code>self()</code>, but should instead use the
+%% <code>GoatId</code> that will be passed to their callback functions.
+%% The use of functions such as <code>link/1</code> should similarly be
+%% avoided.</p>
+%%
 %% <p>See also Ulf Wiger's <code>mdisp</code> package.</p>
 %%
 %% <p>The name <code>goat</code> was chosen because goats are cute and have
@@ -88,7 +94,9 @@
   timeout = infinity       % how long this goat will stay active after a cast
 }).
 
-%% @spec behaviour_info(callbacks) -> [{atom(), integer()}]
+%% @spec behaviour_info(callbacks) -> [{function(), arity()}]
+%%         function() = atom()
+%%         arity() = integer()
 %% @doc Defines the callback interface.
 
 behaviour_info(callbacks) ->
@@ -116,16 +124,17 @@ stop() ->
 %% @spec new(module(), state()) -> goat_id()
 %% @equiv new(module(), state(), infinity)
 
-new(Handler, State) ->
-  new(Handler, State, infinity).
+new(Module, State) ->
+  new(Module, State, infinity).
 
 %% @spec new(module(), state(), timeout()) -> goat_id()
 %%         module() = atom()
 %%         state() = term()
 %%         timeout() = integer()
 %%         goat_id() = goat_id()
-%% @doc Creates a new <code>goat</code> with the given handler module.  The handler
-%% will be used to react to all calls and casts sent to the <code>goat</code>.
+%% @doc Creates a new <code>goat</code> with the given handler module.  The
+%% module should contain functions which will be called to react to all
+%% calls and casts sent to the <code>goat</code>.
 
 new(Handler, State, Timeout) when is_atom(Handler), is_integer(Timeout) ->
   GoatId = new_id(),
@@ -153,7 +162,7 @@ delete(GoatId) ->
 
 %% @spec retrieve(goat_id()) -> {ok, goat()} | {error, Reason}
 %%         goat() = goat()
-%% @doc Retrieves a <code>goat</code> based on it's identifier.
+%% @doc Retrieves a <code>goat</code> based on its identifier.
 
 retrieve(GoatId) ->
   case ets:lookup(?MODULE, GoatId) of
@@ -199,24 +208,34 @@ deactivate(GoatId) ->
 %% This does not necessarily require the <code>goat</code> be active.
 
 call(GoatId, Message) ->
-  {ok, #goat{ pid = Pid } = Goat} = retrieve(GoatId),
+  {ok, #goat{ pid = Pid, timeout = Timeout } = Goat} = retrieve(GoatId),
   case Pid of
-    undefined ->
+    undefined ->                      % inactive - execute in this process
       static_call(Goat, Message);
-    _ ->
+    _ ->                              % active - notify the goat's process
       Ref = erlang:make_ref(),
       Pid ! {{self(), call, Ref}, Message},
       receive
+        {{Pid, call, Ref}, {error, Reason}} ->
+          {error, Reason};
         {{Pid, call, Ref}, Reply} ->
           {ok, Reply}
+	after Timeout ->
+	  {error, timeout}
       end
   end.
 static_call(#goat{ id = GoatId, handler = Handler, state = State } = Goat, Message) ->
-  case Handler:handle_call(GoatId, Message, State) of
+  case catch Handler:handle_call(GoatId, Message, State) of
     {ok, Reply, NewState} ->
       NewGoat = Goat#goat{ state = NewState },
       ets:insert(?MODULE, NewGoat),
-      {ok, Reply}
+      {ok, Reply};
+    {error, Reason} ->
+      {error, Reason};
+    {'EXIT', Reason} ->
+      {error, Reason};
+    Else ->
+      {error, Else}
   end.
 
 %% @spec cast(goat_id(), term()) -> ok | {error, Reason}
@@ -226,7 +245,8 @@ static_call(#goat{ id = GoatId, handler = Handler, state = State } = Goat, Messa
 cast(GoatId, Message) ->
   activate(GoatId),
   {ok, #goat{ pid = Pid } = Goat} = retrieve(GoatId),
-  Pid ! {{self(), cast}, Message}.
+  Pid ! {{self(), cast}, Message},
+  ok.
 
 %% @spec goat_handler(module(), goat_id()) -> never_returns
 %% @doc Handles the dynamic aspect of a <code>goat</code>, as required.
@@ -242,15 +262,27 @@ goat_handler(Handler, GoatId) ->
 goat_handler(Handler, GoatId, State, Timeout) ->
   receive
     {{Parent, call, Ref}, Message} ->
-      case Handler:handle_call(GoatId, Message, State) of
+      MsgRef = {self(), call, Ref},
+      case catch Handler:handle_call(GoatId, Message, State) of
         {ok, Reply, NewState} ->
-          Parent ! {{self(), call, Ref}, Reply},
-          goat_handler(Handler, GoatId, NewState, Timeout)
+          Parent ! {MsgRef, Reply},
+          goat_handler(Handler, GoatId, NewState, Timeout);
+        {error, Reason} ->
+          Parent ! {MsgRef, {error, Reason}},
+          goat_handler(Handler, GoatId, State, Timeout);
+        {'EXIT', Reason} ->
+          Parent ! {MsgRef, {error, Reason}},
+          goat_handler(Handler, GoatId, State, Timeout);
+        Else ->
+          Parent ! {MsgRef, {error, Else}},
+          goat_handler(Handler, GoatId, State, Timeout)
       end;
     {{Parent, cast}, Message} ->
-      case Handler:handle_cast(GoatId, Message, State) of
+      case catch Handler:handle_cast(GoatId, Message, State) of
         {ok, NewState} ->
-          goat_handler(Handler, GoatId, NewState, Timeout)
+          goat_handler(Handler, GoatId, NewState, Timeout);
+	_ ->
+          goat_handler(Handler, GoatId, State, Timeout)
       end
     after Timeout ->
       Goat = retrieve(GoatId),

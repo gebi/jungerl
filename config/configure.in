@@ -113,7 +113,7 @@ if test -f ../support/GDConfig.mk ; then
   AC_MSG_RESULT([yes])
 else
   echo "Missing CVSROOT/jungerl/support/GDConfig.mk file" > ../lib/gd1_drv/SKIP
-  AC_MSG_RESULT([no, see CVSROOT/jungerl/lib/gd1_drv/GDConfig.mk.sample for instructions])
+  AC_MSG_RESULT([no, see CVSROOT/jungerl/lib/gd1_drv/README for instructions])
 fi
 
 dnl End.

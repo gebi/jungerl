@@ -10,6 +10,18 @@
 -include("x.hrl").
 -include_lib("kernel/include/inet.hrl").
 
+auth_file() ->
+    case os:getenv("XAUTHORITY") of
+	false ->
+	    case os:getenv("HOME") of
+		false ->
+		    false;
+		Home ->
+		    filename:join(Home, ".Xauthority")
+	    end;
+	File -> File
+    end.
+
 parse(Fname) ->
     case file:read_file(Fname) of
 	{ok,Bin} ->

@@ -32,16 +32,21 @@ open(Host, DpyN, DefScr) ->
 
 init(Creator, Host, DpyN, DefScr) ->
     ?DBG("init: ~p ~p ~p\n", [Host, DpyN, DefScr]),
-    Home = os:getenv("HOME"),
-    case xauth:parse(filename:join(Home,".Xauthority")) of
-	{error,Err} ->
-	    Creator ! {self(), {error,Err}};
-	Xauth ->
-	    case xauth:lookup(Host, Xauth) of
-		{value,Auth} ->
-		    auth(Creator,Host,Auth,DpyN,DefScr);
-		false ->
-		    Creator ! {self(), {error,bad_auth}}
+    case xauth:auth_file() of
+	false ->
+	    Creator ! {self(), {error, no_xauth_file}};
+	Filename ->
+	    case xauth:parse(Filename) of
+		{error,Err} ->
+		    Creator ! {self(), {error,Err}};
+		Xauth ->
+		    ?DBG("xauth parse: ~p ~p\n", [Host, Xauth]),
+		    case xauth:lookup(Host, Xauth) of
+			{value,Auth} ->
+			    auth(Creator,Host,Auth,DpyN,DefScr);
+			false ->
+			    Creator ! {self(), {error,bad_auth}}
+		    end
 	    end
     end.
 		    

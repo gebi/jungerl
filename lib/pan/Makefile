@@ -1,4 +1,5 @@
-ERLC =	/EDUP/Erlang/R7B-4/bin/erlc
+include ../../support/include.mk
+
 EFLAGS = -W +debug_info
 
 ERLS  = $(shell echo src/*.erl)

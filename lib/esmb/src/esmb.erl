@@ -366,7 +366,7 @@ dec_info_standard(<<_:4/binary, DT:12/binary, Size:32/little,
     F = #file_info{name = Filename,
 		   size = Size,
 		   attr = Attr,
-		   date_time = DT},
+		   date_time = dec_dt_info_std(DT)},
     [F | dec_info_standard(Rest, Max, I+1)];
 dec_info_standard(<<Rkey:4/binary, DT:12/binary, Size:32/little,
 		  _:4/binary, Attr:16/little, Len, 
@@ -375,7 +375,7 @@ dec_info_standard(<<Rkey:4/binary, DT:12/binary, Size:32/little,
     F = #file_info{name = Filename,
 		   size = Size,
 		   attr = Attr,
-		   date_time = DT,
+		   date_time = dec_dt_info_std(DT),
 		   resume_key = Rkey},
     [F];
 dec_info_standard(Data, Max, I) ->
@@ -384,7 +384,29 @@ dec_info_standard(Data, Max, I) ->
     io:format("FLUSH: ~p~n",[receive X -> X after 0 -> false end]),
     [].
 
+%%%
+%%% DOS - Date/Time format
+%%% Year has a range 0-119 which represents 1980-2099
+%%% Twoseconds has a range 0-29 representing two seconds increment
+%%%
+dec_dt_info_std(<<CreationDate:2/binary, CreationTime:2/binary,
+		  LastAccessDate:2/binary, LastAccessTime:2/binary,
+		  LastWriteDate:2/binary, LastWriteTime:2/binary>>) ->
+    <<Yc:7, Mc:4, Dc:5>> = swap(CreationDate),
+    <<Hc:5, Ic:6, Tc:5>> = swap(CreationTime),
+    <<Ya:7, Ma:4, Da:5>> = swap(LastAccessDate),
+    <<Ha:5, Ia:6, Ta:5>> = swap(LastAccessTime),
+    <<Yw:7, Mw:4, Dw:5>> = swap(LastWriteDate),
+    <<Hw:5, Iw:6, Tw:5>> = swap(LastWriteTime),
+    #dt{creation_date    = {Yc + 1980, Mc, Dc},
+	creation_time    = {Hc, Ic, Tc * 2},
+	last_access_date = {Ya + 1980, Ma, Da},
+	last_access_time = {Ha, Ia, Ta * 2},
+	last_write_date  = {Yw + 1980, Mw, Dw},
+	last_write_time  = {Hw, Iw, Tw * 2}}.
 
+swap(<<X,Y>>) -> <<Y,X>>.
+		
 %%% ---    
 
 

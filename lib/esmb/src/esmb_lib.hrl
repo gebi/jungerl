@@ -183,11 +183,22 @@
 	  name,
 	  size,
 	  attr,
-	  date_time,
+	  date_time,     % a #dt{} record
 	  resume_key,
 	  data_len = 0,  % # of bytes in data
 	  data = []      % an I/O list
 	 }).
+
+%%% Date/Time info
+-record(dt, {
+	  creation_date,
+	  creation_time,
+	  last_access_date,
+	  last_access_time,
+	  last_write_date,
+	  last_write_time
+	 }).
+
 
 -define(DIR_FLAG,      16#10).
 -define(HIDDEN_FLAG,   16#2).

@@ -24,8 +24,10 @@ $(LIBS):
 	fi
 
 # Dependencies between programs.
-
 ermacs: slang msc
+enfs: rpc
+xmlrpc: xmerl
+
 
 .PHONY: $(LIBS)
 

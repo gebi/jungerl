@@ -12,7 +12,7 @@
 	 is_formctrl/1,
 	 is_inline/1,
 	 is_heading/1,
-	 is_list/1,
+	 is_lst/1,
 	 is_preformatted/1,
 	 is_block/1,
 	 is_flow/1,
@@ -104,12 +104,12 @@ is_heading(erl)      -> true; %% EXTENSION
 is_heading(_)        -> false.
     
 %% ENTITY % list
-is_list(ul)          -> true;
-is_list(ol)          -> true;
-is_list(dir)         -> true;
-is_list(menu)        -> true;
-is_list(erl)         -> true; %% EXTENSION
-is_list(_)           -> false.
+is_lst(ul)          -> true;
+is_lst(ol)          -> true;
+is_lst(dir)         -> true;
+is_lst(menu)        -> true;
+is_lst(erl)         -> true; %% EXTENSION
+is_lst(_)           -> false.
 
 %% ENTITY % preformatted
 is_preformatted(pre)  -> true;
@@ -134,7 +134,7 @@ is_block(ilayer)     -> true;
 is_block(layer)      -> true;
 is_block(nolayer)    -> true;
 is_block(Tag) ->
-    is_heading(Tag) orelse is_list(Tag) orelse is_preformatted(Tag).
+    is_heading(Tag) orelse is_lst(Tag) orelse is_preformatted(Tag).
 
 %% ENTITY % flow
 is_flow(Tag) ->

@@ -347,20 +347,53 @@
 
 -define(PRINT_ERROR(E),
 	error_logger:error_msg(
-	  "ERROR-MSG: type = ~w  seqno = ~w  minor_opcode = ~w  major_opcode = ~w~n",
-	  [E#error.type,E#error.seqno,E#error.minor_opcode,E#error.major_opcode])).
+	  "ERROR-MSG: type= ~w  seqno= ~w  minor_opcode =~w  major_opcode= ~w  id= ~w~n",
+	  [E#error.type,E#error.seqno,E#error.minor_opcode,E#error.major_opcode,E#error.bad_resource_id])).
 
 %% ---------------
 %% EVENT MESSAGES		  
 %% ---------------
 
 %% Event codes
+-define(EVENT_KEYPRESS, 2).
+-define(EVENT_KEYRELEASE, 3).
+-define(EVENT_BUTTONPRESS, 4).
+-define(EVENT_BUTTONRELEASE, 5).
+-define(EVENT_MOTION_NOTIFY, 6).
+-define(EVENT_ENTER_NOTIFY, 7).
+-define(EVENT_LEAVE_NOTIFY, 8).
+-define(EVENT_FOCUS_IN, 9).
+-define(EVENT_FOCUS_OUT, 10).
+-define(EVENT_KEYMAP_NOTIFY, 11).
 -define(EVENT_EXPOSE,            12).
+-define(EVENT_GRAPHICS_EXPOSURE, 13).
+-define(EVENT_NO_EXPOSURE, 14).
+-define(EVENT_VISIBILITY_NOTIFY, 15).
+-define(EVENT_CREATE_NOTIFY, 16).
+-define(EVENT_DESTROY_NOTIFY, 17).
+-define(EVENT_UNMAP_NOTIFY, 18).
 -define(EVENT_MAP_NOTIFY,        19).
+-define(EVENT_MAP_REQUEST, 20).
 -define(EVENT_REPARENT_NOTIFY,   21).
 -define(EVENT_CONFIGURE_NOTIFY,  22).
+-define(EVENT_CONFIGURE_REQUEST, 23).
+-define(EVENT_GRAVITY_NOTIFY, 24).
+-define(EVENT_RESIZE_REQUEST, 25).
+-define(EVENT_CIRCULATE_NOTIFY, 26).
+-define(EVENT_CIRCULATE_REQUEST, 27).
+-define(EVENT_PROPERTY_NOTIFY, 28).
+-define(EVENT_SELECTION_CLEAR, 29).
+-define(EVENT_SELECTION_REQUEST, 30).
+-define(EVENT_SELECTION_NOTIFY, 31).
+-define(EVENT_COLORMAP_NOTIFY, 32).
+-define(EVENT_CLIENT_MESSAGE, 33).
+-define(EVENT_MAPPING_NOTIFY, 34).
 
 %% Event records
+-record(key_press, {seqno}).
+
+-record(key_release, {seqno}).
+
 -record(expose,	{seqno, window, x, y, width, height, count}).
 
 -record(map_notify, {seqno, event, window, override_redirect}).
@@ -371,10 +404,12 @@
 			   width, height, border_width, override_redirect}).
 
 %% Event guards
--define(IS_EXPOSE_EVENT(E), record(E,expose)).
--define(IS_MAP_NOTIFY_EVENT(E), record(E,map_notify)).
--define(IS_REPARENT_NOTIFY_EVENT(E), record(E,reparent_notify)).
--define(IS_CONFIGURE_NOTIFY_EVENT(E), record(E,configure_notify)).
+-define(IS_KEY_PRESS_EVENT(E), record(E, key_press)).
+-define(IS_KEY_RELEASE_EVENT(E), record(E, key_release)).
+-define(IS_EXPOSE_EVENT(E), record(E, expose)).
+-define(IS_MAP_NOTIFY_EVENT(E), record(E, map_notify)).
+-define(IS_REPARENT_NOTIFY_EVENT(E), record(E, reparent_notify)).
+-define(IS_CONFIGURE_NOTIFY_EVENT(E), record(E, configure_notify)).
 
 %% TEMPORARY: Until all events is implemented
 -record(event_nyi, {event}).

@@ -22,7 +22,6 @@
 %%% Contributor(s): ______________________________________.
 %%%
 %%%---------------------------------------------------------------------
--vc('$Id$ ').
 -export([init/0,get_display/1,set_display/2,put_window/3,put_pixmap/3,
 	 put_gc/3,put_id/4,get_id/2,store_req/4,get_reply/2]).
 

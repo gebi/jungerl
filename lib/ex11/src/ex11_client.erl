@@ -28,7 +28,6 @@
 %%%           use of ex11_xauth:filename/0.
 %%%
 %%%---------------------------------------------------------------------
--vc('$Id$ ').
 -export([start/1,req/2,synchronize/2,flush/1,lock_display/1,unlock_display/1,
 	 set_display/2,get_display/1,new_window/2,new_pixmap/2,new_gc/2]).
 %% Internal exports
@@ -176,13 +175,13 @@ loop(Dpy,Db,Out,Cont,SeqNo,Sync,Lock) ->
     receive
 
 	{From,send_msg,Msg} when Sync == ?FLUSH ->
-	    %%io:format("SENDING REQUEST: ~p~n",[Msg]),
+	    %%io:format("SENDING REQUEST: ~w~n",[binary_to_list(Msg)]),
 	    NewSeqNo = send_request(Dpy,SeqNo,Msg),
 	    return(From,ok),
 	    loop(Dpy,Db,Out,Cont,NewSeqNo,Sync,Lock);
 
 	{From,send_msg,Msg} when Sync == ?BUFFER ->
-	    %%io:format("BUFFERING REQUEST: ~p~n",[Msg]),
+	    %%io:format("BUFFERING REQUEST: ~w~n",[binary_to_list(Msg)]),
 	    return(From,ok),
 	    loop(Dpy,Db,queue:in(Msg,Out),Cont,SeqNo,Sync,Lock);
 
@@ -249,7 +248,7 @@ loop(Dpy,Db,Out,Cont,SeqNo,Sync,Lock) ->
 	    loop(Dpy,NewDb,Out,Cont,SeqNo,Sync,Lock);
 
 	XX ->
-	    io:format("GOT: ~p~n",[XX]),
+	    io:format("GOT: ~w~n",[XX]),
 	    loop(Dpy,Db,Out,Cont,SeqNo,Sync,Lock)
     end.
 
@@ -296,8 +295,10 @@ dispatch(Dpy,Db,Out,Cont,SeqNo,Sync,Lock,Data) ->
 	    loop(Dpy,Db,Out,?NO_CONT,SeqNo,Sync,Lock)
     end.
 
-decode(Db,?NO_CONT,Data)           -> ex11_proto:decode(Db,Data);
-decode(Db,C,Data) when ?IS_CONT(C) -> ?CONTINUE(C,{Db,Data}).
+decode(Db,?NO_CONT,Data)           -> 
+    ex11_proto:decode(Db,Data);
+decode(Db,C,Data) when ?IS_CONT(C) -> 
+    ?CONTINUE(C,{Db,Data}).
 
 %% -----------------------------------------
 %% Deliver an event to the correct process
@@ -324,26 +325,30 @@ deliver_event(Db,Id,Event) ->
 %% See p.113 in the X Protocol standard X11 Rel-6.4
 
 setup_connection(Host,Cookie) ->
-    Opts = [{packet,raw}],
+    Opts = [{packet,raw},binary],
     case gen_tcp:connect(Host,6000,Opts) of
 	{ok,Fd} -> 
-	    gen_tcp:send(Fd,ex11_proto:setup_connection(Cookie)),
+	    Res=gen_tcp:send(Fd,ex11_proto:setup_connection(Cookie)),
 	    get_connect_reply(Fd);
 	Error -> exit(Error)
     end.
 
 get_connect_reply(Fd) ->
-    case recv(Fd) of
-	[0|Emsg]  -> {error,ex11_proto:decode_error(Emsg)};
-	[2|_]     -> {error,"authentication required"};
-	[1,_|Msg] -> ex11_proto:decode_connect_reply(Fd,Msg)
+    Rec = recv(Fd),
+    case Rec of
+	<<0, Emsg/binary>>  -> 
+	    {error,ex11_proto:decode_error(Emsg)};
+	<<2,_/binary>> -> 
+	    {error,"authentication required"};
+	<<1,_,Msg/binary>> -> 
+	    ex11_proto:decode_connect_reply(Fd,Msg)
     end.
 
 %% ----------------------------------------------------
 %% Send a request to the X-server. 
 
 send_request(Dpy,SeqNo,Msg) ->
-    gen_tcp:send(Dpy#display.fd,[Msg]),
+    gen_tcp:send(Dpy#display.fd, Msg),
     bump_seqno(SeqNo).
 
 %% Also, if the request will initiate a reply from the
@@ -361,7 +366,8 @@ bump_seqno(SeqNo) -> (SeqNo + 1) rem ?MAX_SEQNO.
 
 recv(Fd) ->
     receive
-	{tcp,Fd,Data} -> Data
+	{tcp,Fd,Data} -> 
+	    Data
     end.
 
 

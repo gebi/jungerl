@@ -17,7 +17,6 @@
 %%%           Transformed again to use the Erlang X11 binding.
 %%%
 %%% --------------------------------------------------------------------
--vc('$Id$ ').
 -export([start/0, start/1,init/1,kicker/2]).
 
 -import(matrix44,[multiply14/2,mk_rotate_matrix/2,mk_hcord/3,
@@ -47,6 +46,7 @@ init(Host) ->
     Fig = figure(),
     Object = draw_cube(X,Rcube,Fig),
     Kicker = start_kicker(?KICK_INTERVAL),
+    timer:sleep(1000),
     loop(X,Rcube,Fig,Kicker).
 
 init_xyz() ->
@@ -277,6 +277,7 @@ mk_window(Host) ->
 					   value_mask = Wmask,
 					   value_list = Wval
 					  }),
+io:format("PIX=~w~n", [Window]),
     %%
     %% Create the Pixmap
     %%

@@ -27,7 +27,6 @@
 %%%           To make it work under Windows. Added filename/0.
 %%%
 %%%---------------------------------------------------------------------
--vc('$Id$ ').
 -export([read/1,host2cookie/2,filename/0]).
 
 -import(ex11_utils,[first/2,i16/2,split_list/2]).

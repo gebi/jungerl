@@ -23,7 +23,6 @@
 %%% Contributor(s): ______________________________________.
 %%%
 %%%---------------------------------------------------------------------
--vc('$Id$ ').
 -export([start/1,req/2,synchronize/2,flush/1,get_display/1,set_display/2,
 	 lock_display/1,unlock_display/1]).
 

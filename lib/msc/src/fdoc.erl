@@ -271,6 +271,9 @@ drop_line(S0) ->
     S1.
 
 comments_to_doc([]) ->
+    %% FIXME: we should really generate nothing here, since zillions
+    %% of these "undocumented" strings will match e.g. an apropos
+    %% search for "documented" :-) -luke
     "(undocumented)\n";
 comments_to_doc(Comments) ->
     flatten([Line || Line <- map(fun clean_comment/1, Comments),

@@ -1,0 +1,30 @@
+Epop - The Erlang POP3 client/server package
+
+Epop integrates a number of things into one neat package,
+which is easily configured to include several users with
+multiple remote POP3 maildrops as well as a local maildrop.
+Still it is of course possible to use the various parts
+independently. For example you may want to only use the Epop
+client part in your particular Erlang application. One
+reason to use Epop could be the fact that Epop doesn't suffer
+of any security breaches caused by over running memory since
+no memory is explicitly allocated (its all taken care of
+by the underlying Erlang machinery).
+
+Epop supports the APOP authentication scheme as described 
+in RFC-1939. It also implements an extension to POP3, supporting 
+notification of changes to a specified maildrop. Epop has been 
+tested to work with Qpopper, Fetchmail, VM, nmh (mh-e) and 
+ESMTP Sendmail 8.8.5/8.8.5. Here is a summary of the features
+of Epop:
+
+ + A POP3 server.
+ + A POP3 client.
+ + A SMTP client
+ + A local mail delivery agent..
+ + A multi user mail storage backend.
+ + Log support.
+ + Xbiff like, per user, mail notifier.
+ + A mail reader.
+ + Easy to configure.
+

@@ -1,0 +1,29 @@
+.TH epop_biff 3 1998-08-18 "Ericsson Telecom AB" "ERLANG MODULE DEFINITION"
+.SH MODULE
+Epop - A POP3 client/server package \- The Epop mail notifier
+.SH DESCRIPTION
+.LP
+The \fIepop_biff\fR mail notifier displays a small window looking and behaving exactly as Xbiff. The difference is that epop_biff talks to the POP3 server running on the \fIepop_server_host\fR host, listening to the \fIepop_server_port\fR port, according to the Epop notification extension <http://www.serc.rmit.edu.au/~tobbe/epop/RFC-pop3-notification.txt>\&. 
+
+.SH EXPORTS
+.LP
+.B
+start(User)
+.br
+.RS
+.TP
+Types
+User = string()
+.br
+.RE
+.RS
+.LP
+Displays a small window similar to Xbiff and tells the POP3 server that we want to be notified about any changes in the maildrop. \fIepop_biff\fR will first try to used the UIDL command to keep track of seen/unseen mails, and in case UIDL is not supported it uses STAT to keep track of the changes. 
+.RE
+.SH More information
+.LP
+Latest information about Epop can be found at the Epop homepage <http://www.serc.rmit.edu.au/~tobbe/epop>\&.
+.SH AUTHOR
+.nf
+T.Tornkvist - tobbe@cslab.ericsson.se
+.fi

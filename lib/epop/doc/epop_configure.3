@@ -1,0 +1,319 @@
+.TH epop_configure 3 1998-03-12 "Ericsson Telecom AB" "ERLANG MODULE DEFINITION"
+.SH MODULE
+Epop - A POP3 client/server package \- How to configure the Epop package
+.SH DESCRIPTION
+.LP
+The configuration of Epop is done through a file named \fI\&.epop\fR . To find where to look for this file, Epop first reads the environment variable \fIEPOP_HOME\fR which is supposed to contain a directory path pointing to the directory where the .epop file is located. If no EPOP_HOME variable is found, Epop uses the \fIHOME\fR environment variable. If no .epop file can be found, Epop won't start. 
+.LP
+The configuration file consists of Erlang tuples \fI{Key, Value}\fR\&. Each tuple has to end with a dot and the whole file should be possible to read from Erlang with the \fIfile:consult/1\fR command. 
+.LP
+When the Epop POP3 server start, it also start the Epop local mail delivery agent described in the epop_inc <epop_inc.html> man-page. It is the local mail delivery agent who retrieves the mail according to the information defined in the Epop configure file. Information about the running system is written into a log-file which is located according to the specification in the configure file. 
+.SS Note:
+.LP
+Here follows a description of all the configuration parameters, for stylistic reasons we describe a {Key,Value} pair as: Key(Value) 
+
+
+.SH EXPORTS
+.LP
+.B
+epop_mail_dir(DirPath)
+.br
+.RS
+.TP
+Types
+DirPath = string()
+.br
+.RE
+.RS
+.LP
+The DirPath points th the directory where all the maildops should be stored. 
+.LP
+The Epop POP3 server require this parameter to be defined.
+.LP
+Example: 
+
+.nf
+{epop\_mail\_dir,"/export/home/epop/Epop-Mail"}\&.
+.fi
+.RE
+.LP
+.B
+epop_log_dir(DirPath)
+.br
+.RS
+.TP
+Types
+DirPath = string()
+.br
+.RE
+.RS
+.LP
+The DirPath points to the directory where all the log-files should be stored. 
+.LP
+The Epop POP3 server require this parameter to be defined.
+.RE
+.LP
+.B
+epop_server_host(HostName)
+.br
+.RS
+.TP
+Types
+HostName = string()
+.br
+.RE
+.RS
+.LP
+The HostName is a string defining which host the Epop POP3 server is running on. 
+.LP
+The Epop biff mail notifier makes use of this parameter.
+.RE
+.LP
+.B
+epop_server_port(PortNo)
+.br
+.RS
+.TP
+Types
+PortNo = integer()
+.br
+.RE
+.RS
+.LP
+The PortNo is an integer defining which port number should be used. 
+.LP
+If this parameter is not defined it will be defaulted to the standard POP3 port number (i.e 110). 
+.RE
+.LP
+.B
+epop_local_interval(Interval)
+.br
+.RS
+.TP
+Types
+Interval = integer()
+.br
+.RE
+.RS
+.LP
+The Interval is an integer defining the interval in seconds between attempts to incorporate mail from the local file based maildrop (which is defined by the \fIepop_local_maildrops\fR parameter). If no local interval is defined, no attempts to incorporate local mail will be made. The minimum value that can be defined is 15 seconds. 
+.RE
+.LP
+.B
+epop_remote_interval(Interval)
+.br
+.RS
+.TP
+Types
+Interval = integer()
+.br
+.RE
+.RS
+.LP
+The Interval is an integer defining the interval in minutes between attempts to retreive mail from remote POP3 servers (which are defined by the \fIepop_remote_servers\fR parameter). If no remote interval is defined, no attempts to retrieve remote mail will be made. The minimum value that can be defined is 5 minutes. 
+.RE
+.LP
+.B
+epop_auth(Method)
+.br
+.RS
+.TP
+Types
+Method = upass | apop
+.br
+.RE
+.RS
+.LP
+ The Method can be either of \fIupass\fR or \fIapop\fR which specifies which type of authentication method the Epop POP3 server shall use. Two methods are supported, the normal User-Password, and APOP authentication. The User-Password method sends the Password in clear text while the APOP method used the Password as a secret key to encrypt a timestamp (received from the server) using the MD5 algorithm. The encrypted timestamp (called the digest message) is sent to the server where it is decrypted. If the decrypted digest message is the same as the timestamp sent from the server, the client is authenticated and can proceed accessing its maildrop. Both methods are descibed in RFC-1939. 
+.LP
+The Epop POP3 server require this parameter to be defined.
+.RE
+.LP
+.B
+epop_download_delete(Boolean)
+.br
+.RS
+.TP
+Types
+Boolean = true | false
+.br
+.RE
+.RS
+.LP
+The Boolean can be either of \fItrue\fR or \fIfalse\fR\&. If true, the Epop POP3 server will automatically delete all mails that has been read (downloaded) during a session. The RFC-1939 calls this a \fIdownload and delete policy\fR\&. 
+.LP
+NB: The actual deletion of downloaded mails won't actually be done until the session has ended with a QUIT. Any abnormal termination won't cause downloaded mails to be deleted. 
+.RE
+.LP
+.B
+epop_notification(Boolean)
+.br
+.RS
+.TP
+Types
+Boolean = true | false
+.br
+.RE
+.RS
+.LP
+The Boolean can be either of \fItrue\fR or \fIfalse\fR\&. If true, the Epop POP3 server will support the notification extension <http://www.serc.rmit.edu.au/~tobbe/epop/RFC-pop3-notification.txt>\&. The default value is false. 
+.RE
+.LP
+.B
+epop_before(OScmd)
+.br
+.RS
+.TP
+Types
+OScmd = string()
+.br
+.RE
+.RS
+.LP
+The specified string will be used as input argument to os:cmd/1 when called just before Epop tries to access the maildrop. This makes it possible to run a program such as \fImovemail\fR\&. The following example is taken from my own \fI~/.epop\fR file. It makes it possible for me to move my mailspool to my own directory before accessing it with Epop: 
+.LP
+
+
+.nf
+{epop\_before,
+ "/opt/local/bin/movemail /var/mail/tobbe /export/home/tobbe/mailspool/tobbe"}\&.
+.fi
+.RE
+.LP
+.B
+epop_after(OScmd)
+.br
+.RS
+.TP
+Types
+OScmd = string()
+.br
+.RE
+.RS
+.LP
+The specified string will be used as input argument to os:cmd/1 when called just after Epop tries to access the maildrop. For example, this makes it possible to remove a local mailspool file, which has earlier been created by \fImovemail\fR\&. The following example is taken from my own \fI~/.epop\fR file. It makes it possible for me to clean up after running movemail: 
+.LP
+
+
+.nf
+{epop\_after,
+ "/usr/bin/rm -f /export/home/tobbe/mailspool/tobbe"}\&.
+.fi
+.RE
+.LP
+.B
+epop_users(Users)
+.br
+.RS
+.TP
+Types
+Users = list(UserDef)
+.br
+UserDef = tuple(UserName, Passwd, Options)
+.br
+UserName = string()
+.br
+Passwd = string()
+.br
+Options = []
+.br
+.RE
+.RS
+.LP
+Define a list of users. Currently no options exists. 
+.LP
+Example of a user definition: 
+
+.nf
+{"tobbe","jdk938HD3",[]}\&.
+.fi
+.RE
+.LP
+.B
+epop_local_maildrops(MailDrops)
+.br
+.RS
+.TP
+Types
+MailDrops = list(UserMailDrop)
+.br
+UserMailDrop = tuple(UserName, MailDropPath)
+.br
+UserName = string()
+.br
+MailDropPath = string()
+.br
+.RE
+.RS
+.LP
+Define a the local (file based) maildrops for those users who got one. 
+.LP
+Example of a UserMailDrop definition:
+
+.nf
+{"tobbe","/var/mail/tobbe"}\&.
+.fi
+.RE
+.LP
+.B
+epop_remote_users(RemoteUsers)
+.br
+.RS
+.TP
+Types
+RemoteUsers = list(RemoteUser)
+.br
+RemoteUser = tuple(UserHere, POPuser, POPhost, POPpasswd, POPport, Options)
+.br
+UserHere = string()
+.br
+POPuser = string()
+.br
+POPhost = string()
+.br
+POPpasswd = string()
+.br
+POPport = integer()
+.br
+Options = list(Option)
+.br
+Option = list( MoveCopy | Auth | SMTP | Snoop )
+.br
+MoveCopy = move | copy
+.br
+Auth = upass | apop
+.br
+SMTP = tuple(smtp, SMTPuser, SMTPhost)
+.br
+SMTPuser = string()
+.br
+SMTPhost = string()
+.br
+Snoop = tuple(snoop, Boolean)
+.br
+Boolean = true | false
+.br
+.RE
+.RS
+.LP
+Define a list users which have a POP3 account elsewere. The UserHere is the user name as defined in the \fIepop_users\fR parameter. The POPuser, POPhost, POPpasswd and POPport all relates to the remote POP3 account from where Epop should retrieve mails. The MoveCopy specifies weather retrieved mails should be deleted (move) or be left (copy) at the remote account. Default is \fImove\fR\&. The Auth defines which authentication method Epop should use. Default is to use the User-Password scheme (\fIupass\fR). The SMTP tells Epop if a copy of the retrieved mail should be sent to the specified SMTPhost server and the SMTPuser. Finally Snoop can be used for debugging purposes, printing the POP3 client-server dialogue to the terminal. Here follows an example: 
+.LP
+
+
+.nf
+{epop\_remote\_users,
+ [{"tobbe","pop12382","one\&.freemail\&.provider","dj382jd33",110,
+     [move, {smtp,"tobbe","campari\&.serc\&.edu\&.au"}]},
+
+  {"lotta","u122433","another\&.freemail\&.provider","Ff43fF44G",110,
+     [move, apop]}
+ ]}\&.
+.fi
+.RE
+.SH More information
+.LP
+Latest information about Epop can be found at the Epop homepage <http://www.serc.rmit.edu.au/~tobbe/epop>\&.
+.SH AUTHOR
+.nf
+T.Tornkvist - tobbe@serc.rmit.edu.au
+.fi

@@ -1,0 +1,75 @@
+.TH epop_smtp_client 3 1998-08-18 "Ericsson Telecom AB" "ERLANG MODULE DEFINITION"
+.SH MODULE
+Epop - A POP3 client/server package \- The Epop SMTP client
+.SH DESCRIPTION
+.LP
+This is a very simple implementation of a SMTP client. The module implements the minimal functionality that are needed to be able to deliver a mail to a SMTP server. 
+
+.SH EXPORTS
+.LP
+.B
+deliver(User, Host, Mail) -> Bool
+.br
+.B
+deliver(User, Host, Mail, Options) -> Bool
+.br
+.RS
+.TP
+Types
+Bool = true | false
+.br
+User = string()
+.br
+Host = string()
+.br
+Mail = string()
+.br
+Options = list( {port, Port} | {snoop, Bool} )
+.br
+Port = integer()
+.br
+.RE
+.RS
+.LP
+Delivers the Mail for User to the SMTP server running at Host. The list of Options can change the default Port number and/or trigger trace printouts to be turned on. 
+.LP
+This function is synchronous, i.e it returns true when the Mail actually have been delivered, or false at failure. 
+.LP
+Information about the operation is also written to the error_handler module, which in the context of Epop will lead to a log-file
+.RE
+.LP
+.B
+async_deliver(User, Host, Mail) -> Bool
+.br
+.B
+asunc_deliver(User, Host, Mail, Options) -> Bool
+.br
+.RS
+.TP
+Types
+Bool = true | false
+.br
+User = string()
+.br
+Host = string()
+.br
+Mail = string()
+.br
+Options = list( {port, Port} | {snoop, Bool} )
+.br
+Port = integer()
+.br
+.RE
+.RS
+.LP
+Works exactly as the deliver function except that it immediately returns. Thus, there is no way to check weather the operation went well or not (except by checking the log-file). 
+.RE
+.SH More information
+.LP
+Latest information about Epop can be found at the Epop homepage <http://www.serc.rmit.edu.au/~tobbe/epop>\&.
+.LP
+More info about SMTP can be found in RFC-821. 
+.SH AUTHOR
+.nf
+T.Tornkvist - tobbe@cslab.ericsson.se
+.fi

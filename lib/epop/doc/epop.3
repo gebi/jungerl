@@ -1,0 +1,148 @@
+.TH epop 3 1998-03-12 "Ericsson Telecom AB" "ERLANG MODULE DEFINITION"
+.SH MODULE
+Epop - A POP3 client/server package \- A POP3 client/server package
+.SH DESCRIPTION
+.LP
+\fIEpop\fR is a POP3 client/server package implemented according to RFC-1939 and RFC-2449. 
+.LP
+Epop consists of: 
+.RS 2
+.TP 2
+*
+A POP3 server
+.TP 2
+*
+A POP3 client
+.TP 2
+*
+A (simple) SMTP client
+.TP 2
+*
+A local mail delivery agent.
+.TP 2
+*
+A multi user mail storage backend.
+.TP 2
+*
+Log support.
+.TP 2
+*
+An Xbiff like mail notifier.
+.TP 2
+*
+A (naive) mail reader.
+.RE
+.LP
+The POP3 server/client implements the following commands according to RFC-1939: USER, PASS, APOP, STAT, LIST, RETR, DELE, NOOP, RSET, TOP, UIDL, QUIT, and according to RFC-2449: CAPA. 
+.LP
+It also implements an extension <http://www.serc.rmit.edu.au/~tobbe/epop/RFC-pop3-notification.txt> to the POP3 protocol which makes it possible for a client to be notified about changes to his maildrop. This extension is optional and can easily be turned off. 
+.LP
+Epop is very easy to configure, using one single file to store the various configuration options. 
+.LP
+According to the configuration file, the local mail delivery agent fetches mail from remote servers as well as from the local (file based) maildrop. It may also deliver fetched mail to a specified SMTP server. All this is specified per user in the configuration file. The configuration file and how to use it is described in the epop_configure <epop_configure.html> man-page. 
+.LP
+Incorporated mail is stored by the Epop backend which is based on the Erlang \fIdets\fR module. This results in a very efficient storage and a fast retrieval of mail from the Epop backend. 
+.LP
+Epop includes a mail notifier named epop_biff <epop_biff.html>\&. It is a Xbiff lookalike and requires the Epop notification extension to be turned on in the POP3 server. 
+.LP
+The actual Erlang \fIepop\fR module acts as a glue to the different parts of the Epop package. Each part is described by a seperate man-page so this page will in most cases only provide a pointer to the relevant man-page. 
+
+.SH EXPORTS
+.LP
+.B
+start()
+.br
+.B
+stop()
+.br
+.B
+version()
+.br
+.RS
+.LP
+These functions are described in the epop_server <epop_server.html> man-page.
+.RE
+.LP
+.B
+epop:initrc()
+.br
+.B
+epop:read_const(Key)
+.br
+.RS
+.LP
+The \fIinitrc/0\fR function will read and store the values. The values are stored per process and is regarded to be constant values. Thus, it is only possible to read a certain value through the \fIread_const/1\fR function. To change a value, the configuration file <epop_configure.html> has to be modified. 
+.RE
+.LP
+.B
+connect(UserAddr, Passwd)
+.br
+.B
+connect(UserAddr, Passwd, Options)
+.br
+.B
+accept(SockFd, Passwd)
+.br
+.B
+accept(SockFd, Passwd, Options)
+.br
+.B
+stat(SessionKey)
+.br
+.B
+scan(SessionKey)
+.br
+.B
+scan(SessionKey, MsgNumber)
+.br
+.B
+uidl(SessionKey)
+.br
+.B
+uidl(SessionKey, MsgNumber)
+.br
+.B
+top(SessionKey, MsgNumber, Lines)
+.br
+.B
+retrieve(SessionKey, MsgNumber)
+.br
+.B
+delete(SessionKey, MsgNumber)
+.br
+.B
+reset(SessionKey)
+.br
+.B
+quit(SessionKey)
+.br
+.B
+notify(SessionKey,HostName,PortNo)
+.br
+.RS
+.LP
+These functions are client functions and are described in the epop_client <epop_client.html> man-page.
+.RE
+.LP
+.B
+rmail(User)
+.br
+.RS
+.LP
+This function is described in the epop_mh <epop_mh.html> man-page.
+.RE
+.LP
+.B
+store_mail(User,MsgID,Mail)
+.br
+.RS
+.LP
+This function is described in the epop_dets <epop_dets.html> man-page.
+.RE
+.SH More information
+.LP
+Latest information about Epop can be found at the Epop homepage <http://www.serc.rmit.edu.au/~tobbe/epop>\&.
+.SH AUTHOR
+.nf
+T.Tornkvist - tobbe@serc.rmit.edu.au
+.fi

@@ -1,0 +1,359 @@
+.TH epop_dets 3 1998-03-12 "Ericsson Telecom AB" "ERLANG MODULE DEFINITION"
+.SH MODULE
+Epop - A POP3 client/server package \- The Epop mail storage backend
+.SH DESCRIPTION
+.LP
+This module uses the Erlang \fIdets\fR module to store the mail. Each user is represented with two tables: USER-ID_scan and USER-ID_mail. The scan table stores all the message identifiers and the size (in bytes) of the corresponding message. The mail table uses the message identifier to store the actial message. 
+.LP
+Two tables, sys_auth and sys_stat, are used for storing Meta information. The sys_auth table defines all users and their corresponding password. The sys_stat table stores the total number of messages and the total number of bytes stored per user. 
+.LP
+This mail storage runs as a server process registered with the name \fIepop_dets_server\fR\&. At startup the server will read the configuration file <epop_configure.html> where it will get the mail storage directory to use. 
+
+.SH EXPORTS
+.LP
+.B
+start()
+.br
+.RS
+.LP
+This function will start the Epop mail storage server. 
+.RE
+.LP
+.B
+stop()
+.br
+.RS
+.LP
+Unlocks all locked maildrops and closes all open \fIdets\fR tables before terminating. 
+.RE
+.LP
+.B
+check_limits(User,Size) -> Result
+.br
+.RS
+.TP
+Types
+User = string()
+.br
+Size = integer()
+.br
+Result = ok | {error, Reason}
+.br
+Reason = atom()
+.br
+.RE
+.RS
+.LP
+Check weather the limits for maximum number of mails in the maildrop, and the maximum size of the maildrop would be exceeded if a mail of size Size was stored. 
+.RE
+.LP
+.B
+store_mail(User,MsgID,Mail) -> Result
+.br
+.RS
+.TP
+Types
+User = string()
+.br
+MsgID = string()
+.br
+Mail = string()
+.br
+Result = ok | {error, Reason}
+.br
+Reason = atom()
+.br
+.RE
+.RS
+.LP
+Store the Mail in the User table. MsgID is a string uniquely identifying the Mail. 
+.SS Note:
+.LP
+Before the mail is stored a call is made to the function \fIcheck_limits/2\fR to make sure that the maximum number of mails in the maildrop, and the maximum size of the maildrop hasn't been exceeded. 
+
+.RE
+.LP
+.B
+stat(User) -> Result
+.br
+.RS
+.TP
+Types
+User = string()
+.br
+Result = {ok, StatResult} | {error, Reason}
+.br
+StatResult = tuple(NumOfMsgs, TotNumOfBytes)
+.br
+Reason = atom()
+.br
+NumOfMsgs = integer()
+.br
+TotNumOfBytes = integer()
+.br
+.RE
+.RS
+.LP
+Return the number of messages in the maildrop and its total size in bytes. 
+.RE
+.LP
+.B
+scan_list(User) -> Result
+.br
+.RS
+.TP
+Types
+User = string()
+.br
+Result = {ok, list(ScanResult)} | {error, Reason}
+.br
+ScanResult = tuple(MsgID, MsgSize)
+.br
+Reason = atom()
+.br
+MsgID = string()
+.br
+MsgSize = integer()
+.br
+.RE
+.RS
+.LP
+Return a list of tuples containing all message identifier stored and their corresponding sizes in bytes. 
+.RE
+.LP
+.B
+get_passwd(User) -> Result
+.br
+.RS
+.TP
+Types
+User = string()
+.br
+Result = {ok, Passwd} | {error, Reason}
+.br
+Passwd = string()
+.br
+Reason = atom()
+.br
+.RE
+.RS
+.LP
+Return the password associated with the specified user. 
+.RE
+.LP
+.B
+delete_mail(User,MsgID,MsgSize) -> Result
+.br
+.RS
+.TP
+Types
+User = string()
+.br
+MsgID = string()
+.br
+MsgSize = integer()
+.br
+Result = ok | {error, Reason}
+.br
+Reason = atom()
+.br
+.RE
+.RS
+.LP
+Delete the message with the specified message identity. Basically, the output from the scan listing can be used as the input to this function. 
+.RE
+.LP
+.B
+lock_maildrop(User) -> Result
+.br
+.RS
+.TP
+Types
+User = string()
+.br
+Result = ok | {error, Reason}
+.br
+Reason = atom()
+.br
+.RE
+.RS
+.LP
+Locks the specified user's maildrop, i.e it gives the user an exclusive access to his maildrop. The process issuing this command will be linked to by the epop_dets_server. 
+.RE
+.LP
+.B
+unlock_maildrop(User) -> Result
+.br
+.RS
+.TP
+Types
+User = string()
+.br
+Result = ok | {error, Reason}
+.br
+Reason = atom()
+.br
+.RE
+.RS
+.LP
+Unlocks the specified user's maildrop. The process issuing this command will be unlinked by the epop_dets_server. 
+.RE
+.LP
+.B
+setup() -> Result
+.br
+.B
+setup(User) -> Result
+.br
+.RS
+.TP
+Types
+User = string()
+.br
+Result = ok | {error, Reason}
+.br
+Reason = atom()
+.br
+.RE
+.RS
+.LP
+The setup/0 routine, sets up accounts for all users specified by the \fIepop_users\fR parameter. 
+.LP
+To setup just one of the users specified by the \fIepop_users\fR paramer, then use the setup/1 function. 
+.SS Note:
+.LP
+This function is only meant to be used the first time the user accounts are to be defined. Remove all maildrop files in the \fIepop_mail_dir\fR before using it again. 
+
+.RE
+.LP
+.B
+add_user(User,Passwd) -> Result
+.br
+.RS
+.TP
+Types
+User = string()
+.br
+Passwd = string()
+.br
+Result = ok | {error, Reason}
+.br
+Reason = atom()
+.br
+.RE
+.RS
+.LP
+Defines a new user and the password to be used. 
+.RE
+.LP
+.B
+rm_user(User) -> Result
+.br
+.RS
+.TP
+Types
+User = string()
+.br
+Result = ok | {error, Reason}
+.br
+Reason = atom()
+.br
+.RE
+.RS
+.LP
+Removes a user from the storage system. It does this regardless if the user has an ongoing session (i.e has locked his maildrop). 
+.RE
+.LP
+.B
+change_passwd(User,NewPasswd,NewPasswd) -> Result
+.br
+.RS
+.TP
+Types
+User = string()
+.br
+NewPasswd = string()
+.br
+Result = ok | {error, Reason}
+.br
+Reason = atom()
+.br
+.RE
+.RS
+.LP
+Change the password for the specified user. 
+.RE
+.LP
+.B
+msg_limit(NumOfMsgs,MaxTotSize) -> Result
+.br
+.RS
+.TP
+Types
+NumOfMsgs = integer()
+.br
+MaxTotSize = integer()
+.br
+Result = ok | {error, Reason}
+.br
+Reason = atom()
+.br
+.RE
+.RS
+.LP
+Set the upper limit for how many messages each maildrop is allowed to have and how big in bytes each maildrop is allowed to be. 
+.RE
+.LP
+.B
+panic(User,MailDir,DumpDir) -> Result
+.br
+.RS
+.TP
+Types
+User = string()
+.br
+MailDir = string()
+.br
+DumpDir = string()
+.br
+Result = ok | {'EXIT', Reason}
+.br
+Reason = term()
+.br
+.RE
+.RS
+.LP
+In case of disaster. This routine reads every message in the mail-drop, located in \fIMailDir\fR and writes them to \fIDumpDir\fR, one file per message. 
+.RE
+.SH In case of disaster
+.LP
+If a mail-drop become corrupt (heaven forbid), or something else happends that makes it necessary to re-initialize a users maildrop, then do like the following example: 
+.RS 2
+.TP 2
+*
+Shutdown Epop: epop:stop().
+.TP 2
+*
+Start just epop_dets: epop_dets:start().
+.TP 2
+*
+Dump all mails to file: epop_dets:panic("tobbe",".../Mail",".../Dump").
+.TP 2
+*
+Remove the user: epop_dets:rm_user("tobbe").
+.TP 2
+*
+Setup the user: epop_dets:setup("tobbe").
+.TP 2
+*
+shutdown epop_dets: epop_dets:stop().
+.RE
+.LP
+If the user had any mail (look in the Dump Directory you specified) in the mail-drop, then re-send them to the user. 
+.SH More information
+.LP
+Latest information about Epop can be found at the Epop homepage <http://www.serc.rmit.edu.au/~tobbe/epop>\&.
+.SH AUTHOR
+.nf
+T.Tornkvist - tobbe@serc.rmit.edu.au
+.fi

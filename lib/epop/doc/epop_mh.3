@@ -1,0 +1,43 @@
+.TH epop_mh 3 1998-08-18 "Ericsson Telecom AB" "ERLANG MODULE DEFINITION"
+.SH MODULE
+Epop - A POP3 client/server package \- The Epop mail reader
+.SH DESCRIPTION
+.LP
+This is a very naive mail reader basically meant to be used for internal debugging purposes. But it can also be regarded as an example of how to make use of the epop_client <epop_client.html> module. 
+
+.SH EXPORTS
+.LP
+.B
+rmail(User)
+.br
+.RS
+.TP
+Types
+User = string()
+.br
+.RE
+.RS
+.LP
+Start reading mail for specified User. The User in this case is one of the PopUsers specified in the \fIepop_remote_users\fR configuration parameter. The existing mails will be printed to the terminal one piece a time, prompting for next-page, delete-mail or quit. 
+.RE
+.LP
+.B
+local(User)
+.br
+.RS
+.TP
+Types
+User = string()
+.br
+.RE
+.RS
+.LP
+Start reading mail for specified User. The User in this case is one of the Users specified in the \fIepop_users\fR configuration parameter and the hsodt an port number is the local Epop server specified in \fIepop_server_host\fR and \fIepop_server_port\fR\&. The existing mails will be printed to the terminal one piece a time, prompting for next-page, delete-mail or quit. 
+.RE
+.SH More information
+.LP
+Latest information about Epop can be found at the Epop homepage <http://www.serc.rmit.edu.au/~tobbe/epop>\&.
+.SH AUTHOR
+.nf
+T.Tornkvist - tobbe@cslab.ericsson.se
+.fi

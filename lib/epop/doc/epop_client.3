@@ -1,0 +1,315 @@
+.TH epop_client 3 1998-08-18 "Ericsson Telecom AB" "ERLANG MODULE DEFINITION"
+.SH MODULE
+Epop - A POP3 client/server package \- The Epop POP3 client
+.SH DESCRIPTION
+.LP
+This is an implementation of a POP3 client. It implements a sufficient subset of RFC-1939 to be useful in the context of the Epop package. With this module it is possible to do: stat, scan, retrieve, delete, reset and quit, as well as the commands uidl and top. It is possible to specify that the APOP authentication scheme should be used. 
+.LP
+This module also supports the notification extension <http://www.serc.rmit.edu.au/~tobbe/epop/RFC-pop3-notification.txt> which is reflected with the functions: accept/2, accept/3 and notify/3. 
+.LP
+Important information about the operations are written to the error_handler module, which in the context of Epop will lead to a log-file 
+
+.SH EXPORTS
+.LP
+.B
+connect(UserAddr, Passwd) -> Result
+.br
+.B
+connect(UserAddr, Passwd, Options) -> Result
+.br
+.RS
+.TP
+Types
+UserAddr = string()
+.br
+Passwd = string()
+.br
+Options = list( {port, Port} | {snoop, Bool} | apop )
+.br
+Port = integer()
+.br
+Bool = true | false
+.br
+Result = {ok, SessionKey} | {error, Reason}
+.br
+SessionKey = opaque()
+.br
+Reason = atom()
+.br
+.RE
+.RS
+.LP
+Setup the connection to the POP3 server specified in UserAddr. This argument should consist of a string: PopId@PopHost , e.g ''pop1234@my.mail.provider'' 
+.LP
+The Passwd argument specifies the secret password tp be used. If APOP hasn't been specified among the Options, then this password will be sent in clear text. However, if APOP is specified, then this password is used in the computation of the APOP digest message as described in RFC-1939. 
+.RE
+.LP
+.B
+accept(Sock, Passwd) -> Result
+.br
+.B
+accept(Sock, Passwd, Options) -> Result
+.br
+.RS
+.TP
+Types
+Sock = a listen socket
+.br
+Passwd = string()
+.br
+Options = list( {snoop, Bool} | apop )
+.br
+Result = {ok, SessionKey} | {error, Reason}
+.br
+SessionKey = opaque()
+.br
+Reason = atom()
+.br
+.RE
+.RS
+.LP
+This function is used when we want to be able to accept a notification from a POP3 server. 
+.LP
+The Passwd argument specifies the secret password tp be used. If APOP hasn't been specified among the Options, then this password will be sent in clear text. However, if APOP is specified, then this password is used in the computation of the APOP digest message as described in RFC-1939. 
+.RE
+.LP
+.B
+stat(SessionKey) -> Result
+.br
+.RS
+.TP
+Types
+SessionKey = opaque()
+.br
+Result = {ok, Answer} | {error, Reason}
+.br
+Reason = atom()
+.br
+Answer = tuple(NumOfMsgs, TotalSize)
+.br
+NumOfMsgs = integer()
+.br
+TotalSize = integer()
+.br
+.RE
+.RS
+.LP
+Send the STAT command to the POP3 server of this session. Returns a tuple with the number of stored messages and the total size of the maildrop in bytes. 
+.RE
+.LP
+.B
+scan(SessionKey) -> MultiResult
+.br
+.B
+scan(SessionKey, MsgNumber) -> SingleResult
+.br
+.RS
+.TP
+Types
+SessionKey = opaque()
+.br
+SingleResult = {ok, SingleAnswer} | {error, Reason}
+.br
+MultiResult = {ok, MultiAnswer} | {error, Reason}
+.br
+Reason = atom()
+.br
+SingleAnswer = tuple(MsgNumber, MsgSize)
+.br
+MultiAnswer = list(SingleAnswer)
+.br
+MsgNumber = integer()
+.br
+MsgSize = integer()
+.br
+.RE
+.RS
+.LP
+Send the SCAN command to the POP3 server of this session. Either we can specifiy a certain message number, in which case we will get back a tuple with the size of the specified message, or we can omit to specify a certain number which will return a list of tuples representing all messages stored at the server. The above of course assumes a successful operation, otherwise we will get an error reason instead. 
+.SS Note:
+.LP
+Messages marked as deleted are not listed.
+
+.RE
+.LP
+.B
+uidl(SessionKey) -> MultiResult
+.br
+.B
+uidl(SessionKey, MsgNumber) -> SingleResult
+.br
+.RS
+.TP
+Types
+SessionKey = opaque()
+.br
+SingleResult = {ok, SingleAnswer} | {error, Reason}
+.br
+MultiResult = {ok, MultiAnswer} | {error, Reason}
+.br
+Reason = atom()
+.br
+SingleAnswer = tuple(MsgNumber, MsgId)
+.br
+MultiAnswer = list(SingleAnswer)
+.br
+MsgNumber = integer()
+.br
+MsgId = a unique-id, see RFC-1939, p.11
+.br
+.RE
+.RS
+.LP
+Send the UIDL command to the POP3 server of this session. Either we can specifiy a certain message number, in which case we will get back a tuple with the unique identification of the specified message, or we can omit to specify a certain number which will return a list of tuples representing all messages stored at the server. The above of course assumes a successful operation, otherwise we will get an error reason instead. 
+.SS Note:
+.LP
+Messages marked as deleted are not listed.
+
+.RE
+.LP
+.B
+retrieve(SessionKey, MsgNumber) -> Result
+.br
+.RS
+.TP
+Types
+SessionKey = opaque()
+.br
+MsgNumber = integer()
+.br
+Result = {ok, Message} | {error, Reason}
+.br
+Message = string()
+.br
+Reason = atom()
+.br
+.RE
+.RS
+.LP
+Send the RETR command to the POP3 server of this session. Return the specified message or an error reason. 
+.RE
+.LP
+.B
+top(SessionKey, MsgNumber, Lines) -> Result
+.br
+.RS
+.TP
+Types
+SessionKey = opaque()
+.br
+MsgNumber = integer()
+.br
+Lines = integer()
+.br
+Result = {ok, Message} | {error, Reason}
+.br
+Message = string()
+.br
+Reason = atom()
+.br
+.RE
+.RS
+.LP
+Send the TOP command to the POP3 server of this session. If the number of lines in the message is lesser than what is specified in the Lines argument, the whole message is returned. Otherwise, only the first number of Lines in the message will be returned. A third alternative is to return an error reason. 
+.RE
+.LP
+.B
+delete(SessionKey, MsgNumber) -> Result
+.br
+.RS
+.TP
+Types
+SessionKey = opaque()
+.br
+MsgNumber = integer()
+.br
+Result = ok | {error, Reason}
+.br
+Message = string()
+.br
+Reason = atom()
+.br
+.RE
+.RS
+.LP
+Send the DELE command to the POP3 server of this session. Return ok at success or an error reason. 
+.SS Note:
+.LP
+The message won't actually be deleted until the QUIT command terminates the session. The deletion of messages can be undone by using the reset function. 
+
+.RE
+.LP
+.B
+reset(SessionKey) -> Result
+.br
+.RS
+.TP
+Types
+SessionKey = opaque()
+.br
+Result = ok | {error, Reason}
+.br
+Reason = atom()
+.br
+.RE
+.RS
+.LP
+Send the RSET command to the POP3 server of this session. Order the POP3 server to unmark all messages currently marked for deletion. 
+.LP
+If the notification extension is turned on at the POP3 server, it will also cause any order for notification to be cleared. 
+.RE
+.LP
+.B
+quit(SessionKey) -> Result
+.br
+.RS
+.TP
+Types
+SessionKey = opaque()
+.br
+Result = ok | {error, Reason}
+.br
+Reason = atom()
+.br
+.RE
+.RS
+.LP
+Send the QUIT command to the POP3 server of this session. Orders the POP3 server to terminate the session and closes the connection to the POP3 server. 
+.LP
+All messages earlier marked for deletion will be deleted by the server.
+.RE
+.LP
+.B
+notify(SessionKey, HostName, PortNo) -> Result
+.br
+.RS
+.TP
+Types
+SessionKey = opaque()
+.br
+HostName = string()
+.br
+PortNo = integer()
+.br
+Result = ok | {error, Reason}
+.br
+Reason = atom()
+.br
+.RE
+.RS
+.LP
+Send the NTFY command to the POP3 server of this session. Return ok at success or an error reason. 
+.SS Note:
+.LP
+The order for notification will not be activated until the QUIT command has terminated the session. The order for notification can be undone by using the reset function. 
+
+.RE
+.SH More info about POP3
+.LP
+Check out RFC-1939. 
+.LP
+The notification extension made to POP3 is described in RFC-pop3-notification.txt <http://www.serc.rmit.edu.au/~tobbe/epop/RFC-pop3-notification.txt>\&. 
+.SH AUTHOR
+.nf
+T.Tornkvist - tobbe@cslab.ericsson.se
+.fi

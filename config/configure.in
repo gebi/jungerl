@@ -1,5 +1,9 @@
 AC_INIT
 
+dnl work out who the cpu, vendor and OS are
+AC_CANONICAL_SYSTEM
+AC_DEFINE_UNQUOTED(CPU_VENDOR_OS, "$target")
+
 dnl Programs
 
 AC_PROG_CC
@@ -14,15 +18,17 @@ dnl C header files
 
 AC_CHECK_HEADERS(linux/if_tun.h, HAVE_TUNTAP="true")
 
-dnl For the Slang driver
+dnl For the Slang driver. I don't think this is really currect just now..
 
 AC_ARG_WITH(slang-include, [  --with-slang-include=DIR   installed slang library],
-    SLANG_INCLUDE=$withval
+    if test "X$withval" != X; then
+      HAVE_SLANG="true"
+    fi
     )
 
-AC_SUBST(SLANG_INCLUDE)
+AC_CHECK_HEADERS(slang.h, HAVE_SLANG="true")
 
-AC_CHECK_HEADERS(slang.h, HAVE_SLANG="true",,$SLANG_INCLUDE)
+AC_SUBST(SLANG_INCLUDE)
 
 case "$target_os" in
      *cygwin*)
@@ -48,7 +54,10 @@ esac
 
 AC_SUBST(LD_SHARED)
 
-dnl Skip applications that won't build.
+dnl Skip applications that won't build, after cleaning out old SKIP
+dnl files.
+
+rm ../lib/*/SKIP &>/dev/null
 
 if test -z $HAVE_TUNTAP; then
    echo "No tunnel linux/if_tun.h" > ../lib/tuntap/SKIP

@@ -32,7 +32,8 @@
 		id = 0,              % LDAP Request ID 
 		log,                 % User provided log function
 		timeout = infinity,  % Request timeout
-		anon_auth = false    % Allow anonymous authentication
+		anon_auth = false,   % Allow anonymous authentication
+		use_tls = false      % LDAP/LDAPS
 	       }).
 
 %%% For debug purposes
@@ -326,6 +327,10 @@ parse_args([{anon_auth, true}|T], Cpid, Data) ->
     parse_args(T, Cpid, Data#eldap{anon_auth = false});
 parse_args([{anon_auth, _}|T], Cpid, Data) ->
     parse_args(T, Cpid, Data);
+parse_args([{ssl, true}|T], Cpid, Data) ->
+    parse_args(T, Cpid, Data#eldap{use_tls = true});
+parse_args([{ssl, _}|T], Cpid, Data) ->
+    parse_args(T, Cpid, Data);
 parse_args([{log, F}|T], Cpid, Data) when function(F) ->
     parse_args(T, Cpid, Data#eldap{log = F});
 parse_args([{log, _}|T], Cpid, Data) ->
@@ -342,34 +347,34 @@ parse_args([], _, Data) ->
 
 try_connect([Host|Hosts], Data) ->
     TcpOpts = [{packet, asn1}, {active,false}],
-    %%case gen_tcp:connect(Host, Data#eldap.port, TcpOpts) of
-    case ssl_connect(Host, ?LDAPS_PORT, TcpOpts) of
-	{ok,Fd} -> {ok,Data#eldap{host = Host, fd = Fd}};
+    case do_connect(Host, Data, TcpOpts) of
+	{ok,Fd} -> {ok,Data#eldap{host = Host, fd   = Fd}};
 	_       -> try_connect(Hosts, Data)
     end;
 try_connect([],_) ->
     {error,"connect failed"}.
 
-
-ssl_connect(Host, Port, Opts) ->
-    application:start(ssl),
+do_connect(Host, Data, Opts) when Data#eldap.use_tls == false ->
+    gen_tcp:connect(Host, Data#eldap.port, Opts, Data#eldap.timeout);
+do_connect(Host, Data, Opts) when Data#eldap.use_tls == true ->
     Vsn = erlang:system_info(version),
     if Vsn >= "5.3" ->
 	    %% In R9C, but not in R9B
-	    ssl:seed("ellynatefttidppohjeh");
+	    {_,_,X} = erlang:now(),
+	    ssl:seed("bkrlnateqqo" ++ integer_to_list(X));
        true -> true
     end,
-    {ok, CSock} = ssl:connect(Host, Port, [{verify,0}|Opts]),
-    io:fwrite("ssl_connect: connected.~n"),
+    {ok, Fd} = ssl:connect(Host, Data#eldap.port, [{verify,0}|Opts]),
     if Vsn >= "5.3" ->
 	    %% In R9C, but not in R9B
-	    {ok, Cert} = ssl:peercert(CSock, [ssl, subject]),
+	    {ok, Cert} = ssl:peercert(Fd, [ssl, subject]),
 	    io:fwrite("ssl_connect: peer cert:~n~p~n", [Cert]);
-       true -> true
+       true ->
+	    io:fwrite("ssl-connect succeded~n", [])
     end,
-    {ok, CSock}.
+    {ok, Fd}.
 
-    
+
 loop(Cpid, Data) ->
     receive
 
@@ -453,7 +458,7 @@ exec_simple_bind(Data) ->
 			 name           = Data#eldap.binddn,  
 			 authentication = {simple, Data#eldap.passwd}},
     log2(Data, "bind request = ~p~n", [Req]),
-    Reply = request(Data#eldap.fd, Data#eldap.id, {bindRequest, Req}),
+    Reply = request(Data#eldap.fd, Data, Data#eldap.id, {bindRequest, Req}),
     log2(Data, "bind reply = ~p~n", [Reply]),    
     exec_simple_bind_reply(Data, Reply).
 
@@ -522,8 +527,8 @@ do_search_0(Data, A) ->
 collect_search_responses(Data, Req, ID) ->
     S = Data#eldap.fd,
     log2(Data, "search request = ~p~n", [Req]),
-    send_request(S, ID, {searchRequest, Req}),
-    Resp = recv_response(S),
+    send_request(S, Data, ID, {searchRequest, Req}),
+    Resp = recv_response(S, Data),
     log2(Data, "search reply = ~p~n", [Resp]),    
     collect_search_responses(Data, S, ID, Resp, [], []).
 
@@ -534,14 +539,14 @@ collect_search_responses(Data, S, ID, {ok,Msg}, Acc, Ref)
 	    log2(Data, "search reply = searchResDone ~n", []),    
 	    {ok,Acc,Ref,Data};
 	{'searchResEntry',R} when record(R,'SearchResultEntry') ->
-	    Resp = recv_response(S),
+	    Resp = recv_response(S, Data),
 	    log2(Data, "search reply = ~p~n", [Resp]),    
 	    collect_search_responses(Data, S, ID, Resp, [R|Acc], Ref);
 	{'searchResRef',R} ->
 	    %% At the moment we don't do anyting sensible here since
 	    %% I haven't been able to trigger the server to generate
 	    %% a response like this.
-	    Resp = recv_response(S),
+	    Resp = recv_response(S, Data),
 	    log2(Data, "search reply = ~p~n", [Resp]),    
 	    collect_search_responses(Data, S, ID, Resp, Acc, [R|Ref]);
 	Else ->
@@ -568,7 +573,7 @@ do_add_0(Data, Entry, Attrs) ->
     S = Data#eldap.fd,
     Id = bump_id(Data),
     log2(Data, "add request = ~p~n", [Req]),
-    Resp = request(S, Id, {addRequest, Req}),
+    Resp = request(S, Data, Id, {addRequest, Req}),
     log2(Data, "add reply = ~p~n", [Resp]),    
     check_reply(Data#eldap{id = Id}, Resp, addResponse).
 
@@ -589,7 +594,7 @@ do_delete_0(Data, Entry) ->
     S = Data#eldap.fd,
     Id = bump_id(Data),
     log2(Data, "del request = ~p~n", [Entry]),
-    Resp = request(S, Id, {delRequest, Entry}),
+    Resp = request(S, Data, Id, {delRequest, Entry}),
     log2(Data, "del reply = ~p~n", [Resp]),    
     check_reply(Data#eldap{id = Id}, Resp, delResponse).
 
@@ -613,7 +618,7 @@ do_modify_0(Data, Obj, Mod) ->
     S = Data#eldap.fd,
     Id = bump_id(Data),
     log2(Data, "modify request = ~p~n", [Req]),
-    Resp = request(S, Id, {modifyRequest, Req}),
+    Resp = request(S, Data, Id, {modifyRequest, Req}),
     log2(Data, "modify reply = ~p~n", [Resp]),    
     check_reply(Data#eldap{id = Id}, Resp, modifyResponse).
 
@@ -637,7 +642,7 @@ do_modify_dn_0(Data, Entry, NewRDN, DelOldRDN, NewSup) ->
     S = Data#eldap.fd,
     Id = bump_id(Data),
     log2(Data, "modify DN request = ~p~n", [Req]),
-    Resp = request(S, Id, {modDNRequest, Req}),
+    Resp = request(S, Data, Id, {modDNRequest, Req}),
     log2(Data, "modify DN reply = ~p~n", [Resp]),    
     check_reply(Data#eldap{id = Id}, Resp, modDNResponse).
 
@@ -645,27 +650,40 @@ do_modify_dn_0(Data, Entry, NewRDN, DelOldRDN, NewSup) ->
 %%% Send an LDAP request and receive the answer
 %%% --------------------------------------------------------------------
 
-request(S, ID, Request) ->
-    send_request(S, ID, Request),
-    recv_response(S).
+request(S, Data, ID, Request) ->
+    send_request(S, Data, ID, Request),
+    recv_response(S, Data).
 
-send_request(S, ID, Request) ->
+send_request(S, Data, ID, Request) ->
     Message = #'LDAPMessage'{messageID  = ID,
 			     protocolOp = Request},
     {ok,Bytes} = asn1rt:encode('ELDAPv3', 'LDAPMessage', Message),
-    %%gen_tcp:send(S, Bytes).
+    case do_send(S, Data, Bytes) of
+	{error,Reason} -> throw({gen_tcp_error,Reason});
+	Else           -> Else
+    end.
+
+do_send(S, Data, Bytes) when Data#eldap.use_tls == false ->
+    gen_tcp:send(S, Bytes);
+do_send(S, Data, Bytes) when Data#eldap.use_tls == true ->
     ssl:send(S, Bytes).
 
-recv_response(S) ->
+do_recv(S, Data, Len, Timeout) when Data#eldap.use_tls == false ->
+    gen_tcp:recv(S, Len, Timeout);
+do_recv(S, Data, Len, Timeout) when Data#eldap.use_tls == true ->
+    ssl:recv(S, Len, Timeout).
+
+recv_response(S, Data) ->
     Timeout = get(req_timeout), % kludge...
-    %%case gen_tcp:recv(S, 0, Timeout) of
-    case ssl:recv(S, 0, Timeout) of
+    case do_recv(S, Data, 0, Timeout) of
 	{ok, Data} ->
 	    check_tag(Data),
 	    case asn1rt:decode('ELDAPv3', 'LDAPMessage', Data) of
 		{ok,Resp} -> {ok,Resp};
 		Error     -> throw(Error)
 	    end;
+	{error,Reason} ->
+	    throw({gen_tcp_error, Reason});
 	Error ->
 	    throw(Error)
     end.

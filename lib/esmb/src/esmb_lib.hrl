@@ -1,6 +1,12 @@
 -ifndef(_ESMB_LIB_HRL).
 -define(_ESMB_LIB_HRL, true).
 
+-define(elog(X,Y), error_logger:info_msg("*elog ~p:~p: " X,
+					[?MODULE, ?LINE | Y])).
+
+-define(BYTE, integer-unit:8).    % Nice syntactic sugar...
+
+
 %%% --------------------------------------------------------------------
 %%% NetBIOS stuff
 %%% --------------------------------------------------------------------
@@ -46,6 +52,10 @@
 -define(SMB_INFO_STANDARD,                 1).
 -define(SMB_FIND_FILE_DIRECTORY_INFO,      16#101).
 -define(SMB_FIND_FILE_BOTH_DIRECTORY_INFO, 16#104).
+
+%%% Subcommand codes for named pipe operations
+-define(SUBCMD_TRANSACT_NM_PIPE,     16#26).
+
 
 %%% NT_CREATE_ANDX flags
 %%%
@@ -121,6 +131,9 @@
 -define(FLAGS2_LONG_NAMES,  16#0001).
 -define(FLAGS2_UNICODE,     16#8000).
 
+-define(FLAGS2_NO_UNICODE,     16#7111).
+-define(FLAGS2_UNSET_UNICODE(X), (X band ?FLAGS2_NO_UNICODE)).
+
 -define(FLAGS2_NTLM, (?FLAGS2_LONG_NAMES bor 
 		      ?FLAGS2_UNICODE)).
 
@@ -192,7 +205,7 @@
 -define(CORE_PROTOCOL(Neg), 
 	(Neg#smb_negotiate_res.dialect_index == ?PCNET_1_0)).
 -define(PRE_DOS_LANMAN_2_1(Neg), 
-	(Neg#smb_negotiate_res.dialect_index == ?LANMAN_1_0)).
+	(Neg#smb_negotiate_res.dialect_index =< ?LANMAN_1_0)).
 -define(NTLM_0_12(Neg), 
 	(Neg#smb_negotiate_res.dialect_index == ?NT_LM_0_12)).
 
@@ -207,7 +220,9 @@
 -define(CAP_UNICODE,   16#0004).
 
 %%% Tree-Connect-AndX service types
+%%% (NB: These strings should not be sent in Unicode format)
 -define(SERVICE_DISK_SHARE, "A:").
+-define(SERVICE_NAMED_PIPE, "IPC").
 -define(SERVICE_ANY_TYPE,   "?????").
 
 %%% Share type info returned from "list shares" request
@@ -247,7 +262,8 @@
 	  date_time,     % a #dt{} record
 	  resume_key,
 	  data_len = 0,  % # of bytes in data
-	  data = []      % an I/O list
+	  data = [],     % an I/O list
+	  offset = 0     % offset were to start file operation
 	 }).
 
 %%% Date/Time info

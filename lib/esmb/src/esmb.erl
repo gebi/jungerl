@@ -10,16 +10,20 @@
 	 connect/1, connect/2, connect/3, close/1, user_logon/3, emsg/3,
 	 tree_connect/4, tree_connect/5, list_dir/3, called/1,
 	 open_file_ro/3, open_file_rw/3, stream_read_file/3,
-	 read_file/3, mkdir/3, rmdir/3, is_ok/2,
-	 astart/0, istart/0, ustart/0, start/0,
-	 client/2, aclient/2, iclient/2, uclient/2,
-	 close_file/2, write_file/4, delete_file/3, caller/0,
+	 read_file/3, mkdir/3, rmdir/3, is_ok/2, unicode_p/1,
+	 astart/0, istart/0, ustart/0, start/0, to_ucs2_and_null/2,
+	 client/2, aclient/2, iclient/2, uclient/2, to_ucs2/2,
+	 close_file/2, write_file/4, hexprint/1, b2l/1,
+	 delete_file/3, caller/0, named_pipe_transaction/4,
+	 named_pipe_transaction/3,
 	 exit_if_error/2, list_shares/3, list_shares/5, l/3]).
 -export([dec_smb/1, tt_name/1]).
 -export([zeros/1,p14/1,s16x/1,s21_lm_session_key/1,ex/2,swab/1,
 	 lm_challenge_response/2, nt_challenge_response/2, 
 	 lmtest/0, nttest/0, e/2, s2k/1]).
+
 -include("esmb_lib.hrl").
+
 
 -define(PORT, 139).
 
@@ -42,9 +46,9 @@ start()->
 %%%  erl -pa ./ebin -noshell -s esmb ustart   % UTF-8 capable
 %%% 
 %%%---------------------------------------------------------------------
-astart() -> aclient("//korp/tobbe", "tobbe"). % for testing !!
-istart() -> iclient("//korp/tobbe", "tobbe"). % for testing !!
-ustart() -> uclient("//korp/tobbe", "tobbe"). % for testing !!
+astart() -> aclient("//pungmes/tobbe", "tobbe"). % for testing !!
+istart() -> iclient("//pungmes/tobbe", "tobbe"). % for testing !!
+ustart() -> uclient("//pungmes/tobbe", "tobbe"). % for testing !!
 
 client(Path, User)  -> iclient(Path, User).
 
@@ -86,6 +90,9 @@ share_type(?SHARETYPE_DEVICE)   -> "Comm. device";
 share_type(?SHARETYPE_IPC)      -> "IPC".
     
 
+%%%
+%%% NB: list_shares/N may throw an: {error,#smbpdu} | {error,Else}
+%%%
 list_shares(Host, User, Passwd) ->
     list_shares(Host, User, Passwd, ?DEFAULT_WORKGROUP, []).
 
@@ -95,7 +102,8 @@ list_shares(Host, User, Passwd, Workgroup, SockOpts) ->
 	    U = #user{pw = Passwd, name = User, primary_domain = Workgroup},
 	    Pdu0 = user_logon(S, Neg, U),
 	    exit_if_error(Pdu0, "Login failed"),
-	    Path = "\\\\*SMBSERVER\\IPC" ++ [$$], % make the Emacs mode happy...
+	    %%Path = "\\\\*SMBSERVER\\IPC" ++ [$$], % make the Emacs mode happy...
+	    Path = "\\\\" ++ h2s(Host) ++ "\\IPC" ++ [$$], % make the Emacs mode happy...
 	    Pdu1 = tree_connect(S, Neg, Pdu0, ipc_path(Neg, Path), ?SERVICE_ANY_TYPE),
 	    exit_if_error(Pdu1, "Tree connect failed"),
 	    {Req, Pdu2} = smb_list_shares_pdu(Pdu1),
@@ -103,6 +111,11 @@ list_shares(Host, User, Passwd, Workgroup, SockOpts) ->
 	Else ->
 	    Else
     end.
+
+h2s({A,B,C,D}) -> 
+    lists:flatten(io_lib:format("~w.~w.~w.~w", [A,B,C,D]));
+h2s(Host) when list(Host) -> 
+    Host.
 
 ipc_path(Neg, Path) when ?USE_UNICODE(Neg) ->    
     {ok, Cd}    = iconv:open(?CSET_UCS2, ?CSET_ASCII),
@@ -114,7 +127,7 @@ ipc_path(_Neg, Path) ->
 
 
 decode_list_shares_response(Req, {ok, _, ResPdu}) ->
-    Res = dec_smb(Req, ResPdu),   
+    Res = safe_dec_smb(Req, ResPdu),   
     <<TotParamCount:16/little,
      TotDataCount:16/little,
      0:16/little,
@@ -160,6 +173,78 @@ rm_nulls(L)     -> lists:reverse(L).
 warning(X,X,_) -> true;
 warning(_,_,S) -> io:format("~s~n", [S]).
 
+
+%%% --------------------------------------------------------
+%%% Named Pipe Transaction
+%%% --------------------------------------------------------
+
+named_pipe_transaction(S, InReq, Rpc) when binary(Rpc) ->
+    Pipe = "\\PIPE\\",
+    Path = to_ucs2_and_null(unicode_p(InReq), Pipe),
+    named_pipe_transaction(S, InReq, Rpc, Path).
+
+named_pipe_transaction(S, InReq, Rpc, PipeName) 
+  when binary(PipeName), binary(Rpc) ->
+    {Req, Pdu} = smb_named_pipe_transaction(InReq, PipeName, Rpc),
+    decode_smb_response(Req, nbss_session_service(S, Pdu)).
+
+
+smb_named_pipe_transaction(InReq, PipeName, Rpc) ->
+    {Wc,Wp} = wp_named_pipe(InReq#smbpdu.fid, size(PipeName), size(Rpc)),
+    Bf = bf_named_pipe(PipeName),
+    Rec = #smbpdu{cmd = ?SMB_COM_TRANSACTION,
+		  pid = InReq#smbpdu.pid,
+		  uid = InReq#smbpdu.uid,
+		  tid = InReq#smbpdu.tid,
+		  fid = InReq#smbpdu.fid,
+		  flags2 = InReq#smbpdu.flags2,
+		  wc  = Wc,
+		  wp  = Wp,
+		  bc  = size(Bf) + size(Rpc),
+		  bf  = Bf},
+    B1 = enc_smb(Rec),
+    {Rec, <<B1/binary, Rpc/binary>>}.
+
+wp_named_pipe(Fid, NameLen, DataSize) ->
+    %% How to compute the offset values (no.of bytes):
+    %% ParamOffset = ?SMB_HEADER_LEN + ThisLen + WordCount + ByteCount + Pad + length(TransName)
+    %%             = ?SMB_HEADER_LEN + 1 + 16*2 + 2 + 1 + NameLen
+    %%             = ?SMB_HEADER_LEN + 36 + NameLen
+    %%
+    ParamOffset = ?SMB_HEADER_LEN + 36 + NameLen,
+    ParamLen    = 0, 
+    DataOffset  = ParamOffset + ParamLen,
+    ParamCount  = DataOffset - ParamOffset,
+    {16,                         % WordCount = 14+2
+     <<ParamCount:16/little,     % Total parameter bytes sent
+      DataSize:16/little,        % Total data bytes sent
+      0:16/little,               % Max parameter bytes to return
+      ?MAX_BUFFER_SIZE:16/little,% Max data bytes to return
+      0,                         % Max setup words to return
+      0,                         % reserved
+      0:16/little,               % Flags
+      0:32/little,               % timeout , 0 = return immediately
+      0:16/little,               % reserved2
+      ParamLen:16/little,        % Parameter bytes sent this buffer
+      ParamOffset:16/little,     % Offset (from header start) to parameters
+      DataSize:16/little,        % Data bytes sent this buffer
+      DataOffset:16/little,      % Offset (from header start) to data
+      2,                         % Count of setup words
+      0,                         % reserved3 (pad above to word boundary)
+      ?SUBCMD_TRANSACT_NM_PIPE:16/little,
+      Fid:16/little
+      >>}.
+
+bf_named_pipe(PipeName) ->
+    list_to_binary([0,          % Pad
+		    PipeName    % Name of transaction
+		    ]).
+
+
+
+
+%%% ---------------------
+
 smb_list_shares_pdu(InReq) ->
     {Wc,Wp} = wp_list_shares(),
     Bf = bf_list_shares("\\PIPE\\LANMAN"),
@@ -167,6 +252,7 @@ smb_list_shares_pdu(InReq) ->
 		  pid = InReq#smbpdu.pid,
 		  uid = InReq#smbpdu.uid,
 		  tid = InReq#smbpdu.tid,
+		  flags2 = InReq#smbpdu.flags2,
 		  wc  = Wc,
 		  wp  = Wp,
 		  bc  = size(Bf),
@@ -248,7 +334,7 @@ close(S) ->
 write_file(S, Neg, InReq, Finfo) ->
     write_file(S, Neg, InReq, Finfo, list_to_binary(Finfo#file_info.data), 0).
 
-write_file(S, Neg, InReq, Finfo, Bin, Written) when ?LT_BUFSIZE(Neg,Bin) ->
+write_file(S, Neg, InReq, Finfo, Bin, Written) when ?LT_BUFSIZE(Neg,Bin) -> 
     {Req, Pdu} = smb_write_andx_pdu(InReq, Finfo, Bin, Written),
     case decode_smb_response(Req, nbss_session_service(S, Pdu)) of
 	{ok, Wrote} ->
@@ -388,7 +474,6 @@ negotiate(S) ->
     decode_smb_response(Req, nbss_session_service(S, Pdu)).
 
 user_logon(S, Neg, U) ->
-    ?dbg("~w(~w): enter user_logon, U=~p~n", [?MODULE, ?LINE, U]),
     {Req, Pdu} = smb_session_setup_andx_pdu(Neg, U),
     decode_smb_response(Req, nbss_session_service(S, Pdu)).
 
@@ -421,7 +506,6 @@ dbg_smb(What, Res) ->
 decode_smb_response(Req, {ok, _, ResPdu}) when  ?IS(Req, ?SMB_NEGOTIATE) ->
     Res = dec_smb(Req, ResPdu),
     <<Di:16/little, B/binary>> = Res#smbpdu.wp,
-    %%io:format("Dialect Index = ~w~n",[Di]),
     case Di of
 	?PCNET_1_0 ->
 	    #smb_negotiate_res{dialect_index = Di};
@@ -463,7 +547,9 @@ decode_smb_response(Req, {ok, _, ResPdu})
 decode_smb_response(Req, {ok, _, ResPdu}) 
   when  ?IS(Req, ?SMB_COM_TRANSACTION2), 
 	?SUB_CMD(Req, ?SMB_TRANS2_FIND_NEXT2) ->
-    dec_trans2_find_x2(Req, ResPdu, ?SMB_TRANS2_FIND_NEXT2).
+    dec_trans2_find_x2(Req, ResPdu, ?SMB_TRANS2_FIND_NEXT2);
+decode_smb_response(Req, {ok, _, ResPdu}) when  ?IS(Req, ?SMB_COM_TRANSACTION) ->
+    dec_transaction(Req, ResPdu).
 
 
 lanman_neg_resp(<<SecurityMode:16/little,
@@ -536,7 +622,7 @@ dec_read_andx(Req, Pdu) ->
     _:2/binary,                % High 16 bits of number of data bytes if
                                % CAP_LARGE_READEX; else zero
     _/binary>> = Res#smbpdu.wp,
-    <<_:DataOffset/binary,Data:DataLength/binary>> = Pdu,
+    <<_:DataOffset/binary,Data:DataLength/binary, _/binary>> = Pdu,
     {ok, Res, Data}.
     
 
@@ -551,33 +637,79 @@ dec_nt_create_andx(Req, Pdu) ->
     OpLockLevel,               % The oplock level granted
     Fid:16/little,             % The file ID
     CreateAction:32/little,    % The action taken (1 = file opened)
-    CreationTime:64/little,    % When file was created
-    LastAccessTime:64/little,  % When file was accessed
-    LastWriteTime:64/little,   % When file was last written
-    ChangeTime:64/little,      % When file was last changed
+    CreationTime:8/binary,     % When file was created
+    LastAccessTime:8/binary,   % When file was accessed
+    LastWriteTime:8/binary,    % When file was last written
+    ChangeTime:8/binary,       % When file was last changed
     _:4/binary,                % The file attributes
     _:8/binary,                % Allocation size
-    EOF:64/little,             % The file size 
+    EOF:8/binary,              % The file size 
     FileType:16/little,        % 0 = Disk file or directory
     _:2/binary,                % State of IPC device (e.g pipe)
     Directory,                 % Boolean (0 = Not a directory)
     _/binary>> = Res#smbpdu.wp,
     %% NB: The TIME comes in units of 100 nano seconds !!
-    Gsec = (CreationTime div 10000000) + ?GREG_SEC_0_TO_1601,
-    GDT = calendar:gregorian_seconds_to_datetime(Gsec),
-    %%io:format("CREATION TIME: ~w~n", [GDT]),
-    Asec = (LastAccessTime div 10000000) + ?GREG_SEC_0_TO_1601,
-    ADT = calendar:gregorian_seconds_to_datetime(Asec),
-    %%io:format("LAST ACCESS TIME: ~w~n", [ADT]),
-    Wsec = (LastWriteTime div 10000000) + ?GREG_SEC_0_TO_1601,
-    WDT = calendar:gregorian_seconds_to_datetime(Wsec),
-    %%io:format("LAST WRITE TIME: ~w~n", [WDT]),
-    Csec = (ChangeTime div 10000000) + ?GREG_SEC_0_TO_1601,
-    CDT = calendar:gregorian_seconds_to_datetime(Csec),
+    %% Gsec = (CreationTime div 10000000) + ?GREG_SEC_0_TO_1601,
+    %% GDT = calendar:gregorian_seconds_to_datetime(Gsec),
+    %% io:format("CREATION TIME: ~w~n", [GDT]),
+    %% Asec = (LastAccessTime div 10000000) + ?GREG_SEC_0_TO_1601,
+    %% ADT = calendar:gregorian_seconds_to_datetime(Asec),
+    %% io:format("LAST ACCESS TIME: ~w~n", [ADT]),
+    %% Wsec = (LastWriteTime div 10000000) + ?GREG_SEC_0_TO_1601,
+    %% WDT = calendar:gregorian_seconds_to_datetime(Wsec),
+    %% io:format("LAST WRITE TIME: ~w~n", [WDT]),
+    %% Csec = (ChangeTime div 10000000) + ?GREG_SEC_0_TO_1601,
+    %% CDT = calendar:gregorian_seconds_to_datetime(Csec),
     %%io:format("LAST CHANGE TIME: ~w~n", [CDT]),
+    FileSize = large_integer(EOF),
     Res#smbpdu{fid       = Fid,
-	       file_size = EOF}.
+	       file_size = FileSize}.
     
+%%% ---
+
+dec_transaction(Req, Pdu) ->
+    Res = safe_dec_smb(Req, Pdu),
+    <<TotParamCount:16/little,
+     TotDataCount:16/little,
+     _:16/little,                % reserved
+     ParamCount:16/little,
+     ParamOffset:16/little,
+     ParamDisplacement:16/little,
+     DataCount:16/little,
+     DataOffset:16/little,
+     DataDisplacement:16/little,
+     SetupCount,
+     _/binary>> = Res#smbpdu.wp,
+    Bf = Res#smbpdu.bf,
+    {SetupWords, B1} =
+	if (SetupCount > 0) ->
+		<<Xsw:SetupCount/binary,Xb1/binary>> = Bf,
+		{Xsw, Xb1};
+	   true ->
+		{<<>>, Bf}
+	end,
+    %% We may have some pad bytes here between the
+    %% ByteCount parameter and the actual data.
+    %% Strip it off by computing how many bytes
+    %% we have upto and including the ByteCount param,
+    %% and subtract that from the DataOffset param.
+    %% Whatever is left is the number of pad-bytes.
+    Pad = DataOffset - 
+	(?SMB_HEADER_LEN + 
+	 1 +    % WordCount == 1 byte
+	 ((Res#smbpdu.wc + SetupCount) * 2) + 
+	 2),    % ByteCount == 2 bytes
+    Data = if (Pad > 0) ->
+		   <<SS:Pad/binary,Xdata/binary>> = B1,
+		   Xdata;
+	      true ->
+		   B1
+	   end,
+    {ok, Data}.
+    
+
+
+
 %%% ---
 
 %%% Detta suger häst...
@@ -613,7 +745,7 @@ dec_nt_create_andx(Req, Pdu) ->
 	end).
 		
 dec_trans2_find_x2(Req, Pdu, SubCmd) ->
-    Res = dec_smb(Req, Pdu),
+    Res = safe_dec_smb(Req, Pdu),
     <<TotParamCount:16/little,
     TotDataCount:16/little,
     0:16/little,
@@ -643,10 +775,64 @@ dec_trans2_find_x2(Req, Pdu, SubCmd) ->
     ?dbg("  No.of entries = ~p~n",[SearchCount]),
     ?dbg("  EOF search ?  = ~p~n",[EndOfSearch]),
     ?dbg("  LastNameOset  = ~p~n",[LastNameOffset]),
-    Finfo = dec_info_standard(Res, Data, SearchCount),
+    Finfo = dec_find_file_dir_info(Res, Data, SearchCount),
+    %%print_fd_info(Finfo),
     #find_result{sid = Sid, eos = to_bool(EndOfSearch), finfo = Finfo}.
 
 %%% ---
+
+dec_find_file_dir_info(Req, Data, Max) ->
+    Ucode = bytes_per_character(Req),
+    dec_find_file_dir_info(Data, Ucode, Max, 1).
+
+dec_find_file_dir_info(<<Offset:32/little,  % Offset to next struct
+			FileIndex:32/little, 
+			CT:8/binary,        % File creation time
+			AT:8/binary,        % File access time
+			WT:8/binary,        % File write time
+			HT:8/binary,        % File attribute change time
+			Size:8/binary,      % File size
+			AllocSize:8/binary, % Allocation size
+			Attr:32/little,     % Extended file attributes
+			Len:32/little,      % Length of filename (in bytes)    
+			Filename:Len/binary, 
+			Rest/binary>>,  Ucode, Max, I) when I =< Max ->
+    Strip = Offset - (64 + Len),    % Strip off trailing crap...
+    F = #file_info{name = Filename,
+		   size = large_integer(Size),
+		   attr = Attr,
+		   date_time = dec_dt_find_file(CT, AT, WT)},
+    [F | dec_find_file_dir_info(strip(Strip, Rest), Ucode, Max, I+1)];
+dec_find_file_dir_info(Rest, Ucode, Max, I) when I > Max ->
+    [];
+dec_find_file_dir_info(Rest, Ucode, Max, I) ->
+    io:format("dec_find_file_dir_info: <ERROR> Missing file info I=~p~n",[I]),
+    %%hexprint(b2l(Rest)),
+    [].
+
+
+strip(Strip, Rest0) when Strip>0, Strip<size(Rest0) ->
+    <<_:Strip/binary, Rest/binary>> = Rest0,
+    Rest;
+strip(_, Rest) ->
+    Rest.
+
+print_fd_info([H|T]) ->
+    X = H#file_info.date_time,
+    {A,B,C} = X#dt.creation_date,
+    {D,E,F} = X#dt.creation_time,
+    io:format("~-20.s ~10.w  "
+	      "~2.w:~2.w:~2.w "
+	      "~2.s ~s ~w~n",
+	      [b2l(esmb_client:ucs2_to_charset(H#file_info.name, "ASCII")), 
+	       H#file_info.size,
+	       D,E,F,
+	       i2l(C), month(B), A]),
+    print_fd_info(T);
+print_fd_info([]) ->
+    ok.
+
+    
 
 dec_info_standard(Req, Data, Max) ->
     Ucode = bytes_per_character(Req),
@@ -718,8 +904,46 @@ dec_dt_info_std(<<CreationDate:2/binary, CreationTime:2/binary,
 	last_write_time  = {Hw, Iw, Tw * 2}}.
 
 swap(<<X,Y>>) -> <<Y,X>>.
-		
+	
+
+dec_dt_find_file(CT,AT,WT) ->
+    CTime = large_integer(CT),
+    ATime = large_integer(AT),
+    WTime = large_integer(WT),
+    %% NB: The TIME comes in units of 100 nano seconds !!
+    Csec = (CTime div 10000000) + ?GREG_SEC_0_TO_1601,
+    Asec = (ATime div 10000000) + ?GREG_SEC_0_TO_1601,
+    Wsec = (WTime div 10000000) + ?GREG_SEC_0_TO_1601,
+    {Xd,Xt} = calendar:gregorian_seconds_to_datetime(Csec),
+    {Yd,Yt} = calendar:gregorian_seconds_to_datetime(Asec),
+    {Zd,Zt} = calendar:gregorian_seconds_to_datetime(Wsec),
+    #dt{creation_date    = Xd,
+	creation_time    = Xt,
+	last_access_date = Yd,
+	last_access_time = Yt,
+	last_write_date  = Zd,
+	last_write_time  = Zt}.
+
+
+large_integer(<<LowPart:32/little, HiPart:32/little>>) ->
+    if (HiPart == 0) -> LowPart;
+       true          -> (HiPart * 16#100000000) + LowPart
+    end.
+
+
+    
+	
 %%% ---    
+
+safe_dec_smb(Pdu) ->
+    safe_dec_smb(#smbpdu{}, Pdu).
+
+safe_dec_smb(Req, Pdu) ->
+    case catch dec_smb(Req, Pdu) of
+	R when R#smbpdu.eclass == ?SUCCESS -> R;
+	R when record(R,smbpdu)            -> throw({error,R});
+	Else                               -> throw({error,{dec_smb,Else}})
+    end.
 
 
 dec_smb(Pdu) ->
@@ -770,8 +994,6 @@ smb_close_file_pdu(InReq) ->
 		  flags2 = InReq#smbpdu.flags2,
 		  wc = Wc,
 		  wp = Wp},
-    %%io:format("close_file: WordCount = ~p~n",[Rec#smbpdu.wc]),
-    %%io:format("close_file: ByteCount = ~p~n",[Rec#smbpdu.bc]),
     {Rec, enc_smb(Rec)}.
 
 wp_close_file(Fid) ->
@@ -794,8 +1016,6 @@ smb_delete_file_pdu(InReq, Fname) ->
 		  wp = Wp,
 		  bc  = size(Bf),
 		  bf  = Bf},
-    %%io:format("delete_file: WordCount = ~p~n",[Rec#smbpdu.wc]),
-    %%io:format("delete_file: ByteCount = ~p~n",[Rec#smbpdu.bc]),
     {Rec, enc_smb(Rec)}.
 
 wp_delete_file() ->
@@ -817,8 +1037,6 @@ smb_delete_dir_pdu(InReq, Dir) ->
 		  flags2 = InReq#smbpdu.flags2,
 		  bc  = size(Bf),
 		  bf  = Bf},
-    %%io:format("delete_directory: WordCount = ~p~n",[Rec#smbpdu.wc]),
-    %%io:format("delete_directory: ByteCount = ~p~n",[Rec#smbpdu.bc]),
     {Rec, enc_smb(Rec)}.
 
 bf_delete_directory(InReq, Dir) ->
@@ -829,7 +1047,8 @@ bf_delete_directory(InReq, Dir) ->
 
 smb_write_andx_pdu(InReq, Finfo, Data, Written) ->
     DataLen = size(Data),
-    {Wc,Wp} = wp_write_andx(InReq#smbpdu.fid, Written, DataLen),
+    FileOffset = Finfo#file_info.offset + Written,
+    {Wc,Wp} = wp_write_andx(InReq#smbpdu.fid, FileOffset, DataLen),
     Rec = #smbpdu{cmd = ?SMB_WRITE_ANDX,
 		  pid = InReq#smbpdu.pid,
 		  uid = InReq#smbpdu.uid,
@@ -839,18 +1058,15 @@ smb_write_andx_pdu(InReq, Finfo, Data, Written) ->
 		  wp = Wp,
 		  bc = DataLen,
 		  bf = Data},  
-    %%io:format("write_andx: WordCount = ~p~n",[Rec#smbpdu.wc]),
-    %%io:format("write_andx: ByteCount = ~p~n",[Rec#smbpdu.bc]),
     {Rec, enc_smb(Rec)}.
 
-wp_write_andx(Fid, Written, Dlen) ->
+wp_write_andx(Fid, FileOffset, Dlen) ->
     Remaining = 0,
     %% How to compute the offset values (no.of bytes):
     %% ParamOffset = ?SMB_HEADER_LEN + ThisLen + WordCount + ByteCount 
     %%             = ?SMB_HEADER_LEN + 1 + 12*2 + 2
     %%             = ?SMB_HEADER_LEN + 27
     Offset = ?SMB_HEADER_LEN + 27,
-    FileOffset = Written,
     {12,                        % (ThisLen)
      <<?NoAndxCmd,              
      0,                         % reserved
@@ -876,8 +1092,6 @@ smb_read_andx_pdu(InReq, Finfo) ->
 		  flags2 = InReq#smbpdu.flags2,
 		  wc = Wc,
 		  wp = Wp},
-    %%io:format("read_andx: WordCount = ~p~n",[Rec#smbpdu.wc]),
-    %%io:format("read_andx: ByteCount = ~p~n",[Rec#smbpdu.bc]),
     {Rec, enc_smb(Rec)}.
 
 wp_read_andx(Fid, Offset) ->
@@ -887,8 +1101,8 @@ wp_read_andx(Fid, Offset) ->
      0:16/little,               % offset to next command WC
      Fid:16/little,             % File handle
      Offset:32/little,          % Offset in file to begin read
-     4096:16/little,            % Max number of bytes to return
-     4096:16/little,            % Reserved for obsolescent requests
+     ?MAX_BUFFER_SIZE:16/little,% Max number of bytes to return
+     ?MAX_BUFFER_SIZE:16/little,% Reserved for obsolescent requests
      0:32/little,               % High 16 buts of MaxXount if CAP_LARGE READX;
                                 % else must be zero
      0:16/little>>}.            % Remaining, obsolescent requests
@@ -922,8 +1136,6 @@ smb_nt_create_andx_pdu(InReq, Path, Opts) ->
 		  wp = Wp,
 		  bc  = size(Bf),
 		  bf  = Bf},
-    %%io:format("nt_create_andx: WordCount = ~p~n",[Rec#smbpdu.wc]),
-    %%io:format("nt_create_andx: ByteCount = ~p~n",[Rec#smbpdu.bc]),
     {Rec, enc_smb(Rec)}.
 
 wp_nt_create_andx(NameLen, Opts) ->
@@ -941,7 +1153,7 @@ wp_nt_create_andx(NameLen, Opts) ->
       NameLen:16/little,         % Length of Name[] in bytes
       OpLock:32/little,          % Oplock Flags
       0:32/little,               % RootDirectoryFid
-      AccessMask:32/little,        % Desired access
+      AccessMask:32/little,      % Desired access
       0:32/little,               % Allocaton size MSW
       0:32/little,               %                LSW (64 bit)
       FileAttrs:32/little,       % File attributes
@@ -951,9 +1163,19 @@ wp_nt_create_andx(NameLen, Opts) ->
       ?SECURITY_IDENTIFICATION:32/little, % Security QOS info (?)
       0>>}.                      % Security tracking mode flag (?)
 
+%%%
+%%% When a string is passed in Unicode format, it must be
+%%% word-aligned with respect to the beginning of the SMB !!
+%%% Should the string not naturally fall on a two-byte boundary,
+%%% a null byte of padding will be inserted, and the Unicode
+%%% string will begin at the next address.
+%%%
 
+bf_nt_create_andx(InReq, Name) when ?F2_USE_UNICODE(InReq) ->
+    list_to_binary([0,                   % pad !
+		    Name, null(InReq)]); % filename
 bf_nt_create_andx(InReq, Name) ->
-    list_to_binary([0,                   % pad ?
+    list_to_binary([                     % don't pad !
 		    Name, null(InReq)]). % filename
 
 
@@ -993,8 +1215,6 @@ smb_trans2_find_next2_pdu(InReq, Path, Sid) ->
 		  bc  = size(Bf),
 		  bf  = Bf,
 		  sub_cmd = ?SMB_TRANS2_FIND_NEXT2},
-    %%io:format("trans2_find_next2: WordCount = ~p~n",[Rec#smbpdu.wc]),
-    %%io:format("trans2_find_next2: ByteCount = ~p~n",[Rec#smbpdu.bc]),
     {Rec, enc_smb(Rec)}.
 
 bf_trans2_find_next2(InReq, Path, Sid) ->
@@ -1006,7 +1226,7 @@ bf_trans2_find_next2(InReq, Path, Sid) ->
 		    %% --- Start of Parameter Block (12 bytes) ---
 		    <<Sid:16/little>>, % Search attribute or SID
 		    <<512:16/little>>, % Max # of entries returned
-		    <<?SMB_INFO_STANDARD:16/little>>, % What info to return in the result
+		    <<?SMB_FIND_FILE_DIRECTORY_INFO:16/little>>, % What info to return in the result
 		    <<0:32/little>>,   % Resume key
 		    Flags,             % Flags
 		    Path, null(InReq)  % Search pattern
@@ -1028,8 +1248,6 @@ smb_trans2_find_first2_pdu(InReq, Path) ->
 		  bc  = size(Bf),
 		  bf  = Bf,
 		  sub_cmd = ?SMB_TRANS2_FIND_FIRST2},
-    %%io:format("trans2_find_first2: WordCount = ~p~n",[Rec#smbpdu.wc]),
-    %%io:format("trans2_find_first2: ByteCount = ~p~n",[Rec#smbpdu.bc]),
     {Rec, enc_smb(Rec)}.
 
 
@@ -1078,7 +1296,7 @@ bf_trans2_find_first2(InReq, Path) ->
 		    Sa,          % Search attribute
 		    <<512:16/little>>, % Max # of entries returned
 		    Flags,       % Flags
-		    <<?SMB_INFO_STANDARD:16/little>>, % What info to return in the result
+		    <<?SMB_FIND_FILE_DIRECTORY_INFO:16/little>>, % What info to return in the result
 		    <<0:32/little>>,  % Storage type
 		    Path, null(InReq) % Search pattern
 		    ]).
@@ -1130,7 +1348,7 @@ wp_tree_connect_andx(Neg) ->
 bf_tree_connect_andx(Neg, Path, Service) ->
     list_to_binary([0,                    % password
 		    Path, null(Neg),      % filesystem 
-		    Service, null(Neg)]). % service
+		    Service, 0]).         % service (never in Unicode !)
 
 
 null(Neg) when record(Neg,smb_negotiate_res),
@@ -1152,13 +1370,13 @@ null(_) ->
 %%% responses computed using the "LM session key".
 %%%
 smb_session_setup_andx_pdu(Neg, U) when ?PRE_DOS_LANMAN_2_1(Neg) ->
-    ?dbg("~w(~w): session_setup_andx, pre_dos_lanman_2.1~n",[?MODULE,?LINE]),
     {Passwd, PwLen}   = enc_lm_passwd(Neg, U#user.pw),
     {Wc,Wp} = wp_session_setup_andx(Neg, U, PwLen),
     Bf = bf_session_setup_andx(Neg, U, Passwd),
     Rec = #smbpdu{cmd = ?SMB_SESSION_SETUP_ANDX,
 		  pid = mypid(),
 		  mid = 1,
+		  flags2 = flags2(Neg),
 		  wc = Wc,
 		  wp = Wp,
 		  bc  = size(Bf),
@@ -1167,8 +1385,6 @@ smb_session_setup_andx_pdu(Neg, U) when ?PRE_DOS_LANMAN_2_1(Neg) ->
 %%%
 smb_session_setup_andx_pdu(Neg, U) when ?NTLM_0_12(Neg),
 					?USE_UNICODE(Neg) ->
-    ?dbg("~w(~w): session_setup_andx, ntlm_0.12 + Unicode Capa=~w~n",
-	 [?MODULE,?LINE, Neg#smb_negotiate_res.srv_capabilities]),
     {UPasswd, UPwLen} = enc_nt_passwd(Neg, U#user.pw, U#user.charset),
     {Wc,Wp} = wp_session_setup_andx(Neg, U, 0, UPwLen), 
     Bf = bf_session_setup_andx(Neg, U, UPasswd),
@@ -1183,8 +1399,7 @@ smb_session_setup_andx_pdu(Neg, U) when ?NTLM_0_12(Neg),
     {Rec, enc_smb(Rec)};
 %%%
 smb_session_setup_andx_pdu(Neg, U) when ?NTLM_0_12(Neg) ->
-    ?dbg("~w(~w): session_setup_andx, ntlm_0.12~n",[?MODULE,?LINE]),
-    {Passwd, PwLen}   = enc_lm_passwd(Neg, U#user.pw),
+    {Passwd, PwLen} = enc_lm_passwd(Neg, U#user.pw),
     {Wc,Wp} = wp_session_setup_andx(Neg, U, PwLen, 0),
     Bf = bf_session_setup_andx(Neg, U, Passwd),
     Rec = #smbpdu{cmd = ?SMB_SESSION_SETUP_ANDX,
@@ -1276,7 +1491,7 @@ enc_nt_passwd(Neg, Passwd, _) ->
 %%%
 %%% TEST LM-SessionKey: 
 %%%
-%%%  smbclient //korp/tobbe -U tobbe -m LANMAN1
+%%%  smbclient //pungmes/tobbe -U tobbe -m LANMAN1
 %%%
 %%%   EncKey = 1cb2c4dc19d52588
 %%%
@@ -1286,7 +1501,7 @@ enc_nt_passwd(Neg, Passwd, _) ->
 %%%
 %%% TEST NT-SessionKey: 
 %%%
-%%%  smbclient //korp/tobbe -U tobbe
+%%%  smbclient //pungmes/tobbe -U tobbe
 %%%
 %%%   EncKey = 9d5d78803705c22e
 %%%
@@ -1672,4 +1887,41 @@ ip2str({A,B,C,D}) ->
     lists:flatten(io_lib:format("~w.~w.~w.~w",[A,B,C,D]));
 ip2str(L) when list(L) -> 
     L.
+
+i2l(I) when integer(I) -> integer_to_list(I);
+i2l(L) when list(L)    -> L.
+
+month(1)  -> "Jan";
+month(2)  -> "Feb";
+month(3)  -> "Mar";
+month(4)  -> "Apr";
+month(5)  -> "May";
+month(6)  -> "Jun";
+month(7)  -> "Jul";
+month(8)  -> "Aug";
+month(9)  -> "Sep";
+month(10) -> "Oct";
+month(11) -> "Nov";
+month(12) -> "Dec".
+
+to_ucs2_and_null(UnicodeP, Str) ->
+    B = to_ucs2(UnicodeP, Str),
+    N = null2(UnicodeP),
+    <<B/binary,N/binary>>.
+
+to_ucs2(UnicodeP, Str) when UnicodeP == true ->    
+    {ok, Cd}    = iconv:open(?CSET_UCS2, ?CSET_ASCII),
+    {ok, Ustr} = iconv:conv(Cd, Str),
+    iconv:close(Cd),
+    Ustr;
+to_ucs2(_, Str) ->    
+    Str.
+
+null2(UnicodeP) when UnicodeP == true -> <<0,0>>;
+null2(_)                              -> <<0>>.
+
+
+unicode_p(Neg) when record(Neg,smb_negotiate_res),?USE_UNICODE(Neg) -> true;
+unicode_p(Pdu) when record(Pdu,smbpdu),?F2_USE_UNICODE(Pdu)         -> true; 
+unicode_p(_)                                                        -> false.
 

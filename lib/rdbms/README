@@ -1,18 +1,31 @@
-RDBMS vsn 1.3
+RDBMS vsn 1.5
 ===============
 
 A relational database management layer on top of mnesia.
 
 Ulf Wiger
-Chief Designer
-Ericsson Telecom AB
-ATM Switch Development
+Senior System Architect
+Ericsson AB
+IP Connectivity and Control Nodes
 
 <ulf.wiger@ericsson.com>
 
 
 Changes
 -------
+
+Changes since 1.3 (1.4 was an experiment never released.)
+
+- A bug that could lead to endless loops during cascading delete has
+  been fixed.
+
+- New options: 'add_references', 'drop_references' make it easier to 
+  plug in new dependencies when new tables are created.
+
+- Exported functions, create_table/2 and delete_table/1 allow for more
+  integrated handling of rdbms options. delete_table/1 will clean up
+  dangling referential integrity options automatically.
+
 
 Changes since 1.2
 

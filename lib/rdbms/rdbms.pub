@@ -1,17 +1,12 @@
 {name, "rdbms"}.
-{vsn, {1,3}}.
+{vsn, {1,5}}.
 {summary, "Relational Database Management System based on mnesia"}.
-{author, "Ulf Wiger", "ulf.wiger@ericsson.com", "20000103"}.
+{author, "Ulf Wiger", "ulf.wiger@ericsson.com", "20030324"}.
 {keywords, ["mnesia", "dictionary", "rdbms", "relational"]}.
-{needs, [{"mnesia",{3,8}}]}.
+{needs, [{"mnesia",{4,1}}]}.
 {abstract, 
  "Adds relational constraints checking to mnesia. "
  "Also included is a modular data import tool.\n\n"
- "This version of RDBMS has been tested to work on OTP R6B (mnesia-3.8). "
- "Also, a bug concerning commit- and rollback triggers has been fixed."
- "\n\nMinor bug fixes since 1.2 -- see the README file."}.
-
-
-
- 
+ "This version of RDBMS requires OTP R9 (mnesia-4.1 or later). "
+ "\nNew: safer handling of referential integrity + API improvements."}.
  

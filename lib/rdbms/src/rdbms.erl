@@ -41,6 +41,7 @@
 -endif.
 
 -define(NULL, '#.[].#').  % this is my definition of a null value.
+-define(KEYPOS, 2).
 
 %%%----------------------------------------------------------------------
 %%% #2.    EXPORT LISTS
@@ -54,13 +55,21 @@
 %% Initializes the dictionary.
 -export([add_properties/1,	% ([Prop])
 	 do_add_properties/1,
-	 do_add_properties/2]).	% ([Prop]) called within a schema transaction
+	 do_add_properties/2,	% ([Prop]) called within a schema transaction
+	 drop_references/1,
+	 do_drop_references/1]).
+
+-export([create_table/2,
+	 do_create_table/2,
+	 delete_table/1,
+	 do_delete_table/1]).
 
 %% Attribute metadata
 -export([bounds/1,	% (Attr)
 	 default/1,	% (Attr)
 	 references/1,	% (Attr)
 	 required/1,	% (Attr)
+	 key_type/1,	% ({Tab, Attr})
 	 key_type/2,	% (Tab, Attr)
 	 set_property/2,	% (PropKey, Value)
 	 type/1]).	% (Attr)
@@ -74,6 +83,8 @@
 %% Representation
 -export([make_object/1,		% make an rdbms object, new or from existing
 	 make_object/2,		% make/update an RDBMS object
+	 make_simple_form/1,	% make a simple xmerl form
+	 make_simple_form/2,	% make/update a simple xmerl form
 	 make_record/1]).	% make an Erlang record from an RDBMS obj
 
 
@@ -178,6 +189,39 @@ handle_result(Result, [Level|_]) ->
     end.
 
 
+
+create_table(Name, Opts) ->
+    mnesia_schema:schema_transaction(
+      fun() ->
+	      do_create_table(Name, Opts)
+      end).
+
+do_create_table(Name, Opts) ->
+    case lists:keysearch(rdbms, 1, Opts) of
+	{value, {_, Props}} ->
+	    Options = lists:keydelete(rdbms,1,Opts),
+	    Cs = mnesia_schema:list2cs([{name,Name}|Options]),
+	    mnesia_schema:do_create_table(Cs),
+	    rdbms:do_add_properties(Props);
+	false ->
+	    Options = lists:keydelete(rdbms,1,Opts),
+	    Cs = mnesia_schema:list2cs([{name,Name}|Options]),
+	    mnesia_schema:do_create_table(Cs)
+    end.
+
+delete_table(Name) ->      
+    mnesia_schema:schema_transaction(
+      fun() ->
+	      do_delete_table(Name)
+      end).
+
+do_delete_table(Name) ->
+    mnesia_schema:do_delete_table(Name),
+    do_drop_references(Name).
+
+
+
+
 table_properties(Props, Tab) ->
     verify_table_properties(Props, Tab).
 
@@ -198,6 +242,33 @@ do_add_properties([{Key, Val}|T]) ->
 do_add_properties([]) ->
     ok.
 
+drop_references(ToTab) ->
+    mnesia_schema:schema_transaction(
+      fun() ->
+	      do_drop_references(ToTab)
+      end).
+
+do_drop_references(ToTab) ->
+    lists:foreach(
+      fun(Tab) ->
+	      Props = mnesia:table_info(Tab, user_properties),
+	      search_props(Props, ToTab, Tab)
+      end, mnesia:system_info(tables)).
+
+search_props([{{attr,Attr,references},Refs}|Props], ToTab, Tab) ->
+    case [{T,A,As} || {T,A,As} <- Refs,
+		      T == ToTab] of
+	[] ->
+	    %% no reference to ToTab
+	    search_props(Props, ToTab, Tab);
+	Remove ->
+	    do_set_property({attr,{Tab,Attr},references}, Refs -- Remove),
+	    search_props(Props, ToTab, Tab)
+    end;
+search_props([P|Ps], ToTab, Tab) ->
+    search_props(Ps, ToTab, Tab);
+search_props([], _, _) ->
+    ok.
 
 %% mnesia callbacks =====================================
 %%   for each callback, an internal function is implemented.
@@ -221,32 +292,45 @@ write(ActivityId, Opaque, Tab, Rec, LockKind) ->
 			   {Tab, Rec}
 		   end,
     verify_write(WTab, WRec),
+    do_write(ActivityId, Opaque, WTab, WRec, LockKind).
+
+
+% do_write(Tab, Rec) ->
+%     {ActivityId, Opaque} = get_mnesia_transaction_data(),
+%     do_write(ActivityId, Opaque, Tab, Rec, write).
+
+do_write(ActivityId, Opaque, WTab, WRec, LockKind) ->
     case action_on_write(WTab) of
 	default ->
 	    mnesia:write(ActivityId, Opaque, WTab, WRec, LockKind);
 	F ->
 	    F(WRec)
     end.
+    
 
 %% non-exported function -- used by rdbms internally, no verification
 %%
 write(Tab, Rec) ->
     {ActivityId, Opaque} = get_mnesia_transaction_data(),
-    case action_on_write(Tab) of
-	default ->
-	    mnesia:write(ActivityId, Opaque, Tab, Rec, write);
-	F ->
-	    F(Rec)
-    end.
+    do_write(ActivityId, Opaque, Tab, Rec, write).
 
 delete(ActivityId, Opaque, Tab, Key, LockKind) ->
-    verify_delete(Tab, Key),
-    case action_on_delete(Tab) of
-	default ->
-	    mnesia:delete(ActivityId, Opaque, Tab, Key, LockKind);
-	F ->
-	    F(key, Key)
-    end.
+    verify_delete(Tab, Key).
+
+
+% do_delete(Tab, Rec) ->
+%     {ActivityId, Opaque} = get_mnesia_transaction_data(),
+%     do_delete(ActivityId, Opaque, Tab, Rec, write).
+
+% do_delete(ActivityId, Opaque, Tab, Key, LockKind) ->
+%     case action_on_delete(Tab) of
+% 	default ->
+% 	    mnesia:delete(ActivityId, Opaque, Tab, Key, LockKind);
+% 	F ->
+% 	    F(key, Key)
+%     end.
+
+
 
 %delete(Tab, Key) ->
 %    {ActivityId, Opaque} = get_mnesia_transaction_data(),
@@ -256,24 +340,33 @@ delete(ActivityId, Opaque, Tab, Key, LockKind) ->
 %	F ->
 %	    F(key, Key)
 %    end.
-
-delete_object(ActivityId, Opaque, Tab, Obj, LockKind) ->
-    verify_delete_object(Tab, Obj),
-    case action_on_delete(Tab) of
-	default ->
-	    mnesia:delete_object(ActivityId, Opaque, Tab, Obj, LockKind);
-	F ->
-	    F(object, Obj)
-    end.
-
 delete_object(Tab, Obj) ->
     {ActivityId, Opaque} = get_mnesia_transaction_data(),
+    delete_object(ActivityId, Opaque, Tab, Obj, write).
+
+
+delete_object(ActivityId, Opaque, Tab, Obj, LockKind) ->
+    verify_delete_object(Tab, Obj).
+
+
+do_delete_object(ActivityId, Opaque, Tab, Obj, LockKind) ->
     case action_on_delete(Tab) of
 	default ->
-	    mnesia:delete_object(ActivityId, Opaque, Tab, Obj, write);
+	    mnesia:delete_object(
+	      ActivityId, Opaque, Tab, Obj, LockKind);
 	F ->
 	    F(object, Obj)
     end.
+
+
+
+%% I want cascading delete to work through multiple levels, but
+%% activating the uncommented line below may cause an endless loop.
+do_delete_object(Tab, Obj) ->
+    {ActivityId, Opaque} = get_mnesia_transaction_data(),
+%     delete_object(ActivityId, Opaque, Tab, Obj, write).
+    do_delete_object(ActivityId, Opaque, Tab, Obj, write).
+
 
 read(ActivityId, Opaque, Tab, Key, LockKind) ->
     case action_on_read(Tab) of
@@ -569,7 +662,7 @@ verify_write(Tab, Rec) ->
     verify_record(Tab, Rec, write).
 
 
-%% verify_delete(Tab, Key)
+%% verify_delete(Tab, Key, DelF)
 %% This is called in order to verify a mnesia:delete({Tab, Key})
 %% It triggers verification of referential integrity.
 %%
@@ -591,13 +684,19 @@ verify_delete_object(Tab, Obj) when record(Obj, rdbms_obj) ->
     verify_delete_object(Tab, rdbms_obj_to_record(Obj));
 verify_delete_object(Tab, Obj) ->
     Attrs = attributes(Tab),
-    verify_delete_object1(Attrs, Tab, Obj).
+    case all_references(Attrs, Tab, Obj, delete) of
+	[] ->
+	    ok;
+	Refs ->
+	    inspect_references(Refs, Tab, Obj, delete)
+    end.
+%     verify_delete_object1(Attrs, Tab, Obj).
 
-verify_delete_object1([Attr|Attrs], Tab, Obj) ->
-    check_references(Tab, Attr, Obj, delete),
-    verify_delete_object1(Attrs, Tab, Obj);
-verify_delete_object1([], _, _) ->
-    ok.
+% verify_delete_object1([Attr|Attrs], Tab, Obj) ->
+%     check_references(Tab, Attr, Obj, delete),
+%     verify_delete_object1(Attrs, Tab, Obj);
+% verify_delete_object1([], _, _) ->
+%     ok.
 
 
 
@@ -788,7 +887,7 @@ violation(Which, Data) ->
 %%
 %% This function checks referential integrity.
 %% Referential integrity rules are stored as metadata in the following way:
-%% {attr, {Tab, Attr}, [{Tab2, Attr2, RefActions}]}, where
+%% {{attr, {Tab, Attr}, references}, [{Tab2, Attr2, RefActions}]}, where
 %% Tab    : the referencing table
 %% Attr   : the referencing attribute
 %% Tab2   : the referenced table
@@ -803,14 +902,26 @@ references(Attr) ->
     attr_property(Attr, references).
 
 
-check_references(Tab, Attr, Obj, Context) ->
-    case references({Tab, Attr}) of
-	undefined ->
-	    [];
-	Refs ->
-	    Val = attribute_value(Tab, Attr, Obj),
-	    follow_refs(Refs, Val, Context, Tab, Attr)
-    end.
+% check_references(Tab, Attr, Obj, Context) ->
+%     case references({Tab, Attr}) of
+% 	undefined ->
+% 	    [];
+% 	Refs ->
+% 	    Val = attribute_value(Tab, Attr, Obj),
+% 	    follow_refs(Refs, Val, Context, Tab, Attr)
+%     end.
+
+all_references(Attrs, Tab, Obj, Context) ->
+    lists:foldr(
+      fun(Attr, Acc) ->
+	      case references({Tab, Attr}) of
+		  undefined ->
+		      Acc;
+		  Refs ->
+		      Val = attribute_value(Tab, Attr, Obj),
+		      [{Attr, Val, Refs}|Acc]
+	      end
+      end, [], Attrs).
 
 %% in case we've already fetched the value.
 check_references(Tab, Attr, Val, Obj, Context) ->
@@ -835,6 +946,15 @@ follow_refs([{Tab2, Attr2, Actions}|Refs], Val, Context, Tab1, Attr1) ->
     Objs1 ++ follow_refs(Refs, Val, Context, Tab1, Attr1);
 follow_refs([], _, _, _, _) ->
     [].
+
+
+inspect_references(Refs, Tab, Obj, delete) ->
+    %% to avoid a possible endless loop, delete Obj first
+    do_delete_object(Tab, Obj),
+    lists:foldl(
+      fun({Attr,Val, Refs1}, Acc) ->
+	      follow_refs(Refs1, Val, delete, Tab, Attr) ++ Acc
+      end, [], Refs).
 
 
 perform_ref_actions(_, Objs, read, _, _, _) -> Objs;
@@ -988,6 +1108,28 @@ make_object(Data, Values) ->
 	    replace_values(Values, record_to_rdbms_obj(Data))
     end.
 
+make_simple_form(Tab) ->
+    make_simple_form(Tab, []).
+
+make_simple_form(Tab, Values) ->
+    AttrNames = attributes(Tab),
+    Content = lists:foldr(
+		fun(N, Acc) ->
+			[{N, describe_attribute(Tab, N, Values), []}|Acc]
+		end, [], AttrNames),
+    {Tab, [], Content}.
+
+describe_attribute(Tab, Attr, Values) ->
+    Id = {Tab, Attr},
+    Default = default(Id),
+    [{value, get_opt(Attr, Values, Default)},
+     {type, type(Id)},
+     {key_type, key_type(Id)},
+     {required, required(Id)},
+     {bounds, bounds(Id)},
+     {default, default(Id)}].
+    
+		      
 %%% ==========================================================
 %%% make_record(atom() | record() | rdbms_obj()) -> record()
 %%%
@@ -1085,7 +1227,12 @@ required(Attr) ->
 	    %% We enforce required==true for attributes of type oid.
 	    true;
 	_ ->
-	    attr_property(Attr, required)
+	    case attr_property(Attr, required) of
+		undefined ->
+		    false;
+		Other ->
+		    Other
+	    end
     end.
 
 %%
@@ -1200,6 +1347,9 @@ action_on_write(Rec) ->
 %% - secondary  - non-unique key (has an index attached to it)
 %% - {compound, Sub} - compound attribute (may contain keys)
 %% - attribute  - not a key
+key_type({Tab, Attr}) ->
+    key_type(Tab, Attr).
+
 key_type(Tab, Attr) ->
     case attr_property({Tab, Attr}, key_type) of
 	undefined ->
@@ -1208,9 +1358,9 @@ key_type(Tab, Attr) ->
 		    {compound, SubAttrs};
 		_ ->
 		    Apos = attribute_position(Tab, Attr),
-		    case (Apos - table_info(Tab, keypos)) of
-			0 -> primary;
-			_ -> 
+		    case (Apos == ?KEYPOS) of
+			true -> primary;
+			false -> 
 			    case table_info(Tab, index) of
 				[] -> attribute;
 				Ix ->
@@ -1295,6 +1445,30 @@ verify_table_properties([], _) ->
     [].
 
 
+write_property(Tab, {{attr, Attr, drop_references}, Refs}) ->
+    case references({Tab,Attr}) of
+	[] ->
+	    ok;
+	OldRefs ->
+	    case [{T,A,RA} || {T,A,RA} <- OldRefs,
+			      {T1,A1} <- Refs,
+			      {T,A} == {T1,A1}] of
+		[] ->
+		    ok;
+		DelRefs ->
+		    NewRefs = OldRefs -- DelRefs,
+		    do_write_property(Tab, {{attr,Attr,references}, NewRefs})
+	    end
+    end;
+write_property(Tab, {{attr, Attr, add_references}, Refs}) ->
+    Refs1 = check_ref_props(Tab, Attr, Refs),
+    Refs2 = case references({Tab,Attr}) of
+		undefined ->
+		    Refs1;
+		OldRefs ->
+		    merge_refs(Refs1, OldRefs)
+	    end,
+    do_write_property(Tab, {{attr,Attr,references}, Refs2});
 write_property(Tab, {{attr, Attr, references}, Refs}) ->
     ?dbg("referential property~n", []),
     Refs1 = check_ref_props(Tab, Attr, Refs),
@@ -1304,6 +1478,27 @@ write_property(Tab, Prop) ->
 
 do_write_property(Tab, Prop) ->
     mnesia_schema:do_write_table_property(Tab, Prop).
+
+
+
+merge_refs(R1, R2) ->
+    merge_refs(R1, R2, []).
+
+merge_refs([{Tab,Attr,Actions}=R|Refs], Old, Acc) ->
+    case [{T,A,RA} || {T,A,RA} <- Old,
+		      T == Tab,
+		      A == Attr] of
+	[] ->
+	    merge_refs(Refs, Old, [R|Acc]);
+	[R] ->
+	    %% duplicate -- not a problem
+	    merge_refs(Refs, Old, Acc);
+	[{_,_,As}] ->
+	    exit({reference_conflict, {Tab,Attr,Actions,As}})
+    end;
+merge_refs([], Old, Acc) ->
+    Old ++ lists:reverse(Acc).
+	    
 
 %% Referential integrity rules are stored as metadata in the following way:
 %% {attr, {Tab, Attr}, [{Tab2, Attr2, RefActions}]}, where

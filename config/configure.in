@@ -25,6 +25,8 @@ AC_ARG_WITH(slang-include, [  --with-slang-include=DIR   installed slang library
 
 AC_SUBST(SLANG_INCLUDE)
 
+AC_CHECK_HEADERS(slang.h, HAVE_SLANG="true")
+
 case "$target_os" in
      *cygwin*)
 	:
@@ -55,7 +57,7 @@ if test -z $HAVE_TUNTAP; then
    echo "No tunnel linux/if_tun.h" > ../lib/tuntap/SKIP
 fi
 
-if test -z $SLANG_INCLUDE; then
+if test -z $HAVE_SLANG; then
    echo "No Slang header files" > ../lib/slang/SKIP
 fi
 

@@ -3,7 +3,7 @@ include ../../../support/include.mk
 ERLC_FLAGS += -I ../.. -pa ../ebin/
 
 SCRIPT=../bin/ermacs
-SED_EXPR = s\\%BASEDIR%\\`pwd`/..\\
+SED_EXPR = s:%BASEDIR%:`pwd`/..:
 
 all: $(ERL_OBJECTS) $(SCRIPT)
 

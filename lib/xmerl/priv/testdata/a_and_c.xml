@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<!DOCTYPE PLAY SYSTEM "play.dtd">
+
+<PLAY xmlns = 'http://www.w3.org/TR/shak'>
+  <TITLE>The Tragedy of Antony and Cleopatra</TITLE>
+
+  <FM xmlns = 'http://foo.bar.com' 
+      xmlns:fib = 'http://fib.com'
+      xmlns:foo = 'http://fib.com'>
+  <P>ASCII text placed in the public domain by Moby Lexical Tools, 1992.</P>
+  <P>SGML markup by Jon Bosak, 1992-1994.</P>
+  <fib:P>XML version by Jon Bosak, 1996-1999.</fib:P>
+  <foo:P>The XML markup in this version is Copyright &#169; 1999 Jon Bosak.
+  This work may freely be distributed on condition that it not be
+  modified or altered in any way.</foo:P>
+  </FM>
+  </PLAY>

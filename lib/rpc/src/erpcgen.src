@@ -1,0 +1,89 @@
+#!/bin/sh
+# Copyright (c) 2000, 2001 Sendmail, Inc.  All rights reserved.
+
+# Don't add ".boot" suffix.
+case $0 in
+    */*)
+	erpcgen_boot=`dirname $0`/../src/erpcgen
+	# lib_path won't be needed if we're installed under the Erlang root dir.
+	lib_path=`dirname $0`/../ebin
+    ;;
+    *)
+	myself=`which $0`
+	erpcgen_boot=`dirname $myself`/../src/erpcgen
+	# lib_path won't be needed if we're installed under the Erlang root dir.
+	lib_path=`dirname $myself`/../ebin
+    ;;
+esac
+
+args=`getopt o:a: $*`
+errcode=$?
+set -- $args
+
+for i
+do
+	case "$i" in
+	    -a)
+		aarg="$2"; shift;
+		shift;;
+	    -o)
+		oarg="$2"; shift;
+		shift;;
+	    --)
+		shift; break;;
+	esac
+done
+
+infile="$1"
+if [ -z "$infile" ]; then
+    cat <<EOF
+usage: $0 [-a option_list] rpc_spec_file
+
+  Options:  [hrl]          -- generate x.hrl
+            [clnt]         -- generate x_clnt.erl
+            [svc]          -- generate x_svc.erl, user impl. gen_server
+            [svc_callback] -- generate x_svc.erl, user impl. rpc_server
+            [xdr]          -- generate x_xdr.erl
+            [xdr_inc]      -- generate x_xdr.hrl
+            [trace]        -- make stubs profilable via 'trace' option
+          options recognised but not implemented:
+            [svc_stub]     -- generate server server.erl.stub
+       -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        Shorthand:   -- Equivalent to:
+        [client]     -- [hrl,clnt,xdr]
+        [server]     -- [hrl,svc,xdr,svc_stub]
+        [xdrlib]     -- [hrl,xdr]
+        [all]        -- [hrl,clnt,svc,xdr,svc_stub]
+  Multiple options may be specified, see the [all] example for syntax.
+  Yes, you need to include the square brackets.
+  Note that svc and svc_callback are mutually exclusive options.
+
+EOF
+    exit 1
+fi
+
+noxinfile=`echo $infile | sed 's;.x$;;'`
+
+if [ ! -f $xfile ]; then
+	echo "Sorry, file $xfile does not exist"
+	exit 1
+fi
+
+case "$aarg" in
+    ?*.) optarg="$aarg" ;;
+    ?*)  optarg="$aarg." ;;
+    *)   optarg="[all]." ;;
+esac
+
+case "$oarg" in
+    ?*) outfile="$oarg" ;;
+    *)  outfile="$infile" ;;
+esac
+
+noxoutfile=`echo $outfile | sed 's;.x$;;'`
+
+%ERL% -pa $lib_path -noshell \
+	-s erpcgen start -s erlang halt -- \
+	-infile $noxinfile -outfile $noxoutfile -options $optarg
+
+exit 0

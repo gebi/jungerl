@@ -19,3 +19,5 @@ clean:
 	-rm -f $(ERL_OBJECTS)
 	-rm -f ../bin/ermacs
 
+$(ERL_OBJECTS): $(ERL_HEADERS)
+

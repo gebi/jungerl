@@ -1,8 +1,17 @@
-LIBS := tuntap lersp slang ermacs
+LIBS := \
+	enfs \
+	ermacs \
+	slang \
+	lersp \
+	msc \
+	rpc \
+	tuntap \
+	xmerl \
+	xmlrpc
 
 all: $(LIBS)
 
-clean conf:
+clean:
 	@for dir in $(LIBS); do \
 	  if [ ! -e $@/SKIP ]; then \
 	    (cd $$dir; $(MAKE) $@) \
@@ -16,7 +25,7 @@ $(LIBS):
 
 # Dependencies between programs.
 
-ermacs: slang
+ermacs: slang msc
 
 .PHONY: $(LIBS)
 

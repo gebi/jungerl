@@ -1,0 +1,111 @@
+<!-- DTD for Contributors documents    -->
+<!-- DOCTYPE DOCUMENT PUBLIC"-//STEP//DTD Topic Map XML DTD v1.0//EN" [] -->
+<!-- COPYRIGHT - (C) STEP-uk -->
+<!-- AUTHOR:	Graham Moore -->
+
+
+<!-- ********************************************************************************************* -->
+<!-- topicmap is the root element -->
+<!-- ********************************************************************************************* -->
+
+<!ELEMENT   topicmap                 (topic | assoc | facet)*>
+<!ATTLIST   topicmap
+		xmlns:xlink		CDATA			#FIXED "http://www.w3.org/XML/XLink/0.9"
+		name			CDATA 			#IMPLIED>
+
+<!-- ********************************************************************************************* -->
+
+
+<!ELEMENT   topic                 (topname* , occurs*)>
+<!ATTLIST   topic
+		xmlns:xlink		CDATA				#FIXED "http://www.w3.org/XML/XLink/0.9"
+		ID			ID				#REQUIRED
+		xlink:type		(simple|extended|locator|arc) 	#FIXED "extended"
+		types			CDATA				#IMPLIED
+		scope			CDATA				#IMPLIED
+		identity		CDATA				#IMPLIED
+		linktype		CDATA				#IMPLIED>
+
+<!-- ********************************************************************************************* -->
+
+
+<!ELEMENT   occurs                 EMPTY>
+<!ATTLIST   occurs
+		xmlns:xlink		CDATA				#FIXED "http://www.w3.org/XML/XLink/0.9"
+		xlink:type		(simple|extended|locator|arc) 	#FIXED "locator"
+		xlink:href 		CDATA				#REQUIRED
+		type			CDATA				#IMPLIED
+		occrl			CDATA				#IMPLIED
+		scope			CDATA				#IMPLIED>
+
+<!-- ********************************************************************************************* -->
+
+
+<!ELEMENT   topname                 (basename , (dispname | sortname)*)>
+<!ATTLIST   topname
+                      scope 				CDATA 			#IMPLIED>
+
+
+<!ELEMENT   basename                 (#PCDATA)>
+<!ATTLIST   basename
+                      scope 				CDATA 			#IMPLIED>
+
+<!ELEMENT   dispname                 (#PCDATA)>
+<!ATTLIST   dispname
+                      scope 				CDATA 			#IMPLIED>
+
+
+<!ELEMENT   sortname                 (#PCDATA)>
+<!ATTLIST   sortname
+                      scope 				CDATA 			#IMPLIED>
+
+
+<!-- ********************************************************************************************* -->
+
+
+<!ELEMENT   assoc                 (assocrl)*>
+<!ATTLIST   assoc
+                      ID 						ID 					#REQUIRED
+                      xmlns:xlink		CDATA				#FIXED "http://www.w3.org/XML/XLink/0.9"
+                     	xlink:type		(simple|extended|locator|arc) 	#FIXED "extended"
+                      scope 				CDATA 			#IMPLIED
+                      type		 			CDATA 			#IMPLIED
+                      linktype			CDATA 			#IMPLIED>
+
+
+<!-- ********************************************************************************************* -->
+
+
+<!ELEMENT   assocrl                 EMPTY>
+<!ATTLIST   assocrl
+		xmlns:xlink		CDATA				#FIXED "http://www.w3.org/XML/XLink/0.9"
+		xlink:type		(simple|extended|locator|arc) 	#FIXED "locator"
+                xlink:href		CDATA				#REQUIRED
+		type			CDATA				#IMPLIED
+		anchrole		CDATA				#IMPLIED>
+
+
+<!-- ********************************************************************************************* -->
+
+
+<!ELEMENT   facet                 (fvalue)*>
+<!ATTLIST   facet
+		xmlns:xlink		CDATA				#FIXED "http://www.w3.org/XML/XLink/0.9"
+		xlink:type		(simple|extended|locator|arc) 	#FIXED "extended"
+		type			CDATA				#IMPLIED
+		linktype		CDATA				#IMPLIED>
+                      
+
+<!-- ********************************************************************************************* -->
+
+                      
+<!ELEMENT   fvalue                 EMPTY>
+<!ATTLIST   fvalue
+											xmlns:xlink		CDATA				#FIXED "http://www.w3.org/XML/XLink/0.9"
+                     	xlink:type		(simple|extended|locator|arc) 	#FIXED "locator"
+                      type		 			CDATA 			#IMPLIED
+                      facetval		 	CDATA 			#IMPLIED>
+
+
+<!-- ********************************************************************************************* -->
+

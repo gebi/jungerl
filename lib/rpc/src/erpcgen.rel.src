@@ -1,0 +1,8 @@
+{release, {"erpcgen","%ERPCGEN_VSN%"}, {erts, "%ERTS_VSN%"},
+ [{kernel,"%KERNEL_VSN%"},
+  {stdlib,"%STDLIB_VSN%"},
+  {erpcgen,"%ERPCGEN_VSN%"}]}.
+
+
+
+

@@ -1,0 +1,20 @@
+<section heading="heading1">
+  <P>This is a paragraph of text.</P>
+  <section heading="heading2">
+    <P>This is another paragraph</P>
+    <table border="1">
+       <heading>
+         <col>head1</col>
+         <col>head2</col>
+       </heading>
+       <row>
+         <col>col11</col>
+         <col>col12</col>
+       </row>
+       <row>
+         <col>col21</col>
+         <col>col22</col>
+       </row>
+    </table>
+  </section>
+</section>

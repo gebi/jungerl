@@ -1,0 +1,10 @@
+{application, rpc,
+ [
+  {description, "ONC RPC client & server library, XDR library"},
+  {vsn, "%VSN%"},
+  {modules, [%MODULES%]},
+  {registered, []},
+  {applications, [kernel, stdlib]}
+ ]
+}.
+

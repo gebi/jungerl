@@ -1,0 +1,310 @@
+.TH XMLRPC 3 "Jan 2003" "jocke@gleipnir.com" "ERLANG MODULE DEFINITION"
+.SH MODULE
+xmlrpc \- XML\-RPC library
+.SH DESCRIPTION
+This is an HTTP 1.1 compliant XML-RPC Erlang library. It is designed
+to make it easy to write XML-RPC Erlang clients and/or servers. The
+library is compliant with the XML-RPC specification published by
+\fIhttp://www.xmlrpc.org/\fR.
+.SH EXPORTS
+.BI "call(" Socket ", " URI ", " Payload )
+.br
+.BI "call(" Socket ", " URI ", " Payload )
+.br
+.BI "call(" Host ", " Port ", " URI ", " Payload )
+.br
+.BI "call(" Socket ", " URI ", " Payload ", " KeepAlive ", " Timeout )
+.br
+.BI "call(" Host ", " Port ", " URI ", " Payload ", " KeepAlive ", " Timeout ") -> " Result
+.RS
+.TP
+Types
+Socket = socket()
+.br
+URI = string()
+.br
+Payload = {call, Method, [Value]}
+.br
+Method = atom()
+.br
+Value = integer() | float() | string() | Boolean | ISO8601Date | Base64 | Struct | Array
+.br
+Boolean = true | false
+.br
+ISO8601Date = {date, string()}
+.br
+Base64 = {base64, string()}
+.br
+Struct = {struct, [{Key, Value}]}
+.br
+Key = atom()
+.br
+Array = {array, [Value]}
+.br
+Host = string() | ip()
+.br
+Port = integer()
+.br
+KeepAlive = true | false
+.br
+Timeout = integer()
+.br
+ResponsePayload = {response, [Value]} | {response, Fault}
+.br
+Fault = {fault, FaultCode, FaultString}
+.br
+FaultCode = integer()
+.br
+FaultString = string()
+.br
+Result = {ok, ResponsePayload} | {error, Reason} | {ok, Socket, ResponsePayload} | {error, Socket, Reason}
+.br
+Reason = term()
+.LP
+Calls an XML\-RPC server listening on \fIHost\fR:\fIPort\fR. The
+\fIURI\fR and \fIPayload\fR is used in the HTTP POST request sent to
+the server. The \fIValue\fR is converted to XML (see \fBDATA TYPES\fR
+below) and is used as request body.
+.LP
+If \fIKeepAlive\fR is \fBtrue\fR a \fISocket\fR is returned. The
+socket can be used to send several calls on the same connection in
+accordance with HTTP 1.1. If no server response is received within
+\fITimeout\fR milli-seconds \fB{error, timeout}\fR or \fB{error,
+\fISocket\fB, timeout}\fR is returned.
+.LP
+\fIKeepAlive\fR and \fITimeout\fR default to \fBfalse\fR and 60000
+milli-seconds.
+.LP
+See \fBEXAMPLES\fR section below.
+.RE
+.LP
+.BI "start_link(" Handler )
+.br
+.BI "start_link(" Port ", " MaxSessions ", " Timeout ", " Handler ", " State )
+.br
+.BI "start_link(" IP ", " Port ", " MaxSessions ", " Timeout ", " Handler ", " State ") -> " Result
+.RS
+.TP
+Types
+Handler = {Module, Function}
+.br
+Module = Function = atom()
+.br
+Port = MaxSessions = integer()
+.br
+Timeout = integer()
+.br
+State = term()
+.br
+IP = ip()
+.br
+Result = {ok, Pid} | {error, Reason}
+.br
+Pid = pid()
+.br
+Reason = term()
+.LP
+Starts an XML\-RPC server listening on \fIIP\fR:\fIPort\fR. If no
+\fIIP\fR address is given the server listens on \fIPort\fR for all
+available \fIIP\fR addresses. \fIMaxSessions\fR is used to restrict
+the number of concurrent connections. If \fIMaxSessions\fR is reached
+the server accepts no new connections for 5 seconds, i.e. blocking new
+connect attempts.
+.LP
+\fIHandler\fR is a callback, implemented by \fIModule\fR:\fIFunction\fR/2,
+which is used to instantiate your own XML\-RPC server. The
+\fITimeout\fR value is used if the handler is keepalive
+oriented. \fIState\fR is the initial state given to
+\fIModule\fR:\fIFunction\fR/2. The resulting \fIPid\fR can be used as
+input to \fBxmlrpc:stop/1\fR. 
+.LP
+See \fBModule:Function/2\fR and \fBEXAMPLES\fR below.
+.RE
+.LP
+.BI "stop(" Pid ") -> " Result
+.RS
+.TP
+Types
+Pid = pid()
+.br
+Result = void()
+.LP
+Stops a running XML\-RPC server.
+.RE
+.LP
+.IB Module : Function ( State ", " Payload ") -> " Result
+.RS
+.TP
+Types
+State = term()
+.br
+Payload = <See above>
+.br
+Result = {KeepAlive, ResponsePayload} | {KeepAlive, State, Timeout, ResponsePayload}
+.br
+KeepAlive = true | false
+.br
+ResponsePayload = <See above>
+.br
+Timeout = integer()
+.LP
+It is up to you to implement \fIFunction\fR clauses in \fIModule\fR to
+instantiate your own XML\-RPC server. Every time an XML-RPC call
+arrives the \fIValue\fR in the \fIPayload\fR it is converted to Erlang
+format and is passed on to \fIModule\fR:\fIFunction\fR/2.
+.LP
+A \fIFunction\fR clause is supposed to return either a 2-tuple or a
+4-tuple. \fIKeepAlive\fR \fBmust\fR be \fBfalse\fR in a 2-tuple and
+\fBtrue\fR in a 4-tuple. \fIKeepAlive\fR decides if the connection to
+the client should be kept open or not, i.e. compare with the
+\fIKeepAlive\fR argument to \fBcall/{3,4,5,6}\fR above. 
+.LP
+\fIState\fR can be used as a state variable by the callback function
+and changes made to it is propagated to the next call to
+\fIModule\fR:\fIFunction\fR/2. The state variable is only meaningful
+if both the client and the server is keepalive oriented. The
+\fITimeout\fR specified in \fBstart_link/{1,5,6}\fR can be updated in
+the returning 4-tuple.
+.LP
+If \fIKeepAlive\fR is \fBtrue\fR and no call arrives within
+\fITimeout\fR milli-seconds the socket is closed. The socket may be
+closed by the client before the specified timeout.
+.LP
+See \fBEXAMPLES\fR below.
+.RE
+.SH DATA TYPES
+The conversion of \fIValue\fR in \fIPayload\fR and
+\fIResponsePayload\fR (see above) is done as follows:
+.LP
+.ft CW
+.nf
+XML-RPC data type       Erlang data type
+-----------------       ----------------
+<int>                   integer()
+<boolean>               true or false
+<string>                string()
+<double>                float()
+<dateTime.iso8601>      {date, string()}
+<struct>                {struct, [{Key, Value}]}
+<array>                 {array, [Value]}
+<base64>                {base64, string()}
+.fi
+.ft
+.LP
+Read more about the XML\-RPC data types in the XML\-RPC specification
+published by \fIhttp://www.xmlrpc.org/\fR. 
+.LP
+Here are some examples on how Erlang format is converted to XML:
+.TP
+.B
+42
+<int>42</int>
+.TP
+.B
+true
+<boolean>true</boolean>
+.TP
+.B
+"Kilroy was here"
+<string>Kilroy was here</string>
+.TP
+.B
+42.5
+<double>42.5</double>
+.TP
+.B
+{date, "19980717T14:08:55"} 
+<dateTime.iso8601>19980717T14:08:55</dateTime.iso8601>
+.TP
+.B
+{struct, [{foo, 42}, {bar, 4711}]}
+.ft CW
+.nf
+<struct>
+    <member>
+        <name>foo</name><value><int>42</int></value>
+    </member>
+    <member>
+        <name>bar</name><value><int>4711</int></value>
+    </member>
+</struct>
+.fi
+.ft
+.TP
+.B
+{array, [42, 42.5}
+.ft CW
+.nf
+<array>
+    <data>
+        <value><int>42</i4></value>
+        <value><double>42.5</double></value>
+    </data>
+</array>
+.fi
+.ft
+.TP
+.B
+{date, "19980717T14:08:55"}
+<dateTime.iso8601>19980717T14:08:55</dateTime.iso8601>
+.RE
+.LP
+.SH EXAMPLES
+You are strongly advised to inspect the example code in the
+\fIexamples/\fR directory.
+.LP
+The first example (\fIfib_server.erl\fR) calculates Fibonacci values
+and is a non-keepalive server. The second example
+(\fIecho_server.erl\fR) echoes back any incoming parameters and is a
+non-keepalive server. The third example (\fIdate_server.erl\fR)
+calculates calendar values for given dates and is a keepalive server
+which uses the state variable to provide login state and different
+timeout settings. The fourth example (\fIvalidator.erl\fR) is a
+validation server which can be used to validate the library using the
+\fIhttp://validator.xmlrpc.org/\fR service.
+.LP
+Some extract from the \fIexamples/\fR directory. The Fibonacci
+callback module:
+.LP
+.ft CW
+.nf
+handler(_State, {call, fib, [N]}) when integer(N) ->
+    {false, {response, [fib(N)]}};
+handler(_State, Payload) ->
+    FaultString = lists:flatten(io_lib:format("Unknown call: ~p", [Payload])),
+    {false, {response, {fault, -1, FaultString}}}.
+
+fib(0) -> 1;
+fib(1) -> 1;
+fib(N) -> fib(N-1)+fib(N-2).
+.fi
+.ft
+.LP
+and how it can be called:
+.LP
+.ft CW
+.nf
+1> xmlrpc:call({127, 0, 0, 1}, 4567, "/", {call, fib, [0]}). 
+{ok,{response,[1]}}
+2> xmlrpc:call({127, 0, 0, 1}, 4567, "/", {call, fib, [4]}).
+{ok,{response,[5]}}
+.fi
+.ft
+.LP
+Again: You are strongly advised to inspect the example code in the
+\fIexamples/\fR directory.
+.LP
+.SH FILES
+.TP
+.I
+http://www.xmlrpc.org/
+Home for the XML\-RPC specification.
+.TP
+.I
+README
+Main README file for the library.
+.TP
+.I examples/
+Example code
+.SH AUTHOR
+Joakim Grebeno \- jocke@gleipnir.com

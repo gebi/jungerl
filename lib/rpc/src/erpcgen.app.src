@@ -1,0 +1,10 @@
+{application, erpcgen,
+ [
+  {description, "Erlang RPC stub generator 'erpcgen'"},
+  {vsn, "%VSN%"},
+  {modules, [%MODULES%]},
+  {registered, []},
+  {applications, [kernel, stdlib]}
+  ]
+}.
+

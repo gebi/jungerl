@@ -1,5 +1,5 @@
 Miscellaneous small (single-file) libraries.
 
-Would be called 'misc', except that would probably clash with names
-people already have. :-)
+Would be called 'misc', except that would unnecessarily clash with
+names people already have in other applications. :-)
 

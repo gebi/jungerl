@@ -16,6 +16,7 @@
 % <P>.Here <b>File</b> will be used as a cache.
 
 % hacked 2003.0225 by Chris Pressey to work with inet & gen_tcp
+% modified by Mickael Remond to allow retrieval of file or HTTP url
 
 -include_lib("kernel/include/inet.hrl").
 
@@ -58,17 +59,22 @@ get(URL, Proxy, Timeout) ->
 		    {error, What}
 	    end
     end.
-    
+
 raw_get_url(URL, Timeout) -> 
     case url_parse:parse(URL) of
 	{error, Why} ->
 	    {error, {badURL,URL}};
 	{http, HostName, Port, File} ->
-	    get_http(HostName, Port, File, ["Host: ", HostName], Timeout)
+	    get_http(HostName, Port, File, ["Host: ", HostName], Timeout);
+	{file, Location} ->
+	    get_file(Location)
     end.
 
 raw_get_url(URL, Timeout, {IP, Port}) ->
     get_http(IP, Port, URL, [], Timeout).
+
+get_file(Location) ->
+    file:read_file(Location).
 
 get_http(IP, Port, URL, Opts, Timeout) ->
     %% io:format("ip = ~p, port = ~p, url = ~p~n", [ IP, Port, URL ]),

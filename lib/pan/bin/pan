@@ -1,6 +1,5 @@
 #! /bin/tcsh -f
 
-setenv OTP_ROOT /EDUP/Erlang/R8B-2
 setenv PATH "$OTP_ROOT/bin:"$PATH
 
 set SELF_PATH = `which $0`
@@ -13,14 +12,14 @@ if ( `echo $SELF_PATH | grep '/\.$'`  != "" ) then
     set SELF_PATH = $SELF_PATH:h
 endif
 
-set SNAME = `echo $SELF_PATH:t | sed "s/\.//g" | sed "s/-/_/g"`
+set SNAME = pan
 set U1 = "usage: $0 [-setcookie <cookie>] [-nocookie]"
 set U2 = "[-pa <path>] [-tick <netticktime>] [-name <node name>] [-spawn]"
 set usage = "$U1 $U2"
 
 set xpat
-set tick = "-kernel net_ticktime 8"
-set cookie = "-setcookie nc1"
+set tick = ""
+set cookie = ""
 while ($#argv)
     switch ($1)
     case "-help":

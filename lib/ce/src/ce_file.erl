@@ -43,12 +43,14 @@
 -copyright('Copyright (c)2003 Cat`s Eye Technologies. All rights reserved.').
 
 -export([exists/1, size/1, last_modified/1]).
--export([is_dir/1, is_world_readable/1, is_world_executable/1, is_binary/1]).
+-export([is_dir/1, is_binary/1]).
+-export([is_world_readable/1, is_world_writeable/1, is_world_executable/1]).
 -export([dump/2, each_line/3, slurp/1]).
 -export([create/2, create/3, find/3]).
 -export([import_fields/5, import_columns/4, import/4]).
 -export([app_name/1, app_version/1]).
 -export([complete/1, complete/2]).
+-export([add_pathz_libdirs/1]).
 
 -include_lib("kernel/include/file.hrl").
 
@@ -87,6 +89,22 @@ is_world_readable(Filename) ->
         _ -> false
       end;
     _ -> false
+  end.
+
+%% @spec is_world_writeable(filename()) -> true | false | {error, Reason}
+%% @doc Checks whether a file is writeable by the entire world.
+
+is_world_writeable(Filename) ->
+  case file:read_file_info(Filename) of
+    {ok, Info} ->
+      case Info#file_info.mode band 2 of
+        4 -> true;
+        _ -> false
+      end;
+    {error, Reason} ->
+      {error, Reason};
+    Else ->
+      {error, Else}
   end.
 
 %% @spec is_world_executable(filename()) -> true | false
@@ -363,6 +381,19 @@ complete(DirName, [FileName | Tail], PartialFileName, Length, Acc) ->
     _ ->
       complete(DirName, Tail, PartialFileName, Length, Acc)
   end.
+
+%% @spec add_pathz_libdirs([dirname()]) -> ok | {error, Reason}
+%% @doc Adds all the subdirectories of the given directories to the library
+%% search path.  This uses <code>code:add_pathz</code> and is intended to
+%% be called from a <code>.erlang</code> file or other startup file.
+
+add_pathz_libdirs(LibDirs) ->
+  lists:foreach(fun(LibDir) ->
+    {ok, AppDirs} = file:list_dir(LibDir),
+    lists:foreach(fun(AppDir) ->
+      code:add_pathz(filename:join([LibDir, AppDir, "ebin"]))
+    end, lists:reverse(lists:sort(AppDirs)))
+  end, lists:reverse(LibDirs)).
 
 %%% END of ce_file.erl %%%
 

@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+# Wrapper to 'erl' that puts all the jungerl programs in the code path.
+
+basedir=@JUNGERL_DIR@
+erl=@ERL@
+
+${erl} -pa ${basedir}/lib/*/ebin "$@"
+

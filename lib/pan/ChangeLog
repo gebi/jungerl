@@ -1,3 +1,13 @@
+2003-09-29  Mats Cronqvist  <qthmacr@duna283>
+
+	* src/Makefile (Module): removed jungerl support
+
+	* src/pan.erl: fixed help file path
+
+2003-09-26  Mats Cronqvist  <qthmacr@duna283>
+
+	* doc/pan.html (Module): fixed buggy html
+
 2003-05-27  Mats Cronqvist  <etxmacr@cbe2077>
 
 	* released pan-1_03...

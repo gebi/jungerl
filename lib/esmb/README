@@ -1,0 +1,23 @@
+
+This is an implementation of a subset of the SMB protocol.
+
+The file esmb.erl exports a number of functions that makes
+it possible to perform file operations towards a Windows
+(or Samba) server.
+
+The file esmb_client.erl is an example of how to use these
+funtions to build an application. In this case it mimics
+the smbclient program that comes along with the Samba
+distribution.
+
+If you want to add functionality it may be useful to
+know how I have been working. First of all, there exist
+a document describing CIFS 1.0 (i.e the SMB protocol).
+It has been cruicial for my work but not enough. I have
+been making heavy use of ethereal comparing this 
+implementation with smbclient as well as with Windows
+machines. Some obsolete SMB commands, not found in
+the CIFS document can be found at www.thursby.com.
+Finally, NetBIOS is described in RFC 1001,1002.
+
+Good luck, Tobbe

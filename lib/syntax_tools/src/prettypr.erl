@@ -29,13 +29,14 @@
 %% Author contact: richardc@csd.uu.se
 %% =====================================================================
 
+%% TODO: EDoc-ify the documentation.
 %% TODO: can floats be moved in/out of sep:s without too much pain?
 
 -module(prettypr).
 
 -export([above/2, beside/2, best/3, break/1, empty/0, floating/1,
-	 floating/3, follow/2, follow/3, format/1, format/2,
-	 format/3, nest/2, par/1, par/2, sep/1, text/1]).
+	 floating/3, follow/2, follow/3, format/1, format/2, format/3,
+	 layout/1, nest/2, par/1, par/2, sep/1, text/1, markup/1]).
 
 -record(text, {s}).
 -record(nest, {n, d}).
@@ -56,6 +57,9 @@
 
 text(S) ->
     mktext(string(S)).	  % convert to internal representation
+
+markup(S) ->
+    mktext(zerostring(S)).    % convert to internal representation
 
 %% This function is used internally only, and expects a string on
 %% the internal representation:
@@ -322,23 +326,37 @@ format(D, W, R) ->
 %% flat string.
 
 layout(L) ->
-    lists:flatten(layout(0, L)).
+    lists:reverse(layout(0, L, [])).
 
-layout(N, #above{d1 = #text{s = S}, d2 = L}) ->
-    [indent(N, string_chars(S)) | layout(N, L)];
-layout(N, #nest{n = N1, d = L}) ->
-    layout(N + N1, L);
-layout(N, #text{s = S}) ->
-    indent(N, string_chars(S));
-layout(N, null) ->
-    "".
+layout(N, #above{d1 = #text{s = S}, d2 = L}, Cs) ->
+    layout(N, L, [$\n | flatrev(string_chars(S), indent(N, Cs))]);
+layout(N, #nest{n = N1, d = L}, Cs) ->
+    layout(N + N1, L, Cs);
+layout(N, #text{s = S}, Cs) ->
+    flatrev(string_chars(S), indent(N, Cs));
+layout(_N, null, Cs) ->
+    Cs.
 
-indent(N, S) when N >= 8 ->
-    [$\t | indent(N - 8, S)];
-indent(N, S) when N > 0 ->
-    [$\s | indent(N - 1, S)];
-indent(N, S) ->
-    [S, $\n].
+indent(N, Cs) when N >= 8 ->
+    indent(N - 8, [$\t | Cs]);
+indent(N, Cs) when N > 0 ->
+    indent(N - 1, [$\s | Cs]);
+indent(_N, Cs) ->
+    Cs.
+
+flatrev(Cs, As) ->
+    flatrev(Cs, As, []).
+
+flatrev([C = [_|_] | Cs], As, Ss) ->
+    flatrev(C, As, [Cs | Ss]);
+flatrev([[] | Cs], As, Ss) ->
+    flatrev(Cs, As, Ss);
+flatrev([C | Cs], As, Ss) ->
+    flatrev(Cs, [C | As], Ss);
+flatrev([], As, [S | Ss]) ->
+    flatrev(S, As, Ss);
+flatrev([], As, []) ->
+    As.
 
 
 %% =====================================================================
@@ -711,7 +729,7 @@ rewrite(#sep{ds = Ds, i = N, p = P}, C) ->
 	#c_fit{c = C1} ->
 	    %% The vertical layout is thus impossible, and the
 	    %% extra indentation has no effect.
-	    rewrite(fit(horizontal(Ds)), C);
+	    rewrite(fit(horizontal(Ds)), C1);
 	#c_float_beside{d = D1, c = C1} ->
 	    %% Floats are not moved in or out of sep's
 	    rewrite(beside(D1, mksep(Ds, N, P)), C1);
@@ -827,7 +845,7 @@ rewrite(#float{d = D, h = H, v = V}, C) ->
 					D1)),
 			    C2);
 		#c_float_above_nest{d = D2, h = H1, v = V1,
-				    i = N1, c = C2}
+				    i = _N1, c = C2}
 		when V1 == V, H1 /= H ->
 		    %% Align horizontally
 		    rewrite(beside(floating(D2, H1, V1),
@@ -864,7 +882,7 @@ rewrite(#float{d = D, h = H, v = V}, C) ->
 					nest(N + N1, D1))),
 			    C2);
 		#c_float_above_nest{d = D2, h = H1, v = V1,
-				    i = N1, c = C2}
+				    i = _N1, c = C2}
 		when V1 == V, H1 /= H ->
 		    %% Align horizontally
 		    rewrite(beside(
@@ -936,10 +954,10 @@ rewrite(null, C) ->
 	    rewrite(null, #c_best_nest{w = W, r = R, i = N});
 	#c_fit{c = C1} ->
 	    rewrite(null, C1);    % identity
-	#c_float_beside{d = D, h = H, v = V, c = C1} ->
+	#c_float_beside{d = D, h = _H, v = _V, c = C1} ->
 	    %% We just remove the float wrapper; cf. below.
 	    rewrite(beside(D, null), C1);
-	#c_float_above_nest{d = D, h = H, v = V, i = N, c = C1} ->
+	#c_float_above_nest{d = D, h = _H, v = _V, i = N, c = C1} ->
 	    %% It is important that this case just removes the
 	    %% float wrapper; the empty document must be preserved
 	    %% until later, or it will not be useful for forcing
@@ -992,7 +1010,7 @@ horizontal(Ds) ->
 vertical(Ds) ->
     foldr1(fun above/2, Ds).
 
-foldr1(F, [H]) ->
+foldr1(_F, [H]) ->
     H;
 foldr1(F, [H | T]) ->
     F(H, foldr1(F, T)).
@@ -1000,10 +1018,19 @@ foldr1(F, [H | T]) ->
 %% Internal representation of strings; stores the field width and does
 %% not perform list concatenation until the text is requested. Strings
 %% are thus deep lists whose first element is the length of the string.
+%% Zerostrings are strings whose "official width" is zero, typically
+%% used for markup that is not supposed to affect the indentation.
 
 string(S) ->
     [strwidth(S) | S].
 
+zerostring(S) ->
+    [0 | S].
+
+concat([_ | []], [_ | _] = S) ->
+    S;
+concat([_ | _] = S, [_ | []]) ->
+    S;
 concat([L1 | S1], [L2 | S2]) ->
     [L1 + L2 | [S1 | S2]].
 
@@ -1013,8 +1040,10 @@ string_chars([_ | S]) ->
 width(S) ->
     hd(S).
 
-is_empty_string(S) ->
-    width(S) == 0.
+is_empty_string([_ | []]) ->
+    true;
+is_empty_string(_) ->
+    false.
 
 %% We need to use `strwidth' instead of list `length', to properly
 %% handle Tab characters in the text segments. Note that the width of

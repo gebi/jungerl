@@ -1,7 +1,7 @@
 %% =====================================================================
 %% Abstract Erlang syntax trees (`erl_parse'-compatible).
 %%
-%% Copyright (C) 1997-2002 Richard Carlsson
+%% Copyright (C) 1997-2004 Richard Carlsson
 %%
 %% This library is free software; you can redistribute it and/or modify
 %% it under the terms of the GNU Lesser General Public License as
@@ -35,13 +35,15 @@
 %% reverse is not true: abstract syntax trees can in general not be used
 %% as input to functions expecting an <code>erl_parse</code> tree.
 %% However, as long as an abstract syntax tree represents a correct
-%% Erlang program, the function <code>revert/1</code> should be able to
+%% Erlang program, the function <a
+%% href="#revert-1"><code>revert/1</code></a> should be able to
 %% transform it to the corresponding <code>erl_parse</code>
 %% representation.</p>
 %%
 %% <p>A recommended starting point for the first-time user is the
-%% documentation of the function <a
-%% href="#type-1"><code>type/1</code></a>.</p>
+%% documentation of the <a
+%% href="#type-syntaxTree"><code>syntaxTree()</code></a> data type, and
+%% the function <a href="#type-1"><code>type/1</code></a>.</p>
 %%
 %% <h3><b>NOTES:</b></h3>
 %%
@@ -67,8 +69,22 @@
 %% <code>erl_parse</code> "parse tree" representation is a subset of the
 %% <code>syntaxTree()</code> representation.
 %%
-%% <p>Every abstract syntax tree has a <em>type</em>, given by the
-%% function <a href="#type-1"><code>type/1</code></a>.</p>
+%% <p>Every abstract syntax tree node has a <em>type</em>, given by the
+%% function <a href="#type-1"><code>type/1</code></a>. Each node also
+%% has associated <em>attributes</em>; see <a
+%% href="#get_attrs-1"><code>get_attrs/1</code></a> for details. The
+%% functions <a href="#make_tree-2"><code>make_tree/2</code></a> and <a
+%% href="#subtrees-1"><code>subtrees/1</code></a> are generic
+%% constructor/decomposition functions for abstract syntax trees. The
+%% functions <a href="#abstract-1"><code>abstract/1</code></a> and <a
+%% href="#concrete-1"><code>concrete/1</code></a> convert between
+%% constant Erlang terms and their syntactic representations. The set of
+%% syntax tree nodes is extensible through the <a
+%% href="#tree-2"><code>tree/2</code></a> function.</p>
+%%
+%% <p>A syntax tree can be transformed to the <code>erl_parse</code>
+%% representation with the <a href="#revert-1"><code>revert/1</code></a>
+%% function.</p>
 %% 
 %% @end
 %% =====================================================================
@@ -164,6 +180,8 @@
 	 comment/2,
 	 comment_padding/1,
 	 comment_text/1,
+	 cond_expr/1,
+	 cond_expr_clauses/1,
 	 conjunction/1,
 	 conjunction_body/1,
 	 disjunction/1,
@@ -225,6 +243,8 @@
 	 prefix_expr/2,
 	 prefix_expr_argument/1,
 	 prefix_expr_operator/1,
+	 qualified_name/1,
+	 qualified_name_segments/1,
 	 query_expr/1,
 	 query_expr_body/1,
 	 receive_expr/1,
@@ -263,8 +283,16 @@
 	 text/1,
 	 text_string/1,
 	 try_expr/2,
+	 try_expr/3,
+	 try_expr/4,
+	 try_after_expr/2,
 	 try_expr_body/1,
 	 try_expr_clauses/1,
+	 try_expr_handlers/1,
+	 try_expr_after/1,
+	 class_qualifier/2,
+	 class_qualifier_argument/1,
+	 class_qualifier_body/1,
 	 tuple/1,
 	 tuple_elements/1,
 	 tuple_size/1,
@@ -298,6 +326,7 @@
 %% default set to the integer zero.
 %% =====================================================================
 
+-define(NO_UNUSED, true).
 
 %% =====================================================================
 %% Declarations of globally used internal data structures
@@ -380,33 +409,37 @@
 %%   <td>arity_qualifier</td>
 %%   <td>atom</td>
 %%   <td>attribute</td>
-%%   <td>binary</td>
 %%  </tr><tr>
+%%   <td>binary</td>
 %%   <td>binary_field</td>
 %%   <td>block_expr</td>
 %%   <td>case_expr</td>
+%%  </tr><tr>
 %%   <td>catch_expr</td>
 %%   <td>char</td>
-%%  </tr><tr>
+%%   <td>class_qualifier</td>
 %%   <td>clause</td>
+%%  </tr><tr>
 %%   <td>comment</td>
+%%   <td>cond_expr</td>
 %%   <td>conjunction</td>
 %%   <td>disjunction</td>
-%%   <td>eof_marker</td>
 %%  </tr><tr>
+%%   <td>eof_marker</td>
 %%   <td>error_marker</td>
 %%   <td>float</td>
 %%   <td>form_list</td>
+%%  </tr><tr>
 %%   <td>fun_expr</td>
 %%   <td>function</td>
-%%  </tr><tr>
 %%   <td>generator</td>
 %%   <td>if_expr</td>
+%%  </tr><tr>
 %%   <td>implicit_fun</td>
 %%   <td>infix_expr</td>
 %%   <td>integer</td>
-%%  </tr><tr>
 %%   <td>list</td>
+%%  </tr><tr>
 %%   <td>list_comp</td>
 %%   <td>macro</td>
 %%   <td>match_expr</td>
@@ -416,15 +449,17 @@
 %%   <td>operator</td>
 %%   <td>parentheses</td>
 %%   <td>prefix_expr</td>
-%%   <td>query_expr</td>
 %%  </tr><tr>
+%%   <td>qualified_name</td>
+%%   <td>query_expr</td>
 %%   <td>receive_expr</td>
 %%   <td>record_access</td>
+%%  </tr><tr>
 %%   <td>record_expr</td>
 %%   <td>record_field</td>
 %%   <td>record_index_expr</td>
-%%  </tr><tr>
 %%   <td>rule</td>
+%%  </tr><tr>
 %%   <td>size_qualifier</td>
 %%   <td>string</td>
 %%   <td>text</td>
@@ -453,8 +488,10 @@
 %% @see case_expr/2
 %% @see catch_expr/1
 %% @see char/1
+%% @see class_qualifier/2
 %% @see clause/3
 %% @see comment/2
+%% @see cond_expr/1
 %% @see conjunction/1
 %% @see disjunction/1
 %% @see eof_marker/0
@@ -477,6 +514,7 @@
 %% @see operator/1
 %% @see parentheses/1
 %% @see prefix_expr/2
+%% @see qualified_name/1
 %% @see query_expr/1
 %% @see receive_expr/3
 %% @see record_access/3
@@ -487,7 +525,7 @@
 %% @see size_qualifier/2
 %% @see string/1
 %% @see text/1
-%% @see try_expr/2
+%% @see try_expr/3
 %% @see tuple/1
 %% @see underscore/0
 %% @see variable/1
@@ -518,6 +556,7 @@ type(Node) ->
 	%% Composite types
 	{'case', _, _, _} -> case_expr;
 	{'catch', _, _} -> catch_expr;
+	{'cond', _, _} -> cond_expr;
 	{'fun', _, {clauses, _}} -> fun_expr;
 	{'fun', _, {function, _, _}} -> implicit_fun;
 	{'if', _, _} -> if_expr;
@@ -540,11 +579,15 @@ type(Node) ->
 	{record, _, _, _, _} -> record_expr;
 	{record, _, _, _} -> record_expr;
 	{record_field, _, _, _, _} -> record_access;
-	{record_field, _, _, _} -> record_access;
+	{record_field, _, _, _} ->
+	    case is_qualified_name(Node) of
+		true -> qualified_name;
+		false -> record_access
+	    end;
 	{record_index, _, _, _} -> record_index_expr;
 	{remote, _, _, _} -> module_qualifier;
 	{rule, _, _, _, _} -> rule;
-	{'try', _, _, _} -> try_expr;
+	{'try', _, _, _, _, _} -> try_expr;
 	{tuple, _, _} -> tuple;
 	_ ->
 	    erlang:fault({badarg, Node})
@@ -662,11 +705,13 @@ is_form(Node) ->
 %% @spec get_pos(Node::syntaxTree()) -> term()
 %%
 %% @doc Returns the position information associated with
-%% <code>Node</code>. This is usually a nonnegative integer, but may be
-%% any term. By default, all new tree nodes have their associated
-%% position information set to the integer zero.
+%% <code>Node</code>. This is usually a nonnegative integer (indicating
+%% the source code line number), but may be any term. By default, all
+%% new tree nodes have their associated position information set to the
+%% integer zero.
 %%
 %% @see set_pos/2
+%% @see get_attrs/1
 
 %% All `erl_parse' tree nodes are represented by tuples whose second
 %% field is the position information (usually an integer), *with the
@@ -751,10 +796,25 @@ set_com(Node, Com) ->
 %%
 %% @doc Returns the associated pre-comments of a node. This is a
 %% possibly empty list of abstract comments, in top-down textual order.
+%% When the code is formatted, pre-comments are typically displayed
+%% directly above the node. For example:
+%% <pre>
+%%         % Pre-comment of function
+%%         foo(X) -> {bar, X}.</pre>
+%%
+%% <p>If possible, the comment should be moved before any preceding
+%% separator characters on the same line. E.g.:
+%% <pre>
+%%         foo([X | Xs]) ->
+%%             % Pre-comment of 'bar(X)' node
+%%             [bar(X) | foo(Xs)];
+%%         ...</pre>
+%% (where the comment is moved before the "<code>[</code>").</p>
 %%
 %% @see comment/2
 %% @see set_precomments/2
 %% @see get_postcomments/1
+%% @see get_attrs/1
 
 get_precomments(#tree{attr = Attr}) -> get_precomments_1(Attr);
 get_precomments(#wrapper{attr = Attr}) -> get_precomments_1(Attr);
@@ -776,6 +836,9 @@ get_precomments_1(#attr{com = #com{pre = Cs}}) -> Cs.
 %% @see get_precomments/1
 %% @see add_precomments/2
 %% @see set_postcomments/2
+%% @see copy_comments/2
+%% @see remove_comments/1
+%% @see join_comments/2
 
 set_precomments(Node, Cs) ->
     case Node of
@@ -808,6 +871,7 @@ set_precomments_1(#attr{com = Com} = Attr, Cs) ->
 %% @see get_precomments/1
 %% @see set_precomments/2
 %% @see add_postcomments/2
+%% @see join_comments/2
 
 add_precomments(Cs, Node) ->
     case Node of
@@ -830,10 +894,25 @@ add_precomments_1(Cs, #attr{com = Com} = Attr) ->
 %%
 %% @doc Returns the associated post-comments of a node. This is a
 %% possibly empty list of abstract comments, in top-down textual order.
+%% When the code is formatted, post-comments are typically displayed to
+%% the right of and/or below the node. For example:
+%% <pre>
+%%         {foo, X, Y}     % Post-comment of tuple</pre>
+%%
+%% <p>If possible, the comment should be moved past any following
+%% separator characters on the same line, rather than placing the
+%% separators on the following line. E.g.:
+%% <pre>
+%%         foo([X | Xs], Y) ->
+%%             foo(Xs, bar(X));     % Post-comment of 'bar(X)' node
+%%          ...</pre>
+%% (where the comment is moved past the rightmost "<code>)</code>" and
+%% the "<code>;</code>").</p>
 %%
 %% @see comment/2
 %% @see set_postcomments/2
 %% @see get_precomments/1
+%% @see get_attrs/1
 
 get_postcomments(#tree{attr = Attr}) -> get_postcomments_1(Attr);
 get_postcomments(#wrapper{attr = Attr}) -> get_postcomments_1(Attr);
@@ -855,6 +934,9 @@ get_postcomments_1(#attr{com = #com{post = Cs}}) -> Cs.
 %% @see get_postcomments/1
 %% @see add_postcomments/2
 %% @see set_precomments/2
+%% @see copy_comments/2
+%% @see remove_comments/1
+%% @see join_comments/2
 
 set_postcomments(Node, Cs) ->
     case Node of
@@ -887,6 +969,7 @@ set_postcomments_1(#attr{com = Com} = Attr, Cs) ->
 %% @see get_postcomments/1
 %% @see set_postcomments/2
 %% @see add_precomments/2
+%% @see join_comments/2
 
 add_postcomments(Cs, Node) ->
     case Node of
@@ -916,6 +999,7 @@ add_postcomments_1(Cs, #attr{com = Com} = Attr) ->
 %%
 %% @see get_precomments/1
 %% @see get_postcomments/1
+%% @see remove_comments/1
 
 has_comments(#tree{attr = Attr}) ->
     case Attr#attr.com of
@@ -970,8 +1054,8 @@ remove_comments(Node) ->
 %% @see comment/2
 %% @see get_precomments/1
 %% @see get_postcomments/1
-%% @see set_postcomments/2
 %% @see set_precomments/2
+%% @see set_postcomments/2
 
 copy_comments(Source, Target) ->
     set_com(Target, get_com(Source)).
@@ -988,6 +1072,12 @@ copy_comments(Source, Target) ->
 %% <code>add_postcomments(get_postcomments(Source),
 %% add_precomments(get_precomments(Source), Target))</code>, but
 %% potentially more efficient.</p>
+%%
+%% @see comment/2
+%% @see get_precomments/1
+%% @see get_postcomments/1
+%% @see add_precomments/2
+%% @see add_postcomments/2
 
 join_comments(Source, Target) ->
     add_postcomments(
@@ -1003,6 +1093,7 @@ join_comments(Source, Target) ->
 %% annotations may be any terms.
 %%
 %% @see set_ann/2
+%% @see get_attrs/1
 
 get_ann(#tree{attr = Attr}) -> Attr#attr.ann;
 get_ann(#wrapper{attr = Attr}) -> Attr#attr.ann;
@@ -1081,7 +1172,13 @@ copy_ann(Source, Target) ->
 %% @doc Returns a representation of the attributes associated with a
 %% syntax tree node. The attributes are all the extra information that
 %% can be attached to a node. Currently, this includes position
-%% information, source code comments, and user annotations.
+%% information, source code comments, and user annotations. The result
+%% of this function cannot be inspected directly; only attached to
+%% another node (cf. <code>set_attrs/2</code>).
+%%
+%% <p>For accessing individual attributes, see <code>get_pos/1</code>,
+%% <code>get_ann/1</code>, <code>get_precomments/1</code> and
+%% <code>get_postcomments/1</code>.</p>
 %%
 %% @type syntaxTreeAttributes(). This is an abstract representation of
 %% syntax tree node attributes; see the function <a
@@ -1108,7 +1205,6 @@ get_attrs(Node) -> #attr{pos = get_pos(Node),
 %% <code>Attributes</code>.
 %%
 %% @see get_attrs/1
-%% @see set_attrs/2
 %% @see copy_attrs/2
 
 set_attrs(Node, Attr) ->
@@ -1731,21 +1827,11 @@ string_literal(Node) ->
 atom(Name) when atom(Name) ->
     tree(atom, Name);
 atom(Name) ->
-    tree(atom, my_list_to_atom(Name)).
+    tree(atom, list_to_atom(Name)).
 
 revert_atom(Node) ->
     Pos = get_pos(Node),
     {atom, Pos, atom_value(Node)}.
-
-my_list_to_atom(Name) when is_list(Name), is_atom(hd(Name)) ->
-  my_list_to_atom(Name, []);
-my_list_to_atom(Name) ->
-  list_to_atom(Name).
-  
-my_list_to_atom([Last], Acc) ->
-  list_to_atom(Acc ++ atom_to_list(Last));
-my_list_to_atom([Head | Tail], Acc) ->
-  my_list_to_atom(Tail, Acc ++ atom_to_list(Head) ++ ".").
 
 
 %% =====================================================================
@@ -2531,7 +2617,7 @@ binary_field_types(Node) ->
 
 binary_field_size(Node) ->
     case unwrap(Node) of
-	{bin_element, _, Body, Size, _} ->
+	{bin_element, _, _, Size, _} ->
 	    if Size == default ->
 		    none;
 	       true ->
@@ -2780,11 +2866,15 @@ attribute(Name) ->
 %%
 %% `erl_parse' representation:
 %%
+%% {attribute, Pos, module, {Name,Vars}}
 %% {attribute, Pos, module, Name}
 %%
-%%	Name = atom()
+%%	Name = atom() | [atom()]
+%%	Vars = [atom()]
 %%
-%%	Representing `-module(Name).'.
+%%	Representing `-module(M).', or `-module(M, Vs).', where M is
+%%	`A1.A2.....An' if Name is `[A1, A2, ..., An]', and Vs is `[V1,
+%%	..., Vm]' if Vars is `[V1, ..., Vm]'.
 %%
 %% {attribute, Pos, export, Exports}
 %%
@@ -2795,11 +2885,12 @@ attribute(Name) ->
 %%
 %% {attribute, Pos, import, Imports}
 %%
-%%	Imports = {atom(), Pairs}
+%%	Imports = {atom(), Pairs} | [atom()]
 %%	Pairs = [{atom(), integer()]
 %%
 %%	Representing `-import(Module, [A1/N1, ..., Ak/Nk]).', if
-%%	`Imports' is `{Module, [{A1, N1}, ..., {Ak, Nk}]}'.
+%%	`Imports' is `{Module, [{A1, N1}, ..., {Ak, Nk}]}', or
+%%	`-import(A1.....An).', if `Imports' is `[A1, ..., An]'.
 %%
 %% {attribute, Pos, file, Position}
 %%
@@ -2844,12 +2935,28 @@ revert_attribute(Node) ->
 
 %% All the checking makes this part a bit messy:
 
-revert_attribute_1(module, [A], Pos, Node) ->
-    case type(A) of
-	atom ->
-	    {attribute, Pos, module, concrete(A)};
-	_ ->
-	    Node
+revert_attribute_1(module, [M], Pos, Node) ->
+    case revert_module_name(M) of
+	{ok, A} -> 
+	    {attribute, Pos, module, A};
+	error -> Node
+    end;
+revert_attribute_1(module, [M, List], Pos, Node) ->
+    Vs = case is_list_skeleton(List) of
+	     true ->
+		 case is_proper_list(List) of
+		     true ->
+			 fold_variable_names(list_elements(List));
+		     false ->
+			 Node
+		 end;
+	     false ->
+		 Node
+	 end,
+    case revert_module_name(M) of
+	{ok, A} -> 
+	    {attribute, Pos, module, {A, Vs}};
+	error -> Node
     end;
 revert_attribute_1(export, [List], Pos, Node) ->
     case is_list_skeleton(List) of
@@ -2863,6 +2970,11 @@ revert_attribute_1(export, [List], Pos, Node) ->
 	    end;
 	false ->
 	    Node
+    end;
+revert_attribute_1(import, [M], Pos, Node) ->
+    case revert_module_name(M) of
+	{ok, A} -> {attribute, Pos, import, A};
+	error -> Node
     end;
 revert_attribute_1(import, [A, List], Pos, Node) ->
     case type(A) of
@@ -2911,10 +3023,21 @@ revert_attribute_1(record, [A, Tuple], Pos, Node) ->
 	_ ->
 	    Node
     end;
-revert_attribute_1(N, [T], Pos, Node) ->
+revert_attribute_1(N, [T], Pos, _) ->
     {attribute, Pos, N, concrete(T)};
 revert_attribute_1(_, _, _, Node) ->
     Node.
+
+revert_module_name(A) ->
+    case type(A) of
+	atom ->
+	    {ok, concrete(A)};
+	qualified_name ->
+	    Ss = qualified_name_segments(A),
+	    {ok, [concrete(S) || S <- Ss]};
+	_ ->
+	    error
+    end.
 
 
 %% =====================================================================
@@ -2951,20 +3074,40 @@ attribute_arguments(Node) ->
 	{attribute, Pos, Name, Data} ->
 	    case Name of
 		module ->
-		    [set_pos(atom(Data), Pos)];
+		    {M1, Vs} =
+			case Data of
+			    {M0, Vs0} ->
+				{M0, unfold_variable_names(Vs0, Pos)};
+			    M0 ->
+				{M0, none}
+			end,
+		    M2 = if list(M1) ->
+				 qualified_name([atom(A) || A <- M1]);
+			    true ->
+				 atom(M1)
+			 end,
+		    M = set_pos(M2, Pos),
+		    if Vs == none -> [M];
+		       true -> [M, set_pos(list(Vs), Pos)]
+		    end;
 		export ->
 		    [set_pos(
 		       list(unfold_function_names(Data, Pos)),
 		       Pos)];
 		import ->
 		    case Data of
-		       {Module, Imports} ->
-		           [set_pos(atom(Module), Pos),
-		           set_pos(
-		              list(unfold_function_names(Imports, Pos)),
-		           Pos)];
-		       _ ->
-		           [set_pos(atom(Data), Pos)]
+			{Module, Imports} ->
+			    [if list(Module) ->
+				     qualified_name([atom(A)
+						     || A <- Module]);
+				true ->
+				     set_pos(atom(Module), Pos)
+			     end,
+			     set_pos(
+			       list(unfold_function_names(Imports, Pos)),
+			       Pos)];
+			_ ->
+			    [qualified_name([atom(A) || A <- Data])]
 		    end;
 		file ->
 		    {File, Line} = Data,
@@ -3097,6 +3240,53 @@ module_qualifier_body(Node) ->
 	    Body;
 	Node1 ->
 	    (data(Node1))#module_qualifier.body
+    end.
+
+
+%% =====================================================================
+%% @spec qualified_name(Segments::[syntaxTree()]) -> syntaxTree()
+%%
+%% @doc Creates an abstract qualified name. The result represents
+%% "<code><em>S1</em>.<em>S2</em>. ... .<em>Sn</em></code>", if
+%% <code>Segments</code> is <code>[S1, S2, ..., Sn]</code>.
+%%
+%% @see qualified_name_segments/1
+
+%% type(Node) = qualified_name
+%% data(Node) = [syntaxTree()]
+%%
+%% `erl_parse' representation:
+%%
+%% {record_field, Pos, Node, Node}
+%%
+%%	Node = {atom, Pos, Value} | {record_field, Pos, Node, Node}
+%%
+%% Note that if not all leaf subnodes are (abstract) atoms, then Node
+%% represents a Mnemosyne query record field access ('record_access');
+%% see type/1 for details.
+
+qualified_name(Segments) ->
+    tree(qualified_name, Segments).
+
+revert_qualified_name(Node) ->
+    Pos = get_pos(Node),
+    fold_qualified_name(qualified_name_segments(Node), Pos).
+
+
+%% =====================================================================
+%% @spec qualified_name_segments(syntaxTree()) -> [syntaxTree()]
+%%
+%% @doc Returns the list of name segments of a
+%% <code>qualified_name</code> node.
+%%
+%% @see qualified_name/1
+
+qualified_name_segments(Node) ->
+    case unwrap(Node) of
+	{record_field, _, _, _} = Node1 ->
+	    unfold_qualified_name(Node1);
+	Node1 ->
+	    data(Node1)
     end.
 
 
@@ -3348,6 +3538,30 @@ revert_clause_disjunction(D) ->
 	     [E]
      end
      || E <- disjunction_body(D)].
+
+revert_try_clause(Node) ->
+    fold_try_clause(revert_clause(Node)).
+
+fold_try_clause({clause, Pos, [P], Guard, Body}) ->
+    P1 = case type(P) of
+	     class_qualifier ->
+		 {tuple, Pos, [class_qualifier_argument(P),
+			       class_qualifier_body(P),
+			       {var, Pos, '_'}]};
+	     _ ->
+		 {tuple, Pos, [{atom, Pos, throw}, P, {var, Pos, '_'}]}
+	 end,
+    {clause, Pos, [P1], Guard, Body}.
+
+unfold_try_clauses(Cs) ->
+    [unfold_try_clause(C) || C <- Cs].
+
+unfold_try_clause({clause, Pos, [{tuple, _, [{atom,_,throw}, V, _]}],
+		   Guard, Body}) ->
+    {clause, Pos, [V], Guard, Body};
+unfold_try_clause({clause, Pos, [{tuple, _, [C, V, _]}],
+		   Guard, Body}) ->
+    {clause, Pos, [class_qualifier(C, V)], Guard, Body}.
 
 
 %% =====================================================================
@@ -3952,12 +4166,12 @@ record_access(Argument, Field) ->
 %%	    Type = none | syntaxTree()
 %%
 %% @doc Creates an abstract record field access expression. If
-%% <code>Type</code> is <code>none</code>, the result represents
-%% simply "<code><em>Argument</em>.<em>Field</em></code>", otherwise
-%% it represents
-%% "<code><em>Argument</em>#<em>Type</em>.<em>Field</em></code>". (The
-%% first case is a special form only allowed within Mnemosyne
-%% queries.)
+%% <code>Type</code> is not <code>none</code>, the result represents
+%% "<code><em>Argument</em>#<em>Type</em>.<em>Field</em></code>".
+%%
+%% <p>If <code>Type</code> is <code>none</code>, the result represents
+%% "<code><em>Argument</em>.<em>Field</em></code>". This is a special
+%% form only allowed within Mnemosyne queries.</p>
 %%
 %% @see record_access/2
 %% @see record_access_argument/1
@@ -4722,6 +4936,7 @@ if_expr_clauses(Node) ->
 %% @see case_expr_argument/1
 %% @see clause/3
 %% @see if_expr/1
+%% @see cond_expr/1
 
 -record(case_expr, {argument, clauses}).
 
@@ -4783,6 +4998,65 @@ case_expr_clauses(Node) ->
 	    Clauses;
 	Node1 ->
 	    (data(Node1))#case_expr.clauses
+    end.
+
+
+%% =====================================================================
+%% @spec cond_expr(Clauses::[syntaxTree()]) -> syntaxTree()
+%%
+%% @doc Creates an abstract cond-expression. If <code>Clauses</code> is
+%% <code>[C1, ..., Cn]</code>, the result represents "<code>cond
+%% <em>C1</em>; ...; <em>Cn</em> end</code>". More exactly, if each
+%% <code>Ci</code> represents "<code>() <em>Ei</em> ->
+%% <em>Bi</em></code>", then the result represents "<code>cond
+%% <em>E1</em> -> <em>B1</em>; ...; <em>En</em> -> <em>Bn</em>
+%% end</code>".
+%%
+%% @see cond_expr_clauses/1
+%% @see clause/3
+%% @see case_expr/2
+
+%% type(Node) = cond_expr
+%% data(Node) = Clauses
+%%
+%%	Clauses = [syntaxTree()]
+%%
+%% `erl_parse' representation:
+%%
+%% {'cond', Pos, Clauses}
+%%
+%%	Clauses = [Clause] \ []
+%%	Clause = {clause, ...}
+%%
+%%	See `clause' for documentation on `erl_parse' clauses.
+
+cond_expr(Clauses) ->
+    tree(cond_expr, Clauses).
+
+revert_cond_expr(Node) ->
+    Pos = get_pos(Node),
+    Clauses = [revert_clause(C) || C <- cond_expr_clauses(Node)],
+    {'cond', Pos, Clauses}.
+
+
+%% =====================================================================
+%% cond_expr_clauses(Node) -> Clauses
+%%
+%%	    Node = syntaxTree()
+%%	    Clauses = [syntaxTree()]
+%%	    type(Node) = cond_expr
+%%
+%% @doc Returns the list of clause subtrees of a <code>cond_expr</code>
+%% node.
+%%
+%% @see cond_expr/1
+
+cond_expr_clauses(Node) ->
+    case unwrap(Node) of
+	{'cond', _, Clauses} ->
+	    Clauses;
+	Node1 ->
+	    data(Node1)
     end.
 
 
@@ -4937,65 +5211,118 @@ receive_expr_action(Node) ->
 
 
 %% =====================================================================
-%% @spec try_expr(Body::syntaxTree(), Clauses::[syntaxTree()]) ->
+%% @spec try_expr(Body::syntaxTree(), Handlers::[syntaxTree()]) ->
+%%           syntaxTree()
+%% @equiv try_expr(Body, [], Handlers)
+
+try_expr(Body, Handlers) ->
+    try_expr(Body, [], Handlers).
+
+
+%% =====================================================================
+%% @spec try_expr(Body::syntaxTree(), Clauses::[syntaxTree()],
+%%           Handlers::[syntaxTree()]) -> syntaxTree()
+%% @equiv try_expr(Body, Clauses, Handlers, [])
+
+try_expr(Body, Clauses, Handlers) ->
+    try_expr(Body, Clauses, Handlers, []).
+
+
+%% =====================================================================
+%% @spec try_after_expr(Body::syntaxTree(), After::[syntaxTree()]) ->
+%%           syntaxTree()
+%% @equiv try_expr(Body, [], [], After)
+
+try_after_expr(Body, After) ->
+    try_expr(Body, [], [], After).
+
+
+%% =====================================================================
+%% @spec try_expr(Body::[syntaxTree()], Clauses::[syntaxTree()],
+%%                Handlers::[syntaxTree()], After::[syntaxTree()]) ->
 %%           syntaxTree()
 %%
-%% @doc Creates an abstract try-expression. If <code>Clauses</code> is
-%% <code>[C1, ..., Cn]</code>, the result represents "<code>try
-%% <em>Body</em> catch <em>C1</em>; ...; <em>Cn</em> end</code>". More
-%% exactly, if each <code>Ci</code> represents "<code>(<em>Pi</em>)
-%% <em>Gi</em> -> <em>Bi</em></code>", then the result represents
-%% "<code>try <em>Body</em> catch <em>P1</em> <em>G1</em> ->
-%% <em>B1</em>; ...; <em>Pn</em> <em>Gn</em> -> <em>Bn</em> end</code>".
-%%
-%% <p>Note: try-expressions are not yet part of the Erlang language, and
-%% the syntax is not final.</p>
+%% @doc Creates an abstract try-expression. If <code>Body</code> is
+%% <code>[B1, ..., Bn]</code>, <code>Clauses</code> is <code>[C1, ...,
+%% Cj]</code>, <code>Handlers</code> is <code>[H1, ..., Hk]</code>, and
+%% <code>After</code> is <code>[A1, ..., Am]</code>, the result
+%% represents "<code>try <em>B1</em>, ..., <em>Bn</em> of <em>C1</em>;
+%% ...; <em>Cj</em> catch <em>H1</em>; ...; <em>Hk</em> after
+%% <em>A1</em>, ..., <em>Am</em> end</code>". More exactly, if each
+%% <code>Ci</code> represents "<code>(<em>CPi</em>) <em>CGi</em> ->
+%% <em>CBi</em></code>", and each <code>Hi</code> represents
+%% "<code>(<em>HPi</em>) <em>HGi</em> -> <em>HBi</em></code>", then the
+%% result represents "<code>try <em>B1</em>, ..., <em>Bn</em> of
+%% <em>CP1</em> <em>CG1</em> -> <em>CB1</em>; ...; <em>CPj</em>
+%% <em>CGj</em> -> <em>CBj</em> catch <em>HP1</em> <em>HG1</em> ->
+%% <em>HB1</em>; ...; <em>HPk</em> <em>HGk</em> -> <em>HBk</em> after
+%% <em>A1</em>, ..., <em>Am</em> end</code>"; cf.
+%% <code>case_expr/2</code>. If <code>Clauses</code> is the empty list,
+%% the <code>of ...</code> section is left out. If <code>After</code> is
+%% the empty list, the <code>after ...</code> section is left out. If
+%% <code>Handlers</code> is the empty list, and <code>After</code> is
+%% nonempty, the <code>catch ...</code> section is left out.
 %%
 %% @see try_expr_body/1
 %% @see try_expr_clauses/1
+%% @see try_expr_handlers/1
+%% @see try_expr_after/1
+%% @see try_expr/2
+%% @see try_expr/3
+%% @see try_after_expr/2
 %% @see clause/3
+%% @see class_qualifier/2
 %% @see case_expr/2
 
--record(try_expr, {body, clauses}).
+-record(try_expr, {body, clauses, handlers, 'after'}).
 
 %% type(Node) = try_expr
 %% data(Node) = #try_expr{body :: Body,
-%%			  clauses :: Clauses}
+%%			  clauses :: Clauses,
+%%			  handlers :: Clauses,
+%%			  after :: Body}
 %%
 %%	Body = syntaxTree()
 %%	Clauses = [syntaxTree()]
 %%
 %% `erl_parse' representation:
 %%
-%% {'try', Pos, Body, Clauses}
+%% {'try', Pos, Body, Clauses, Handlers, After}
 %%
-%%	Body = erl_parse()
-%%	Clauses = [Clause] \ []
+%%	Body = [erl_parse()]
+%%	Clauses = [Clause]
+%%	Handlers = [Clause] \ []
 %%	Clause = {clause, ...}
+%%	After = [erl_parse()]
 %%
 %%	See `clause' for documentation on `erl_parse' clauses.
 
-try_expr(Body, Clauses) ->
+try_expr(Body, Clauses, Handlers, After) ->
     tree(try_expr, #try_expr{body = Body,
-			     clauses = Clauses}).
+			     clauses = Clauses,
+			     handlers = Handlers,
+			     'after' = After}).
 
 revert_try_expr(Node) ->
     Pos = get_pos(Node),
     Body = try_expr_body(Node),
     Clauses = [revert_clause(C) || C <- try_expr_clauses(Node)],
-    {'try', Pos, Body, Clauses}.
+    Handlers = [revert_try_clause(C) || C <- try_expr_handlers(Node)],
+    After = try_expr_after(Node),
+    {'try', Pos, Body, Clauses, Handlers, After}.
 
 
 %% =====================================================================
-%% @spec try_expr_body(syntaxTree()) -> syntaxTree()
+%% @spec try_expr_body(syntaxTree()) -> [syntaxTree()]
 %%
-%% @doc Returns the body subtree of a <code>try_expr</code> node.
+%% @doc Returns the list of body subtrees of a <code>try_expr</code>
+%% node.
 %%
-%% @see try_expr/2
+%% @see try_expr/4
 
 try_expr_body(Node) ->
     case unwrap(Node) of
-	{'try', _, Body, _} ->
+	{'try', _, Body, _, _, _} ->
 	    Body;
 	Node1 ->
 	    (data(Node1))#try_expr.body
@@ -5003,20 +5330,102 @@ try_expr_body(Node) ->
 
 
 %% =====================================================================
-%% @spec try_expr_clauses(syntaxTree()) -> [syntaxTree()]
+%% @spec try_expr_clauses(Node::syntaxTree()) -> [syntaxTree()]
 %%
-%% @doc Returns the list of clause subtrees of a <code>try_expr</code>
-%% node.
+%% @doc Returns the list of case-clause subtrees of a
+%% <code>try_expr</code> node. If <code>Node</code> represents
+%% "<code>try <em>Body</em> catch <em>H1</em>; ...; <em>Hn</em>
+%% end</code>", the result is the empty list.
 %%
-%% @see try_expr/2
+%% @see try_expr/4
 
 try_expr_clauses(Node) ->
     case unwrap(Node) of
-	{'try', _, _, Clauses} ->
+	{'try', _, _, Clauses, _, _} ->
 	    Clauses;
 	Node1 ->
 	    (data(Node1))#try_expr.clauses
     end.
+
+
+%% =====================================================================
+%% @spec try_expr_handlers(syntaxTree()) -> [syntaxTree()]
+%%
+%% @doc Returns the list of handler-clause subtrees of a
+%% <code>try_expr</code> node.
+%%
+%% @see try_expr/4
+
+try_expr_handlers(Node) ->
+    case unwrap(Node) of
+	{'try', _, _, _, Handlers, _} ->
+	    unfold_try_clauses(Handlers);
+	Node1 ->
+	    (data(Node1))#try_expr.handlers
+    end.
+
+
+%% =====================================================================
+%% @spec try_expr_after(syntaxTree()) -> [syntaxTree()]
+%%
+%% @doc Returns the list of "after" subtrees of a <code>try_expr</code>
+%% node.
+%%
+%% @see try_expr/4
+
+try_expr_after(Node) ->
+    case unwrap(Node) of
+	{'try', _, _, _, _, After} ->
+	    After;
+	Node1 ->
+	    (data(Node1))#try_expr.'after'
+    end.
+
+
+%% =====================================================================
+%% @spec class_qualifier(Class::syntaxTree(), Body::syntaxTree()) ->
+%%           syntaxTree()
+%%
+%% @doc Creates an abstract class qualifier. The result represents
+%% "<code><em>Class</em>:<em>Body</em></code>".
+%%
+%% @see class_qualifier_argument/1
+%% @see class_qualifier_body/1
+%% @see try_expr/4
+
+-record(class_qualifier, {class, body}).
+
+%% type(Node) = class_qualifier
+%% data(Node) = #class_qualifier{class :: Class, body :: Body}
+%%
+%%	Class = Body = syntaxTree()
+
+class_qualifier(Class, Body) ->
+    tree(class_qualifier,
+	 #class_qualifier{class = Class, body = Body}).
+
+
+%% =====================================================================
+%% @spec class_qualifier_argument(syntaxTree()) -> syntaxTree()
+%%
+%% @doc Returns the argument (the class) subtree of a
+%% <code>class_qualifier</code> node.
+%%
+%% @see class_qualifier/1
+
+class_qualifier_argument(Node) ->
+    (data(Node))#class_qualifier.class.
+
+
+%% =====================================================================
+%% @spec class_qualifier_body(syntaxTree()) -> syntaxTree()
+%%
+%% @doc Returns the body subtree of a <code>class_qualifier</code> node.
+%%
+%% @see class_qualifier/1
+
+class_qualifier_body(Node) ->
+    (data(Node))#class_qualifier.body.
 
 
 %% =====================================================================
@@ -5120,7 +5529,7 @@ implicit_fun_name(Node) ->
 %%
 %%	Clauses = [syntaxTree()]
 %%
-%%	(See `function' for notes on why the arity is not stored.)
+%%	(See `function' for notes; e.g. why the arity is not stored.)
 %%
 %% `erl_parse' representation:
 %%
@@ -5391,7 +5800,7 @@ concrete(Node) ->
 					   {value, concrete(F), []}
 				   end, [], true),
 	    B;
-    	Type ->
+    	_ ->
 	    erlang:fault({badarg, Node})
     end.
 
@@ -5446,28 +5855,42 @@ is_literal(T) ->
 %% @doc Returns an <code>erl_parse</code>-compatible representation of a
 %% syntax tree, if possible. If <code>Tree</code> represents a
 %% well-formed Erlang program or expression, the conversion should work
-%% without problems. There is however currently no way of detecting
-%% whether the operation succeeded; if it did not, then one or more
-%% subtrees of the result are not compatible with
-%% <code>erl_parse</code>.
+%% without problems. Typically, <code>is_tree/1</code> yields
+%% <code>true</code> if conversion failed (i.e., the result is still an
+%% abstract syntax tree), and <code>false</code> otherwise.
+%%
+%% <p>The <code>is_tree/1</code> test is not completely foolproof. For a
+%% few special node types (e.g. <code>arity_qualifier</code>), if such a
+%% node occurs in a context where it is not expected, it will be left
+%% unchanged as a non-reverted subtree of the result. This can only
+%% happen if <code>Tree</code> does not actually represent legal Erlang
+%% code.</p>
 %%
 %% @see revert_forms/1
 %% @see erl_parse
 
 revert(Node) ->
-    case is_leaf(Node) of
-	true ->
-	    revert_root(Node);
+    case is_tree(Node) of
 	false ->
-	    %% First revert the subtrees, where possible. (Sometimes,
-	    %% subtrees cannot be reverted out of context, and the real
-	    %% work will be done when the parent node is reverted.)
-	    Gs = [[revert(X) || X <- L] || L <- subtrees(Node)],
-	    
-	    %% Then reconstruct the node from the reverted parts, and
-	    %% revert the node itself.
-	    Node1 = update_tree(Node, Gs),
-	    revert_root(Node1)
+	    %% Just remove any wrapper. `erl_parse' nodes never contain
+	    %% abstract syntax tree nodes as subtrees.
+	    unwrap(Node);
+	true ->
+	    case is_leaf(Node) of
+		true ->
+		    revert_root(Node);
+		false ->
+		    %% First revert the subtrees, where possible.
+		    %% (Sometimes, subtrees cannot be reverted out of
+		    %% context, and the real work will be done when the
+		    %% parent node is reverted.)
+		    Gs = [[revert(X) || X <- L] || L <- subtrees(Node)],
+
+		    %% Then reconstruct the node from the reverted
+		    %% parts, and revert the node itself.
+		    Node1 = update_tree(Node, Gs),
+		    revert_root(Node1)
+	    end
     end.
 
 %% Note: The concept of "compatible root node" is not strictly defined.
@@ -5477,100 +5900,97 @@ revert(Node) ->
 %% compatible.
 
 revert_root(Node) ->
-    case is_tree(Node) of
-	false ->
-	    %% Just remove any wrapper. `erl_parse' nodes never contain
-	    %% abstract syntax tree nodes as subtrees.
-	    unwrap(Node);
-	true ->
-	    case type(Node) of
-		application ->
-		    revert_application(Node);
-		atom ->
-		    revert_atom(Node);
-		attribute ->
-		    revert_attribute(Node);
-		binary ->
-		    revert_binary(Node);
-		binary_field ->
-		    revert_binary_field(Node);
-		block_expr ->
-		    revert_block_expr(Node);
-		case_expr ->
-		    revert_case_expr(Node);
-		catch_expr ->
-		    revert_catch_expr(Node);
-		char ->
-		    revert_char(Node);
-		clause ->
-		    revert_clause(Node);
-		eof_marker ->
-		    revert_eof_marker(Node);
-		error_marker ->
-		    revert_error_marker(Node);
-		float ->
-		    revert_float(Node);
-		fun_expr ->
-		    revert_fun_expr(Node);
-		function ->
-		    revert_function(Node);
-		generator ->
-		    revert_generator(Node);
-		if_expr ->
-		    revert_if_expr(Node);
-		implicit_fun ->
-		    revert_implicit_fun(Node);
-		infix_expr ->
-		    revert_infix_expr(Node);
-		integer ->
-		    revert_integer(Node);
-		list ->
-		    revert_list(Node);
-		list_comp ->
-		    revert_list_comp(Node);
-		match_expr ->
-		    revert_match_expr(Node);
-		module_qualifier ->
-		    revert_module_qualifier(Node);
-		nil ->
-		    revert_nil(Node);
-		parentheses ->
-		    revert_parentheses(Node);
-		prefix_expr ->
-		    revert_prefix_expr(Node);
-		query_expr ->
-		    revert_query_expr(Node);
-		receive_expr ->
-		    revert_receive_expr(Node);
-		record_access ->
-		    revert_record_access(Node);
-		record_expr ->
-		    revert_record_expr(Node);
-		record_index_expr ->
-		    revert_record_index_expr(Node);
-		rule ->
-		    revert_rule(Node);
-		string ->
-		    revert_string(Node);
-		try_expr ->
-		    revert_try_expr(Node);
-		tuple ->
-		    revert_tuple(Node);
-		underscore ->
-		    revert_underscore(Node);
-		variable ->
-		    revert_variable(Node);
-		warning_marker ->
-		    revert_warning_marker(Node);
-		_ ->
-		    %% Non-revertible new-form node
-		    Node
-	    end
+    case type(Node) of
+	application ->
+	    revert_application(Node);
+	atom ->
+	    revert_atom(Node);
+	attribute ->
+	    revert_attribute(Node);
+	binary ->
+	    revert_binary(Node);
+	binary_field ->
+	    revert_binary_field(Node);
+	block_expr ->
+	    revert_block_expr(Node);
+	case_expr ->
+	    revert_case_expr(Node);
+	catch_expr ->
+	    revert_catch_expr(Node);
+	char ->
+	    revert_char(Node);
+	clause ->
+	    revert_clause(Node);
+	cond_expr ->
+	    revert_cond_expr(Node);
+	eof_marker ->
+	    revert_eof_marker(Node);
+	error_marker ->
+	    revert_error_marker(Node);
+	float ->
+	    revert_float(Node);
+	fun_expr ->
+	    revert_fun_expr(Node);
+	function ->
+	    revert_function(Node);
+	generator ->
+	    revert_generator(Node);
+	if_expr ->
+	    revert_if_expr(Node);
+	implicit_fun ->
+	    revert_implicit_fun(Node);
+	infix_expr ->
+	    revert_infix_expr(Node);
+	integer ->
+	    revert_integer(Node);
+	list ->
+	    revert_list(Node);
+	list_comp ->
+	    revert_list_comp(Node);
+	match_expr ->
+	    revert_match_expr(Node);
+	module_qualifier ->
+	    revert_module_qualifier(Node);
+	nil ->
+	    revert_nil(Node);
+	parentheses ->
+	    revert_parentheses(Node);
+	prefix_expr ->
+	    revert_prefix_expr(Node);
+	qualified_name ->
+	    revert_qualified_name(Node);
+	query_expr ->
+	    revert_query_expr(Node);
+	receive_expr ->
+	    revert_receive_expr(Node);
+	record_access ->
+	    revert_record_access(Node);
+	record_expr ->
+	    revert_record_expr(Node);
+	record_index_expr ->
+	    revert_record_index_expr(Node);
+	rule ->
+	    revert_rule(Node);
+	string ->
+	    revert_string(Node);
+	try_expr ->
+	    revert_try_expr(Node);
+	tuple ->
+	    revert_tuple(Node);
+	underscore ->
+	    revert_underscore(Node);
+	variable ->
+	    revert_variable(Node);
+	warning_marker ->
+	    revert_warning_marker(Node);
+	_ ->
+	    %% Non-revertible new-form node
+	    Node
     end.
 
 
 %% =====================================================================
-%% @spec revert_forms(Forms) -> error | [erl_parse()]
+%% @spec revert_forms(Forms) -> [erl_parse()]
 %%
 %%	    Forms = syntaxTree() | [syntaxTree()]
 %%
@@ -5578,10 +5998,9 @@ revert_root(Node) ->
 %% be given either as a <code>form_list</code> syntax tree (possibly
 %% nested), or as a list of "program form" syntax trees. If successful,
 %% the corresponding flat list of <code>erl_parse</code>-compatible
-%% syntax trees is returned (cf. <code>revert/1</code>), otherwise, if
-%% some program form could not be reverted, <code>error</code> is
-%% returned. Standalone comments in the sequence of forms are
-%% automatically ignored and discarded.
+%% syntax trees is returned (cf. <code>revert/1</code>). If some program
+%% form could not be reverted, <code>{error, Form}</code> is thrown.
+%% Standalone comments in the form sequence are discarded.
 %%
 %% @see revert/1
 %% @see form_list/1
@@ -5721,6 +6140,9 @@ subtrees(T) ->
 		     case_expr_clauses(T)];
 		catch_expr ->
 		    [[catch_expr_body(T)]];
+		class_qualifier ->
+		    [[class_qualifier_argument(T)],
+		     [class_qualifier_body(T)]];
 		clause ->
 		    case clause_guard(T) of
 			none ->
@@ -5729,6 +6151,8 @@ subtrees(T) ->
 			    [clause_patterns(T), [G],
 			     clause_body(T)]
 		    end;
+		cond_expr ->
+		    [cond_expr_clauses(T)];
 		conjunction ->
 		    [conjunction_body(T)];
 		disjunction ->
@@ -5776,6 +6200,8 @@ subtrees(T) ->
 		prefix_expr ->
 		    [[prefix_expr_operator(T)],
 		     [prefix_expr_argument(T)]];
+		qualified_name ->
+		    [qualified_name_segments(T)];
 		query_expr ->
 		    [[query_expr_body(T)]];
 		receive_expr ->
@@ -5823,8 +6249,10 @@ subtrees(T) ->
 		    [[size_qualifier_body(T)],
 		     [size_qualifier_argument(T)]];
 		try_expr ->
-		    [[try_expr_body(T)],
-		     try_expr_clauses(T)];
+		    [try_expr_body(T),
+		     try_expr_clauses(T),
+		     try_expr_handlers(T),
+		     try_expr_after(T)];
 		tuple ->
 		    [tuple_elements(T)]
 	    end
@@ -5882,8 +6310,10 @@ make_tree(binary_field, [[B], Ts]) -> binary_field(B, Ts);
 make_tree(block_expr, [B]) -> block_expr(B);
 make_tree(case_expr, [[A], C]) -> case_expr(A, C);
 make_tree(catch_expr, [[B]]) -> catch_expr(B);
+make_tree(class_qualifier, [[A], [B]]) -> class_qualifier(A, B);
 make_tree(clause, [P, B]) -> clause(P, none, B);
 make_tree(clause, [P, [G], B]) -> clause(P, G, B);
+make_tree(cond_expr, [C]) -> cond_expr(C);
 make_tree(conjunction, [E]) -> conjunction(E);
 make_tree(disjunction, [E]) -> disjunction(E);
 make_tree(form_list, [E]) -> form_list(E);
@@ -5902,6 +6332,7 @@ make_tree(match_expr, [[P], [E]]) -> match_expr(P, E);
 make_tree(module_qualifier, [[M], [N]]) -> module_qualifier(M, N);
 make_tree(parentheses, [[E]]) -> parentheses(E);
 make_tree(prefix_expr, [[F], [A]]) -> prefix_expr(F, A);
+make_tree(qualified_name, [S]) -> qualified_name(S);
 make_tree(query_expr, [[B]]) -> query_expr(B);
 make_tree(receive_expr, [C]) -> receive_expr(C);
 make_tree(receive_expr, [C, [E], A]) -> receive_expr(C, E, A);
@@ -5917,7 +6348,7 @@ make_tree(record_index_expr, [[T], [F]]) ->
     record_index_expr(T, F);
 make_tree(rule, [[N], C]) -> rule(N, C);
 make_tree(size_qualifier, [[N], [A]]) -> size_qualifier(N, A);
-make_tree(try_expr, [[B], C]) -> try_expr(B, C);
+make_tree(try_expr, [B, C, H, A]) -> try_expr(B, C, H, A);
 make_tree(tuple, [E]) -> tuple(E).
 
 
@@ -6108,7 +6539,7 @@ tree(Type) ->
 %% <ul>
 %%  <li>Any nodes created outside of this module must have type tags
 %%      distinct from those currently defined by this module; see
-%%      <code>type</code> for a complete list.</li>
+%%      <code>type/1</code> for a complete list.</li>
 %%  <li>The type tag of a syntax tree node may also be used
 %%      as a primary tag by the <code>erl_parse</code> representation;
 %%      in that case, the selector functions for that node type
@@ -6208,10 +6639,12 @@ unwrap(Node) -> Node.	 % This could also be a new-form node.
 %% @doc Returns <code>true</code> if the argument is a wrapper
 %% structure, otherwise <code>false</code>.
 
+-ifndef(NO_UNUSED).
 is_wrapper(#wrapper{}) ->
     true;
 is_wrapper(_) ->
     false.
+-endif.
 
 
 %% =====================================================================
@@ -6241,6 +6674,41 @@ fold_function_name(N) ->
 	true ->
 	    {concrete(Name), concrete(Arity)}
     end.
+
+fold_variable_names(Vs) ->
+    [variable_name(V) || V <- Vs].
+
+unfold_variable_names(Vs, Pos) ->
+    [set_pos(variable(V), Pos) || V <- Vs].
+
+%% Support functions for qualified names ("foo.bar.baz",
+%% "erl.lang.lists", etc.). The representation overlaps with the weird
+%% "Mnesia query record access" operators. The '.' operator is left
+%% associative, so folding should nest on the left.
+
+is_qualified_name({record_field, _, L, R}) ->
+    case is_qualified_name(L) of
+	true -> is_qualified_name(R);
+	false -> false
+    end;
+is_qualified_name({atom, _, _}) -> true;
+is_qualified_name(_) -> false.
+
+unfold_qualified_name(Node) ->
+    lists:reverse(unfold_qualified_name(Node, [])).
+
+unfold_qualified_name({record_field, _, L, R}, Ss) ->
+    unfold_qualified_name(R, unfold_qualified_name(L, Ss));
+unfold_qualified_name(S, Ss) -> [S | Ss].
+
+fold_qualified_name([S | Ss], Pos) ->
+    fold_qualified_name(Ss, Pos, {atom, Pos, atom_value(S)}).
+
+fold_qualified_name([S | Ss], Pos, Ack) ->
+    fold_qualified_name(Ss, Pos, {record_field, Pos, Ack,
+				  {atom, Pos, atom_value(S)}});
+fold_qualified_name([], _Pos, Ack) ->
+    Ack.
 
 %% Support functions for transforming lists of record field definitions.
 %%

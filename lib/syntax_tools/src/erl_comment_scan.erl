@@ -131,20 +131,20 @@ scan_lines([$\040 | Cs], L, Col, M, Ack) ->
     scan_lines(Cs, L, Col + 1, M, Ack);
 scan_lines([$\t | Cs], L, Col, M, Ack) ->
     scan_lines(Cs, L, tab(Col), M, Ack);
-scan_lines([$\n | Cs], L, Col, M, Ack) ->
+scan_lines([$\n | Cs], L, _Col, _M, Ack) ->
     scan_lines(Cs, L + 1, 0, 0, Ack);
 scan_lines([$% | Cs], L, Col, M, Ack) ->
     scan_comment(Cs, "", L, Col, M, Ack);
-scan_lines([$$ | Cs], L, Col, M, Ack) ->
+scan_lines([$$ | Cs], L, Col, _M, Ack) ->
     scan_char(Cs, L, Col + 1, Ack);
-scan_lines([$" | Cs], L, Col, M, Ack) ->
+scan_lines([$" | Cs], L, Col, _M, Ack) ->
     scan_string(Cs, $", L, Col + 1, Ack);
-scan_lines([$' | Cs], L, Col, M, Ack) ->
+scan_lines([$' | Cs], L, Col, _M, Ack) ->
     scan_string(Cs, $', L, Col + 1, Ack);
-scan_lines([C | Cs], L, Col, M, Ack) ->
+scan_lines([_C | Cs], L, Col, _M, Ack) ->
     N = Col + 1,
     scan_lines(Cs, L, N, N, Ack);
-scan_lines([], L, Col, M, Ack) ->
+scan_lines([], _L, _Col, _M, Ack) ->
     Ack.
 
 tab(Col) ->
@@ -174,30 +174,30 @@ scan_string([Quote | Cs], Quote, L, Col, Ack) ->
     scan_lines(Cs, L, N, N, Ack);
 scan_string([$\t | Cs], Quote, L, Col, Ack) ->
     scan_string(Cs, Quote, L, tab(Col), Ack);
-scan_string([$\n | Cs], Quote, L, Col, Ack) ->
+scan_string([$\n | Cs], Quote, L, _Col, Ack) ->
     %% Newlines should really not occur in strings/atoms, but we
     %% want to be well behaved even if the input is not.
     scan_string(Cs, Quote, L + 1, 0, Ack);
-scan_string([$\\, C | Cs], Quote, L, Col, Ack) ->
+scan_string([$\\, _C | Cs], Quote, L, Col, Ack) ->
     scan_string(Cs, Quote, L, Col + 2, Ack);  % ignore character C
-scan_string([C | Cs], Quote, L, Col, Ack) ->
+scan_string([_C | Cs], Quote, L, Col, Ack) ->
     scan_string(Cs, Quote, L, Col + 1, Ack);
-scan_string([], Quote, L, Col, Ack) ->
+scan_string([], _Quote, _L, _Col, Ack) ->
     %% Finish quietly.
     Ack.
 
 scan_char([$\t | Cs], L, Col, Ack) ->
     N = tab(Col),
     scan_lines(Cs, L, N, N, Ack);    % this is not just any whitespace
-scan_char([$\n | Cs], L, Col, Ack) ->
+scan_char([$\n | Cs], L, _Col, Ack) ->
     scan_lines(Cs, L + 1, 0, 0, Ack);    % handle this, just in case
-scan_char([$\\, C | Cs], L, Col, Ack) ->
+scan_char([$\\, _C | Cs], L, Col, Ack) ->
     N = Col + 2,    % character C must be ignored
     scan_lines(Cs, L, N, N, Ack);
-scan_char([C | Cs], L, Col, Ack) ->
+scan_char([_C | Cs], L, Col, Ack) ->
     N = Col + 1,    % character C must be ignored
     scan_lines(Cs, L, N, N, Ack);
-scan_char([], L, Col, Ack) ->
+scan_char([], _L, _Col, Ack) ->
     %% Finish quietly.
     Ack.
 

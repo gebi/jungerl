@@ -32,7 +32,26 @@
 
 -module(erl_recomment).
 
--export([recomment_forms/2, recomment_tree/2]).
+-export([recomment_forms/2, quick_recomment_forms/2, recomment_tree/2]).
+
+
+%% =====================================================================
+%% @spec quick_recomment_forms(Forms, Comments::[Comment]) ->
+%%           syntaxTree()
+%%
+%%	    Forms = syntaxTree() | [syntaxTree()]
+%%	    Comment = {Line, Column, Indentation, Text}
+%%	    Line = integer()
+%%	    Column = integer()
+%%	    Indentation = integer()
+%%	    Text = [string()]
+%%
+%% @doc Like {@link recomment_forms/2}, but only inserts top-level
+%% comments. Comments within function definitions or declarations
+%% ("forms") are simply ignored.
+
+quick_recomment_forms(Tree, Cs) ->
+    recomment_forms(Tree, Cs, false).
 
 
 %% =====================================================================
@@ -91,10 +110,14 @@
 %%
 %% @see erl_comment_scan
 %% @see recomment_tree/2
+%% @see quick_recomment_forms/2
 
-recomment_forms(Tree, Cs) when list(Tree) ->
-    recomment_forms(erl_syntax:form_list(Tree), Cs);
 recomment_forms(Tree, Cs) ->
+    recomment_forms(Tree, Cs, true).
+
+recomment_forms(Tree, Cs, Insert) when list(Tree) ->
+    recomment_forms(erl_syntax:form_list(Tree), Cs, Insert);
+recomment_forms(Tree, Cs, Insert) ->
     case erl_syntax:type(Tree) of
 	form_list ->
 	    Tree1 = erl_syntax:flatten_form_list(Tree),
@@ -103,11 +126,11 @@ recomment_forms(Tree, Cs) ->
 	    %% Here we make a small assumption about the substructure of
 	    %% a `form_list' tree: it has exactly one group of subtrees.
 	    [Node1] = node_subtrees(Node),
-	    List = recomment_forms_1(Cs, filter_forms(
-					   node_subtrees(Node1))),
+	    List = filter_forms(node_subtrees(Node1)),
+	    List1 = recomment_forms_1(Cs, List, Insert),
 	    revert_tree(set_node_subtrees(Node,
 					  [set_node_subtrees(Node1,
-							     List)]));
+							     List1)]));
 	_ ->
 	    %% Not a form list - just call `recomment_tree' and
 	    %% append any leftover comments.
@@ -123,23 +146,27 @@ append_comments([], Tree) ->
 %% This part goes over each comment in turn and inserts it into the
 %% proper place in the given list of program forms:
 
-recomment_forms_1([C | Cs], Ns) ->
-    Ns1 = recomment_forms_2(C, Ns),
-    recomment_forms_1(Cs, Ns1);
-recomment_forms_1([], Ns) ->
+recomment_forms_1([C | Cs], Ns, Insert) ->
+    Ns1 = recomment_forms_2(C, Ns, Insert),
+    recomment_forms_1(Cs, Ns1, Insert);
+recomment_forms_1([], Ns, _Insert) ->
     Ns.
 
-recomment_forms_2(C, [Node | Ns]) ->
+recomment_forms_2(C, [Node | Ns], Insert) ->
     {L, Col, Ind, Text} = C,
     Min = node_min(Node),
     Max = node_max(Node),
     N = comment_delta(Text),
     if L > Max ->
-	    [Node | recomment_forms_2(C, Ns)];
+	    [Node | recomment_forms_2(C, Ns, Insert)];
        L + N < Min - 1 ->
 	    %% At least one empty line between the current form
 	    %% and the comment, so we make it a standalone.
 	    [standalone_comment(C), Node | Ns];
+       L < Min ->
+	    %% The comment line should be above this node.
+	    %% (This duplicates what insert/5 would have done.)
+	    [node_add_precomment(C, Node) | Ns];
        Col =< 1, L =< Min, L + N >= Min ->
 	    %% This is a conflict - the "first" token of the node
 	    %% overlaps with some comment line, but the comment
@@ -150,16 +177,18 @@ recomment_forms_2(C, [Node | Ns]) ->
 	       true ->
 		    [Node, Node1 | Ns]
 	    end;
+       Insert == true ->
+	    [insert(Node, L, Col, Ind, C) | Ns];
        true ->
-	    [insert(Node, L, Col, Ind, C) | Ns]
+	    [Node | Ns]    % skipping non-toplevel comment
     end;
-recomment_forms_2(C, []) ->
+recomment_forms_2(C, [], _Top) ->
     [standalone_comment(C)].
 
 %% Creating a leaf node for a standalone comment. Note that we try to
 %% preserve the original starting column rather than the indentation.
 
-standalone_comment({L, Col, Ind, Text}) ->
+standalone_comment({L, Col, _Ind, Text}) ->
     leaf_node(L, L + comment_delta(Text),
 	      erl_syntax:set_pos(erl_syntax:comment(Col - 1, Text), L)).
 
@@ -312,7 +341,7 @@ insert_comments(Cs, Node) ->
     insert_comments(Cs, Node, []).
 
 insert_comments([C | Cs], Node, Cs1) ->
-    {L, Col, Ind, Text} = C,
+    {L, Col, Ind, _Text} = C,
     Max = node_max(Node),
     if L =< Max ->
 	    insert_comments(Cs, insert(Node, L, Col, Ind, C),
@@ -381,19 +410,19 @@ insert_in_list([Node | Ns], L, Col, Ind, C) ->
     NextMin = next_min_in_list(Ns),
     
     %% `NextMin' could be less than `Max', in inconsistent trees.
-    V = if NextMin < 0 ->
-		%% There is no following leaf/tree node, so we try
-		%% to insert at this node.
-		insert_here(Node, L, Col, Ind, C, Ns);
-	   L >= NextMin, NextMin >= Max ->
-		%% Tend to select the later node, in case the next
-		%% node should also match.
-		insert_later(Node, L, Col, Ind, C, Ns);
-	   L =< Max ->
-		insert_here(Node, L, Col, Ind, C, Ns);
-	   true ->
-		insert_later(Node, L, Col, Ind, C, Ns)
-	end;
+    if NextMin < 0 ->
+	    %% There is no following leaf/tree node, so we try
+	    %% to insert at this node.
+	    insert_here(Node, L, Col, Ind, C, Ns);
+       L >= NextMin, NextMin >= Max ->
+	    %% Tend to select the later node, in case the next
+	    %% node should also match.
+	    insert_later(Node, L, Col, Ind, C, Ns);
+       L =< Max ->
+	    insert_here(Node, L, Col, Ind, C, Ns);
+       true ->
+	    insert_later(Node, L, Col, Ind, C, Ns)
+    end;
 insert_in_list([], L, Col, _, _) ->
     exit({bad_tree, L, Col}).
 
@@ -532,7 +561,7 @@ expand_comments([]) ->
     [].
 
 expand_comment(C) ->
-    {L, Col, Ind, Text} = C,
+    {L, _Col, Ind, Text} = C,
     erl_syntax:set_pos(erl_syntax:comment(Ind, Text), L).
 
 
@@ -684,7 +713,7 @@ tree_node_attrs(#tree{attrs = Attrs}) ->
 %% Just the generic "maximum" function
 
 max(X, Y) when X > Y -> X;
-max(X, Y) -> Y.
+max(_, Y) -> Y.
 
 %% Return the least positive integer of X and Y, or zero if none of them
 %% are positive. (This is necessary for computing minimum source line
@@ -698,7 +727,7 @@ minpos(X, Y) ->
 
 minpos1(X, Y) when X < 1 ->
     minpos2(Y);
-minpos1(X, Y) ->
+minpos1(X, _) ->
     X.
 
 minpos2(X) when X < 1 ->

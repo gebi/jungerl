@@ -52,8 +52,8 @@
 -define(NOHOOK, none).
 
 -record(ctxt, {prec = 0,
-	       body_indent = 4,
 	       sub_indent = 2,
+	       break_indent = 4,
 	       clause = undefined,
 	       hook = ?NOHOOK,
 	       paper = ?PAPER,
@@ -128,7 +128,7 @@ get_ctxt_linewidth(Ctxt) ->
 %%
 %% @see get_ctxt_linewidth/1
 
-set_ctxt_linewidth(W, Ctxt) ->
+set_ctxt_linewidth(Ctxt, W) ->
     Ctxt#ctxt{ribbon = W}.
 
 %% @spec (context()) -> hook()
@@ -142,7 +142,7 @@ get_ctxt_hook(Ctxt) ->
 %% @doc Updates the hook function field of the prettyprinter context.
 %% @see get_ctxt_hook/1
 
-set_ctxt_hook(Hook, Ctxt) ->
+set_ctxt_hook(Ctxt, Hook) ->
     Ctxt#ctxt{hook = Hook}.
 
 %% @spec (context()) -> term()
@@ -156,20 +156,20 @@ get_ctxt_user(Ctxt) ->
 %% @doc Updates the user data field of the prettyprinter context.
 %% @see get_ctxt_user/1
 
-set_ctxt_user(X, Ctxt) ->
+set_ctxt_user(Ctxt, X) ->
     Ctxt#ctxt{user = X}.
 
 
 %% =====================================================================
-%% @spec format(Node) -> string()
-%% @equiv format(Node, [])
+%% @spec format(Tree::syntaxTree()) -> string()
+%% @equiv format(Tree, [])
 
 format(Node) ->
     format(Node, []).
 
 
 %% =====================================================================
-%% @spec format(Node::syntaxTree(), Options::[term()]) -> string()
+%% @spec format(Tree::syntaxTree(), Options::[term()]) -> string()
 %%           syntaxTree() = erl_syntax:syntaxTree()
 %%
 %% @type hook() = (syntaxTree(), context(), Continuation) -> document()
@@ -204,23 +204,23 @@ format(Node) ->
 %%       value is <code>undefined</code>.</dd>
 %% </dl></p>
 %%
-%% <p>A hook function (cf. the
-%% <a href="#type-hook"><code>hook()</code></a> type) is passed the
-%% current syntax tree node, the context, and a continuation. The
-%% context can be examined and manipulated by functions such as
+%% <p>A hook function (cf. the <a
+%% href="#type-hook"><code>hook()</code></a> type) is passed the current
+%% syntax tree node, the context, and a continuation. The context can be
+%% examined and manipulated by functions such as
 %% <code>get_ctxt_user/1</code> and <code>set_ctxt_user/2</code>. The
 %% hook must return a "document" data structure (see
 %% <code>layout/2</code> and <code>best/2</code>); this may be
 %% constructed in part or in whole by applying the continuation
 %% function. For example, the following is a trivial hook:
 %% <pre>
-%%     fun (Node, Ctxt, Cont) -> Cont(Node, Xtxt) end
+%%     fun (Node, Ctxt, Cont) -> Cont(Node, Ctxt) end
 %% </pre>
 %% which yields the same result as if no hook was given.
 %% The following, however:
 %% <pre>
 %%     fun (Node, Ctxt, Cont) ->
-%%         Doc = Cont(Node, Xtxt),
+%%         Doc = Cont(Node, Ctxt),
 %%         prettypr:beside(prettypr:text("&lt;b>"),
 %%                         prettypr:beside(Doc,
 %%                                         prettypr:text("&lt;/b>")))
@@ -244,15 +244,15 @@ format(Node, Options) ->
 
 
 %% =====================================================================
-%% @spec best(Node) -> empty | document()
-%% @equiv best(Node, [])
+%% @spec best(Tree::syntaxTree()) -> empty | document()
+%% @equiv best(Tree, [])
 
 best(Node) ->
     best(Node, []).
 
 
 %% =====================================================================
-%% @spec best(Node::syntaxTree(), Options::[term()]) ->
+%% @spec best(Tree::syntaxTree(), Options::[term()]) ->
 %%           empty | document()
 %%
 %% @doc Creates a fixed "best" abstract layout for a syntax tree. This
@@ -274,15 +274,15 @@ best(Node, Options) ->
 
 
 %% =====================================================================
-%% @spec layout(Node) -> document()
-%% @equiv layout(Node, [])
+%% @spec layout(Tree::syntaxTree()) -> document()
+%% @equiv layout(Tree, [])
 
 layout(Node) ->
     layout(Node, []).
 
 
 %% =====================================================================
-%% @spec layout(Node::syntaxTree(), Options::[term()]) -> document()
+%% @spec layout(Tree::syntaxTree(), Options::[term()]) -> document()
 %%	    document() = prettypr:document()
 %%
 %% @doc Creates an abstract document layout for a syntax tree. The
@@ -315,7 +315,7 @@ lay(Node, Ctxt) ->
 	[] ->
 	    %% Hooks are not called if there are no annotations.
 	    lay_1(Node, Ctxt);
-	As ->
+	_As ->
 	    case Ctxt#ctxt.hook of
 		?NOHOOK ->
 		    lay_1(Node, Ctxt);
@@ -510,7 +510,7 @@ lay_2(Node, Ctxt) ->
 	    D2 = lay(erl_syntax:match_expr_body(Node),
 		     set_prec(Ctxt, PrecR)),
 	    D3 = follow(beside(D1, floating(text(" ="))), D2,
-			Ctxt#ctxt.body_indent),
+			Ctxt#ctxt.break_indent),
 	    maybe_parentheses(D3, Prec, Ctxt);
 
 	underscore ->
@@ -569,10 +569,9 @@ lay_2(Node, Ctxt) ->
 	    D2 = lay_clauses(
 		   erl_syntax:case_expr_clauses(Node),
 		   case_expr, Ctxt1),
-	    sep([par([follow(text("case"), D1,
-			     Ctxt1#ctxt.sub_indent),
+	    sep([par([follow(text("case"), D1, Ctxt1#ctxt.sub_indent),
 		      text("of")],
-		     Ctxt1#ctxt.sub_indent),
+		     Ctxt1#ctxt.break_indent),
 		 nest(Ctxt1#ctxt.sub_indent, D2),
 		 text("end")]);
 	
@@ -583,6 +582,14 @@ lay_2(Node, Ctxt) ->
 	    sep([follow(text("if"), D, Ctxt1#ctxt.sub_indent),
 		 text("end")]);
 
+	cond_expr ->
+	    Ctxt1 = reset_prec(Ctxt),
+	    D = lay_clauses(erl_syntax:cond_expr_clauses(Node),
+			    cond_expr, Ctxt1),
+	    sep([text("cond"),
+		 nest(Ctxt1#ctxt.sub_indent, D),
+		 text("end")]);
+
 	fun_expr ->
 	    Ctxt1 = reset_prec(Ctxt),
 	    D = lay_clauses(erl_syntax:fun_expr_clauses(Node),
@@ -591,12 +598,16 @@ lay_2(Node, Ctxt) ->
 		 text("end")]);
 
 	module_qualifier ->
-	    {PrecL, Prec, PrecR} = inop_prec(':'),
+	    {PrecL, _Prec, PrecR} = inop_prec(':'),
 	    D1 = lay(erl_syntax:module_qualifier_argument(Node),
 		     set_prec(Ctxt, PrecL)),
 	    D2 = lay(erl_syntax:module_qualifier_body(Node),
 		     set_prec(Ctxt, PrecR)),
 	    beside(D1, beside(text(":"), D2));
+
+	qualified_name ->
+	    Ss = erl_syntax:qualified_name_segments(Node),
+	    lay_qualified_name(Ss, Ctxt);
 
 	%%
 	%% The rest is in alphabetical order
@@ -652,7 +663,7 @@ lay_2(Node, Ctxt) ->
 	    Es = seq(erl_syntax:block_expr_body(Node),
 		     floating(text(",")), Ctxt1, fun lay/2),
 	    sep([text("begin"),
-		 nest(Ctxt1#ctxt.body_indent, sep(Es)),
+		 nest(Ctxt1#ctxt.sub_indent, sep(Es)),
 		 text("end")]);
 
 	catch_expr ->
@@ -661,6 +672,12 @@ lay_2(Node, Ctxt) ->
 		    set_prec(Ctxt, PrecR)),
 	    D1 = follow(text("catch"), D, Ctxt#ctxt.sub_indent),
 	    maybe_parentheses(D1, Prec, Ctxt);
+
+	class_qualifier ->
+	    Ctxt1 = set_prec(Ctxt, max_prec()),
+	    D1 = lay(erl_syntax:class_qualifier_argument(Node), Ctxt1),
+	    D2 = lay(erl_syntax:class_qualifier_body(Node), Ctxt1),
+	    beside(D1, beside(text(":"), D2));
 
 	comment ->
 	    D = stack_comment_lines(
@@ -703,7 +720,7 @@ lay_2(Node, Ctxt) ->
 	    Ctxt1 = reset_prec(Ctxt),
 	    D1 = lay(erl_syntax:generator_pattern(Node), Ctxt1),
 	    D2 = lay(erl_syntax:generator_body(Node), Ctxt1),
-	    par([D1, beside(text("<- "), D2)], Ctxt1#ctxt.sub_indent);
+	    par([D1, beside(text("<- "), D2)], Ctxt1#ctxt.break_indent);
 
 	implicit_fun ->
 	    D = lay(erl_syntax:implicit_fun_name(Node),
@@ -748,7 +765,7 @@ lay_2(Node, Ctxt) ->
 	    Ctxt1 = reset_prec(Ctxt),
 	    D = lay(erl_syntax:query_expr_body(Node), Ctxt1),
 	    sep([text("query"),
-		 nest(Ctxt1#ctxt.body_indent, D),
+		 nest(Ctxt1#ctxt.sub_indent, D),
 		 text("end")]);
 
 	receive_expr ->
@@ -818,7 +835,7 @@ lay_2(Node, Ctxt) ->
 		    D1;
 		V ->
 		    par([D1, floating(text("=")), lay(V, Ctxt1)],
-			Ctxt1#ctxt.sub_indent)
+			Ctxt1#ctxt.break_indent)
 	    end;
 
 	record_index_expr ->
@@ -853,19 +870,33 @@ lay_2(Node, Ctxt) ->
 	    Ctxt1 = reset_prec(Ctxt),
 	    D1 = sep(seq(erl_syntax:try_expr_body(Node),
 			 floating(text(",")), Ctxt1, fun lay/2)),
-	    case erl_syntax:try_expr_clauses(Node) of
-		[] ->
-		    sep([text("try"),
-			 nest(Ctxt1#ctxt.body_indent, D1),
-			 text("end")]);
-		Cs ->
-		    D2 = lay_clauses(Cs, try_expr, Ctxt1),
-		    sep([text("begin"),
-			 nest(Ctxt1#ctxt.body_indent, D1),
-			 text("catch"),
-			 nest(Ctxt1#ctxt.sub_indent, D2),
-			 text("end")])
-		end;
+	    Es0 = [text("end")],
+	    Es1 = case erl_syntax:try_expr_after(Node) of
+		      [] -> Es0;
+		      As ->
+			  D2 = sep(seq(As, floating(text(",")), Ctxt1,
+				       fun lay/2)),
+			  [text("after"),
+			   nest(Ctxt1#ctxt.sub_indent, D2)
+			   | Es0]
+		  end,
+	    Es2 = case erl_syntax:try_expr_handlers(Node) of
+		      [] -> Es1;
+		      Hs ->
+			  D3 = lay_clauses(Hs, try_expr, Ctxt1),
+			  [text("catch"),
+			   nest(Ctxt1#ctxt.sub_indent, D3)
+			   | Es1]
+		  end,
+	    Es3 = case erl_syntax:try_expr_clauses(Node) of
+		      [] -> Es2;
+		      Cs ->
+			  D4 = lay_clauses(Cs, try_expr, Ctxt1),
+			  [text("of"),
+			   nest(Ctxt1#ctxt.sub_indent, D4)
+			   | Es2]
+		  end,
+	    sep([text("try"), nest(Ctxt1#ctxt.sub_indent, D1) | Es3]);
 
 	warning_marker ->
 	    E = erl_syntax:warning_marker_info(Node),
@@ -874,7 +905,7 @@ lay_2(Node, Ctxt) ->
 			  text(").")))
     end.
 
-lay_parentheses(D, Ctxt) ->
+lay_parentheses(D, _Ctxt) ->
     beside(floating(text("(")), beside(D, floating(text(")")))).
 
 maybe_parentheses(D, Prec, Ctxt) ->
@@ -885,6 +916,26 @@ maybe_parentheses(D, Prec, Ctxt) ->
 	    D
     end.
 
+lay_qualified_name([S | Ss1] = Ss, Ctxt) ->
+    case erl_syntax:type(S) of
+	atom ->
+	    case erl_syntax:atom_value(S) of
+		'' ->
+		    beside(text("."),
+			   lay_qualified_name_1(Ss1, Ctxt));
+		_ ->
+		    lay_qualified_name_1(Ss, Ctxt)
+	    end;
+	_ ->
+	    lay_qualified_name_1(Ss, Ctxt)
+    end.
+
+lay_qualified_name_1([S], Ctxt) ->
+    lay(S, Ctxt);
+lay_qualified_name_1([S | Ss], Ctxt) ->
+    beside(lay(S, Ctxt), beside(text("."),
+				lay_qualified_name_1(Ss, Ctxt))).
+
 lay_string(S, Ctxt) ->
     %% S includes leading/trailing double-quote characters. The segment
     %% width is 2/3 of the ribbon width - this seems to work well.
@@ -894,13 +945,13 @@ lay_string(S, Ctxt) ->
 lay_string_1(S, L, W) when L > W, W > 0 ->
     %% Note that L is the minimum, not the exact, printed length.
     case split_string(S, W - 1, L) of
-	{S1, ""} ->
+	{_S1, ""} ->
 	    text(S);
 	{S1, S2} ->
 	    above(text(S1 ++ "\""),
 		  lay_string_1([$" | S2], L - W + 1, W))
     end;
-lay_string_1(S, L, W) ->
+lay_string_1(S, _L, _W) ->
     text(S).
 
 split_string(Xs, N, L) ->
@@ -921,7 +972,7 @@ split_string_1(Xs, N, L, As) when N =< -10, L >= 5 ->
     {lists:reverse(As), Xs};
 split_string_1([X | Xs], N, L, As) ->
     split_string_1(Xs, N - 1, L - 1, [X | As]);
-split_string_1([], N, L, As) ->
+split_string_1([], _N, _L, As) ->
     {lists:reverse(As), ""}.
 
 split_string_2([$^, X | Xs], N, L, As) ->
@@ -970,7 +1021,7 @@ make_rule_clause(N, P, G, B, Ctxt) ->
 make_case_clause(P, G, B, Ctxt) ->
     append_clause_body(B, append_guard(G, P, Ctxt), Ctxt).
 
-make_if_clause(P, G, B, Ctxt) ->
+make_if_clause(_P, G, B, Ctxt) ->
     %% We ignore the patterns; they should be empty anyway.
     G1 = if G == none ->
 		 text("true");
@@ -986,13 +1037,13 @@ append_rule_body(B, D, Ctxt) ->
     append_clause_body(B, D, floating(text(" :-")), Ctxt).
 
 append_clause_body(B, D, S, Ctxt) ->
-    sep([beside(D, S), nest(Ctxt#ctxt.body_indent, B)]).
+    sep([beside(D, S), nest(Ctxt#ctxt.break_indent, B)]).
 
 append_guard(none, D, _) ->
     D;
 append_guard(G, D, Ctxt) ->
     par([D, follow(text("when"), G, Ctxt#ctxt.sub_indent)],
-	Ctxt#ctxt.sub_indent).
+	Ctxt#ctxt.break_indent).
 
 lay_bit_types([T], Ctxt) ->
     lay(T, Ctxt);
@@ -1027,16 +1078,16 @@ vertical([D | Ds]) ->
 vertical([]) ->
     [].
 
-vertical_sep(Sep, [D]) ->
+vertical_sep(_Sep, [D]) ->
     D;
 vertical_sep(Sep, [D | Ds]) ->
     above(above(D, Sep), vertical_sep(Sep, Ds));
-vertical_sep(Sep, []) ->
+vertical_sep(_Sep, []) ->
     [].
 
 spaces(N) when N > 0 ->
     [$\040 | spaces(N - 1)];
-spaces(N) ->
+spaces(_) ->
     [].
 
 tidy_float([$., C | Cs]) ->
@@ -1064,7 +1115,7 @@ tidy_float_2([$e, $-, $0]) -> [];
 tidy_float_2([$e, $-, $0 | Cs]) -> tidy_float_2([$e, $- | Cs]);
 tidy_float_2([$e, $- | _] = Cs) -> Cs;
 tidy_float_2([$e | Cs]) -> tidy_float_2([$e, $+ | Cs]);
-tidy_float_2([C | Cs]) -> tidy_float_2(Cs);
+tidy_float_2([_C | Cs]) -> tidy_float_2(Cs);
 tidy_float_2([]) -> [].
 
 

@@ -40,8 +40,9 @@
          analyze_form/1, analyze_forms/1, analyze_function/1,
          analyze_function_name/1, analyze_implicit_fun/1,
          analyze_import_attribute/1, analyze_module_attribute/1,
-         analyze_record_attribute/1, analyze_record_field/1,
-         analyze_rule/1, analyze_wild_attribute/1, annotate_bindings/1,
+         analyze_record_attribute/1, analyze_record_expr/1,
+         analyze_record_field/1, analyze_rule/1,
+         analyze_wild_attribute/1, annotate_bindings/1,
          annotate_bindings/2, fold/3, fold_subtrees/3, foldl_listlist/3,
          function_name_expansions/1, is_fail_expr/1, limit/2, limit/3,
          map/2, map_subtrees/2, mapfold/3, mapfold_subtrees/3,
@@ -118,12 +119,12 @@ fold(F, S, Tree) ->
 
 fold_1(F, S, [L | Ls]) ->
     fold_1(F, fold_2(F, S, L), Ls);
-fold_1(F, S, []) ->
+fold_1(_, S, []) ->
     S.
 
 fold_2(F, S, [T | Ts]) ->
     fold_2(F, fold(F, S, T), Ts);
-fold_2(F, S, []) ->
+fold_2(_, S, []) ->
     S.
 
 
@@ -156,12 +157,12 @@ fold_subtrees(F, S, Tree) ->
 
 foldl_listlist(F, S, [L | Ls]) ->
     foldl_listlist(F, foldl(F, S, L), Ls);
-foldl_listlist(F, S, []) ->
+foldl_listlist(_, S, []) ->
     S.
 
 foldl(F, S, [T | Ts]) ->
     foldl(F, F(T, S), Ts);
-foldl(F, S, []) ->
+foldl(_, S, []) ->
     S.
 
 
@@ -195,14 +196,14 @@ mapfold_1(F, S, [L | Ls]) ->
     {L1, S1} = mapfold_2(F, S, L),
     {Ls1, S2} = mapfold_1(F, S1, Ls),
     {[L1 | Ls1], S2};
-mapfold_1(F, S, []) ->
+mapfold_1(_, S, []) ->
     {[], S}.
 
 mapfold_2(F, S, [T | Ts]) ->
     {T1, S1} = mapfold(F, S, T),
     {Ts1, S2} = mapfold_2(F, S1, Ts),
     {[T1 | Ts1], S2};
-mapfold_2(F, S, []) ->
+mapfold_2(_, S, []) ->
     {[], S}.
 
 
@@ -244,14 +245,14 @@ mapfoldl_listlist(F, S, [L | Ls]) ->
     {L1, S1} = mapfoldl(F, S, L),
     {Ls1, S2} = mapfoldl_listlist(F, S1, Ls),
     {[L1 | Ls1], S2};
-mapfoldl_listlist(F, S, []) ->
+mapfoldl_listlist(_, S, []) ->
     {[], S}.
 
 mapfoldl(F, S, [L | Ls]) ->
     {L1, S1} = F(L, S),
     {Ls1, S2} = mapfoldl(F, S1, Ls),
     {[L1 | Ls1], S2};
-mapfoldl(F, S, []) ->
+mapfoldl(_, S, []) ->
     {[], S}.
 
 
@@ -338,7 +339,7 @@ new_variable_name(N, R, T, F, S) when T < ?MAX_RETRIES ->
         false ->
             A
     end;
-new_variable_name(N, R, T, F, S) ->
+new_variable_name(N, R, _T, F, S) ->
     %% Too many retries - enlarge the range and start over.
     R1 = (R * ?ENLARGE_ENUM) div ?ENLARGE_DENOM,
     new_variable_name(generate(N, R1), R1, 0, F, S).
@@ -351,7 +352,7 @@ start_range(S) ->
     max(sets:size(S) * ?START_RANGE_FACTOR, ?MINIMUM_RANGE).
 
 max(X, Y) when X > Y -> X;
-max(X, Y) -> Y.
+max(_, Y) -> Y.
 
 %% The previous number might or might not be used to compute the
 %% next number to be tried. It is currently not used.
@@ -359,7 +360,7 @@ max(X, Y) -> Y.
 %% It is important that this function does not generate values in
 %% order, but (pseudo-)randomly distributed over the range.
 
-generate(Key, Range) ->
+generate(_Key, Range) ->
     random:uniform(Range).    % works well
 
 
@@ -462,8 +463,12 @@ vann(Tree, Env) ->
             vann_case_expr(Tree, Env);
         if_expr ->
             vann_if_expr(Tree, Env);
+        cond_expr ->
+            vann_cond_expr(Tree, Env);
         receive_expr ->
             vann_receive_expr(Tree, Env);
+        try_expr ->
+            vann_try_expr(Tree, Env);
         function ->
             vann_function(Tree, Env);
         rule ->
@@ -478,7 +483,7 @@ vann(Tree, Env) ->
             vann_block_expr(Tree, Env);
         macro ->
             vann_macro(Tree, Env);
-        Type ->
+        _Type ->
             F = vann_list_join(Env),
             {Tree1, {Bound, Free}} = mapfold_subtrees(F, {[], []},
                                                       Tree),
@@ -548,6 +553,12 @@ vann_if_expr(Tree, Env) ->
     Tree1 = rewrite(Tree, erl_syntax:if_expr(Cs1)),
     {ann_bindings(Tree1, Env, Bound, Free), Bound, Free}.
 
+vann_cond_expr(_Tree, _Env) ->
+    erlang:error({not_implemented,cond_expr}).
+
+vann_try_expr(_Tree, _Env) ->
+    erlang:error({not_implemented,try_expr}).
+
 vann_receive_expr(Tree, Env) ->
     %% The timeout action is treated as an extra clause.
     %% Bindings in the expiry expression are local only.
@@ -555,7 +566,7 @@ vann_receive_expr(Tree, Env) ->
     Es = erl_syntax:receive_expr_action(Tree),
     C = erl_syntax:clause([], Es),
     {[C1 | Cs1], {Bound, Free1}} = vann_clauses([C | Cs], Env),
-    Es1 = erl_syntax:clause_body(C),
+    Es1 = erl_syntax:clause_body(C1),
     {T1, _, Free2} = case erl_syntax:receive_expr_timeout(Tree) of
                          none ->
                              {none, [], []};
@@ -686,7 +697,7 @@ vann_pattern(Tree, Env) ->
             N = erl_syntax:macro_name(Tree),
             Tree1 = rewrite(Tree, erl_syntax:macro(N, As)),
             {ann_bindings(Tree1, Env, Bound, Free), Bound, Free};
-        Type ->
+        _Type ->
             F = vann_patterns_join(Env),
             {Tree1, {Bound, Free}} = mapfold_subtrees(F, {[], []},
                                                       Tree),
@@ -785,6 +796,10 @@ is_fail_expr(E) ->
                     true;
                 {ok, {erlang, throw}} when N == 1 ->
                     true;
+                {ok, {erlang, error}} when N == 1 ->
+                    true;
+                {ok, {erlang, error}} when N == 2 ->
+                    true;
                 {ok, {erlang, fault}} when N == 1 ->
                     true;
                 {ok, {erlang, fault}} when N == 2 ->
@@ -823,9 +838,8 @@ is_fail_expr(E) ->
 %% 	 names and corresponding values of all so-called "wild"
 %% 	 attributes (as e.g. "<code>-compile(...)</code>") occurring in
 %% 	 <code>Forms</code> (cf. <code>analyze_wild_attribute/1</code>).
-%% 	 Each name may occur more than once in the list, with possibly
-%% 	 different values for each occurrence. The order of listing is
-%% 	 not defined.</dd>
+%% 	 We do not guarantee that each name occurs at most once in the
+%% 	 list. The order of listing is not defined.</dd>
 %%
 %%     <dt><code>{errors, Errors}</code></dt>
 %%       <dd><ul>
@@ -846,9 +860,9 @@ is_fail_expr(E) ->
 %% 	 <code>Exports</code> is a list of representations of those
 %% 	 function names that are listed by export declaration attributes
 %% 	 in <code>Forms</code> (cf.
-%% 	 <code>analyze_export_attribute/1</code>). Note that duplicates
-%% 	 may occur in the list, and that the order of listing is not
-%% 	 defined.</dd>
+%% 	 <code>analyze_export_attribute/1</code>). We do not guarantee
+%% 	 that each name occurs at most once in the list. The order of
+%% 	 listing is not defined.</dd>
 %%
 %%     <dt><code>{functions, Functions}</code></dt>
 %%       <dd><ul>
@@ -856,9 +870,9 @@ is_fail_expr(E) ->
 %%       </ul>
 %% 	 <code>Functions</code> is a list of the names of the functions
 %% 	 that are defined in <code>Forms</code> (cf.
-%% 	 <code>analyze_function/1</code>). Note that duplicates may
-%% 	 occur in the list, and that the order of listing is not
-%% 	 defined.</dd>
+%% 	 <code>analyze_function/1</code>). We do not guarantee that each
+%% 	 name occurs at most once in the list. The order of listing is
+%% 	 not defined.</dd>
 %%
 %%     <dt><code>{imports, Imports}</code></dt>
 %%       <dd><ul>
@@ -875,19 +889,19 @@ is_fail_expr(E) ->
 %% 	 by import declaration attributes in <code>Forms</code> (cf.
 %% 	 <code>analyze_import_attribute/1</code>), where each
 %% 	 <code>Module</code> occurs at most once in
-%% 	 <code>Imports</code>. Note that duplicates may occur in the
-%% 	 lists of function names, and that the order of the lists is not
-%% 	 defined.</dd>
+%% 	 <code>Imports</code>. We do not guarantee that each name occurs
+%% 	 at most once in the lists of function names. The order of
+%% 	 listing is not defined.</dd>
 %%
 %%     <dt><code>{module, ModuleName}</code></dt>
 %%       <dd><ul>
 %% 	    <li><code>ModuleName = atom()</code></li>
 %%       </ul>
 %% 	 <code>ModuleName</code> is the name declared by a module
-%% 	 attribute in <code>Forms</code>. If the module name is not
-%% 	 uniquely defined in <code>Forms</code>, the result will contain
-%% 	 no entry for the <code>module</code> key. Multiple declarations
-%% 	 using the same name are however allowed.</dd>
+%% 	 attribute in <code>Forms</code>. If no module name is defined
+%% 	 in <code>Forms</code>, the result will contain no entry for the
+%% 	 <code>module</code> key. If multiple module name declarations
+%% 	 should occur, all but the first will be ignored.</dd>
 %%
 %%     <dt><code>{records, Records}</code></dt>
 %%       <dd><ul>
@@ -900,10 +914,9 @@ is_fail_expr(E) ->
 %% 	 attributes occurring in <code>Forms</code>. For fields declared
 %% 	 without a default value, the corresponding value for
 %% 	 <code>Default</code> is the atom <code>none</code> (cf.
-%% 	 <code>analyze_record_attribute/1</code>). Each record name
-%% 	 could occur more than once in the list, with possibly different
-%% 	 fields for each occurrence. The order of listing is not
-%% 	 defined.</dd>
+%% 	 <code>analyze_record_attribute/1</code>). We do not guarantee
+%% 	 that each record name occurs at most once in the list. The
+%% 	 order of listing is not defined.</dd>
 %%
 %%     <dt><code>{rules, Rules}</code></dt>
 %%       <dd><ul>
@@ -911,8 +924,9 @@ is_fail_expr(E) ->
 %%       </ul>
 %% 	 <code>Rules</code> is a list of the names of the rules that are
 %% 	 defined in <code>Forms</code> (cf.
-%% 	 <code>analyze_rule/1</code>). Note that duplicates may occur in
-%% 	 the list, and that the order of listing is not defined.</dd>
+%% 	 <code>analyze_rule/1</code>). We do not guarantee that each
+%% 	 name occurs at most once in the list. The order of listing is
+%% 	 not defined.</dd>
 %%
 %%     <dt><code>{warnings, Warnings}</code></dt>
 %%       <dd><ul>
@@ -966,6 +980,8 @@ collect_attribute(export, L, Info) ->
     finfo_add_exports(L, Info);
 collect_attribute(import, {M, L}, Info) ->
     finfo_add_imports(M, L, Info);
+collect_attribute(import, M, Info) ->
+    finfo_add_module_import(M, Info);
 collect_attribute(file, _, Info) ->
     Info;
 collect_attribute(record, {R, L}, Info) ->
@@ -975,12 +991,13 @@ collect_attribute(_, {N, V}, Info) ->
 
 %% Abstract datatype for collecting module information.
 
--record(forms, {module, exports, imports, attributes, records,
-                errors, warnings, functions, rules}).
+-record(forms, {module, exports, module_imports, imports, attributes,
+		records, errors, warnings, functions, rules}).
 
 new_finfo() ->
     #forms{module = none,
            exports = [],
+           module_imports = [],
            imports = [],
            attributes = [],
            records = [],
@@ -994,14 +1011,15 @@ finfo_set_module(Name, Info) ->
     case Info#forms.module of
         none ->
             Info#forms{module = {value, Name}};
-        {value, Name} ->
-            Info;    % allow duplicates
-        _ ->
-            Info#forms{module = error}
+        {value, _} ->
+            Info
     end.
 
 finfo_add_exports(L, Info) ->
     Info#forms{exports = L ++ Info#forms.exports}.
+
+finfo_add_module_import(M, Info) ->
+    Info#forms{module_imports = [M | Info#forms.module_imports]}.
 
 finfo_add_imports(M, L, Info) ->
     Es = Info#forms.imports,
@@ -1037,6 +1055,7 @@ finfo_to_list(Info) ->
             [{module, Info#forms.module},
              {exports, list_value(Info#forms.exports)},
              {imports, list_value(Info#forms.imports)},
+             {module_imports, list_value(Info#forms.module_imports)},
              {attributes, list_value(Info#forms.attributes)},
              {records, list_value(Info#forms.records)},
              {errors, list_value(Info#forms.errors)},
@@ -1196,7 +1215,7 @@ analyze_attribute(file, Node) ->
     analyze_file_attribute(Node);
 analyze_attribute(record, Node) ->
     analyze_record_attribute(Node);
-analyze_attribute(define, Node) ->
+analyze_attribute(define, _Node) ->
     define;
 analyze_attribute(_, Node) ->
     %% A "wild" attribute (such as e.g. a `compile' directive).
@@ -1219,16 +1238,24 @@ analyze_module_attribute(Node) ->
         attribute ->
             case erl_syntax:attribute_arguments(Node) of
                 [M] ->
-                    case erl_syntax:type(M) of
-                        atom ->
-                            erl_syntax:atom_value(M);
-                        _ ->
-                            throw(syntax_error)
-                    end;
+                    module_name_to_atom(M);
+                [M, L] ->
+		    M1 = module_name_to_atom(M),
+		    L1 = analyze_variable_list(L),
+		    {M1, L1};
                 _ ->
                     throw(syntax_error)
             end;
         _ ->
+            throw(syntax_error)
+    end.
+
+analyze_variable_list(Node) ->
+    case erl_syntax:is_proper_list(Node) of
+        true ->
+            [erl_syntax:variable_name(V)
+	     || V <- erl_syntax:list_elements(Node)];
+        false ->
             throw(syntax_error)
     end.
 
@@ -1241,8 +1268,8 @@ analyze_module_attribute(Node) ->
 %%          ModuleName = atom()
 %%
 %% @doc Returns the list of function names declared by an export
-%% attribute. Duplicates may occur in the result, and the order of
-%% listing is not defined.
+%% attribute. We do not guarantee that each name occurs at most once in
+%% the list. The order of listing is not defined.
 %%
 %% <p>The evaluation throws <code>syntax_error</code> if
 %% <code>Node</code> does not represent a well-formed export
@@ -1324,24 +1351,25 @@ append_arity(A, Name) when atom(Name) ->
     {Name, A};
 append_arity(A, A) ->
     A;
-append_arity(A, Name) ->
+append_arity(_A, Name) ->
     Name.    % quietly drop extra arity in case of conflict
 
 
 %% =====================================================================
 %% @spec analyze_import_attribute(Node::syntaxTree()) ->
-%%           {atom(), [FunctionName]}
+%%           {atom(), [FunctionName]} | atom()
 %%
 %%          FunctionName = atom() | {atom(), integer()}
 %%                       | {ModuleName, FunctionName}
 %%          ModuleName = atom()
 %%
-%% @doc Returns the module name and list of function names declared by
-%% an import attribute. The returned value is a pair <code>{Module,
-%% Names}</code>, where <code>Names</code> is a list of function names
-%% declared as imported from the module named by <code>Module</code>.
-%% Duplicates may occur in <code>Names</code>, and the order of listing
-%% is not defined.
+%% @doc Returns the module name and (if present) list of function names
+%% declared by an import attribute. The returned value is an atom
+%% <code>Module</code> or a pair <code>{Module, Names}</code>, where
+%% <code>Names</code> is a list of function names declared as imported
+%% from the module named by <code>Module</code>. We do not guarantee
+%% that each name occurs at most once in <code>Names</code>. The order
+%% of listing is not defined.
 %%
 %% <p>The evaluation throws <code>syntax_error</code> if
 %% <code>Node</code> does not represent a well-formed import
@@ -1353,21 +1381,12 @@ analyze_import_attribute(Node) ->
     case erl_syntax:type(Node) of
         attribute ->
             case erl_syntax:attribute_arguments(Node) of
-                [M, L] ->
-                    case erl_syntax:type(M) of
-                        atom ->
-                            L1 = analyze_function_name_list(L),
-                            {erl_syntax:atom_value(M), L1};
-                        _ ->
-                            throw(syntax_error)
-                    end;
 		[M] ->
-                    case erl_syntax:type(M) of
-                        atom ->
-                            {erl_syntax:atom_value(M), []};
-                        _ ->
-                            throw(syntax_error)
-                    end;		    
+		    module_name_to_atom(M);
+		[M, L] ->
+		    M1 = module_name_to_atom(M),
+		    L1 = analyze_function_name_list(L),
+		    {M1, L1};
                 _ ->
                     throw(syntax_error)
             end;
@@ -1418,20 +1437,17 @@ analyze_wild_attribute(Node) ->
 %% @spec analyze_record_attribute(Node::syntaxTree()) ->
 %%           {atom(), Fields}
 %%
-%%          Fields = [{atom(), Tree}]
-%%          Tree = none | syntaxTree()
+%%          Fields = [{atom(), none | syntaxTree()}]
 %%
 %% @doc Returns the name and the list of fields of a record declaration
 %% attribute. The result is a pair <code>{Name, Fields}</code>, if
 %% <code>Node</code> represents "<code>-record(Name, {...}).</code>",
 %% where <code>Fields</code> is a list of pairs <code>{Label,
-%% Tree}</code> for each field "<code>Label</code>" or "<code>Label =
-%% <em>Tree</em></code>" in the declaration, listed in left-to-right
-%% order. If no default value is declared, the value for
-%% <code>Tree</code> will be the atom <code>none</code> (cf.
-%% <code>analyze_record_field/1</code>). Multiple occurrences of the
-%% same label could occur in the list, with possibly different values
-%% for <code>Tree</code>.
+%% Default}</code> for each field "<code>Label</code>" or "<code>Label =
+%% <em>Default</em></code>" in the declaration, listed in left-to-right
+%% order. If the field has no default-value declaration, the value for
+%% <code>Default</code> will be the atom <code>none</code>. We do not
+%% guarantee that each label occurs at most one in the list.
 %%
 %% <p>The evaluation throws <code>syntax_error</code> if
 %% <code>Node</code> does not represent a well-formed record declaration
@@ -1447,7 +1463,7 @@ analyze_record_attribute(Node) ->
                 [R, T] ->
                     case erl_syntax:type(R) of
                         atom ->
-                            Es = analyze_record_field_tuple(T),
+                            Es = analyze_record_attribute_tuple(T),
                             {erl_syntax:atom_value(R), Es};
                         _ ->
                             throw(syntax_error)
@@ -1459,26 +1475,119 @@ analyze_record_attribute(Node) ->
             throw(syntax_error)
     end.
 
-analyze_record_field_tuple(Node) ->
+analyze_record_attribute_tuple(Node) ->
     case erl_syntax:type(Node) of
         tuple ->
             [analyze_record_field(F)
-             || F <- erl_syntax:tuple_elements(Node)];
+	     || F <- erl_syntax:tuple_elements(Node)];
         _ ->
             throw(syntax_error)
     end.
 
 
 %% =====================================================================
-%% @spec analyze_record_field(Node::syntaxTree()) -> {atom(), Tree}
+%% @spec analyze_record_expr(Node::syntaxTree()) ->
+%%     {atom(), Info} | atom()
 %%
-%%          Tree = none | syntaxTree()
+%%    Info = {atom(), [{atom(), Value}]} | {atom(), atom()} | atom()
+%%    Value = none | syntaxTree()
+%%
+%% @doc Returns the record name and field name/names of a record
+%% expression. If <code>Node</code> has type <code>record_expr</code>,
+%% <code>record_index_expr</code> or <code>record_access</code>, a pair
+%% <code>{Type, Info}</code> is returned, otherwise an atom
+%% <code>Type</code> is returned. <code>Type</code> is the node type of
+%% <code>Node</code>, and <code>Info</code> depends on
+%% <code>Type</code>, as follows:
+%% <dl>
+%%   <dt><code>record_expr</code>:</dt>
+%%     <dd><code>{atom(), [{atom(), Value}]}</code></dd>
+%%   <dt><code>record_access</code>:</dt>
+%%     <dd><code>{atom(), atom()} | atom()</code></dd>
+%%   <dt><code>record_index_expr</code>:</dt>
+%%     <dd><code>{atom(), atom()}</code></dd>
+%% </dl>
+%%
+%% <p>For a <code>record_expr</code> node, <code>Info</code> represents
+%% the record name and the list of descriptors for the involved fields,
+%% listed in the order they appear. (See
+%% <code>analyze_record_field/1</code> for details on the field
+%% descriptors). For a <code>record_access</code> node,
+%% <code>Info</code> represents the record name and the field name (or
+%% if the record name is not included, only the field name; this is
+%% allowed only in Mnemosyne-query syntax). For a
+%% <code>record_index_expr</code> node, <code>Info</code> represents the
+%% record name and the name field name.</p>
+%%
+%% <p>The evaluation throws <code>syntax_error</code> if
+%% <code>Node</code> represents a record expression that is not
+%% well-formed.</p>
+%%
+%% @see analyze_record_attribute/1
+%% @see analyze_record_field/1
+
+analyze_record_expr(Node) ->
+    case erl_syntax:type(Node) of
+	record_expr ->
+            A = erl_syntax:record_expr_type(Node),
+            case erl_syntax:type(A) of
+                atom ->
+                    Fs = [analyze_record_field(F)
+			  || F <- erl_syntax:record_expr_fields(Node)],
+                    {record_expr, {erl_syntax:atom_value(A), Fs}};
+                _ ->
+                    throw(syntax_error)
+            end;
+	record_access ->
+	    F = erl_syntax:record_access_field(Node),
+	    case erl_syntax:type(F) of
+		atom ->
+		    case erl_syntax:record_access_type(Node) of
+			none ->
+			    {record_access, erl_syntax:atom_value(F)};
+			A ->
+			    case erl_syntax:type(A) of
+				atom ->
+				    {record_access,
+				     {erl_syntax:atom_value(A),
+				      erl_syntax:atom_value(F)}};
+				_ ->
+				    throw(syntax_error)
+			    end
+		    end;
+		_ ->
+		    throw(syntax_error)
+	    end;
+	record_index_expr ->
+	    F = erl_syntax:record_index_expr_field(Node),
+	    case erl_syntax:type(F) of
+		atom ->
+		    A = erl_syntax:record_index_expr_type(Node),
+		    case erl_syntax:type(A) of
+			atom ->
+			    {record_index_expr,
+			     {erl_syntax:atom_value(A),
+			      erl_syntax:atom_value(F)}};
+			_ ->
+			    throw(syntax_error)
+		    end;
+		_ ->
+		    throw(syntax_error)
+	    end;
+	Type ->
+	    Type
+    end.
+
+%% =====================================================================
+%% @spec analyze_record_field(Node::syntaxTree()) -> {atom(), Value}
+%%
+%%          Value = none | syntaxTree()
 %%
 %% @doc Returns the label and value-expression of a record field
-%% specifier. The result is a pair <code>{Label, Tree}</code>, if
-%% <code>Node</code> represents "<code>Label = <em>Tree</em></code>" or
-%% "<code>Label</code>", where in the former case, <code>Tree</code> is
-%% a syntax tree, and in the latter case <code>Tree</code> is
+%% specifier. The result is a pair <code>{Label, Value}</code>, if
+%% <code>Node</code> represents "<code>Label = <em>Value</em></code>" or
+%% "<code>Label</code>", where in the first case, <code>Value</code> is
+%% a syntax tree, and in the second case <code>Value</code> is
 %% <code>none</code>.
 %%
 %% <p>The evaluation throws <code>syntax_error</code> if
@@ -1486,6 +1595,7 @@ analyze_record_field_tuple(Node) ->
 %% specifier.</p>
 %%
 %% @see analyze_record_attribute/1
+%% @see analyze_record_expr/1
 
 analyze_record_field(Node) ->
     case erl_syntax:type(Node) of
@@ -1799,7 +1909,7 @@ limit(Tree, Depth) ->
 %%
 %% @see limit/2
 
-limit(Tree, Depth, Node) when Depth < 0 ->
+limit(_Tree, Depth, Node) when Depth < 0 ->
     Node;
 limit(Tree, Depth, Node) ->
     limit_1(Tree, Depth, Node).
@@ -1840,13 +1950,13 @@ limit_1(Tree, Depth, Node) ->
             end
     end.
 
-cut_group([], Node) ->
+cut_group([], _Node) ->
     [];
 cut_group([T], Node) ->
     %% Only if the group contains a single subtree do we try to
     %% preserve it if suitable.
     [limit_1(T, 0, Node)];
-cut_group(Ts, Node) ->
+cut_group(_Ts, Node) ->
     [Node].
 
 is_simple_leaf(Tree) ->
@@ -1879,7 +1989,7 @@ limit_list_1([T | Ts], N, Node) ->
        true ->
             [Node]
     end;
-limit_list_1([], N, Node) ->
+limit_list_1([], _N, _Node) ->
     [].
 
 
@@ -1888,6 +1998,19 @@ limit_list_1([], N, Node) ->
 
 rewrite(Tree, Tree1) ->
     erl_syntax:copy_attrs(Tree, Tree1).
+
+module_name_to_atom(M) ->
+    case erl_syntax:type(M) of
+	atom ->
+	    erl_syntax:atom_value(M);
+	qualified_name ->
+	    list_to_atom(packages:concat(
+			   [erl_syntax:atom_value(A)
+			    || A <- erl_syntax:qualified_name_segments(M)])
+			);
+	_ ->
+	    throw(syntax_error)
+    end.
 
 %% This splits lines at line terminators and expands tab characters to
 %% spaces. The width of a tab is assumed to be 8.
@@ -1901,11 +2024,11 @@ split_lines(Cs, Prefix) ->
 split_lines(Cs, Prefix, N) ->
     lists:reverse(split_lines(Cs, N, [], [], Prefix)).
 
-split_lines([$\r, $\n | Cs], N, Cs1, Ls, Prefix) ->
+split_lines([$\r, $\n | Cs], _N, Cs1, Ls, Prefix) ->
     split_lines_1(Cs, Cs1, Ls, Prefix);
-split_lines([$\r | Cs], N, Cs1, Ls, Prefix) ->
+split_lines([$\r | Cs], _N, Cs1, Ls, Prefix) ->
     split_lines_1(Cs, Cs1, Ls, Prefix);
-split_lines([$\n | Cs], N, Cs1, Ls, Prefix) ->
+split_lines([$\n | Cs], _N, Cs1, Ls, Prefix) ->
     split_lines_1(Cs, Cs1, Ls, Prefix);
 split_lines([$\t | Cs], N, Cs1, Ls, Prefix) ->
     split_lines(Cs, 0, push(8 - (N rem 8), $\040, Cs1), Ls,
@@ -1914,7 +2037,7 @@ split_lines([C | Cs], N, Cs1, Ls, Prefix) ->
     split_lines(Cs, N + 1, [C | Cs1], Ls, Prefix);
 split_lines([], _, [], Ls, _) ->
     Ls;
-split_lines([], N, Cs, Ls, Prefix) ->
+split_lines([], _N, Cs, Ls, Prefix) ->
     [Prefix ++ lists:reverse(Cs) | Ls].
 
 split_lines_1(Cs, Cs1, Ls, Prefix) ->
@@ -1926,5 +2049,3 @@ push(N, C, Cs) when N > 0 ->
 push(0, _, Cs) ->
     Cs.
 
-
-%% =====================================================================

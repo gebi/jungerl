@@ -175,7 +175,7 @@
 
 -define(SCAP_UNICODE,  16#0004).
 
--define(USE_UNICODE(Neg), 
+-define(USE_UNICODE(Neg),
 	((Neg#smb_negotiate_res.srv_capabilities band ?SCAP_UNICODE) > 0)).
 
 %%% Add more dialects when we can support them.
@@ -231,8 +231,9 @@
 	  charset        = ?DEFAULT_CHARSET
 	  }).
 
--define(CSET_UCS2,   "UCS2").
--define(CSET_ASCII,  "ASCII").
+-define(CSET_UCS2,         "UCS2").
+-define(CSET_ASCII,        "ASCII").
+-define(CSET_ISO_8859_1,   "ISO-8859-1").
 
 %%% File info
 -record(file_info, {
@@ -289,9 +290,9 @@
 -define(GREG_SEC_0_TO_1601,  50522745600).
 
 -ifdef(DEBUG).
--define(TRACE(Fstr, Args), error_logger:info_msg(Fstr, Args)).
+-define(dbg(Fstr, Args), error_logger:info_msg(Fstr, Args)).
 -else.
--define(TRACE(Fstr, Args), true).
+-define(dbg(Fstr, Args), true).
 -endif.
 
 -endif.

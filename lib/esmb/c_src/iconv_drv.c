@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <iconv.h>
+#include <errno.h>
 
 #include "erl_driver.h"
 #ifndef ERL_DRV_NIL
@@ -82,6 +83,8 @@ static ErlDrvTermData am_value;
 static ErlDrvTermData am_error;
 static ErlDrvTermData am_enomem;
 static ErlDrvTermData am_einval;
+static ErlDrvTermData am_eilseq;
+static ErlDrvTermData am_e2big;
 static ErlDrvTermData am_unknown;
 
 static ErlDrvEntry iconvdrv_driver_entry;
@@ -203,7 +206,14 @@ static void iv_conv(t_iconvdrv *iv, iconv_t cd, char *ip, int ileft)
     iconv(cd, NULL, NULL, NULL, NULL);
 
     if (iconv(cd, &ip, &ileft, &op, &oleft) == (size_t) -1) {
-	fprintf(stderr, "iconv failed \n");
+	if (errno == EILSEQ) 
+	    driver_send_error(iv, &am_eilseq);
+	else if (errno == EINVAL) 
+	    driver_send_error(iv, &am_einval);
+	else if (errno == E2BIG) 
+	    driver_send_error(iv, &am_e2big);
+	else 
+	    driver_send_error(iv, &am_unknown);
     }
     else if (ileft == 0) {
 	len = OUTBUF_SZ - oleft;
@@ -301,6 +311,8 @@ DRIVER_INIT(iconvdrv)
   am_error        = driver_mk_atom("error");
   am_enomem       = driver_mk_atom("enomem");
   am_einval       = driver_mk_atom("einval");
+  am_eilseq       = driver_mk_atom("eilseq");
+  am_e2big        = driver_mk_atom("e2big");
   am_unknown      = driver_mk_atom("unknown");
 
   iconvdrv_driver_entry.init         = NULL;   /* Not used */

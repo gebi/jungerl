@@ -44,14 +44,27 @@ init(Host, Share, User, Wgroup) ->
 mk_path(Called, User) ->
     "\\\\" ++ Called ++ "\\" ++ ucase(User).
 
-to_ucs2(Neg, Path) when ?USE_UNICODE(Neg) ->
+to_ucs2(Neg, Str) when ?USE_UNICODE(Neg) ->
     iconv:start(),
-    {ok, Cd}    = iconv:open(?CSET_UCS2, ?CSET_ASCII),
-    {ok, Upath} = iconv:conv(Cd, l2b(Path)),
+    {ok, Cd}   = iconv:open(?CSET_UCS2, ?CSET_ISO_8859_1),
+    {ok, Ustr} = iconv:conv(Cd, l2b(Str)),
     iconv:close(Cd),
-    Upath;
-to_ucs2(_, Path) ->
-    Path.
+    Ustr;
+to_ucs2(_, Str) ->
+    Str.
+
+to_iso8859_1(Neg, Str) when ?USE_UNICODE(Neg) ->
+    iconv:start(),
+    {ok, Cd}   = iconv:open(?CSET_ISO_8859_1, ?CSET_UCS2),
+    Astr = case iconv:conv(Cd, l2b(Str)) of
+	       {ok, Res}        -> Res;
+	       {error, _Reason} -> string:copies("?", length(b2l(Str)) div 2)
+	   end,
+    iconv:close(Cd),
+    Astr;
+to_iso8859_1(_, Str) ->
+    Str.
+
 
 shell(S, Neg, {_Pdu, Cwd} = State) ->
     shell(S, Neg, cmd(read_line(Cwd), S, Neg, State)).
@@ -152,13 +165,13 @@ delete(S, Neg, {Pdu0, Cwd}, File0) ->
 
 ls(S, Neg, {Pdu, Cwd} = State) ->
     Finfo = esmb:list_dir(S, Pdu, to_ucs2(Neg, Cwd  ++ "*")),
-    print_file_info(Finfo),
+    print_file_info(Neg, Finfo),
     State.
 
-print_file_info(L) ->
+print_file_info(Neg, L) ->
     F = fun(X) ->
 		io:format("~-20s ~-20s SIZE ~-15w IS ~p~n", 
-			  [binary_to_list(X#file_info.name),
+			  [b2l(to_iso8859_1(Neg, X#file_info.name)),
 			   dt(X#file_info.date_time),
 			   X#file_info.size,
 			   check_attr(X#file_info.attr)])
@@ -221,3 +234,6 @@ eat_until([H|T], X, Acc)      -> eat_until(T, X, [H|Acc]).
     
 l2b(L) when list(L)   -> list_to_binary(L);
 l2b(B) when binary(B) -> B.
+
+b2l(B) when binary(B) -> binary_to_list(B);
+b2l(L) when list(L)   -> L.

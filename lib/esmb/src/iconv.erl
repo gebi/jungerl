@@ -101,8 +101,6 @@ recv(Port) ->
 	{Port, value, Bin} ->
 	    {ok,Bin};
 	{Port, error, ErrAtom} ->
-	    unlink(Port),
-	    erlang:port_close(Port),
 	    {error, ErrAtom}
     end.
 

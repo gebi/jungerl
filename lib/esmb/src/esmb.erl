@@ -187,7 +187,7 @@ connect(Caller, Called)           -> connect(Caller, Called, []).
 connect(Caller, Called, SockOpts) -> connect(Caller, Called, SockOpts, ?PORT).
 
 connect(Caller, Called, SockOpts, Port) ->
-    ?TRACE("~w(~w): enter connect, Caller=~p Called=~p~n",
+    ?dbg("~w(~w): enter connect, Caller=~p Called=~p~n",
 	   [?MODULE, ?LINE, Caller, Called]),
     Opts = [binary, {packet, 0}|SockOpts],
     case gen_tcp:connect(lcase_host(Called), Port, Opts) of
@@ -344,12 +344,12 @@ tree_connect(S, Neg, InReq, Path, Service) ->
     decode_smb_response(Req, nbss_session_service(S, Pdu)).
 
 negotiate(S) ->
-    ?TRACE("~w(~w): enter negotiate~n", [?MODULE, ?LINE]),
+    ?dbg("~w(~w): enter negotiate~n", [?MODULE, ?LINE]),
     {Req, Pdu} = smb_negotiate_pdu(),
     decode_smb_response(Req, nbss_session_service(S, Pdu)).
 
 user_logon(S, Neg, U) ->
-    ?TRACE("~w(~w): enter user_logon, U=~p~n", [?MODULE, ?LINE, U]),
+    ?dbg("~w(~w): enter user_logon, U=~p~n", [?MODULE, ?LINE, U]),
     {Req, Pdu} = smb_session_setup_andx_pdu(Neg, U),
     decode_smb_response(Req, nbss_session_service(S, Pdu)).
 
@@ -394,7 +394,7 @@ decode_smb_response(Req, {ok, _, ResPdu}) when  ?IS(Req, ?SMB_NEGOTIATE) ->
 			    #smb_negotiate_res{dialect_index = Di});
 	?NT_LM_0_12 ->
 	    crypto:start(),
-	    ?TRACE("~w(~w): decode_neg_resp, size=~p , Buf=~p~n", 
+	    ?dbg("~w(~w): decode_neg_resp, size=~p , Buf=~p~n", 
 		   [?MODULE, ?LINE, size(Res#smbpdu.bf), Res#smbpdu.bf]),
 	    ntlm_neg_resp(B, Res#smbpdu.bf, 
 			  #smb_negotiate_res{dialect_index = Di});
@@ -460,7 +460,7 @@ ntlm_neg_resp(<<SecurityMode,
 	      EncKeyLen>>,           % Encryption key length
 	      B,
 	      Neg) ->
-    ?TRACE("~w(~w): ntlm_neg_resp EncKeyLen=~p~n", 
+    ?dbg("~w(~w): ntlm_neg_resp EncKeyLen=~p~n", 
 	   [?MODULE, ?LINE, EncKeyLen]),
     <<EncKey:EncKeyLen/binary, _/binary>> = B,
     Neg#smb_negotiate_res{security_mode    = SecurityMode,
@@ -597,48 +597,66 @@ dec_trans2_find_x2(Req, Pdu, SubCmd) ->
 		   EaErrorOffset,
 		   LastNameOffset,
 		   Res#smbpdu.bf),
-    <<_:DataOffset/unit:8, Data/binary>> = Pdu,
-    %%io:format("dec_trans2_find_first2: ~n",[]),
-    %%io:format("  Data offset   = ~p~n",[DataOffset]),
-    %%io:format("  Search handle = ~p~n",[Sid]),
-    %%io:format("  No.of entries = ~p~n",[SearchCount]),
-    %%io:format("  EOF search ?  = ~p~n",[EndOfSearch]),
-    %%io:format("  LastNameOset  = ~p~n",[LastNameOffset]),
+    %%<<_:DataOffset/unit:8, Data/binary>> = Pdu,
+    <<_:DataOffset/binary, Data/binary>> = Pdu,
+    ?dbg("dec_trans2_find_first2: ~n",[]),
+    ?dbg("  Data offset   = ~p~n",[DataOffset]),
+    ?dbg("  Search handle = ~p~n",[Sid]),
+    ?dbg("  No.of entries = ~p~n",[SearchCount]),
+    ?dbg("  EOF search ?  = ~p~n",[EndOfSearch]),
+    ?dbg("  LastNameOset  = ~p~n",[LastNameOffset]),
     Finfo = dec_info_standard(Res, Data, SearchCount),
     #find_result{sid = Sid, eos = to_bool(EndOfSearch), finfo = Finfo}.
 
 %%% ---
 
 dec_info_standard(Req, Data, Max) ->
-    Ucode = length(null(Req)), % FIXME , length factor
-    dec_info_standard(Ucode, Data, Max, 1).
+    Ucode = bytes_per_character(Req),
+    dec_info_standard(Data, Ucode, Max, 1).
 
-dec_info_standard(Ucode, <<_:4/binary, DT:12/binary, Size:32/little,
+dec_info_standard(<<_:4/binary, DT:12/binary, Size:32/little,
 		  _:4/binary, Attr:16/little, Len, 
-		  Rest0/binary>>, Max, I) when I<Max->
-    Ulen = Len * Ucode,
-    <<Filename:Ulen/binary, _:Ucode/binary, Rest/binary>> = Rest0,
+		  Rest0/binary>>, Ucode, Max, I) when I<Max->
+    Rest1 = strip_upad(Ucode, Rest0),
+    <<Filename:Len/binary, _:Ucode/binary, Rest/binary>> = Rest1,
+    ?dbg("Finfo: I=~p, Ucode=~w, Len=~w, Filename=~w~n",[I, Ucode, Len, Filename]),
     F = #file_info{name = Filename,
 		   size = Size,
 		   attr = Attr,
 		   date_time = dec_dt_info_std(DT)},
-    [F | dec_info_standard(Ucode, Rest, Max, I+1)];
-dec_info_standard(Ucode, <<Rkey:4/binary, DT:12/binary, Size:32/little,
+    [F | dec_info_standard(Rest, Ucode, Max, I+1)];
+dec_info_standard(<<Rkey:4/binary, DT:12/binary, Size:32/little,
 		  _:4/binary, Attr:16/little, Len, 
-		  Rest0/binary>>, Max, Max) ->
-    Ulen = Len * Ucode,
-    <<Filename:Ulen/binary, _:Ucode/binary, Rest/binary>> = Rest0,
+		  Rest0/binary>>, Ucode, Max, Max) ->
+    Rest1 = strip_upad(Ucode, Rest0),
+    <<Filename:Len/binary, _:Ucode/binary, Rest/binary>> = Rest1,
+    ?dbg("Finfo: I=~p, Ucode=~w, Len=~w, Filename=~w~n",[Max, Ucode, Len, Filename]),
     F = #file_info{name = Filename,
 		   size = Size,
 		   attr = Attr,
 		   date_time = dec_dt_info_std(DT),
 		   resume_key = Rkey},
     [F];
-dec_info_standard(Ucode, Data, Max, I) ->
-    io:format("ERROR: Missing file info I=~p~n",[I]),
-    sleep(2),
-    io:format("FLUSH: ~p~n",[receive X -> X after 0 -> false end]),
+dec_info_standard(Data, Ucode, Max, I) ->
+    io:format("dec_info_standard: <ERROR> Missing file info I=~p~n",[I]),
     [].
+
+
+bytes_per_character(Pdu) when record(Pdu,smbpdu),
+			      ?F2_USE_UNICODE(Pdu) -> 
+    2;
+bytes_per_character(Neg) when record(Neg,smb_negotiate_res),
+			    ?USE_UNICODE(Neg) ->  
+    2;
+bytes_per_character(_) -> 
+    1.
+
+
+%%%
+%%% In case of unicode, we have a pad byte in front !
+%%%
+strip_upad(1, Bin)               -> Bin;
+strip_upad(2, <<_, Bin/binary>>) -> Bin.
 
 %%%
 %%% DOS - Date/Time format
@@ -1104,7 +1122,7 @@ null(_) ->
 %%% responses computed using the "LM session key".
 %%%
 smb_session_setup_andx_pdu(Neg, U) when ?PRE_DOS_LANMAN_2_1(Neg) ->
-    ?TRACE("~w(~w): session_setup_andx, pre_dos_lanman_2.1~n",[?MODULE,?LINE]),
+    ?dbg("~w(~w): session_setup_andx, pre_dos_lanman_2.1~n",[?MODULE,?LINE]),
     {Passwd, PwLen}   = enc_lm_passwd(Neg, U#user.pw),
     {Wc,Wp} = wp_session_setup_andx(Neg, U, PwLen),
     Bf = bf_session_setup_andx(Neg, U, Passwd),
@@ -1117,12 +1135,29 @@ smb_session_setup_andx_pdu(Neg, U) when ?PRE_DOS_LANMAN_2_1(Neg) ->
 		  bf  = Bf},
     {Rec, enc_smb(Rec)};
 %%%
-smb_session_setup_andx_pdu(Neg, U) when ?NTLM_0_12(Neg) ->
-    ?TRACE("~w(~w): session_setup_andx, ntlm_0.12~n",[?MODULE,?LINE]),
+smb_session_setup_andx_pdu(Neg, U) when ?NTLM_0_12(Neg),
+					?USE_UNICODE(Neg) ->
+    ?dbg("~w(~w): session_setup_andx, ntlm_0.12 + Unicode Capa=~w~n",
+	 [?MODULE,?LINE, Neg#smb_negotiate_res.srv_capabilities]),
     %%{Passwd, PwLen}   = enc_lm_passwd(Neg, U#user.pw),
     {UPasswd, UPwLen} = enc_nt_passwd(Neg, U#user.pw, U#user.charset),
-    {Wc,Wp} = wp_session_setup_andx(Neg, U, 'FIXME', UPwLen),
-    Bf = bf_session_setup_andx(Neg, U, 'FIXME', UPasswd),
+    {Wc,Wp} = wp_session_setup_andx(Neg, U, 0, UPwLen), 
+    Bf = bf_session_setup_andx(Neg, U, UPasswd),
+    Rec = #smbpdu{cmd = ?SMB_SESSION_SETUP_ANDX,
+		  pid = mypid(),
+		  mid = 1,
+		  flags2 = flags2(Neg),
+		  wc = Wc,
+		  wp = Wp,
+		  bc  = size(Bf),
+		  bf  = Bf},
+    {Rec, enc_smb(Rec)};
+%%%
+smb_session_setup_andx_pdu(Neg, U) when ?NTLM_0_12(Neg) ->
+    ?dbg("~w(~w): session_setup_andx, ntlm_0.12~n",[?MODULE,?LINE]),
+    {Passwd, PwLen}   = enc_lm_passwd(Neg, U#user.pw),
+    {Wc,Wp} = wp_session_setup_andx(Neg, U, PwLen, 0),
+    Bf = bf_session_setup_andx(Neg, U, Passwd),
     Rec = #smbpdu{cmd = ?SMB_SESSION_SETUP_ANDX,
 		  pid = mypid(),
 		  mid = 1,
@@ -1157,33 +1192,33 @@ wp_session_setup_andx(Neg, U, PwLen, UPwLen) ->
       ?MaxMpxCount:16/little,   
       ?VcNumber:16/little,
       0:32/little,               % session key
-      %%PwLen:16/little,
-      0:16/little,               % ANSI password length
+      PwLen:16/little,           % ANSI password length
       UPwLen:16/little,          % UNICODE password length
       0:32/little,               % reserved
       ?CAP_UNICODE:32/little>>}. % client capabilities
     
-bf_session_setup_andx(Neg, U, Passwd) ->
-    list_to_binary([Passwd,
-		    U#user.name,[0],
-		    U#user.primary_domain,[0],
-		    U#user.native_os,[0],
-		    U#user.native_lanman,[0]]).
-%%%
-bf_session_setup_andx(Neg, U, Passwd, UPasswd) ->
-    iconv:start_link(),
+
+bf_session_setup_andx(Neg, U, Passwd) when ?USE_UNICODE(Neg) ->
+    iconv:start(),
     {ok, Cd}    = iconv:open(?CSET_UCS2, ?CSET_ASCII),
     {ok, Uname} = iconv:conv(Cd, l2b(U#user.name)),
     {ok, Udom}  = iconv:conv(Cd, l2b(U#user.primary_domain)),
     {ok, Unos}  = iconv:conv(Cd, l2b(U#user.native_os)),
     {ok, Ulan}  = iconv:conv(Cd, l2b(U#user.native_lanman)),
     iconv:close(Cd),
-    list_to_binary([UPasswd,
+    list_to_binary([Passwd,
 		    [0],         % if Unicode, pad to even byte boundary
 		    Uname,[0,0],
 		    Udom,[0,0],
 		    Unos,[0,0],
-		    Ulan,[0,0]]).
+		    Ulan,[0,0]]);
+%%%
+bf_session_setup_andx(Neg, U, Passwd) ->
+    list_to_binary([Passwd,
+		    U#user.name,[0],
+		    U#user.primary_domain,[0],
+		    U#user.native_os,[0],
+		    U#user.native_lanman,[0]]).
 
 
 -define(USE_ENCRYPTION(Neg), ((Neg#smb_negotiate_res.security_mode 
@@ -1451,11 +1486,11 @@ dec_msg(<<?SESSION_KEEP_ALIVE, _/binary>>) ->
     {ok, ?SESSION_KEEP_ALIVE};
 dec_msg(<<?NEGATIVE_SESSION_RESPONSE,Flags,Length:16,Ecode>>) ->
     Emsg =  neg_sess_resp(Ecode),
-    ?TRACE("~w(~w): Got NEGATIVE_SESSION_RESPONSE: ~s~n",
+    ?dbg("~w(~w): Got NEGATIVE_SESSION_RESPONSE: ~s~n",
 	   [?MODULE, ?LINE, Emsg]),
     {error, neg_sess_resp(Ecode)};
 dec_msg(Bin) ->
-    ?TRACE("~w(~w): nbs_session_resp Got: ~p~n",[?MODULE, ?LINE, Bin]),
+    ?dbg("~w(~w): nbs_session_resp Got: ~p~n",[?MODULE, ?LINE, Bin]),
     {error, Bin}.
 
 get_more(Expected, Got, Bins) when Got < Expected ->

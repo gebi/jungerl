@@ -57,14 +57,22 @@ start() ->
     gen_server:start({local, ?SERVER}, ?MODULE, [], []).
 
 %%-----------------------------------------------------------------
-%% Authenticate a user
+%% --- Authenticate a user. ---
+%%
+%% The auth() function can return either of:
+%%
+%%    {accept, AttributeList}
+%%    {reject, AttributeList}
+%%    {reject, ErrorCode}
+%%    {challenge, ChallengeState, ReplyMsg}
+%%
 %%-----------------------------------------------------------------
 
 auth(E) ->
     auth(E, E#eradius.user, E#eradius.passwd).
 
 auth(E, User, Passwd) ->
-    auth(E, User, Passwd, <<>>).
+    auth(E, User, Passwd, E#eradius.state).
 
 auth(E, User, Passwd, CallState) when record(E, eradius) ->
     gen_server:call(?SERVER, {auth, E, User, Passwd, CallState},
@@ -195,7 +203,7 @@ wloop(E, User0, Passwd0, [[Ip,Port,Secret0]|Srvs], State) ->
 		   authenticator = Auth,
 		   cmd = #rad_request{user = User,
 				      passwd = RPasswd,
-				      state = get_radius_state(State),
+				      state = State,
 				      nas_ip = E#eradius.nas_ip_address}},
     ?TRACEFUN(E,"sending RADIUS request for ~s to ~p",
 	      [binary_to_list(User), {Ip, Port}]),
@@ -229,19 +237,6 @@ wloop(E, User0, Passwd0, [[Ip,Port,Secret0]|Srvs], State) ->
 wloop(E, User, _Passwd, [], _State) ->
     ?TRACEFUN(E,"no more RADIUS servers to try for ~s",[binary_to_list(User)]),
     {reject, ?AL_Backend_Unreachable}.
-
-
-get_radius_state({_E, _User, State}) ->
-    case catch binary_to_term(State) of
-	{{_Ip,_Port,_Secret0}, RadiusState} -> 
-	    RadiusState;
-	_ -> 
-	    State
-    end;
-get_radius_state(RadiusState) when binary(RadiusState) ->
-    RadiusState;
-get_radius_state(What) ->
-    What.
 
 
 send_recv_msg(Ip, Port, Req, E) ->

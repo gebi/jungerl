@@ -1,0 +1,33 @@
+<$macro>html_macros</$macro>
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+<HEAD>
+   <TITLE>Erlang97</TITLE>
+</HEAD>
+<BODY TEXT="#00AAAA" BGCOLOR="#000000" LINK="#B6CBD3" VLINK="#0080C0" ALINK="#80FFFF" BACKGROUND="paper4.jpg">
+
+<CENTER><P><BR>
+<BR>
+<B><I><FONT SIZE=+4>Erlang97</FONT></I></B></P></CENTER>
+
+<font size=+1>
+<ul>
+<$dp>Erlang95</$dp> is a new implementation of Erlang which consolodates.
+
+<$dp>Sub-nodes</$dp> for added protection.
+
+<$dp>Extended guards</$dp> - guard expressions  have been changed to
+allow full boolean expressions.
+
+<$dp>Roland</$dp> likes this.
+
+<$dp>Multi-processor</$dp> support.
+
+</ul>
+
+<CENTER>
+<P><FONT SIZE=-1>Copyright 1997 Ericsson IP-services</FONT></P>
+</CENTER>
+
+</BODY>
+

@@ -1,0 +1,1052 @@
+<!-- received="Thu Aug  4 18:04:06 1994 MST" -->
+<!-- sent="Thu, 4 Aug 1994 15:46:18 PDT" -->
+<!-- name="Larry Masinter" -->
+<!-- email="masinter@parc.xerox.com" -->
+<!-- subject="Draft URL document, for last call to be proposed standard RFC" -->
+<!-- id="94Aug4.154628pdt.2760@golden.parc.xerox.com" -->
+<!-- inreplyto="" -->
+<title>uri-94q3: Draft URL document, for last call to be proposed standard RFC</title>
+<h1>Draft URL document, for last call to be proposed standard RFC</h1>
+Larry Masinter (<i>masinter@parc.xerox.com</i>)<br>
+<i>Thu, 4 Aug 1994 15:46:18 PDT</i>
+<p>
+<ul>
+<li> <b>Messages sorted by:</b> <a href="index.html#150">[ date ]</a><a href="thread.html#150">[ thread ]</a><a href="subject.html#150">[ subject ]</a><a href="author.html#150">[ author ]</a>
+<!-- next="start" -->
+<li> <b>Next message:</b> <a href="0151.html">Mitra: "Latest URL draft - diffs please"</a>
+<li> <b>Previous message:</b> <a href="0149.html">Internet-Drafts@CNRI.Reston.VA.US: "I-D ACTION:draft-ietf-uri-resource-names-02.txt"</a>
+<!-- nextthread="start" -->
+<li> <b>Next in thread:</b> <a href="0170.html">John A. Kunze: "Re: Draft URL document, for last call to be proposed standard RFC"</a>
+<li> <b>Maybe reply:</b> <a href="0170.html">John A. Kunze: "Re: Draft URL document, for last call to be proposed standard RFC"</a>
+<li> <b>Maybe reply:</b> <a href="0173.html">John A. Kunze: "Re: Draft URL document, for last call to be proposed standard RFC"</a>
+<!-- reply="end" -->
+</ul>
+<!-- body="start" -->
+Uniform Resource Locators                                 T. Berners-Lee<br>
+draft-ietf-uri-url-06.txt                                    L. Masinter<br>
+Expires March 4, 1995                                        M. McCahill<br>
+                                                                 Editors<br>
+                                                          August 4, 1994<br>
+<p>
+                  Uniform Resource Locators (URL)<br>
+<p>
+Status of this memo<br>
+<p>
+     This document is an Internet-Draft.  Internet-Drafts are<br>
+     working documents of the Internet Engineering Task Force<br>
+     (IETF), its areas, and its working groups.  Note that other<br>
+     groups may also distribute working documents as<br>
+     Internet-Drafts.<br>
+ <br>
+     Internet-Drafts are draft documents valid for a maximum of six<br>
+     months.  Internet-Drafts may be updated, replaced, or obsoleted<br>
+     by other documents at any time.  It is not appropriate to use<br>
+     Internet-Drafts as reference material or to cite them other<br>
+     than as a ``working draft'' or ``work in progress.''<br>
+ <br>
+     To learn the current status of any Internet-Draft, please check<br>
+     the 1id-abstracts.txt listing contained in the Internet-Drafts<br>
+     Shadow Directories on ds.internic.net, nic.nordu.net,<br>
+     ftp.isi.edu, or munnari.oz.au.<br>
+<p>
+     This Internet Draft expires March 4, 1995.<br>
+<p>
+0. Abstract<br>
+<p>
+   This document specifies a Uniform Resource Locator (URL), the<br>
+   syntax and semantics of formalized information for location and<br>
+   access of resources on the Internet.<br>
+<p>
+1. Introduction<br>
+<p>
+   The work is derived from concepts introduced by the World-Wide Web<br>
+   global information initiative,  whose use of  such objects dates<br>
+   from 1990 and is described in "Universal Resource Identifiers in<br>
+   WWW", RFC 1630.<br>
+<p>
+   This document was written by the URI working group of the Internet<br>
+   Engineering Task Force.  Comments may be addressed to the editor,<br>
+   Tim Berners-Lee &lt;timbl@info.cern.ch&gt;, or to the URI-WG<br>
+   &lt;uri@bunyip.com&gt;. Discussions of the group are archived at<br>
+   &lt;URL:<a href="http://www.acl.lanl.gov/URI/archive/uri-archive.index.html">http://www.acl.lanl.gov/URI/archive/uri-archive.index.html</a>&gt;<br>
+<p>
+2. Recommendations<br>
+<p>
+   This document describes the syntax for "Uniform Resource Locators"<br>
+   (URLs): a compact representation of the location and access method<br>
+   for a resource available on the Internet. Just as there are many<br>
+   different methods of access to resources, there are several<br>
+   _schemes_ for describing the location of such resources.<br>
+<p>
+   The generic syntax provides a framework for new URL schemes to be<br>
+   resolved using as yet undefined protocols.<br>
+<p>
+   The syntax is described in two parts. First, we give the syntax<br>
+   rules of a completely specified URL; second, we give the rules<br>
+   under which parts of the URL may be omitted in a well-defined<br>
+   context.<br>
+<p>
+2.1. URL SYNTAX<br>
+<p>
+   URLs are written as follows:<br>
+<p>
+       &lt;scheme&gt;:&lt;scheme-specific-part&gt;<br>
+<p>
+   A the URL contains the name of the scheme being used (&lt;scheme&gt;)<br>
+   followed by a colon and then a string (the &lt;scheme-specific-part&gt;)<br>
+   whose interpretation depends on the scheme.<br>
+<p>
+   Scheme names consist of lower case letters "a"--"z", digits, and<br>
+   the characters plus ("+"), period ("."), and hyphen ("-"). For<br>
+   resiliency, programs interpreting URLs should allow upper case<br>
+   letters as equivalent to lower case in scheme names (e.g., allow<br>
+   "HTTP" as well as "http").<br>
+<p>
+   A BNF description of the URL syntax is given in Section 5.<br>
+<p>
+2.2. Reserved, unsafe, and encoded characters<br>
+<p>
+   URLs are represented as a sequence of characters.  Characters are<br>
+   used to represent the 8-bit byte that corresponds to their ASCII<br>
+   encoding.<br>
+ <br>
+   There is a standard way, known as `URL-encoding', to encode bytes<br>
+   that are otherwise disallowed: bytes are encoded by representing<br>
+   them as a percent sign "%" followed by two hexadecimal digits (0-9,<br>
+   A-F).<br>
+<p>
+   In any circumstance, only printable ASCII characters are allowed:<br>
+   URLs may not contain space or other non-printable characters. These<br>
+   and the character "%" must always be encoded.<br>
+   <br>
+   Many URL schemes reserve certain characters for a special meaning;<br>
+   their appearance in the scheme-specific part of the URL has a<br>
+   designated semantics. If it is necessary to designate a byte in a<br>
+   component of a URL that would otherwise be represented by a<br>
+   reserved character, it is necessary to represent that byte encoded.<br>
+   The characters ";", "/", "?", ":", "@", "=" and "&amp;" are the<br>
+   characters which may be reserved for special meaning within a<br>
+   scheme.  No other characters may be reserved within a scheme.<br>
+<p>
+   Most characters mean the same thing when represented as themselves<br>
+   as when represented encoded; however, this is not true for reserved<br>
+   characters: encoding a reserved character for a particular scheme<br>
+   may change the semantics of a URL.<br>
+<p>
+   There are a number of characters whose use in URLs is _unsafe_;<br>
+   characters can be unsafe for a number of reasons.  The characters<br>
+   "&lt;" and "&gt;" are unsafe because they are used as the delimiters<br>
+   around URLs in free text; the quote mark (""") is used to delimit<br>
+   URLs in other systems. The character "#" is unsafe because it is<br>
+   used in World Wide Web and in other systems to delimit a URL from a<br>
+   fragment identifier that might follow it.  Other characters are<br>
+   unsafe because gateways and other transport agents are sometimes<br>
+   known to modify such characters. All unsafe characters should<br>
+   always be encoded within a URL. For example, the character "#"<br>
+   should always be encoded within URLs, even in systems that do not<br>
+   normally deal with fragment identifiers, so that if the URL is<br>
+   copied into another system that does use fragments it will not be<br>
+   necessary to change the URL encoding.<br>
+    <br>
+   In general, only alphanumerics, reserved characters used for their<br>
+   reserved purposes, "$", "-", "_", ".", and "+" are safe and may be<br>
+   transmitted unencoded. Even so, safe characters _may_ be encoded<br>
+   within the scheme specific part of a URL.<br>
+<p>
+3. Specific Schemes<br>
+<p>
+   The mapping for some existing standard and experimental protocols<br>
+   is outlined in the BNF syntax definition.  Notes on particular<br>
+   protocols follow. The schemes covered are:<br>
+<p>
+   ftp                     File Transfer protocol<br>
+   http                    Hypertext Transfer Protocol<br>
+   gopher                  The Gopher protocol<br>
+   mailto                  Electronic mail address<br>
+   news                    USENET news<br>
+   nntp                    USENET news using NNTP access<br>
+   telnet                  Reference to interactive sessions<br>
+   wais                    Wide Area Information Servers<br>
+   file                    Host-specific file names<br>
+   prospero                Prospero Directory Service<br>
+<p>
+   Other schemes may be specified by future specifications. Section 4<br>
+   of this document describes how new schemes may be registered, and<br>
+   lists some scheme names that are under development.<br>
+<p>
+3.1. Common Internet Scheme Syntax<br>
+<p>
+   While the syntax for the rest of the URL may vary depending on the<br>
+   particular scheme selected, URL schemes that involve the direct use<br>
+   of an IP-based protocol to a specified host on the Internet use a<br>
+   common syntax for the initial part of the scheme-specific data:<br>
+<p>
+        //&lt;user&gt;:&lt;password&gt;@&lt;host&gt;:&lt;port&gt;<br>
+        //&lt;user&gt;:&lt;password&gt;@&lt;host&gt;:&lt;port&gt;/&lt;url-path&gt;<br>
+<p>
+   This initial part starts with a double slash "//" to indicate its<br>
+   presence, and continues until the following slash "/", if any.<br>
+   Within this section are:<br>
+<p>
+    user<br>
+        An optional user name. Some schemes (e.g., ftp) allow the<br>
+        specification of a user name.<br>
+<p>
+    password<br>
+        An optional password. If present, it follows the user<br>
+        name separated from it by a colon.<br>
+<p>
+   The user name (and password), if present, are followed by a<br>
+   commercial at-sign "@". Within the user and password field, any<br>
+   ":", "@", or "/" must be encoded.<br>
+<p>
+   Note that an empty user name or password is different than no user<br>
+   name or password; there is no way to specify a password without<br>
+   specifying a user name. E.g., &lt;URL:<a href="ftp://@host.com/">ftp://@host.com/</a>&gt; has an empty<br>
+   user name and no password, &lt;URL:<a href="ftp://host.com/">ftp://host.com/</a>&gt; has no user name,<br>
+   while &lt;URL:<a href="ftp://foo:@host.com/">ftp://foo:@host.com/</a>&gt; has a user name of "foo" and an<br>
+   empty password.<br>
+<p>
+    host<br>
+        The fully qualified domain name of a network host, or its IP<br>
+        address as a set of four decimal digits separated by periods. <br>
+        Fully qualified domain names take the form as described in<br>
+        Section 3.5 of RFC 1034: a sequence of parts separated by<br>
+        period.<br>
+<p>
+    port<br>
+        The (optional) port number to connect to. Most schemes<br>
+        designate protocols that have a default port number. Another<br>
+        port number may optionally be supplied, in decimal, separated<br>
+        from the host by a colon.<br>
+<p>
+    url-path<br>
+        The rest of the locator consists of data specific to the<br>
+        scheme, and is known as the "url-path". It supplies the<br>
+        details of how the specified resource can be accessed. Note<br>
+        that the "/" between the host (or port) and the url-path is<br>
+        NOT part of the url-path.<br>
+<p>
+   The url-path is interpreted in a manner dependent on the scheme<br>
+   being used.<br>
+<p>
+3.2. FTP<br>
+<p>
+   The FTP URL scheme is used to designate files and directories on<br>
+   Internet hosts accessible using the FTP protocol (RFC959).<br>
+<p>
+   A FTP URL follow the syntax described in Section 3.1.  If :&lt;port&gt;<br>
+   is omitted, the port defaults to 21.<br>
+<p>
+3.2.1. FTP Name and Password<br>
+<p>
+   A user name and password may be supplied. If no user name or<br>
+   password is supplied and one is requested by the FTP server, the<br>
+   conventions for "anonymous" FTP are to be used, as follows:<br>
+<p>
+        The user name "anonymous" is supplied.<br>
+<p>
+        The password is supplied as the Internet e-mail address<br>
+        of the end user accessing the resource.<br>
+<p>
+   If the URL supplies a user name but no password, and the remote<br>
+   server requests a password, the program interpreting the FTP URL<br>
+   should request one from the user.<br>
+<p>
+3.2.2. FTP url-path<br>
+<p>
+   The url-path of a FTP URL has the following syntax:<br>
+<p>
+        &lt;cwd1&gt;/&lt;cwd2&gt;/.../&lt;cwdN&gt;/&lt;name&gt;;type=&lt;typecode&gt;<br>
+<p>
+   Where &lt;cwd1&gt; through &lt;cwdN&gt; and &lt;name&gt; are (possibly encoded)<br>
+   strings and &lt;typecode&gt; is one of the characters "a", "i", or "d".<br>
+<p>
+   The url-path is interpreted as a series of FTP commands as follows:<br>
+<p>
+      Each of the &lt;cwd&gt; elements is to be supplied, sequentially, as<br>
+      the argument to a CWD (change working directory) command.<br>
+<p>
+      If the typecode is "d", perform a NLST (name list) command with<br>
+      &lt;name&gt; as the argument, and interpret the results as a file<br>
+      directory listing.<br>
+<p>
+      Otherwise, perform a TYPE command with &lt;typecode&gt; as the<br>
+      argument, and then access the file whose name is &lt;name&gt; (for<br>
+      example, using the RETR command.)<br>
+<p>
+   Within a name or CWD component, the characters "/" and ";" are<br>
+   reserved and must be encoded. The components are decoded prior to<br>
+   their use in the FTP protocol.  In particular, if the appropriate<br>
+   FTP sequence to access a particular file requires supplying a<br>
+   string containing a "/" as an argument to a CWD or RETR command, it<br>
+   is necessary to encode each "/" as %2F.<br>
+<p>
+   For example, the URL &lt;URL:<a href="ftp://myname@host.dom/%2Fetc/motd">ftp://myname@host.dom/%2Fetc/motd</a>&gt; is<br>
+   interpreted by FTP-ing to "host.dom", logging in as "myname"<br>
+   (prompting for a password if it is asked for), and then executing<br>
+   "CWD /etc" and then "RETR motd". This has a different meaning from<br>
+   &lt;URL:<a href="ftp://myname@host.dom/etc/motd">ftp://myname@host.dom/etc/motd</a>&gt; which would "CWD etc",<br>
+   relative to the default directory for "myname", or &lt;URL:ftp:<br>
+   //myname@host.dom//etc/motd&gt;, which would "CWD " with a null<br>
+   argument and then "RETR motd".<br>
+<p>
+3.2.3. FTP Typecode is Optional<br>
+<p>
+   The entire ;type=&lt;typecode&gt; part of a FTP URL is optional. If it is<br>
+   omitted, the client program interpreting the URL must guess the<br>
+   appropriate mode to use. In general, the data content type of a<br>
+   file can only be guessed from the name, e.g., from the suffix of<br>
+   the name; the appropriate type code to be used for transfer of the<br>
+   file can then be deduced from the data content of the file.<br>
+<p>
+3.2.4 Hierarchy<br>
+<p>
+   For some file systems, the "/" used to denote the hierarchical<br>
+   structure of the URL corresponds to the delimiter used to construct<br>
+   a file name hierarchy, and thus, the filename will look similar to<br>
+   the URL path. This does NOT mean that the URL is a Unix filename.<br>
+<p>
+3.2.5. Optimization<br>
+<p>
+   Clients accessing resources via FTP may employ additional<br>
+   heuristics to optimize the interaction. For some FTP servers, for<br>
+   example, it may be reasonable to keep the control connection open<br>
+   while accessing multiple URLs from the same server. However, there<br>
+   is no common hierarchical model to the FTP protocol, so if a<br>
+   directory change command has been given, it is impossible in<br>
+   general to deduce what sequence should be given to navigate to<br>
+   another directory for a second retrieval, if the paths are<br>
+   different.  The only reliable algorithm is to disconnect and<br>
+   reestablish the control connection.<br>
+<p>
+3.3. HTTP<br>
+<p>
+   The HTTP URL scheme is used to designate Internet resources<br>
+   accessible using HTTP (HyperText Transfer Protocol).<br>
+<p>
+   The HTTP protocol is specified elsewhere. This specification only<br>
+   describes the syntax of HTTP URLs. <br>
+<p>
+   An HTTP URL takes the form:<br>
+<p>
+      <a href="http://">http://</a>&lt;host&gt;:&lt;port&gt;/&lt;path&gt;?&lt;searchpart&gt;<br>
+<p>
+   where &lt;host&gt; and &lt;port&gt; are as described in Section 3.1. If :&lt;port&gt;<br>
+   is omitted, the port defaults to 80.  No user name or password is<br>
+   allowed.  &lt;path&gt; is an HTTP selector, and &lt;searchpart&gt; is a query<br>
+   string. The &lt;path&gt; is optional, as is the &lt;searchpart&gt; and its<br>
+   preceding "?". If neither &lt;path&gt; nor &lt;searchpart&gt; is present, the<br>
+   "/" may also be omitted.<br>
+<p>
+   Within the &lt;path&gt; and &lt;searchpart&gt; components, "/", ";", "?" are<br>
+   reserved.  The "/" character may be used within HTTP to designate a<br>
+   hierarchical structure.<br>
+<p>
+3.4. GOPHER<br>
+<p>
+   The Gopher URL scheme is used to designate Internet resources<br>
+   accessible using the Gopher protocol.<br>
+<p>
+   The base Gopher protocol is specified in RFC 1436 and supports<br>
+   items and collections of items (directories). The Gopher+ protocol<br>
+   is a set of upward compatible extensions to the base Gopher<br>
+   protocol and is specified in [2]. Gopher+ supports associating<br>
+   arbitrary sets of attributes and alternate data representations<br>
+   with Gopher items. Gopher URLs accommodate both Gopher and Gopher+<br>
+   items and item attributes.<br>
+<p>
+3.4.1. Gopher URL syntax<br>
+<p>
+   A Gopher URL takes the form: <br>
+<p>
+      <a href="gopher://">gopher://</a>&lt;host&gt;:&lt;port&gt;/&lt;gopher-path&gt;<br>
+<p>
+   where &lt;gopher-path&gt; is one of<br>
+<p>
+       &lt;gophertype&gt;&lt;selector&gt;<br>
+       &lt;gophertype&gt;&lt;selector&gt;%09&lt;search&gt;<br>
+       &lt;gophertype&gt;&lt;selector&gt;%09&lt;gopher+_string&gt;<br>
+       &lt;gophertype&gt;&lt;selector&gt;%09&lt;search&gt;%09&lt;gopher+_string&gt;<br>
+<p>
+   If :&lt;port&gt; is omitted, the port defaults to 70.  &lt;gophertype&gt; is<br>
+   single-character field to denote the Gopher type of the resource to<br>
+   which the URL refers. The entire &lt;gopher-path&gt; may also be empty,<br>
+   in which case the delimiting "/" is also optional and the<br>
+   &lt;gophertype&gt; defaults to "1".<br>
+<p>
+   &lt;selector&gt; is the Gopher selector string.  In the Gopher protocol,<br>
+   gopher selector strings are a sequence of 8-bit bytes which may<br>
+   contain any characters other than tab, return, or linefeed.  Gopher<br>
+   clients specify which item to retrieve by sending the gopher<br>
+   selector string to a gopher server.<br>
+   <br>
+   Within the &lt;gopher-path&gt;, no additional characters have a reserved<br>
+   interpretation.<br>
+<p>
+   Note that some gopher &lt;selector&gt; strings begin with a copy of the<br>
+   &lt;gophertype&gt; character, in which case that character will occur<br>
+   twice consecutively. The gopher selector string may be an empty<br>
+   string; this is how gopher clients refer to the top-level directory<br>
+   on a gopher server.<br>
+<p>
+3.4.2 Specifying URLs for Gopher Search Engines<br>
+<p>
+   If the URL refers to a search to be submitted to a gopher search<br>
+   engine, the selector is followed by an encoded tab (%09) and the<br>
+   search string. To submit a search to a gopher search engine, the<br>
+   gopher client sends the selector string, a tab, and the search<br>
+   string to the gopher server.<br>
+<p>
+3.4.3 URL syntax for Gopher+ items<br>
+<p>
+   URLs for Gopher+ items are have a second encoded tab and a<br>
+   gopher+ string. Note that in this case, the %09&lt;search&gt; string must<br>
+   be supplied, although the &lt;search&gt; element may be the empty string.<br>
+<p>
+   The &lt;gopher+_string&gt; is used to represent information required for<br>
+   retrieval of the Gopher+ item. Gopher+ items may have alternate<br>
+   views, arbitrary sets of attributes, and may have electronic forms<br>
+   associated with them.<br>
+<p>
+   To retrieve the data associated with a Gopher+ URL, a client will<br>
+   connect to the server and send the gopher selector, followed<br>
+   optionally by a tab and the search string, followed by a tab and<br>
+   the Gopher+ commands.<br>
+<p>
+   More explicitly, if the Gopher+ URL refers to a Gopher search type<br>
+   (that is, if the Gopher type is 7), the client sends to the gopher<br>
+   server the gopher selector string, followed by a tab, followed the<br>
+   search string, followed by a tab, followed by the gopher+ commands.<br>
+<p>
+   If the Gopher+ URL does _not_ refer to a Gopher search (when the<br>
+   Gopher type is not 7), the Gopher client sends to the server the<br>
+   gopher selector string, followed by a tab, followed by the gopher+<br>
+   commands.<br>
+<p>
+3.4.4 Default Gopher+ data representation<br>
+<p>
+   When a Gopher server returns a directory listing to a client, the<br>
+   Gopher+ items are tagged with either a "+" (denoting gopher+ items)<br>
+   or a "?" (denoting Gopher+ items which have a +ASK form associated <br>
+   with them). A Gopher URL with a Gopher+ string consisting of only <br>
+   a "+" refers to the default view (data representation) of the item <br>
+   while a Gopher+ string containing only a "?" refer to an item with<br>
+   a Gopher electronic form associated with it.<br>
+<p>
+3.4.5 Gopher+ items with electronic forms<br>
+<p>
+   Gopher+ items which have a +ASK associated with them (i.e. Gopher+<br>
+   items tagged with a "?") require the client to fetch the item's<br>
+   +ASK attribute to get the form definition, and then ask the user to<br>
+   fill out the form and return the user's responses along with the<br>
+   selector string to retrieve the item.  Gopher+ clients know how to<br>
+   do this but depend on the "?" tag in the gopher+ item description<br>
+   to know when to handle this case. The "?" is used in the Gopher+<br>
+   string to be consistent with Gopher+ protocol's use of this symbol.<br>
+<p>
+3.4.6 Gopher+ item attribute collections<br>
+<p>
+   To refer to the Gopher+ attributes of an item, the Gopher URL's <br>
+   Gopher+ string consists of "!" or "$". "!" refers to the all of a <br>
+   Gopher+ item's attributes. "$" refers to all the item attributes for<br>
+   all items in a Gopher directory.<br>
+<p>
+3.4.7 Referring to specific Gopher+ attributes<br>
+<p>
+   To refer to specific attributes, the URL's gopher+_string is<br>
+   "!attribute_name" or "$attribute_name". For example, to refer to<br>
+   the attribute containing the abstract of an item, the <br>
+   gopher+_string would be "!+ABSTRACT". <br>
+<p>
+   To refer to several attributes, the gopher+_string consists of <br>
+   the attribute names separated by coded spaces. For example, <br>
+   "!+ABSTRACT%20+SMELL" refers to the +ABSTRACT and +SMELL attributes <br>
+   of an item.<br>
+<p>
+3.4.8 URL syntax for Gopher+ alternate views<br>
+<p>
+   Gopher+ allows for optional alternate data representations<br>
+   (alternate views) of items. To retrieve a Gopher+ alternate view,<br>
+   a Gopher+ client sends the appropriate view and language<br>
+   identifier (found in the item's +VIEW attribute). To refer to a<br>
+   specific Gopher+ alternate view, the URL's Gopher+ string would <br>
+   be in the form:<br>
+<p>
+        +view_name%20language_name<br>
+<p>
+   For example, a Gopher+ string of "+application/postscript%20Es_ES" <br>
+   refers to the Spanish language postscript alternate view of a <br>
+   Gopher+ item. <br>
+<p>
+3.4.9 URL syntax for Gopher+ electronic forms<br>
+<p>
+   The gopher+ string for a URL that refers to an item referenced by<br>
+   a Gopher+ electronic form (an ASK block) filled out with specific <br>
+   values is a coded version of what the client sends to the server.<br>
+   The gopher+ string is of the form:<br>
+<p>
+   +%091%0D%0A+-1%0D%0Aask_item1_value%0D%0Aask_item2_value%0D%0A.%0D%0A<br>
+<p>
+   To retrieve this item, the gopher client sends:<br>
+<p>
+       a_gopher_selector&lt;tab&gt;+&lt;tab&gt;1&lt;cr&gt;&lt;lf&gt;<br>
+       +-1&lt;cr&gt;&lt;lf&gt;<br>
+       ask_item1_value&lt;cr&gt;&lt;lf&gt;<br>
+       ask_item2_value&lt;cr&gt;&lt;lf&gt;<br>
+       .&lt;cr&gt;&lt;lf&gt;<br>
+<p>
+   to the gopher server.<br>
+<p>
+3.5. MAILTO<br>
+<p>
+   The mailto URL scheme is used to designate the Internet mailing<br>
+   address of an individual or service. No additional information<br>
+   other than an Internet mailing address is present or implied.<br>
+<p>
+   A mailto URL takes the form:<br>
+<p>
+        <a href="mailto:">mailto:</a>&lt;rfc822-addr-spec&gt;<br>
+<p>
+   where &lt;rfc822-addr-spec&gt; is (the encoding of an) addr-spec, as<br>
+   specified in RFC 822. Within mailto URLs, no additional characters<br>
+   are reserved within the &lt;rfc822-addr-spec&gt; component.<br>
+<p>
+   Note that the percent sign ("%") is commonly used within RFC 822<br>
+   addresses and must be URL-encoded.<br>
+<p>
+   Unlike many URLs, the mailto scheme does not represent a data<br>
+   object to be accessed directly; there is no sense in which it<br>
+   designates an object. It has a different use than the<br>
+   message/external-body type in MIME.<br>
+<p>
+3.6. NEWS<br>
+<p>
+   The news URL scheme is used to refer to either news groups or<br>
+   individual articles of USENET news, as specified in RFC 1036.<br>
+<p>
+   A news URL takes one of two forms:<br>
+<p>
+     <a href="news:">news:</a>&lt;newsgroup-name&gt;<br>
+     <a href="news:">news:</a>&lt;message-id&gt;<br>
+<p>
+   A &lt;newsgroup-name&gt; is a period-delimited hierarchical name, such as<br>
+   "comp.infosystems.www.misc". A &lt;message-id&gt; corresponds to the<br>
+   Message-ID of section 2.1.5 of RFC 1036, without the enclosing "&lt;"<br>
+   and "&gt;"; it takes the form &lt;unique&gt;@&lt;full_domain_name&gt;.  A message<br>
+   identifier may be distinguished from a news group name by the<br>
+   presence of the commercial at "@" character. No additional<br>
+   characters are reserved within the components of a news URL.<br>
+<p>
+   If &lt;newsgroup-name&gt; is "*" (as in &lt;URL:<a href="news:">news:</a>*&gt;), it is used to<br>
+   refer to "all available news groups".<br>
+<p>
+   The news URLs are unusual in that by themselves, they do not<br>
+   contain sufficient information to locate a single resource, but,<br>
+   rather, are location-independent.<br>
+<p>
+3.7. NNTP<br>
+<p>
+   The nntp URL scheme is an alternative method of referencing news<br>
+   articles, useful for specifying news articles from NNTP servers<br>
+   (RFC 977). <br>
+<p>
+   A nntp URL take the form:<br>
+<p>
+      nntp://&lt;host&gt;:&lt;port&gt;/&lt;newsgroup-name&gt;/&lt;article-number&gt;<br>
+<p>
+   where &lt;host&gt; and &lt;port&gt; are as described in Section 3.1. If :&lt;port&gt;<br>
+   is omitted, the port defaults to 119.<br>
+<p>
+   The &lt;newsgroup-name&gt; is the name of the group, while the<br>
+   &lt;article-number&gt; is the numeric id of the article within that<br>
+   newsgroup.<br>
+<p>
+   Note that while nntp: URLs specify a unique location for the<br>
+   article resource, most NNTP servers currently on the Internet today<br>
+   are configured only to allow access from local clients, and thus<br>
+   nntp URLs do not designate globally accessible resources. Thus, the<br>
+   <a href="news:">news:</a> form of URL is preferred as a way of identifying news<br>
+   articles.<br>
+<p>
+3.8. TELNET<br>
+<p>
+   The Telnet URL scheme is used to designate interactive services<br>
+   that may be accessed by the Telnet protocol.<br>
+<p>
+   A telnet URL takes the form:<br>
+<p>
+       telnet://&lt;user&gt;:&lt;password&gt;@&lt;host&gt;:&lt;port&gt; [ / ]<br>
+<p>
+   as specified in Section 3.1. The port defaults to 23; the &lt;user&gt;<br>
+   and &lt;password&gt; segments are completely optional (a &lt;password&gt;<br>
+   requires a &lt;user&gt; element.)<br>
+<p>
+   This URL does not designate a data object, but rather an<br>
+   interactive service. In practice, the &lt;user&gt; and &lt;password&gt;<br>
+   supplied are advisory only.<br>
+<p>
+3.9.  WAIS<br>
+<p>
+   The WAIS URL scheme is used to designate WAIS databases, searches,<br>
+   or individual documents available from a WAIS database. WAIS is<br>
+   described in [6]; the WAIS protocol is described in RFC 1625 [19].<br>
+<p>
+   A WAIS URLs takes one the following forms:<br>
+<p>
+     <a href="wais://">wais://</a>&lt;host&gt;:&lt;port&gt;/&lt;database&gt;<br>
+     <a href="wais://">wais://</a>&lt;host&gt;:&lt;port&gt;/&lt;database&gt;?&lt;search&gt;<br>
+     <a href="wais://">wais://</a>&lt;host&gt;:&lt;port&gt;/&lt;database&gt;/&lt;wtype&gt;/&lt;wpath&gt;<br>
+<p>
+   where &lt;host&gt; and &lt;port&gt; are as described in Section 3.1. If :&lt;port&gt;<br>
+   is omitted, the port defaults to 210.  The first form designates a<br>
+   WAIS database that is available for searching. The second form<br>
+   designates a particular search.  &lt;database&gt; is the name of the WAIS<br>
+   database being queried.<br>
+<p>
+   The third form designates a particular document within a WAIS<br>
+   database to be retrieved. In this form &lt;wtype&gt; is the WAIS<br>
+   designation of the type of the object. Many WAIS implementations<br>
+   require that a client know the "type" of an object prior to<br>
+   retrieval, the type being returned along with the internal object<br>
+   identifier in the search response.  The &lt;wtype&gt; is included in the<br>
+   URL in order to allow the client interpreting the URL adequate<br>
+   information to actually retrieve the document.<br>
+<p>
+   The &lt;wpath&gt; of a WAIS URL consists of the WAIS document-id, encoded<br>
+   as necessary using the method described in Section 2.2. The WAIS<br>
+   document-id should be treated opaquely; it may only be decomposed<br>
+   by the server that issued it.<br>
+<p>
+3.10 FILES<br>
+<p>
+   The file URL scheme is used to designate files accessible on<br>
+   a particular host computer. This scheme, unlike most other <br>
+   URL schemes, does not designate a resource that is universally<br>
+   accessible over the Internet.<br>
+<p>
+   A file URL takes the form:<br>
+<p>
+       <a href="file://">file://</a>&lt;host&gt;/&lt;path&gt;<br>
+<p>
+   where &lt;host&gt; is the fully qualified domain name of the system on<br>
+   which the &lt;path&gt; is accessible, and &lt;path&gt; is a hierarchical<br>
+   directory path of the form &lt;directory&gt;/&lt;directory&gt;/&lt;name&gt;.<br>
+<p>
+   For example, a VMS file<br>
+<p>
+     DISK$USER:[MY.NOTES]NOTE123456.TXT<br>
+<p>
+   might become<br>
+<p>
+     &lt;URL:<a href="file://vms.host.edu/disk$user/my/notes/note12345.txt">file://vms.host.edu/disk$user/my/notes/note12345.txt</a>&gt;<br>
+<p>
+   As a special case, &lt;host&gt; can be the string "localhost" or the<br>
+   empty string; this is interpreted as `the machine from which the<br>
+   URL is being interpreted'.<br>
+<p>
+   The file URL scheme is unusual in that it does not specify an<br>
+   Internet protocol or access method for such files; as such, its<br>
+   utility in network protocols between hosts is limited.<br>
+<p>
+3.11 PROSPERO<br>
+<p>
+   The Prospero URL scheme is used to designate resources that are<br>
+   accessed via the Prospero Directory Service. The Prospero protocol<br>
+   is described elsewhere [16].<br>
+<p>
+   A prospero URLs takes the form:<br>
+<p>
+      prospero://&lt;host&gt;:&lt;port&gt;/&lt;hsoname&gt;;&lt;field&gt;=&lt;value&gt;<br>
+<p>
+   where &lt;host&gt; and &lt;port&gt; are as described in Section 3.1. If :&lt;port&gt;<br>
+   is omitted, the port defaults to 1525. No username or password is<br>
+   allowed.<br>
+<p>
+   The &lt;hsoname&gt; is the host-specific object name in the Prospero<br>
+   protocol, suitably encoded.  This name is opaque and interpreted by<br>
+   the Prospero server.  The semicolon ";" is reserved and may not<br>
+   appear without quoting in the &lt;hsoname&gt;.<br>
+<p>
+   Prospero URLs are interpreted by contacting a Prospero directory<br>
+   server on the specified host and port to determine appropriate<br>
+   access methods for a resource, which might themselves be<br>
+   represented as different URLs. External Prospero links are<br>
+   represented as URLs of the underlying access method and are not<br>
+   represented as Prospero URLs.<br>
+<p>
+   Note that a slash "/" may appear in the &lt;hsoname&gt; without quoting<br>
+   and no significance may be assumed by the application.  Though<br>
+   slashes may indicate hierarchical structure on the server, such<br>
+   structure is not guaranteed. Note that many &lt;hsoname&gt;s begin with a<br>
+   slash, in which case the host or port will be followed by a double<br>
+   slash: the slash from the URL syntax, followed by the initial slash<br>
+   from the &lt;hsoname&gt;. (E.g., &lt;URL:prospero://host.dom//pros/name&gt;<br>
+   designates a &lt;hsoname&gt; of "/pros/name".)<br>
+<p>
+   In addition, after the &lt;hsoname&gt;, optional fields and values<br>
+   associated with a Prospero link may be specified as part of the<br>
+   URL.  When present, each field/value pair is separated from each<br>
+   other and from the rest of the URL by a ";" (semicolon).  The name<br>
+   of the field and its value are separated by a "=" (equal sign). If<br>
+   present, these fields serve to identify the target of the URL.  For<br>
+   example, the OBJECT-VERSION field can be specified to identify a<br>
+   specific version of an object.<br>
+<p>
+4. REGISTRATION OF NEW SCHEMES<br>
+<p>
+   A new scheme may be introduced by defining a mapping onto a<br>
+   conforming URL syntax, using a new prefix. Experimental prefixes<br>
+   may be used by mutual agreement between parties. Scheme names<br>
+   starting with the characters "x-" are reserved for experimental<br>
+   purposes.<br>
+<p>
+   The Internet Assigned Numbers Authority (IANA) will maintain a<br>
+   registry of URL schemes. Any submission of a new URL scheme must<br>
+   include a definition of an algorithm for accessing of resources<br>
+   within that scheme and the syntax for representing such a scheme.<br>
+<p>
+   URL schemes must have demonstrable utility and operability.  One<br>
+   way to provide such a demonstration is via a gateway which provides<br>
+   objects in the new scheme for clients using an existing protocol.<br>
+   If the new scheme does not locate resources that are data objects,<br>
+   the properties of names in the new space must be clearly defined.<br>
+<p>
+   New schemes should try to follow the same syntactic conventions of<br>
+   existing schemes, where appropriate.  It is likewise recommended<br>
+   that, where a protocol allows for retrieval by URL, that the client<br>
+   software have provision for being configured to use specific<br>
+   gateway locators for indirect access through new naming schemes.<br>
+<p>
+   The following scheme have been proposed at various times, but this<br>
+   document does not define their syntax or use at this time. It is<br>
+   suggested that IANA reserve their scheme names for future<br>
+   definition:<br>
+<p>
+   afs	            Andrew File System global file names.<br>
+   mid              Message identifiers for electronic mail.<br>
+   cid              Content identifiers for MIME body parts.<br>
+   nfs              Network File System (NFS) file names.<br>
+   tn3270           Interactive 3270 emulation sessions.<br>
+   mailserver       Access to data available from mail servers.<br>
+   z39.50           Access to ANSI Z39.50 services.<br>
+<p>
+5. BNF for specific URL schemes<br>
+<p>
+   This is a BNF-like description of the Uniform Resource Locator<br>
+   syntax, using the conventions of RFC822, except that "|" is used to<br>
+   designate alternatives, and brackets [] are used around optional or<br>
+   repeated elements. Briefly, literals are quoted with "", optional<br>
+   elements are enclosed in [brackets], and elements may be preceded<br>
+   with &lt;n&gt;* to designate n or more repetitions of the following<br>
+   element; n defaults to 0.<br>
+<p>
+   url            = httpurl | ftpurl | newsurl |<br>
+                    nntpurl | telneturl | gopherurl |<br>
+                    waisurl | mailtourl | fileurl |<br>
+                    prosperourl | otherurl<br>
+   otherurl       = scheme ":" schemepart<br>
+   scheme         = 1*[ lowalpha | digit | "+" | "-" | "." ]<br>
+   schemepart     = *xchar<br>
+<p>
+   login          = [ user [ ":" password ] "@" ] hostport<br>
+   hostport       = host [ ":" port ]<br>
+   host           = hostname | hostnumber<br>
+   hostname       = alpha *uchar<br>
+   hostnumber     = digits "." digits "." digits "." digits<br>
+   port           = digits<br>
+   user           = *[ uchar | ";" | "?" | "&amp;" | "=" ]<br>
+   password       = *[ uchar | ";" | "?" | "&amp;" | "=" ]<br>
+<p>
+   ftpurl         = "<a href="ftp://">ftp://</a>" login [ "/" fpath [ ";type=" ftptype ]]<br>
+   fpath          = fsegment *[ "/" fsegment ]<br>
+   fsegment       = *[ uchar | "?" | ":" | "@" | "&amp;" | "=" ]<br>
+   ftptype        = "A" | "I" | "D" | "a" | "i" | "d"<br>
+<p>
+   fileurl        = "<a href="file://">file://</a>" host [ "/" fpath ]<br>
+<p>
+   httpurl        = "<a href="http://">http://</a>" hostport [ "/" hpath [ "?" search ]]<br>
+   hpath          = hsegment *[ "/" hsegment ]<br>
+   hsegment       = *[ uchar | ";" | ":" | "@" | "&amp;" | "=" ]<br>
+   search         = *[ uchar | ";" | ":" | "@" | "&amp;" | "=" ]<br>
+<p>
+   gopherurl      = "<a href="gopher://">gopher://</a>" hostport [ / [ gtype [ selector<br>
+                    [ "%09" search [ "%09" gopher+_string ] ] ] ] ]<br>
+   gtype          = xchar<br>
+   selector       = *xchar<br>
+   gopher+_string = *xchar<br>
+<p>
+   mailtourl      = "<a href="mailto:">mailto:</a>" encoded822addr<br>
+   encoded822addr = 1*xchar<br>
+<p>
+   newsurl        = "<a href="news:">news:</a>" grouppart<br>
+   grouppart      = "*" | group | article<br>
+   group          = alpha *[ alpha | digit | "-" | "." ]<br>
+   article        = 1*[ uchar | ";" | "/" | "?" | ":" | "&amp;" | "=" ] "@" host<br>
+<p>
+   nntpurl        = "nntp://" hostport "/" group [ "/" digits ]<br>
+<p>
+   telneturl      = "<a href="telnet://">telnet://</a>" login [ "/" ]<br>
+<p>
+   waisurl        = waisdatabase | waisindex | waisdoc<br>
+   waisdatabase   = "<a href="wais://">wais://</a>" hostport "/" database<br>
+   waisindex      = "<a href="wais://">wais://</a>" hostport "/" database "?" search<br>
+   waisdoc        = "<a href="wais://">wais://</a>" hostport "/" database "/" wtype "/" wpath<br>
+   database       = *uchar<br>
+   wtype          = *uchar<br>
+   wpath          = *uchar<br>
+<p>
+   prosperourl    = "prospero://" hostport "/" ppath *[ fieldspec ]<br>
+   ppath          = psegment *[ "/" psegment ]<br>
+   psegment       = *[ uchar | "?" | ":" | "@" | "&amp;" | "=" ]<br>
+   fieldspec      = ";" fieldname "=" fieldvalue<br>
+   fieldname      = *[ uchar | "?" | ":" | "@" | "&amp;" ]<br>
+   fieldvalue     = *[ uchar | "?" | ":" | "@" | "&amp;" ]<br>
+<p>
+   lowalpha       = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" |<br>
+                    "i" | "j" | "k" | "l" | "m" | "n" | "o" | "p" |<br>
+                    "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" |<br>
+                    "y" | "z"<br>
+   hialpha        = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | <br>
+                    "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | <br>
+                    "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"<br>
+   alpha          = lowalpha | hialpha<br>
+   digit          = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" |<br>
+                    "8" | "9"<br>
+   safe           = "$" | "-" | "_" | "." | "+"<br>
+   extra          = "!" | "*" | "'" | "(" | ")" | "," | "="<br>
+   national       = "{" | "}" | "|" | "\" | "^" | "~" | "[" | "]"<br>
+   punctuation    = "&lt;" | "&gt;" | """ | "#"<br>
+   reserved       = ";" | "/" | "?" | ":" | "@" | "&amp;" | "="<br>
+   hex            = digit | "A" | "B" | "C" | "D" | "E" | "F" |<br>
+		    "a" | "b" | "c" | "d" | "e" | "f"<br>
+   escape         = "%" hex hex<br>
+<p>
+   unreserved     = alpha | digit | safe | extra | national<br>
+   uchar          = unreserved | escape<br>
+   xchar          = unreserved | reserved | escape<br>
+   digits         = 1*digit<br>
+<p>
+<p>
+6. Security considerations<br>
+<p>
+   The URL scheme does not in itself pose a security threat. Users<br>
+   should beware that there is no general guarantee that a URL which<br>
+   at one time points to a given object continues to do so, and does<br>
+   not even at some later time point to a different object due to the<br>
+   movement of objects on servers.<br>
+<p>
+   A URL-related security threat is that it is sometimes possible to<br>
+   construct a URL such that an attempt to perform a harmless<br>
+   idempotent operation such as the retrieval of the object will in<br>
+   fact cause a possibly damaging remote operation to occur.  The<br>
+   unsafe URL is typically constructed by specifying a port number<br>
+   other than that reserved for the network protocol in question.  The<br>
+   client unwittingly contacts a server which is in fact running a<br>
+   different protocol.  The content of the URL contains instructions<br>
+   which when interpreted according to this other protocol cause an<br>
+   unexpected operation. An example has been the use of gopher URLs<br>
+   to cause a rude message to be sent via a SMTP server.  Caution<br>
+   should be used when using any URL which specifies a port number<br>
+   other than the default for the protocol, especially when it is a<br>
+   number within the reserved space.<br>
+<p>
+   Care should be taken when URLs contain embedded encoded delimiters<br>
+   for a given protocol (for example, CR and LF characters for telnet<br>
+   protocols) that these are not unencoded before transmission.  This<br>
+   would violate the protocol but could be used to simulate an extra<br>
+   operation or parameter, again causing an unexpected and possible<br>
+   harmful remote operation to be performed.<br>
+<p>
+   The use of URLs containing passwords that should be secret is<br>
+   clearly unwise.<br>
+<p>
+7. Acknowledgements<br>
+<p>
+   This paper builds on the basic W3 design and much discussion of<br>
+   these issues by many people on the network. The discussion was<br>
+   particularly stimulated by articles by Clifford Lynch (1991),<br>
+   Brewster Kahle (1991) and Wengyik Yeong (1991b). Contributions from<br>
+   John Curran (NEARNET), Clifford Neuman (ISI) Ed Vielmetti (MSEN)<br>
+   and later the IETF URL BOF and URI working group have been<br>
+   incorporated into this issue of this paper.<br>
+<p>
+   The draft url4 (Internet Draft 00) was generated from url3<br>
+   following discussion and overall approval of the URL working group<br>
+   on 29 March 1993. The paper url3 had been generated from udi2 in<br>
+   the light of discussion at the UDI BOF meeting at the Boston IETF<br>
+   in July 1992. Draft url4 was Internet Draft 00. Draft url5<br>
+   incorporated changes suggested by Clifford Neuman, and draft url6<br>
+   (ID 01) incorporated character group changes and a few other fixes<br>
+   defined by the IETF URI WG in submitting it as a proposed standard.<br>
+   URL7 (Internet Draft 02) incorporated changes introduced at the<br>
+   Amsterdam IETF and refined in net discussion.<br>
+<p>
+   The draft 03 includes changes made at Houston in Nov 93, and on the<br>
+   net before Seattle March 1994.  Draft 04 responded to various<br>
+   suggestions and remarks made since the Seattle March 1994 meeting,<br>
+   special thanks to Dan Connolly, Ned Freed, Roy Fielding, and Guido<br>
+   van Rossum for their careful readings and corrections.  Draft 05<br>
+   makes a number of minor modifications suggested at or just before<br>
+   the Toronto July 1994 IETF meeting. This draft incorporates<br>
+   numerous revisions and edits as suggested by the active members of<br>
+   the IETF URI Working Group.<br>
+<p>
+APPENDIX: Recommendations for URLs in Context<br>
+<p>
+   URIs, including URLs, are intended to be transmitted though<br>
+   protocols which provide a context for their interpretation.<br>
+<p>
+   In some cases, it will be necessary to distinguish URLs from other<br>
+   possible data structures in a syntactic structure. In this case, is<br>
+   recommended that URLs be preceeded with a prefix consisting of the<br>
+   characters "URL:". For example, this prefix may be used to<br>
+   distinguish URLs from other kinds of URIs.<br>
+<p>
+   In addition, there are many occasions when URLs are included in<br>
+   plain, non-marked-up text; examples include electronic mail, USENET<br>
+   news messages, or printed papers. In such cases, it is convenient<br>
+   to have a separate syntactic wrapper that delimits the URL and<br>
+   separates it from the rest of the text. For this purpose, is<br>
+   recommended that angle brackets ("&lt;" and "&gt;"), along with the<br>
+   prefix "URL:", be used to delimit the boundaries of the URL.  This<br>
+   wrapper does not form part of the URL and should not be used in<br>
+   contexts in which delimiters are already specified.<br>
+<p>
+   In some cases, extra whitespace may need to be added to break long<br>
+   URLs across lines. The whitespace is ignored when extracting the<br>
+   URL. In the case where a fragment identifier is associated with a<br>
+   URL (following a "#"), the identifier would be placed within the<br>
+   brackets as well.<br>
+<p>
+   Examples<br>
+<p>
+   Yes, Jim, I found it under &lt;URL:<a href="ftp://info.cern.ch/pub/www/doc">ftp://info.cern.ch/pub/www/doc</a><br>
+   ;type=d&gt; but you can probably pick it up from &lt;URL:<a href="ftp://ds.inter">ftp://ds.inter</a><br>
+   nic.net/rfc&gt;.  Note the warning in &lt;URL:<a href="http://ds.internic.net/">http://ds.internic.net/</a><br>
+   instructions/overview.html#WARNING&gt;.<br>
+<p>
+REFERENCES<br>
+<p>
+   [1] Anklesaria, F., et al. (1993) "The Internet Gopher Protocol",<br>
+       RFC 1436. &lt;URL:<a href="ftp://ds.internic.net/rfc/rfc1436.txt">ftp://ds.internic.net/rfc/rfc1436.txt</a>&gt;.<br>
+<p>
+   [2] Anklesaria, F., et al. (1993) "Gopher+ upward compatible<br>
+       enhancements to the Internet Gopher protocol", University of<br>
+       Minnesota, July 1993, &lt;URL:<a href="ftp://boombox.micro.umn.edu">ftp://boombox.micro.umn.edu</a><br>
+       /pub/gopher/gopher_protocol/Gopher+/Gopher+.txt&gt;.  See also:<br>
+       &lt;URL:<a href="gopher://boombox.micro.umn.edu/11/gopher/">gopher://boombox.micro.umn.edu/11/gopher/</a><br>
+       gopher_protocol&gt;.<br>
+<p>
+   [3] Berners-Lee, T., (1994) "Universal Resource Identifiers in<br>
+       WWW".  RFC 1630, &lt;URL:<a href="ftp://ds.internic.net/rfc/rfc1630.txt">ftp://ds.internic.net/rfc/rfc1630.txt</a>&gt;.<br>
+<p>
+   [4] Berners-Lee, T ., (1993) "Hypertext Transfer Protocol (HTTP)" ,<br>
+       CERN, November 1993, as updated from time to time,<br>
+       &lt;URL:<a href="ftp://info.cern.ch/pub/www/doc/http-spec.txt.Z">ftp://info.cern.ch/pub/www/doc/http-spec.txt.Z</a>&gt;.<br>
+<p>
+   [5] Crocker, D. H., (1982) "Standard for ARPA Internet Text<br>
+       Messages".  RFC822, &lt;URL:<a href="ftp://ds.internic.net/rfc/rfc822.txt">ftp://ds.internic.net/rfc/rfc822.txt</a>&gt;.<br>
+<p>
+   [6] Davis, F, et al., (1990) "WAIS Interface Protocol Prototype<br>
+       Functional Specification", Thinking Machines Corporation, April<br>
+       23, 1990 &lt;URL:<a href="ftp://quake.think.com/pub/wais/doc/protspec.txt">ftp://quake.think.com/pub/wais/doc/protspec.txt</a>&gt;.<br>
+<p>
+   [7] Deutsch, P., Emtage, A. &amp; Marine, A. (1994) "How to Use<br>
+       Anonymous FTP." RFC1635. &lt;URL:<a href="ftp://ds.internic.net/">ftp://ds.internic.net/</a><br>
+       rfc/rfc1635.txt&gt;.<br>
+<p>
+   [8] International Standards Organization, (1991) Information and<br>
+       Documentation - Search and Retrieve Application Protocol<br>
+       Specification for Open Systems Interconnection, ISO-10163.<br>
+<p>
+   [9] Horton, M., Adams, R., (1987)"Standard For Interchange of<br>
+       USENET messages", RFC1036. &lt;URL:<a href="ftp://ds.internic.net">ftp://ds.internic.net</a><br>
+       /rfc/rfc1036.txt&gt;.<br>
+<p>
+  [10] Huitema, C., (1991) "Naming: strategies and techniques",<br>
+       Computer Networks and ISDN Systems 23 (1991) 107-110.<br>
+<p>
+  [11] Kahle, B. (1991) "Document Identifiers, or International<br>
+       Standard Book Numbers for the Electronic Age".<br>
+       &lt;URL:<a href="ftp://quake.think.com/pub/wais/doc/doc-ids.txt">ftp://quake.think.com/pub/wais/doc/doc-ids.txt</a>&gt;<br>
+<p>
+  [12] Kantor, B., and Lapsley, P., (1986) "Network News Transfer <br>
+       Protocol", RFC977.  &lt;URL:<a href="ftp://ds.internic.net/rfc/rfc977.txt">ftp://ds.internic.net/rfc/rfc977.txt</a>&gt;<br>
+<p>
+  [13] Kunze, J., "Functional Requirements for Internet Resource<br>
+       Locators", to be published as RFC????. Available as an internet<br>
+       draft &lt;URL:<a href="ftp://ds.internic.net/internet-drafts/">ftp://ds.internic.net/internet-drafts/</a><br>
+       draft-ietf-uri-fun-req-00.txt&gt;<br>
+<p>
+  [14] Lynch, C., (1991) Coalition for Networked Information.<br>
+       "Workshop on ID and Reference Structures for Networked<br>
+       Information", November 1991. See<br>
+       &lt;URL:<a href="wais://quake.think.com/wais-discussion-archives?lynch">wais://quake.think.com/wais-discussion-archives?lynch</a>&gt;<br>
+<p>
+  [15] Mockapetris, P. (1987) "Domain Names - Concepts and <br>
+       Facilities." RFC1034, USC-ISI,<br>
+       &lt;URL:<a href="ftp://ds.internic.net/rfc/rfc1034.txt">ftp://ds.internic.net/rfc/rfc1034.txt</a>&gt;<br>
+<p>
+  [16] Neuman, B. Clifford, and Augart, Steven (1993). "The Prospero<br>
+       Protocol", USC Information Sciences Institute, June 1993 and as<br>
+       updated from time to time, &lt;URL:<a href="ftp://prospero.isi.edu/pub/">ftp://prospero.isi.edu/pub/</a><br>
+       prospero/doc/prospero-protocol.PS.Z&gt;.<br>
+<p>
+  [17] Postel, J. and Reynolds, J. (1985) "File Transfer Protocol <br>
+       (FTP)", RFC959. &lt;URL:<a href="ftp://ds.internic.net/rfc/rfc959.txt">ftp://ds.internic.net/rfc/rfc959.txt</a>&gt;<br>
+<p>
+  [18] Sollins, K. and Masinter, L. (1994) "Requirements for Uniform<br>
+       Resource Names", to be published as an RFC. Available as an<br>
+       internet draft &lt;URL:<a href="ftp://ds.internic.net/internet-drafts/">ftp://ds.internic.net/internet-drafts/</a><br>
+       draft-sollins-urn-00.txt&gt;<br>
+<p>
+  [19] St. Pierre, M, et.al., (1994) "WAIS over Z39.50-1988", RFC1625<br>
+       &lt;URL:<a href="ftp://ds.internic.net/rfc/rfc1625.txt">ftp://ds.internic.net/rfc/rfc1625.txt</a>&gt;<br>
+<p>
+  [20] Yeong, W. (1991) "Towards Networked Information Retrieval",<br>
+       Technical report 91-06-25-01, June 1991, Performance Systems<br>
+       International, Inc.  &lt;URL:<a href="ftp://uu.psi.com/wp/nir.txt">ftp://uu.psi.com/wp/nir.txt</a>&gt;<br>
+<p>
+  [21] Yeong, W., (1991) "Representing Public Archives in the<br>
+       Directory", Internet Draft, November 1991, now expired.<br>
+<p>
+EDITORS' ADDRESSES<br>
+<p>
+Tim Berners-Lee               <br>
+World-Wide Web project        <br>
+CERN,<br>
+1211 Geneva 23,<br>
+Switzerland<br>
+Tel: +41 (22)767 3755<br>
+Fax: +41 (22)767 7155<br>
+Email: timbl@info.cern.ch<br>
+<p>
+Larry Masinter<br>
+Xerox PARC<br>
+3333 Coyote Hill Road<br>
+Palo Alto, CA 94034<br>
+Tel: (415) 812-4365<br>
+Fax: (415) 812-4333<br>
+Email: masinter@parc.xerox.com<br>
+<p>
+Mark McCahill<br>
+Computer and Information Services,<br>
+University of Minnesota<br>
+Room 152 Shepherd Labs<br>
+100 Union Street SE<br>
+Minneapolis, MN 55455<br>
+Tel: (612) 625 1300<br>
+EMail: mpm@boombox.micro.umn.edu<br>
+<!-- body="end" -->
+<p>
+<ul>
+<!-- next="start" -->
+<li> <b>Next message:</b> <a href="0151.html">Mitra: "Latest URL draft - diffs please"</a>
+<li> <b>Previous message:</b> <a href="0149.html">Internet-Drafts@CNRI.Reston.VA.US: "I-D ACTION:draft-ietf-uri-resource-names-02.txt"</a>
+<!-- nextthread="start" -->
+<li> <b>Next in thread:</b> <a href="0170.html">John A. Kunze: "Re: Draft URL document, for last call to be proposed standard RFC"</a>
+<li> <b>Maybe reply:</b> <a href="0170.html">John A. Kunze: "Re: Draft URL document, for last call to be proposed standard RFC"</a>
+<li> <b>Maybe reply:</b> <a href="0173.html">John A. Kunze: "Re: Draft URL document, for last call to be proposed standard RFC"</a>
+<!-- reply="end" -->
+</ul>

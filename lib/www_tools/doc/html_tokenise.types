@@ -1,0 +1,6 @@
+-interface(html_tokenise).
+
+-deftype token() = raw{string()} | tagEnd{string()} | tagError{int() | string()} | tagStart{string()} | tagStart{string(),[{string(),string()}]}.
+
+file(string()) -> ok{[token()]} | error.
+

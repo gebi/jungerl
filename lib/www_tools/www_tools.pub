@@ -1,0 +1,12 @@
+{author,"Joe Armstrong","joe@cslab.ericsson.se","981127"}.
+{name,"www_tools"}.
+{vsn,{1,0}}.
+{summary,"Tools for fetching and manipulating WWW pages"}.
+{keywords,["html","www","web"]}.
+{needs,[]}.
+{abstract,"WWW tools is a package of tools
+for fetching and manipulating web pages.
+The programs in this package illustrate how to fetch a URL using the
+Erlang socket interface, we show how to tokenise and analysis HTML and
+also provide a simple macro processor for HTML."}.
+

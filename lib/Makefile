@@ -7,6 +7,7 @@ LIBS := \
 	rpc \
 	tuntap \
         wumpus \
+        www_tools \
 	xmerl \
 	xmlrpc
 

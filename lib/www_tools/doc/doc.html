@@ -1,0 +1,21 @@
+<body bgcolor="white">
+<h1>WWW tools</h1>
+WWW tools is a package of tools
+for fetching and manipulating web pages.<p>
+The programs in this package illustrate how to fetch a URL using the
+Erlang socket interface, we show how to tokenise and analysis HTML and
+also provide a simple macro processor for HTML.
+<ul>
+<li><b>disk_cache.erl</b> provides disk cache of URLs.
+<li><b>html_tokenise.erl</b> tokenises an html file.
+<li><b>html_analyse.erl</b> analyses an html file.
+<li><b>html_expand.erl</b> Is a macro processor which
+adds a simple macro facility to expand macros in an HTML file.
+<li><b>url.erl</b> has routines to get a URL from a disk cache or the
+network.
+<li><b>url_parse.erl</b> is a simple minded parser for URLs
+<li><b>url_copy.erl</b> Makes a deep copy of a URL.
+We first the remote URL to the local file system. We then recursively copies
+all images in the original to the local file system. Image names in the
+original are renamed in a consistent manner.
+</ul>

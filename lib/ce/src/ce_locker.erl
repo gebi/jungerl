@@ -35,6 +35,10 @@
 
 %% @doc Generic resource locker design pattern.
 %%
+%% <p>This is an example of how a resource locker can be coded in Erlang.
+%% For a more practical, distributed locker, see the <code>global</code>
+%% module in the <code>kernel</code> application of OTP.</p>
+%%
 %% <p>One locker is created per resource you wish to lock.  These lockers
 %% are named and their names are stored in a public ETS table.  Locker names
 %% can be arbitary terms.  This allows non-re-entrant functions to be called

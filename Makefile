@@ -13,7 +13,6 @@ $(MK_INCLUDE): $(MK_INCLUDE).in
 
 conf:
 	(cd config; $(MAKE))
-	(cd lib; $(MAKE) $@)
 
 conf_clean:
 	(cd config; $(MAKE) clean)

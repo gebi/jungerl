@@ -267,6 +267,7 @@ ntform({Msec, Sec, Usec} = Now) ->
     T = tuple_to_list(element(2,calendar:now_to_datetime(Now)))++[Usec],
     lists:flatten(io_lib:fwrite("~2.2.0w:~2.2.0w:~2.2.0w.~6.6.0w", T)).
 
-ets_new(Tab) -> 
-    catch ets:delete(Tab),
-    ets:new(Tab, [named_table,ordered_set,public]).
+ets_new(Tab) -> ets_new(Tab, [ordered_set]).
+ets_new(Tab, Attr) -> 
+    panEts:server(delete, Tab),
+    panEts:server(new, {Tab, [named_table,public]++Attr}).

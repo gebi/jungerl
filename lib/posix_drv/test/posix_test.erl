@@ -102,8 +102,8 @@ r1(P) ->
 
     TmpFile2 = "/tmp/VerYSiLLYnAMe2",
     file:delete(TmpFile2),
-    case {?DRV:mknod(P, TmpFile2, 8#640, 16#fe), ?DRV:geteuid(P)} of
-	{{ok, 0}, 0} ->
+    case {?DRV:mknod(P, TmpFile2, 8#20640, 16#fe), ?DRV:geteuid(P)} of
+	{{ok, 0}, {ok, 0}} ->
 	    io:format("\nWARNING: mknod call succeeded, why are your running this test as superuser??\n\n"),
 	    timer:sleep(3000),
 	    {ok, FileInfo2} = file:read_file_info(TmpFile2),

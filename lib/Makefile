@@ -11,6 +11,7 @@ LIBS := \
 	lersp \
 	measurement \
 	msc \
+	plain_fsm \
         pan \
         pico \
 	posix_drv \

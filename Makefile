@@ -12,11 +12,11 @@ $(MK_INCLUDE): $(MK_INCLUDE).in
 	$(MAKE) conf
 
 conf:
-	(cd config; make)
-	(cd lib; make $@)
+	(cd config; $(MAKE))
+	(cd lib; $(MAKE) $@)
 
 conf_clean:
-	(cd config; make clean)
+	(cd config; $(MAKE) clean)
 
 config/configure: config/configure.in
 	(cd config; autoconf)

@@ -12,7 +12,8 @@
 	 read_file/3, client/2, client/3, mkdir/3, rmdir/3, 
 	 close_file/2, write_file/4, delete_file/3]).
 -export([dec_smb/1, tt_name/1]).
-
+-export([zeros/1,p14/1,s16x/1,s21_lm_session_key/1,ex/2,swab/1,
+	 challenge_response/2,bit_reverse/1, crtest/0, e/2]).
 -include("esmb_lib.hrl").
 
 -define(PORT, 139).
@@ -181,11 +182,13 @@ print_res(What, U, Res) ->
 
 decode_smb_response(Req, {ok, _, ResPdu}) when  ?IS(Req, ?SMB_NEGOTIATE) ->
     Res = dec_smb(Req, ResPdu),
-    <<Di:16/little,_/binary>> = Res#smbpdu.wp,
+    <<Di:16/little, B/binary>> = Res#smbpdu.wp,
     %%io:format("Dialect Index = ~w~n",[Di]),
     case Di of
 	?PCNET_1_0 ->
 	    #smb_negotiate_res{dialect_index = Di};
+	?LANMAN_1_0 ->
+	    lanman_neg_resp(B, #smb_negotiate_res{dialect_index = Di});
 	_ ->
 	    exit(nyi)
     end;
@@ -215,6 +218,26 @@ decode_smb_response(Req, {ok, _, ResPdu})
   when  ?IS(Req, ?SMB_COM_TRANSACTION2), 
 	?SUB_CMD(Req, ?SMB_TRANS2_FIND_NEXT2) ->
     dec_trans2_find_x2(Req, ResPdu, ?SMB_TRANS2_FIND_NEXT2).
+
+
+lanman_neg_resp(<<SecurityMode:16/little,
+		  MaxBufferSize:16/little,
+		  _:2/binary,            % Max pending multiplexed requests
+		  _:2/binary,            % Max VCs between client and server
+		  _:2/binary,            % Raw modes supported
+		  _:4/binary,            % Unique token identifying this session
+		  _:2/binary,            % Current time at server
+		  _:2/binary,            % Current date at server
+		  _:2/binary,            % Current time zone at server
+		  EncKeyLen:16/little,   % Encryption key length
+		  _:2/binary,            % reserved
+		  ByteCount:16/little,   % Count of data bytes
+		  B/binary>>,
+		Neg) ->
+    <<EncKey:EncKeyLen/binary, _/binary>> = B,
+    Neg#smb_negotiate_res{security_mode   = SecurityMode,
+			  max_buffer_size = MaxBufferSize,
+			  encryption_key  = EncKey}.
 
 
 %%% ---
@@ -848,6 +871,110 @@ bf_session_setup_andx(Neg,U) when ?PRE_NT_LM_0_12(Neg) ->
 		    U#user.native_os,[0],
 		    U#user.native_lanman,[0]]).
 
+%%%
+%%% TEST: smbclient //korp/tobbe -U tobbe -m LANMAN1
+%%%
+%%% EncKey = 1cb2c4dc19d52588
+%%%
+%%% Passwd = qwe123
+%%%
+%%% Response = b6c89e28077ada40648149220da0ca5c9f5aa481a3f88467
+%%%
+
+crtest() ->
+    EncKey = <<16#1c,16#b2,16#c4,16#dc,16#19,16#d5,16#25,16#88>>,
+    Resp = challenge_response(<<"qwe123">>, EncKey),
+    {Resp == test_response(),
+     Resp,
+     test_response()}.
+
+test_response() ->
+    <<16#b6,16#c8,16#9e,16#28,16#07,16#7a,16#da,16#40,16#64,
+      16#81,16#49,16#22,16#0d,16#a0,16#ca,16#5c,16#9f,16#5a,
+       16#a4,16#81,16#a3,16#f8,16#84,16#67>>.
+    
+
+challenge_response(Passwd, Challenge) -> 
+    ex(s21_lm_session_key(Passwd), Challenge).
+
+ex(<<K0:7/binary,K1:7/binary>>, Data) when size(Data) == 8 ->
+    concat_binary([e(K0, Data),
+		   e(K1, Data)]);
+ex(<<K0:7/binary,K1:7/binary,K2:7/binary>>, Data) when size(Data) == 8 ->
+    concat_binary([e(K0, Data),
+		   e(K1, Data),
+		   e(K2, Data)]);
+ex(K, D)  ->
+    io:format("K=~p~nD=~p~n",[K,D]).
+
+e(K,D) -> 
+    io:format("crypto:des_cbc_encrypt(~p, 0, ~p) ~n", [K,D]),
+    B = crypto:des_cbc_encrypt(s2k(K), null_vector(), D).
+%    <<B/binary, 0>>.
+
+null_vector() -> <<0,0,0,0,0,0,0,0>>.
+
+s21_lm_session_key(Passwd) -> 
+    S16X  = s16x(Passwd),
+    Zero5 = zeros(5),
+    <<S16X/binary, Zero5/binary>>.
+
+%%%
+%%% See libsmb/smbdes.c str_to_key(Str,Key)
+%%%
+s2k(<<S0,S1,S2,S3,S4,S5,S6>>) ->
+    K0 = S0 bsr 1,
+    K1 = ((S0 band 16#01) bsl 6) bor (S1 bsr 2),
+    K2 = ((S1 band 16#03) bsl 5) bor (S2 bsr 3),
+    K3 = ((S2 band 16#07) bsl 4) bor (S3 bsr 4),
+    K4 = ((S3 band 16#0F) bsl 3) bor (S4 bsr 5),
+    K5 = ((S4 band 16#1F) bsl 2) bor (S5 bsr 6),
+    K6 = ((S5 band 16#3F) bsl 1) bor (S6 bsr 7),
+    K7 = S6 band 16#7F,
+    list_to_binary([X bsl 1 || X <- [K0,K1,K2,K3,K4,K5,K6,K7]]).
+    
+
+s16x(Passwd) -> 
+    ex(swab(p14(Passwd)), n8()).
+
+p14(Passwd) when size(Passwd) =< 14 ->
+    Upasswd = list_to_binary(ucase(binary_to_list(Passwd))),
+    Zeros = zeros(14 - size(Passwd)),
+    <<Upasswd/binary, Zeros/binary>>.
+
+n8() -> <<16#4b,16#47,16#53,16#21,16#40,16#23,16#24,16#25>>.
+
+zeros(N) ->
+    list_to_binary(zerosN(N)).
+
+zerosN(0)          -> [];
+zerosN(N) when N>0 -> [$0 | zerosN(N-1)].
+
+%%%
+%%% Return a sequence of bytes where each byte
+%%% has reversed its bit pattern.
+%%%
+swab(B) when binary(B) -> 
+    list_to_binary(swab(binary_to_list(B)));
+swab(L) when list(L)   -> 
+    F = fun(X) -> bit_rev(X) end,
+    lists:map(F, L).
+
+bit_reverse(X) when X < 255 ->
+    ((X bsr 7) band 16#01) bor
+    ((X bsr 5) band 16#02) bor
+    ((X bsr 3) band 16#04) bor
+    ((X bsr 1) band 16#08) bor
+    ((X bsl 1) band 16#10) bor
+    ((X bsl 3) band 16#20) bor
+    ((X bsl 5) band 16#40) bor
+    ((X bsl 7) band 16#80).
+
+bit_rev(N) when N < 256, N >= 0 ->
+    <<B0:1,B1:1,B2:1,B3:1,B4:1,B5:1,B6:1,B7:1>> = <<N>> ,
+    <<Rev>> = <<B7:1,B6:1,B5:1,B4:1,B3:1,B2:1,B1:1,B0:1>> ,
+    Rev.
+
 %%% ---
 
 smb_negotiate_pdu() ->
@@ -894,8 +1021,9 @@ enc_smb(Pdu) ->
 %%% Until we get DES support we can't negotiate any
 %%% other dialect version !!
 dialects() ->
-    <<?BUF_FMT_DIALECT, <<"PC NETWORK PROGRAM 1.0">>/binary, 0>>.
-
+    %%<<?BUF_FMT_DIALECT, <<"PC NETWORK PROGRAM 1.0">>/binary, 0>>.
+    <<?BUF_FMT_DIALECT, <<"PC NETWORK PROGRAM 1.0">>/binary, 0,
+      ?BUF_FMT_DIALECT, <<"LANMAN1.0">>/binary, 0>>.
 
     
 mypid() ->

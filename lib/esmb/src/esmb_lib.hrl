@@ -149,17 +149,18 @@
 %%% This record hold the negotiation result.
 %%% (Add entries when more complex dialects are being implemented !)
 -record(smb_negotiate_res, {
-	  dialect_index,        % Dialect == PCNET_1_0
-	  security_mode,        % Dialect <= LANMAN_2_1
-	  max_buffer_size=4096
+	  dialect_index,        % Example: ?PCNET_1_0
+	  security_mode,        % PCNET_1_0 < Dialect <= LANMAN_2_1
+	  encryption_key,       % PCNET_1_0 < Dialect <= LANMAN_2_1
+	  max_buffer_size=4096  % arbitrary default value
 	  }).
 
 %%% Add more dialects when we can support them.
-%%% Make sure to not break the successive order so
+%%% Make sure to not break the successive order of
+%%% the dialects we are sending in the neg-req, so
 %%% that we know which dialect that was choosen !
 -define(PCNET_1_0,   0).    % PC NETWORK PROGRAM 1.0
-%-define(MICNET_1_03, 1)     % MICROSOFT NETWORKS 1.03
-%-define(MICNET_3_0,  2)     % MICROSOFT NETWORKS 3.0
+-define(LANMAN_1_0,  1).    % LANMAN 1.0
 
 
 %%% Session_Setup_AndX parameter values

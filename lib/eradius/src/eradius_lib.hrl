@@ -45,8 +45,10 @@
 %%- Terminate Cause values
 -define(RTCUser_Request,           1).
 -define(RTCIdle_Timeout,           4).
+-define(RTCSession_Timeout,        5).
 -define(RTCAdmin_Reset,            6).
 -define(RTCAdmin_Reboot,           7).
+-define(RTCNAS_Request,           10).
 -define(RTCNAS_Reboot,            11).
 
 %% In a server we need to store properties of a NAS. This is used as
@@ -61,6 +63,7 @@
 %%- Radius accounting server info.
 -record( radacct , {
 	   servers,      % a list of [Ip,Port,Secret] tripplets
+	   sockopts = [],% list of extra socket options
 	   timeout}).    % timeout in seconds
 
 
@@ -80,12 +83,14 @@
 -record(rad_accept, {
 	  user,
 	  vendor_specifics = [],
-	  attribs = []
+	  attribs = [],
+	  session_timeout = 0
 	 }).
 
 -record(rad_challenge, {
 	  state,
-	  reply_msgs = []  % list of binaries
+	  reply_msgs = [], % list of binaries
+	  session_timeout = 0
 	 }).
 
 -record(rad_reject, {
@@ -98,10 +103,12 @@
 	  login_time,      % erlang:now/0
 	  logout_time,     % erlang:now/0
 	  session_id,
+	  vend_id = 1872,  % Alteon
 	  vend_attrs = [], % list_of( {VendorId, list_of( {Id, Val} ) } )
 	  std_attrs  = [], % list_of( {Id, Val} )
 	  user,
 	  nas_ip,
+	  sockopts = [],   % list of extra socket options
 	  servers,         % overrides the #radacct{} content
 	  timeout = 5000,  % -- "" --  , default is 5 seconds
 	  term_cause}).

@@ -14,22 +14,30 @@
 %%--------------------------------------------------------------------
 
 -include("eradius_lib.hrl").
+-include_lib("kernel/include/inet.hrl").
 
 %%--------------------------------------------------------------------
 %% External exports
--export([start_link/0, start/0, acc_start/1, acc_stop/1, 
-	 set_user/2, set_nas_ip_address/2, new/0, acc_update/1,
-	 set_login_time/1, set_logout_time/1, set_session_id/2, 
-	 set_radacct/1, set_attr/3, 
-	 set_vend_attrs/2, append_vend_attrs/2,
-	 set_servers/2, set_timeout/2, set_login_time/2, 
-	 set_logout_time/2, set_tc_ureq/1, set_tc_itimeout/1,
-	 set_tc_areset/1, set_tc_areboot/1, set_tc_nasreboot/1]).
+-export([start_link/0, acc_on/1, acc_off/1, 
+	 acc_start/1, acc_stop/1, 
+	 validate_servers/1, start/0, 
+	 set_user/2, set_nas_ip_address/1, set_nas_ip_address/2, 
+ 	 set_sockopts/2,
+	 set_login_time/1, set_logout_time/1, set_session_id/2, new/0, 
+	 set_radacct/1, set_attr/3, set_vend_attr/3, acc_update/1,
+	 set_servers/2, set_timeout/2, set_login_time/2,  set_vendor_id/2,
+	 set_logout_time/2, set_tc_ureq/1, 
+	 set_tc_itimeout/1,set_tc_stimeout/1,
+	 set_tc_areset/1, set_tc_areboot/1, 
+	 set_tc_nasrequest/1, set_tc_nasreboot/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, 
 	 terminate/2, code_change/3]).
 
+-ifdef(debug).
+-export([test/0,test/1,test_stop/0]).
+-endif.
 
 %% The State record
 -record(s, {
@@ -40,7 +48,6 @@
 -define(TABLENAME,  ?MODULE).
 -define(PORT,       1813).     % standard port for Radius Accounting
 -define(TIMEOUT,    10).       
-
 
 
 %%% ====================================================================
@@ -56,20 +63,29 @@ set_attr(R, Type, Bval) when record(R,rad_accreq),integer(Type),binary(Bval)->
     R#rad_accreq{std_attrs = [{Type, Bval} | StdAttrs]}.
 
 %%% Vendor Attributes
-set_vend_attrs(R, Vas) ->
-    R#rad_accreq{vend_attrs = Vas}.
-
-append_vend_attrs(R, Vas) -> 
+set_vend_attr(R, Type, Bval) when record(R,rad_accreq),
+				  integer(Type),binary(Bval)->
     VendAttrs = R#rad_accreq.vend_attrs,
-    R#rad_accreq{vend_attrs = Vas ++ VendAttrs}.
+    R#rad_accreq{vend_attrs = [{Type, Bval} | VendAttrs]}.
+
+%%% Vendor Id
+set_vendor_id(R, VendId) when record(R, rad_accreq),integer(VendId) ->
+    R#rad_accreq{vend_id = VendId}.
 
 %%% User
 set_user(R, User) when record(R, rad_accreq) ->
     R#rad_accreq{user = any2bin(User)}.
 
 %%% NAS-IP
-set_nas_ip_address(R, Ip) when record(R, rad_accreq) ->
+set_nas_ip_address(R) when record(R, rad_accreq) ->
+    R#rad_accreq{nas_ip = nas_ip_address()}.
+
+set_nas_ip_address(R, Ip) when record(R, rad_accreq),tuple(Ip) ->
     R#rad_accreq{nas_ip = Ip}.
+
+%%% Extra socket options
+set_sockopts(R, SockOpts) when record(R, rad_accreq),list(SockOpts) ->
+    R#rad_accreq{sockopts = SockOpts}.
 
 %%% Login / Logout
 set_login_time(R) ->
@@ -93,11 +109,17 @@ set_tc_ureq(R) when record(R, rad_accreq) ->
 set_tc_itimeout(R) when record(R, rad_accreq) ->
     R#rad_accreq{term_cause = ?RTCIdle_Timeout}.
 
+set_tc_stimeout(R) when record(R, rad_accreq) ->
+    R#rad_accreq{term_cause = ?RTCSession_Timeout}.
+
 set_tc_areset(R) when record(R, rad_accreq) ->
     R#rad_accreq{term_cause = ?RTCAdmin_Reset}.
 
 set_tc_areboot(R) when record(R, rad_accreq) ->
     R#rad_accreq{term_cause = ?RTCAdmin_Reboot}.
+
+set_tc_nasrequest(R) when record(R, rad_accreq) ->
+    R#rad_accreq{term_cause = ?RTCNAS_Request}.
 
 set_tc_nasreboot(R) when record(R, rad_accreq) ->
     R#rad_accreq{term_cause = ?RTCNAS_Reboot}.
@@ -130,6 +152,19 @@ start_link() ->
 start() ->
     gen_server:start({local, ?SERVER}, ?MODULE, [], []).
 
+
+
+%%-----------------------------------------------------------------
+%% Func: auth(User, Passwd, AuthSpec)
+%% Types: 
+%% Purpose: 
+%%-----------------------------------------------------------------
+
+acc_on(Req) when record(Req,rad_accreq) ->
+    gen_server:cast(?SERVER, {acc_on, Req}).
+
+acc_off(Req) when record(Req,rad_accreq) ->
+    gen_server:cast(?SERVER, {acc_off, Req}).
 
 acc_start(Req) when record(Req,rad_accreq) ->
     gen_server:cast(?SERVER, {acc_start, Req}).
@@ -188,6 +223,14 @@ handle_call({set_radacct, R}, _From, State) when record(R, radacct) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
+handle_cast({acc_on, Req}, State) ->
+    punch_acc(Req, State, ?RStatus_Type_On),
+    {noreply, State};
+%%
+handle_cast({acc_off, Req}, State) ->
+    punch_acc(Req, State, ?RStatus_Type_Off),
+    {noreply, State};
+%%
 handle_cast({acc_start, Req}, State) ->
     punch_acc(Req, State, ?RStatus_Type_Start),
     {noreply, State};
@@ -283,9 +326,7 @@ do_punch([[Ip,Port,Shared] | Rest], Timeout, Req) ->
 send_recv_msg(Ip, Port, Timeout, Req) ->
     {ok, S} = gen_udp:open(0, [binary]),
     gen_udp:send(S, Ip, Port, Req),
-    %%io:format("Sent Request to: ~p:~p !~n",[Ip,Port]),
     Resp = recv_wait(S, Timeout),
-    %%io:format("Received Response: ~p~n",[Resp]),
     gen_udp:close(S),
     Resp.
 
@@ -298,10 +339,19 @@ recv_wait(S, Timeout) ->
     end.
 
 
-%% Both argguments should be in erlang:now/0 format
-compute_session_time(Login, Logout) ->
+%% Login = Logout = {MSec, Sec, uSec} | integer()
+%% (In the second form it is erlang:now() in seconds)
+compute_session_time(Login0, Logout0) ->
+    Login = to_now(Login0),
+    Logout = to_now(Logout0),
     calendar:datetime_to_gregorian_seconds(calendar:now_to_local_time(Logout)) -
 	calendar:datetime_to_gregorian_seconds(calendar:now_to_local_time(Login)).
+
+to_now(Now = {MSec, Sec, USec}) when is_integer(MSec),
+				     is_integer(Sec), is_integer(USec) ->
+    Now;
+to_now(Now) when is_integer(Now) ->
+    {Now div 1000000, Now rem 1000000, 0}.
 
 
 any2bin(I) when integer(I) -> list_to_binary(integer_to_list(I));
@@ -309,3 +359,27 @@ any2bin(L) when list(L)    -> list_to_binary(L);
 any2bin(B) when binary(B)  -> B.
 
 
+%%%
+%%% Registry validation and typecheck stuff
+%%%
+
+validate_servers(_X) ->
+    true.
+
+
+nas_ip_address() ->
+    node2ip(node()).
+
+node2ip(Node) ->
+    host2ip(node2host(Node)).
+
+node2host(Node) ->
+    n2h(atom_to_list(Node)).
+
+n2h([$@ | Host]) -> Host;
+n2h([_H | T])    -> n2h(T);
+n2h([])          -> [].
+
+host2ip(Host) ->
+    {ok, #hostent{h_addr_list = [Ip | _]}} = inet:gethostbyname(Host),
+    Ip.

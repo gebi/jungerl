@@ -109,21 +109,6 @@ static int iface_get_id(int sock_fd, const char *device)
     return ifr.ifr_ifindex;
 }
 
-/* Return true if the device `device' running. */
-static int device_running(int sock_fd, const char *device)
-{
-    struct ifreq ifr;
-
-    memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, device, sizeof(ifr.ifr_name));
-
-    if (ioctl(sock_fd, SIOCGIFFLAGS, &ifr) == -1) {
-        return 0;
-    }
-
-    return ifr.ifr_flags & IFF_RUNNING;
-}
-
 static int read_from_erlang(char *buffer)
 {
     int len;
@@ -246,9 +231,6 @@ int main(int argc, char** argv)
         perror("bind");
         exit(1);
     }
-
-    /* Make sure the interface is running */
-    require (device_running(sock_fd, argv[1]));
 
     setup(sock_fd);
     select_loop(sock_fd, index);

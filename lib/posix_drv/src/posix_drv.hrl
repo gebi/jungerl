@@ -60,9 +60,9 @@
         st_uid,
         st_gid,
         st_rdev,
-        st_atimespec,
-        st_mtimespec,
-        st_ctimespec,
+        st_atime,
+        st_mtime,
+        st_ctime,
         st_size,
         st_blocks,
         st_blksize
@@ -91,5 +91,5 @@
 %%%  filename = posix.xml
 %%%  gslgen version = 2.000 Beta 1
 %%%  date = 2003/04/22
-%%%  time =  3:50:16
+%%%  time =  3:53:44
 %%%

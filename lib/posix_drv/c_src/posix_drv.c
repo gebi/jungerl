@@ -1146,35 +1146,11 @@ reply_xtra_stat(descriptor_t *desc, callstate_t *c)
                  members++;
                  msgcount = LOAD_INT(msg, msgcount, c->o.sb.st_rdev);
                  members++;
-                 {
-                     int members = 0;
-
-                     msgcount = LOAD_INT(msg, msgcount, c->o.sb.st_atimespec.tv_sec);
-                     members++;
-                     msgcount = LOAD_INT(msg, msgcount, c->o.sb.st_atimespec.tv_nsec);
-                     members++;
-                     msgcount = LOAD_TUPLE(msg, msgcount, members); /* XXX */
-                 }
+                 msgcount = LOAD_INT(msg, msgcount, c->o.sb.st_atime);
                  members++;
-                 {
-                     int members = 0;
-
-                     msgcount = LOAD_INT(msg, msgcount, c->o.sb.st_mtimespec.tv_sec);
-                     members++;
-                     msgcount = LOAD_INT(msg, msgcount, c->o.sb.st_mtimespec.tv_nsec);
-                     members++;
-                     msgcount = LOAD_TUPLE(msg, msgcount, members); /* XXX */
-                 }
+                 msgcount = LOAD_INT(msg, msgcount, c->o.sb.st_mtime);
                  members++;
-                 {
-                     int members = 0;
-
-                     msgcount = LOAD_INT(msg, msgcount, c->o.sb.st_ctimespec.tv_sec);
-                     members++;
-                     msgcount = LOAD_INT(msg, msgcount, c->o.sb.st_ctimespec.tv_nsec);
-                     members++;
-                     msgcount = LOAD_TUPLE(msg, msgcount, members); /* XXX */
-                 }
+                 msgcount = LOAD_INT(msg, msgcount, c->o.sb.st_ctime);
                  members++;
                  msgcount = LOAD_INT(msg, msgcount, c->o.sb.st_size);
                  members++;

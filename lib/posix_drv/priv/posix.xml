@@ -13,9 +13,9 @@
 	st_uid,
 	st_gid,
 	st_rdev,
-	st_atimespec,
-	st_mtimespec,
-	st_ctimespec,
+	st_atime,
+	st_mtime,
+	st_ctime,
 	st_size,
 	st_blocks,
 	st_blksize
@@ -172,18 +172,9 @@
      <xtra_val etype="integer" val="c->o.sb.st_uid"/>
      <xtra_val etype="integer" val="c->o.sb.st_gid"/>
      <xtra_val etype="integer" val="c->o.sb.st_rdev"/>
-     <xtra_val etype="tuple">
-       <xtra_val etype="integer" val="c->o.sb.st_atimespec.tv_sec"/>
-       <xtra_val etype="integer" val="c->o.sb.st_atimespec.tv_nsec"/>
-     </xtra_val>
-     <xtra_val etype="tuple">
-       <xtra_val etype="integer" val="c->o.sb.st_mtimespec.tv_sec"/>
-       <xtra_val etype="integer" val="c->o.sb.st_mtimespec.tv_nsec"/>
-     </xtra_val>
-     <xtra_val etype="tuple">
-       <xtra_val etype="integer" val="c->o.sb.st_ctimespec.tv_sec"/>
-       <xtra_val etype="integer" val="c->o.sb.st_ctimespec.tv_nsec"/>
-     </xtra_val>
+     <xtra_val etype="integer" val="c->o.sb.st_atime"/>
+     <xtra_val etype="integer" val="c->o.sb.st_mtime"/>
+     <xtra_val etype="integer" val="c->o.sb.st_ctime"/>
      <xtra_val etype="integer" val="c->o.sb.st_size"/>
      <xtra_val etype="integer" val="c->o.sb.st_blocks"/>
      <xtra_val etype="integer" val="c->o.sb.st_blksize"/>

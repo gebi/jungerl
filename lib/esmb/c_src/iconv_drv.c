@@ -17,6 +17,12 @@
 #define IV_CONV       'v'
 #define IV_CLOSE      'c'
 
+/* convert buffers */
+#define INBUF_SZ 512
+#define OUTBUF_SZ INBUF_SZ*4
+static char inbuf[INBUF_SZ];
+static char outbuf[OUTBUF_SZ];
+
 
 /* these should really be defined in driver.h */
 #define LOAD_ATOM(vec, i, atom) \
@@ -71,8 +77,10 @@
 static int driver_send_bin();
 
 /* atoms which are sent to erlang */
+static ErlDrvTermData am_ok;
 static ErlDrvTermData am_value;
 static ErlDrvTermData am_error;
+static ErlDrvTermData am_enomem;
 static ErlDrvTermData am_einval;
 static ErlDrvTermData am_unknown;
 
@@ -103,35 +111,50 @@ static void iconvdrv_stop(ErlDrvData drv_data)
 
 
 /* send {P, value, Bin} to caller */
-static int driver_send_bin(t_iconvdrv *iconv, ErlDrvBinary *bin, int len)
+static int driver_send_bin(t_iconvdrv *iv, ErlDrvBinary *bin, int len)
 {
     int i = 0;
     ErlDrvTermData to, spec[10];
 
-    to = driver_caller(iconv->port);
+    to = driver_caller(iv->port);
 
-    i = LOAD_PORT(spec, i, iconv->dport);
+    i = LOAD_PORT(spec, i, iv->dport);
     i = LOAD_ATOM(spec, i, am_value);
     i = LOAD_BINARY(spec, i, bin, 0, len);
     i = LOAD_TUPLE(spec, i, 3);
 
-    return driver_send_term(iconv->port, to, spec, i);
+    return driver_send_term(iv->port, to, spec, i);
+}
+
+/* send {P, ok} to caller */
+static int driver_send_ok(t_iconvdrv *iv)
+{
+    int i = 0;
+    ErlDrvTermData to, spec[10];
+
+    to = driver_caller(iv->port);
+
+    i = LOAD_PORT(spec, i, iv->dport);
+    i = LOAD_ATOM(spec, i, am_ok);
+    i = LOAD_TUPLE(spec, i, 2);
+
+    return driver_send_term(iv->port, to, spec, i);
 }
 
 /* send {P, error, Error} to caller */
-static int driver_send_error(t_iconvdrv *iconv, ErlDrvTermData *am)
+static int driver_send_error(t_iconvdrv *iv, ErlDrvTermData *am)
 {
     int i = 0;
     ErlDrvTermData to, spec[8];
 
-    to = driver_caller(iconv->port);
+    to = driver_caller(iv->port);
 
-    i = LOAD_PORT(spec, i, iconv->dport);
+    i = LOAD_PORT(spec, i, iv->dport);
     i = LOAD_ATOM(spec, i, am_error);
     i = LOAD_ATOM(spec, i, *am);
     i = LOAD_TUPLE(spec, i, 3);
 
-    return driver_send_term(iconv->port, to, spec, i);
+    return driver_send_term(iv->port, to, spec, i);
 }
 
 #define CODE_STR_SZ  64
@@ -145,35 +168,60 @@ static int driver_send_error(t_iconvdrv *iconv, ErlDrvTermData *am)
 
 static void iv_open(t_iconvdrv *iv, char *tocode, char *fromcode)
 {
-    iconv_t cd;
+    int len;
+    iconv_t *cd;
+    ErlDrvBinary *bin;
 
-    if ((cd = iconv_open(tocode, fromcode)) == -1) {
+    if ((*cd = iconv_open(tocode, fromcode)) == (iconv_t) -1) {
 	driver_send_error(iv, &am_einval);
     }
     else {
+	len = sizeof(iconv_t);
 	if (!(bin = driver_alloc_binary(len))) {
-	    driver_send_error(md4, &am_enomem);
+	    driver_send_error(iv, &am_enomem);
 	}
 	else {
-	    memcpy(bin->orig_bytes, digest, 16);
-	    driver_send_bin(md4, bin, 16);
+	    memcpy(bin->orig_bytes, cd, len);
+	    driver_send_bin(iv, bin, len);
 	    driver_free_binary(bin);
 	}
-
-	
     }
 
     return;
 }
 
-static void iv_conv(t_iconvdrv *iv, iconv_t cd, char *buf, int len)
+static void iv_conv(t_iconvdrv *iv, iconv_t cd, char *ip, int ileft)
 {
+    int oleft=OUTBUF_SZ;
+    char *op;
+    int len;
+    ErlDrvBinary *bin;
 
+    op = &outbuf[0];
+
+    if (iconv(cd, &ip, &ileft, &op, &oleft) == (size_t) -1) {
+	fprintf(stderr, "iconv failed \n");
+    }
+    else if (ileft == 0) {
+	len = OUTBUF_SZ - oleft;
+	if (!(bin = driver_alloc_binary(len))) {
+	    driver_send_error(iv, &am_enomem);
+	}
+	else {
+	    memcpy(bin->orig_bytes, &outbuf[0], len);
+	    driver_send_bin(iv, bin, len);
+	    driver_free_binary(bin);
+	}
+    }
+
+    return;
 }
 
 static void iv_close(t_iconvdrv *iv, iconv_t cd)
 {
-
+    iconv_close(cd);
+    driver_send_ok(iv);
+    return;
 }
 
 static void iconvdrv_from_erlang(ErlDrvData drv_data, char *buf, int len)
@@ -184,7 +232,9 @@ static void iconvdrv_from_erlang(ErlDrvData drv_data, char *buf, int len)
     unsigned int i=0;
     iconv_t cd;
 
-    switch ((int) bp++) {
+    i = bp[0];
+    bp++;
+    switch (i) {
 
     case IV_OPEN: {
 	/*
@@ -193,12 +243,15 @@ static void iconvdrv_from_erlang(ErlDrvData drv_data, char *buf, int len)
 	i = get_int16(bp);
 	bp += 2;
 	memcpy(tocode, bp, i);
+	tocode[i] = '\0';
 	bp += i;
 	i = get_int16(bp);
 	bp += 2;
 	memcpy(fromcode, bp, i);
+	fromcode[i] = '\0';
 
 	iv_open(iv, tocode, fromcode);
+	break;
     }
 
     case IV_CONV: {
@@ -207,12 +260,13 @@ static void iconvdrv_from_erlang(ErlDrvData drv_data, char *buf, int len)
 	 */
 	i = get_int16(bp);
 	bp += 2;
-	memcpy(cd, bp, i);
+	memcpy(&cd, bp, i);
 	bp += i;
 	i = get_int16(bp);
 	bp += 2;
 
 	iv_conv(iv, cd, bp, i);
+	break;
     }
 
     case IV_CLOSE: {
@@ -221,9 +275,10 @@ static void iconvdrv_from_erlang(ErlDrvData drv_data, char *buf, int len)
 	 */
 	i = get_int16(bp);
 	bp += 2;
-	memcpy(cd, bp, i);
+	memcpy(&cd, bp, i);
 
 	iv_close(iv, cd);
+	break;
     }
 
     } /* switch */
@@ -238,8 +293,10 @@ static void iconvdrv_from_erlang(ErlDrvData drv_data, char *buf, int len)
 
 DRIVER_INIT(iconvdrv)
 {
+  am_ok           = driver_mk_atom("ok");
   am_value        = driver_mk_atom("value");
   am_error        = driver_mk_atom("error");
+  am_enomem       = driver_mk_atom("enomem");
   am_einval       = driver_mk_atom("einval");
   am_unknown      = driver_mk_atom("unknown");
 

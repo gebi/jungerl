@@ -11,7 +11,7 @@
 
 regression() ->
     {ok, Port} = ?DRV:start(),
-    %% {ok, 1} = ?DRV:debug(Port, 1),
+    {ok, 1} = ?DRV:debug(Port, 1),
     ok = r1(Port),
     io:format("All regression tests PASSED.\n"),
     ok.
@@ -57,7 +57,12 @@ r1(P) ->
 
     %% Choose groups that we know/hope do or don't exist
     case ?DRV:getgrnam(P, "wheel") of
-	{ok, GROUP1} when record(GROUP1, group) -> ok
+        {ok, GROUP1} when record(GROUP1, group) -> ok;
+        {error, 0} ->
+	    %% Perhaps we're a Solaris box, don't have wheel, try root
+            case ?DRV:getgrnam(P, "root") of
+                {ok, GROUP1} when record(GROUP1, group) -> ok
+            end
     end,
     case ?DRV:getgrnam(P, "does-not-exist") of
 	{error, 0} -> ok

@@ -1,7 +1,7 @@
 #
 # The autoconf magic required to automatically find your system's
-# header files and shared libraries for libgd, libpng, libjpeg, and
-# libXpm are too complex to bother with.  Instead, you must configure
+# header files and shared libraries for the Spread library
+# are too complex to bother with.  Instead, you must configure
 # them manually.  The process goes like this:
 #
 # 1. Create a file named CVSROOT/jungerl/config/SpreadConfig.mk

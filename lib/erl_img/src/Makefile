@@ -14,8 +14,9 @@ OBJS = 	$(EBIN)/image_bmp.beam \
 	$(EBIN)/exif.beam \
 	$(EBIN)/lzw.beam \
 	$(EBIN)/zlib.beam \
-	$(EBIN)/erl_img.beam \
-	$(EBIN)/erl_img_show.beam
+	$(EBIN)/erl_img.beam
+
+#	$(EBIN)/erl_img_show.beam
 
 
 # $(EBIN)/photo.beam 

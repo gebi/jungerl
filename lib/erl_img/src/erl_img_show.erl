@@ -111,6 +111,7 @@ make_gdk_image(Image) ->
     Colormap = gdk:colormap_get_system(),
     %% Visual   = gdk:window_get_visual(Window), 
     %% Colormap = gdk:window_get_colormap(Window),
+    Map0 = map_colors(Image#erl_image.palette, Colormap),
     IList = 
 	map(
 	  fun(Pixmap) ->
@@ -120,7 +121,12 @@ make_gdk_image(Image) ->
 					   Image#erl_image.height),
 		  if Pixmap#erl_pixmap.format == palette8;
 		     Pixmap#erl_pixmap.format == palette4 ->
-			  Map = map_colors(Pixmap#erl_pixmap.palette,Colormap),
+			  Pal = Pixmap#erl_pixmap.palette,
+			  Map = if Pal == undefined ->
+					Map0;
+				   true ->
+					map_colors(Pal, Colormap)
+				end,
 			  indexed_colors(Pixmap,GdkImage,Visual,Colormap,
 					 Image#erl_image.order, Map);
 		     true ->
@@ -140,6 +146,8 @@ make_gdk_image(Image) ->
 
 
 %% create a color lookup  table
+map_colors(undefined, Colormap) ->
+    {};
 map_colors(Colors, Colormap) ->
     map_colors(Colors, Colormap, []).
     
@@ -179,6 +187,16 @@ indexed_colors(Pixmap, GdkImg, Visual, Colormap,Order,Map) ->
 	    left_to_right -> lists:seq(0, W-1);
 	    right_to_left -> reverse(lists:seq(0, W-1))
 	end,
+    Transparent =
+	case lists:keysearch('Transparent', 1, Pixmap#erl_pixmap.attributes) of
+	    false -> undefined;
+	    {value,{_,T}} -> T
+	end,
+    Background = 
+	case lists:keysearch('Background', 1, Pixmap#erl_pixmap.attributes) of
+	    false -> 0;
+	    {value,{_,B}} -> B
+	end,
     foreach(
       fun({Y,Row}) ->
 	      foreach(
@@ -195,12 +213,14 @@ indexed_colors(Pixmap, GdkImg, Visual, Colormap,Order,Map) ->
 				    <<_:Offs/binary,I,_/binary>> = Row,
 				    I
 			    end,
-			if IX == Pixmap#erl_pixmap.transparent ->
-				%% Fixme get background pixel
-				0;
+			IX1 = if IX == Transparent ->
+				      B;
+				 true ->
+				      IX
+			      end,
 			   true ->
 				gdk:image_put_pixel(GdkImg, X+X0, Y+Y0, 
-						    element(IX+1, Map))
+						    element(IX1+1, Map))
 			end
                 end, XList)
       end, Pixmap#erl_pixmap.pixels),

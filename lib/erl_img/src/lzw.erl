@@ -17,51 +17,89 @@
 
 -export([compress/1,
 	 compress/2,
-	 compress/5]).
+	 compress/5,
+	 compress_gif/1,
+	 compress_gif/2]).
 
 -export([rbits8/1, rbits/2]).
+-compile(export_all).
 
 -import(lists, [reverse/1, foldl/3]).
 
 -include("erl_img.hrl").
 
+-define(debug, true).
+
 -include("dbg.hrl").
 
-%% should go
--define(LZW_CLEAR,           256).
--define(LZW_EOI,             257).
--define(LZW_FIRST,           258).
--define(LZW_STARTBITLEN,     9).
+-record(z,
+	{
+	  clear,
+	  eoi,
+	  first,
+	  startlen,
+	  next,
+	  max,
+	  nextfn
+	 }).
 
--define(LZW_SWAP_9,          510).
--define(LZW_SWAP_10,        1022).
--define(LZW_SWAP_11,        2046).
--define(LZW_MAX,            4094).
-
--define(get_lzw(Code), get(Code)).
+-define(get_lzw(Code),      get(Code)).
 -define(add_lzw(Code, Str), put(Code, Str)).
+
+%% most significant bits first
+read_bits_msb(Bin, Offs, Len) ->
+    Offs1 = Offs+Len,
+    Pad = ?PAD_Len8(Offs1),
+    <<_:Offs, Code:Len, _:Pad,_/binary>> = Bin,
+    {Code,Offs1}.
+
+%% least significant bytes first
+read_bits_lsb(Bin, Offs, Len) ->
+    Offs1  = Offs+Len,
+    B0     = Offs  div 8,
+    B1     = Offs1 div 8,
+    R0     = Offs  rem 8,
+    R1     = Offs1 rem 8,
+    ?dbg("b0=~w,r0=~w b1=~w,r1=~w\n", [B0,R0,B1,R1]),
+    if R0 == 0, R1 == 0 ->
+	    BL = (B1 - B0)*8,
+	    ?dbg("blen=~w\n", [BL]),
+	    <<_:B0/binary,BCode:BL/little-unsigned-integer,_/binary>> = Bin,
+	    {BCode,Offs1};
+       true ->
+	    BL = ((B1 - B0)+1)*8,
+	    ?dbg("blen=~w\n", [BL]),
+	    <<_:B0/binary,BCode:BL/little-unsigned-integer,_/binary>> = Bin,
+	    Code = (BCode bsr R0) band ((1 bsl Len)-1),
+	    {Code,Offs1}
+    end.
+
+%% least significant bits and bytes first 
+read_bits_LSB(Bin, Offs, Len) ->
+    {Code,Offs1} = read_bits_lsb(Bin,Offs,Len),
+    {rbits(Code,Len),Offs1}.
+
 
 %% should finalize the dictionary (if not using special process)
 init_decomp(Lim) ->
+    erase(),
     init_decomp(0,Lim).
     
-init_decomp(No,Lim) when No >= Lim ->
-    case erase(No) of
-        undefined -> ok;
-        _ -> init_decomp(No+1,Lim)
-    end;
-init_decomp(No,Lim) ->
-    ?add_lzw(No, [No]),
-    init_decomp(No+1,Lim).
+init_decomp(Lim,Lim) ->
+    ok;
+init_decomp(I,Lim) ->
+    ?add_lzw(I, [I]),
+    init_decomp(I+1,Lim).
 
-init_comp() ->
+init_comp(Lim) ->
     erase(),
-    init_comp(257).
-init_comp(No) when No >= 0 ->
-    ?add_lzw([No], No),
-    init_comp(No - 1);
-init_comp(_) ->
-    ok.
+    init_comp(0, Lim).
+
+init_comp(Lim,Lim) ->
+    ok;
+init_comp(I,Lim) ->
+    ?add_lzw([I], I),
+    init_comp(I+1,Lim).
 
 
 %% reverse bytes and read the codes backwards
@@ -71,143 +109,88 @@ decompress_gif(Bin) ->
     decompress_gif(Bin, 8). 
 
 decompress_gif(Bin, MinCodeSize) ->
-    RBin = list_to_binary(reverse(binary_to_list(Bin))),
-    ?dbg("rev-binary=~p\n", [RBin]),
-    ReadCode = fun(Len, Offs) ->
-		       Offs1 = Offs-Len,
-		       Pad = ?PAD_Len8(Offs),
-		       case RBin of
-			   <<_:Offs1, Code:Len, _:Pad, _/binary>> ->
-			       ?dbg("offs=~p, len=~p, code=~p\n",[Offs1,Len,Code]),
-			       {Code, Offs1};
-			   _ ->
-			       {error, eof}
-		       end
-	       end,
-    Next = fun(Len) -> 1 bsl Len end,
-    decomp(size(RBin)*8,ReadCode,MinCodeSize,Next).
+    ReadFn = fun(Len,Offs) ->
+		     read_bits_lsb(Bin,Offs,Len)
+	     end,
+    NextFn = fun(Len) -> (1 bsl Len) end,
+    decomp(0,ReadFn,MinCodeSize,NextFn).
     
+
+
 decompress_tiff(Bin) ->
     decompress_tiff(Bin, 8, 1).
 
-
 decompress_tiff(Bin, MinCodeSize, 2) ->
-    RBin = list_to_binary(reverse(binary_to_list(Bin))),
-    ?dbg("rev-binary=~p\n", [RBin]),
-    ReadCode = fun(Len, Offs) ->
-		       Offs1 = Offs-Len,
-		       Pad = ?PAD_Len8(Offs),
-		       case RBin of
-			   <<_:Offs1, Code:Len, _:Pad, _/binary>> ->
-			       ?dbg("offs=~p, len=~p, code=~p\n",[Offs1,Len,Code]),
-			       {rbits(Code,Len), Offs1};
-			   _ ->
-			       {error, eof}
-		       end
-	       end,
-    Next = fun(Len) -> (1 bsl Len)-1 end,
-    decomp(size(RBin)*8,ReadCode,MinCodeSize,Next);
+    ReadFn = fun(Len,Offs) ->
+		     read_bits_LSB(Bin,Offs,Len)
+	     end,
+    NextFn = fun(Len) -> (1 bsl Len)-1 end,
+    decomp(0,ReadFn,MinCodeSize,NextFn);
 decompress_tiff(Bin, MinCodeSize, 1) ->
-    ?dbg("binary=~p\n", [Bin]),
-    ReadCode = fun(Len, Offs) ->
-		       Offs1 = Offs+Len,
-		       Pad = ?PAD_Len8(Offs1),
-		       case Bin of
-			   <<_:Offs, Code:Len, _:Pad, _/binary>> ->
-			       ?dbg("offs=~p, len=~p, code=~p\n",
-				   [Offs,Len,Code]),
-			       {Code, Offs1};
-			   _ ->
-			       {error, eof}
-		       end
-	       end,
-    Next = fun(Len) -> (1 bsl Len)-1 end,
-    decomp(0, ReadCode, MinCodeSize, Next).
+    ReadFn = fun(Len,Offs) ->
+		     read_bits_msb(Bin,Offs,Len)
+	     end,    
+    NextFn = fun(Len) -> (1 bsl Len)-1 end,
+    decomp(0, ReadFn, MinCodeSize, NextFn).
 
 
-decomp(S, Read, MinCodeSize, Next) ->
-    LZW_Clear = (1 bsl MinCodeSize),
-    LZW_Eoi   = (1 bsl MinCodeSize)+1,
-    LZW_First = (1 bsl MinCodeSize)+2,
-    LZW_StartLen = MinCodeSize+1,
-    LZW_Next = Next(LZW_StartLen),
-    %% init_decomp(LZW_First), GIF/TIF will always? start with LZW_Clear code
-    ?dbg("MinCodeSize=~p,Clear=~p,Eoi=~p,First=~p,Next=~p,StartLen=~p\n",
-	      [MinCodeSize, LZW_Clear, LZW_Eoi,LZW_First,LZW_Next,LZW_StartLen]),
-    decomp(S,Read,0,LZW_First,LZW_StartLen,
-	   LZW_Clear,LZW_Eoi,LZW_First,LZW_Next,LZW_StartLen,Next,[]).
+decomp(S, Read, MinCodeSize, NextFn) ->
+    First      = (1 bsl MinCodeSize)+2,
+    StartLen   = MinCodeSize+1,
+    Z = #z { clear    = (1 bsl MinCodeSize),
+	     eoi      = (1 bsl MinCodeSize)+1,
+	     first    = First,
+	     startlen = StartLen,
+	     next     = NextFn(StartLen),
+	     max      = 0,  %% not used here
+	     nextfn   = NextFn
+	    },
+    ?dbg("decomp: mincodesize=~p, z = ~p\n",[MinCodeSize, Z]),
+    decomp(S,Read,0,First,StartLen,Z,[]).
 
-decomp(S, Read, PrevCode, Count, BitLen,
-       LZW_Clear,LZW_Eoi,LZW_First,LZW_Next,LZW_StartLen,Next,Acc) when Count == LZW_Next ->
+
+
+decomp(S,Read,PrevCode,Count,BitLen,Z,Acc) 
+  when Count == Z#z.next ->
     ?dbg("NEXT BITLEN=~p\n", [BitLen+1]),
+    NextCode = (Z#z.nextfn)(BitLen+1),
     decomp(S, Read, PrevCode, Count, BitLen+1,
-	   LZW_Clear, LZW_Eoi, LZW_First, Next(BitLen+1), LZW_StartLen, Next, Acc);
+	   Z#z { next = NextCode }, Acc);
 
-decomp(S, Read, PrevCode, Count, BitLen,
-       LZW_Clear, LZW_Eoi, LZW_First, LZW_Next, LZW_StartLen, Next, Acc) ->
-    ?dbg("Len=~p,Count=~p,Clear=~p,Eoi=~p,First=~p,Next=~p,StartLen=~p\n",
-	[BitLen,Count,LZW_Clear,LZW_Eoi,LZW_First,LZW_Next,LZW_StartLen]),
-    case (catch Read(BitLen,S)) of
-        {LZW_Eoi, _} ->
-	    ?dbg("EOI:~p\n",[LZW_Eoi]),
+	   
+decomp(S,Read,PrevCode,Count,BitLen,Z,Acc) ->
+    {NewCode,NS} = Read(BitLen,S),
+    ?dbg("read: ~w/~w count=~w\n", [NewCode, BitLen,Count]),
+    if NewCode == Z#z.eoi ->
+	    ?dbg("EOI:~p\n",[Z#z.eoi]),
             list_to_binary(reverse(Acc));
-        {LZW_Clear, NS} ->
-	    ?dbg("CLEAR:~p\n",[LZW_Clear]),
-	    init_decomp(LZW_First),
-            case catch Read(LZW_StartLen, NS) of
-                {LZW_Eoi, _} ->
+       NewCode == Z#z.clear ->
+	    ?dbg("CLEAR:~p\n",[Z#z.clear]),
+	    init_decomp(Z#z.first),
+	    StartLen = Z#z.startlen,
+            {NewCode1,NS1} = Read(StartLen, NS),
+	    ?dbg("read: ~w/~w count=~w\n", [NewCode1,StartLen,Count]),
+	    if NewCode1 == Z#z.eoi ->
 		    list_to_binary(reverse(Acc));
-                {NewCode, NS2} when integer(NewCode) -> 
-                    Str = ?get_lzw(NewCode),
-                    decomp(NS2,Read,NewCode,LZW_First,LZW_StartLen,
-			   LZW_Clear, LZW_Eoi, LZW_First,
-			   Next(LZW_StartLen), LZW_StartLen, Next,
-			   [Str|Acc]);
-                Else ->
-                    io:format("~n~p: Error ~p Args: ~p ~n", 
-                              [?MODULE, Else, {NS, PrevCode, Count, BitLen}]),
-                    erlang:fault({?MODULE, decomp, {badly_compressed_data}})
-            end;
-        {NewCode, NS} when integer(NewCode) ->
+	       true ->
+                    Str = ?get_lzw(NewCode1),
+		    NextCode = (Z#z.nextfn)(StartLen),
+                    decomp(NS1,Read,NewCode1, Z#z.first, StartLen,
+			   Z#z { next = NextCode }, [Str|Acc])
+	    end;
+       true ->
 	    ?dbg("CODE:~p\n",[NewCode]),
             case ?get_lzw(NewCode) of
                 undefined when Count == NewCode ->
                     OldStr = [H|_] = ?get_lzw(PrevCode),
                     NewStr = OldStr ++ [H],
                     ?add_lzw(Count, NewStr),
-		    decomp(NS, Read, NewCode, Count+1, BitLen,
-			   LZW_Clear, LZW_Eoi, LZW_First,
-			   LZW_Next,LZW_StartLen, Next,
-			   [NewStr|Acc]);
+		    decomp(NS,Read,NewCode,Count+1,BitLen,Z,[NewStr|Acc]);
 		Str = [H|_]->
                     ?add_lzw(Count, ?get_lzw(PrevCode) ++ [H]),
-		    decomp(NS, Read, NewCode, Count+1, BitLen,
-			   LZW_Clear, LZW_Eoi, LZW_First,
-			   LZW_Next,LZW_StartLen, Next,
-			   [Str|Acc]);
-		Else ->
-                    io:format("~n~p: Error Case Clause ~p ~p Args ~p ~n", 
-                              [?MODULE, Else, NewCode, {S, PrevCode, Count, BitLen}]),
-                    erlang:fault({?MODULE, decomp, {badly_compressed_data}})
-            end;
-        Else ->
-            io:format("~n~p: Error ~p Args: ~p ~n", 
-                      [?MODULE, Else, {S, PrevCode, Count, BitLen}]),
-            erlang:fault({?MODULE, decomp, {badly_compressed_data}})
+		    decomp(NS,Read,NewCode,Count+1,BitLen,Z,[Str|Acc])
+	    end
     end.
-
-bl(2,   Len) -> Len+1;
-bl(6,   Len) -> Len+1;
-bl(14,  Len) -> Len+1;
-bl(30,  Len) -> Len+1;
-bl(62,  Len) -> Len+1;
-bl(126, Len) -> Len+1;
-bl(254, Len) -> Len+1;
-bl(510, Len) -> Len+1;
-bl(1022,Len) -> Len+1;
-bl(2046,Len) -> Len+1;
-bl(_,Len) -> Len.
-
 
 %% reverse bits in a byte
 rbits8(Code) ->
@@ -483,61 +466,94 @@ rbits(Code, Len, Acc) ->
     (Acc bsl Len) bor (A8 bsr (8 - Len)).
 
 
-
 compress(Bin) ->
-    compress(Bin, size(Bin), ?LZW_STARTBITLEN, {0,[]}, []).
+    compress(Bin, size(Bin)).
 
-compress(Bin, Strips) ->
-    compress(Bin,  Strips, ?LZW_STARTBITLEN, {0,[]}, []).
+compress(Bin, Stripe) ->
+    NextFn = fun(Len) -> (1 bsl Len)-1 end,
+    compress(Bin, Stripe, 8, 12, NextFn).
 
-compress(Bin, W, BitLen, Build, Acc) ->
-    init_comp(),
-    {NBuild, Nacc} = write({BitLen,?LZW_CLEAR}, Build, Acc),
-    compress(Bin, 0, W, [], ?LZW_STARTBITLEN, ?LZW_FIRST, NBuild, Nacc).
+compress_gif(Bin) ->
+    compress_gif(Bin, 8).
 
-compress(<<>>, CC, W, Omega, BitLen, TabCount, Build, Acc) ->
-    Code =?get_lzw(Omega),
+compress_gif(Bin,MinCodeSize) ->
+    NextFn = fun(Len) -> (1 bsl Len) end,
+    compress(Bin,size(Bin), MinCodeSize, 14, NextFn).
+
+
+compress(Bin,Stripe,MinCodeSize,MaxCodeSize,NextFn) ->
+    First      = (1 bsl MinCodeSize)+2,
+    StartLen   = MinCodeSize+1,
+    Z = #z { clear    = (1 bsl MinCodeSize),
+	     eoi      = (1 bsl MinCodeSize)+1,
+	     first    = First,
+	     startlen = StartLen,
+	     next     = NextFn(StartLen),
+	     max      = NextFn(MaxCodeSize+1),
+	     nextfn   = NextFn
+	    },
+    ?dbg("compress: mincodesize=~w, z=~w\n",[MinCodeSize,Z]),
+    comp0(Bin,Stripe,StartLen,Z,{0,[]},[]).
+
+
+comp0(Bin,Stripe,BitLen,Z,Build,Acc) ->
+    init_comp(Z#z.first-3),
+    {NBuild, Nacc} = write({BitLen,Z#z.clear}, Build, Acc),
+    comp1(Bin,0,Stripe,[],Z#z.startlen,Z#z.first,Z,NBuild,Nacc).
+
+comp1(<<>>,CC,Stripe,Omega,BitLen,Count,Z,Build,Acc) ->
+    Code = ?get_lzw(Omega),
     {NBuild, Nacc} =  write({BitLen,Code}, Build, Acc),
-    %%    NewBL = lzw_bl(TabCount, BitLen),
     NewBL = BitLen,
-    {{TotBitLen, Codes}, N2acc} = write({NewBL,?LZW_EOI}, NBuild, Nacc),
+    {{TotBitLen, Codes}, N2acc} = write({NewBL,Z#z.eoi}, NBuild, Nacc),
     PaddL = 8 - (TotBitLen rem 8),
-    case catch buildbin(reverse([{PaddL, 0}|Codes])) of
-        Bin when binary(Bin) -> 
-            list_to_binary(reverse([Bin|N2acc]));
-        Else ->
-            io:format("~p:~p Error ~p ~p ~n",[?MODULE,?LINE,{PaddL,Codes},CC]),
-            erlang:fault({?MODULE, compress, {internal_error, ?LINE}})
-    end;
-%% FIXME: this clause is for tif?
-compress(Bin, CC, W, Omega, BitLen, TabCount, Build, Acc) when CC == W ->
+    Bin = buildbin(reverse([{PaddL, 0}|Codes])),
+    list_to_binary(reverse([Bin|N2acc]));
+
+comp1(Bin,CC,Stripe,Omega,BitLen,Count,Z,Build,Acc) when CC == Stripe ->
     Code =?get_lzw(Omega),
-    {NBuild, Nacc} = write({BitLen,Code}, Build, Acc),
-    compress(Bin, W, bl(TabCount-1,BitLen), NBuild, Nacc);
-compress(<<Char:8, Bin/binary>>, CC, W, Omega, BitLen, TabC, Build, Acc) ->
+    {NBuild, NAcc} = write({BitLen,Code}, Build, Acc),
+    if Count+2 == Z#z.next ->
+	    BitLen1 = BitLen+1,
+	    NextCode = (Z#z.nextfn)(BitLen1),
+	    Z1 = Z#z { next = NextCode },
+	    comp0(Bin,Stripe,BitLen1,Z1,NBuild,NAcc);
+       true ->
+	    comp0(Bin,Stripe,BitLen,Z,NBuild,NAcc)
+    end;
+
+comp1(<<Char:8, Bin/binary>>,CC,Stripe,Omega,BitLen,Count,Z,Build,Acc) ->
     NewOmega = [Char|Omega],
     case ?get_lzw(NewOmega) of
         undefined ->
             Code = ?get_lzw(Omega),
-            {NBuild, Nacc} = write({BitLen,Code}, Build, Acc),
-            ?add_lzw(NewOmega, TabC),
-            case TabC of
-                ?LZW_MAX - 1 ->
-                    Code2 =?get_lzw([Char]),
-                    {NBuild2, Nacc2} = write({BitLen,Code2},NBuild,Nacc),
-		    compress(Bin,W,bl(TabC-1,BitLen), NBuild2, Nacc2);
-                _ ->
-                    compress(Bin, CC+1, W, [Char], bl(TabC-1, BitLen), 
-			     TabC + 1, NBuild, Nacc)
-            end;
+            {NBuild, NAcc} = write({BitLen,Code}, Build, Acc),
+            ?add_lzw(NewOmega, Count),
+	    if Count+2 == Z#z.next ->
+		    BitLen1 = BitLen+1,
+		    NextCode = (Z#z.nextfn)(BitLen1),
+		    Z1 = Z#z { next = NextCode },
+		    if Z#z.next == Z#z.max ->
+			    Code2 =?get_lzw([Char]),
+			    {NBuild2,NAcc2}=write({BitLen,Code2},NBuild,NAcc),
+			    comp0(Bin,Stripe,BitLen1,Z1,NBuild2,NAcc2);
+		       true ->
+			    comp1(Bin,CC+1,Stripe,[Char],BitLen1,
+				  Count+1,Z1,NBuild,NAcc)
+		    end;
+	       true ->
+		    comp1(Bin,CC+1,Stripe,[Char],BitLen,
+			  Count+1,Z,NBuild, NAcc)
+	    end;
         _ ->
-            compress(Bin, CC +1, W, NewOmega, BitLen, TabC, Build, Acc)
+            comp1(Bin,CC+1,Stripe,NewOmega,BitLen,Count,Z,Build,Acc)
     end.
 
 
 write({_,undefined}, _, _) -> 
     erlang:fault({undef,value});
 write({CLen, Code}, {Totlen, List}, Acc) ->
+    ?dbg("write: ~w/~w\n", [Code, CLen]),
     NewLen = CLen + Totlen,
     if 
         NewLen rem 8 == 0 ->
@@ -565,6 +581,8 @@ write({CLen, Code}, {Totlen, List}, Acc) ->
         true ->
             {{Totlen + CLen,[{CLen,Code}|List]}, Acc}
     end.
+
+
 
 buildbin([{8,0}]) ->
     <<>>;

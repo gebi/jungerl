@@ -14,7 +14,7 @@
 -export([dir_info/1]).
 -export([read_file_info/1]).
 -export([read/2, write/2]).
--export([load/1, save/2]).
+-export([load/1, save/1, save/2, to_binary/1]).
 -export([attribute/2, attribute/3]).
 
 -export([hex32/1, hex16/1, hex8/1]).
@@ -126,9 +126,34 @@ load(File) ->
 	Error -> Error
     end.
 
+save(IMG) ->
+    save(IMG#erl_image.filename, IMG).
 
-save(File, Img) ->
-    ok.
+save(File, IMG) ->
+    case file:open(File, [raw, binary, write]) of
+	{ok,Fd} ->
+	    Res = write(Fd, IMG),
+	    file:close(Fd),
+	    Res;
+	Error ->
+	    Error
+    end.
+
+to_binary(IMG) ->
+    case file:open(<<>>, [ram, binary, write]) of
+	{ok,Fd} ->
+	    Res = write(Fd, IMG),
+	    case ram_file:get_file_close(Fd) of
+		{ok, Data} ->
+		    {ok,Data};
+		Error -> 
+		    Error
+	    end;
+	Error ->
+	    Error
+    end.
+
+    
 		    
 
 read_info(Type, Fd) ->

@@ -65,7 +65,10 @@ read_info(Fd) ->
     end.
 
 write_info(Fd, IMG) ->
-    ok.
+    %% Should version be configurable?
+    file:write(Fd, <<?MAGIC89,
+		    (IMG#erl_image.width):16/little-unsigned-integer,
+		    (IMG#erl_image.height):16/little-unsigned-integer>>).
 
 
 %% The Grammar.
@@ -94,10 +97,16 @@ read(Fd,IMG,RowFun,St0) ->
 	      Background:8,
 	      AspectRatio:8>>} ->
 	    ColorRes = Cr+1,
-	    Palette = read_palette(Fd, Map, Pix+1, undefined),
-	    ?dbg("sizeof(palette)=~p pix=~w\n", 
-		[length(Palette),1 bsl (Pix+1)]),
-	    read_data(Fd, IMG#erl_image { palette = Palette }, RowFun, St0, []);
+	    Palette = read_palette(Fd, Map, Pix+1),
+	    ?dbg("sizeof(palette)=~p Map=~w, Cr=~w, Sort=~w, Pix=~w\n", 
+		 [length(Palette),Map,Cr,Sort,Pix]),
+	    ?dbg("Background=~w, AspectRatio=~w\n",
+		 [Background, AspectRatio]),
+	    As = [{'Background',Background},
+		  {'AspectRation',AspectRatio},
+		  {'Sort',Sort} | IMG#erl_image.attributes],
+	    IMG1 = IMG#erl_image { palette = Palette, attributes = As},
+	    read_data(Fd, IMG1, RowFun, St0, []);
 	Error ->
 	    Error
     end.
@@ -122,8 +131,9 @@ read_data(Fd, IMG, RowFun, St0, As) ->
 		{ok, <<Left:16/little, Top:16/little,
 		      Width:16/little, Height:16/little,
 		      Map:1, Interlaced:1, Sort:1,_:2, Pix:3>>} ->
-		    Palette = read_palette(Fd, Map, Pix+1,
-					   IMG#erl_image.palette),
+		    Palette = read_palette(Fd, Map, Pix+1),
+		    As1 = [{'Interlaced', Interlaced},
+			   {'Sort', Sort} | As],
 		    Pixmap0 =
 			#erl_pixmap { top = Top,
 				      left = Left,
@@ -131,16 +141,14 @@ read_data(Fd, IMG, RowFun, St0, As) ->
 				      height = Height,
 				      format = IMG#erl_image.format,
 				      palette = Palette,
-				      attributes = As
+				      attributes = As1
 				     },
-		    ?dbg("sizeof(palette)=~p pix=~w\n", 
-			[length(Palette),1 bsl (Pix+1)]),
+		    ?dbg("pix=~w, sizeof(palette)=~p\n", [Pix,Palette]),
 		    case read_pixels(Fd,Pixmap0,RowFun,St0,
 				     Width,Height,Interlaced) of
 			{ok, Pixmap1} ->
-			    Pixmap2 = setup_transparent(Pixmap1),
 			    %% ?dbg("Pixmap = ~p\n", [Pixmap2]),
-			    Ps = IMG#erl_image.pixmaps ++ [Pixmap2],
+			    Ps = IMG#erl_image.pixmaps ++ [Pixmap1],
 			    read_data(Fd, IMG#erl_image { pixmaps = Ps },
 				      RowFun, St0, []);
 			Error -> Error
@@ -153,21 +161,6 @@ read_data(Fd, IMG, RowFun, St0, As) ->
 	Error -> 
 	    Error
     end.
-
-
-setup_transparent(Pix) ->
-    As = Pix#erl_pixmap.attributes,
-    case lists:keysearch('Transparent', 1, As) of
-	{value, {_, 1}} ->
-	    case lists:keysearch('TransparentColor', 1, As) of
-		{value, {_, Index}} ->
-		    Pix#erl_pixmap { transparent = Index };
-		false -> Pix
-	    end;
-	_ -> Pix
-    end.
-
-    
 
 
 read_extension(Fd, IMG,RowFun,St0,As) ->
@@ -287,6 +280,7 @@ read_block(Fd) ->
 	    Error
     end.
 
+
 %%
 %% Read a list of blocks
 %%
@@ -301,22 +295,201 @@ read_blocks(Fd,Acc) ->
     end.
 
 
-write(Fd, IMG) ->
-    ok.
 
-read_palette(Fd, 0, Pixel, Palette) -> 
-    Palette;
-read_palette(Fd, 1, Pixel, DefaultMap) ->
+read_palette(Fd, 0, Pixel) -> 
+    undefined;
+read_palette(Fd, 1, Pixel) ->
     Sz = (1 bsl Pixel),
     case file:read(Fd, Sz*3) of
 	{ok, Bin} -> 
-	    palette(Bin, [], Sz)
+	    rd_palette(Bin, [], Sz)
     end.
 
-palette(Bin, Map, 0) -> 
+
+rd_palette(Bin, Map, 0) -> 
     reverse(Map);
-palette(<<R:8,G:8,B:8, Bin/binary>>, Map, I) ->
-    palette(Bin, [{R*255,G*255,B*255} | Map], I-1).
+rd_palette(<<R:8,G:8,B:8, Bin/binary>>, Map, I) ->
+    rd_palette(Bin, [{R*255,G*255,B*255} | Map], I-1).
+
+
+
+
+write(Fd, IMG) ->
+    write_info(Fd, IMG),
+    Palette = IMG#erl_image.palette,
+    Background = 
+	case lists:keysearch('Background', 1, IMG#erl_image.attributes) of
+	    false -> 0;
+	    {value,{_,B}} -> B
+	end,
+    AspectRatio = 
+	case lists:keysearch('AspectRatio', 1, IMG#erl_image.attributes) of
+	    false -> 0;
+	    {value,{_,A}} -> A
+	end,
+    if list(Palette) ->
+	    PLen = length(Palette),
+	    ColorRes = if PLen > 0, PLen =< 256 ->
+			       trunc(math:log(PLen)/math:log(2))+1;
+			  PLen > 0 ->
+			       8;
+			  true -> 
+			       1
+		       end,
+	    Map = 1,
+	    Cr = ColorRes - 1,
+	    Sort = 0,
+	    Pix = ColorRes - 1,
+	    file:write(Fd, <<Map:1, Cr:3, Sort:1, Pix:3>>),
+	    file:write(Fd, <<Background:8, AspectRatio:8>>),	    
+	    write_palette(Fd, IMG#erl_image.palette, Pix+1);
+       true ->
+	    Map = 0,
+	    Cr = 0,
+	    Sort = 0,
+	    Pix = 0,
+	    file:write(Fd, <<Map:1, Cr:3, Sort:1, Pix:3>>),
+	    file:write(Fd, <<Background:8, AspectRatio:8>>)	    
+    end,
+    write_data(Fd, IMG),
+    file:write(Fd, <<?TRAILER>>).
+
+
+write_palette(Fd, Map, Pixel) ->
+    wr_palette(Fd, Map, (1 bsl Pixel)).
+
+wr_palette(Fd, _, 0) -> ok;
+wr_palette(Fd, [{R,G,B}|Map], I) ->
+    file:write(Fd, <<(R div 255):8, (G div 255):8, (B div 255):8>>),
+    wr_palette(Fd, Map, I-1);
+wr_palette(Fd, [], I) ->
+    file:write(Fd, <<0:8, 0:8, 0:8>>),
+    wr_palette(Fd, [], I-1).
+
+write_data(Fd, IMG) ->
+    write_pixmaps(Fd, IMG, IMG#erl_image.pixmaps).
+
+write_pixmaps(Fd, IMG, [Pm|Pms]) ->
+    DisposalMethod = attribute('DisposalMethod',Pm#erl_pixmap.attributes, 0),
+    UserInput = attribute('UserInput', Pm#erl_pixmap.attributes, 0),
+    DelayTime = attribute('DelayTime', Pm#erl_pixmap.attributes, 0),
+    Transparent = attribute('Transparent', Pm#erl_pixmap.attributes, 0),
+    TransparentColor = attribute('TransparentColor', 
+				 Pm#erl_pixmap.attributes, 0),
+    file:write(Fd, <<?EXTENSION, ?CTL_EXTENSION>>),
+    write_blocks(Fd, <<0:3, DisposalMethod:3, 
+		      UserInput:1, Transparent:1, 
+		      DelayTime:16/unsigned-little,
+		      TransparentColor:8>>),
+    write_image(Fd, Pm),
+    write_pixmaps(Fd, IMG, Pms);
+write_pixmaps(Fd, IMG, []) ->
+    ok.
+
+
+write_image(Fd, Pm) ->
+    file:write(Fd,
+	       <<(Pm#erl_pixmap.left):16/little,
+		(Pm#erl_pixmap.top):16/little,
+		(Pm#erl_pixmap.width):16/little,
+		(Pm#erl_pixmap.height):16/little>>),
+    Palette = Pm#erl_pixmap.palette,
+    Interlaced = attribute('Interlaced', Pm#erl_pixmap.attributes, 0),
+    if list(Palette) ->
+	    PLen = length(Palette),
+	    ColorRes = if PLen > 0, PLen =< 256 ->
+			       trunc(math:log(PLen)/math:log(2))+1;
+			  PLen > 0 ->
+			       8;
+			  true -> 
+			       1
+		       end,
+	    Sort = 0,
+	    Pix = ColorRes - 1,
+	    Map = 1,
+	    file:write(Fd, <<Map:1, Interlaced:1, Sort:1, 0:2, Pix:3>>),
+	    write_palette(Fd, Palette, Pix+1);
+       true ->
+	    Sort = 0,
+	    Pix = 0,
+	    Map = 0,
+	    file:write(Fd, <<Map:1, Interlaced:1, Sort:1, 0:2, Pix:3>>)
+    end,
+    write_pixels(Fd,
+		 Pm#erl_pixmap.pixels, 
+		 Pm#erl_pixmap.width, 
+		 Pm#erl_pixmap.height, Interlaced).
+
+write_pixels(Fd, Pixels, Width, Height, Interlaced) ->
+    Bin = collect_pixels(Pixels, Width, Height, Interlaced),
+    {LZWCodeSize, Bin1} = lzw:compress_gif(Bin),
+    ?dbg("compress: orig_size=~w, size=~w codesize=~w\n",
+	 [size(Bin), size(Bin1), LZWCodeSize]),
+    file:write(Fd, <<LZWCodeSize>>),
+    write_blocks(Fd, Bin1).
+
+%%
+%% Fixme check that all rows are present and
+%% implement interlaced order
+%%
+collect_pixels(Rows, Width, Height, Interlaced) ->
+    SortedRows = lists:sort(Rows),
+    if Interlaced == 1 ->
+	    collect_interlaced(SortedRows,Width,Height,[],[],[],[]);
+       true ->
+	    collect_raw(SortedRows,Width,Height,[])
+    end.
+
+collect_raw([{Ri,Row} | Rows], Width, Height,Acc) when Ri < Height ->
+    Sz = size(Row),
+    R = if Sz > Width ->
+		%% remove pixels
+		<<Bin:Width/binary, _/binary>> = Row,
+		Bin;
+	   Sz < Width ->
+		%% add pixels
+		<<Row/binary, 
+		 (list_to_binary(lists:duplicate(Width-Sz,0)))/binary>>;
+	   true ->
+		Row
+	end,
+    collect_raw(Rows, Width, Height, [R | Acc]);
+collect_raw([{Ri,Row} | Rows], Width, Height, Acc) ->
+    %% ignore line out of range
+    collect_raw(Rows, Width, Height, Acc);
+collect_raw([], Width, Height, Acc) ->
+    list_to_binary(reverse(Acc)).
+
+collect_interlaced([{Ri,Row}|Rows],Width,Height,R1,R2,R3,R4) ->
+    case Ri band 7 of
+	0 -> collect_interlaced(Rows,Width,Height,[Row|R1],R2,R3,R4);
+	1 -> collect_interlaced(Rows,Width,Height,R1,R2,R3,[Row|R4]);
+	2 -> collect_interlaced(Rows,Width,Height,R1,R2,[Row|R3],R4);
+	3 -> collect_interlaced(Rows,Width,Height,R1,R2,R3,[Row|R4]);
+	4 -> collect_interlaced(Rows,Width,Height,R1,[Row|R2],R3,R4);
+	5 -> collect_interlaced(Rows,Width,Height,R1,R2,R3,[Row|R4]);
+	6 -> collect_interlaced(Rows,Width,Height,R1,R2,[Row|R3],R4);
+	7 -> collect_interlaced(Rows,Width,Height,R1,R2,R3,[Row|R4])
+    end;
+collect_interlaced([],Width,Height,R1,R2,R3,R4) ->
+    list_to_binary([reverse(R1),reverse(R2),reverse(R3),reverse(R4)]).
+
+    
+    
+write_blocks(Fd, Bin) ->
+    write_blocks(Fd, Bin, 0, size(Bin)).
+
+write_blocks(Fd, Bin, Pos, Size) ->
+    Sz = Size - Pos,
+    if Sz > 255 ->
+	    <<_:Pos/binary, Block:255/binary, _/binary>> = Bin,
+	    file:write(Fd, <<255, Block/binary>>),
+	    write_blocks(Fd, Bin, Pos+25, Size);
+       true ->
+	    <<_:Pos/binary, Block:Sz/binary, _/binary>> = Bin,
+	    file:write(Fd, <<Sz, Block/binary>>),
+	    file:write(Fd, <<0>>)
+    end.
 
 
 read_pixels(Fd,Pix0,RowFun,St0,Width,Height,Interlaced) ->
@@ -386,6 +559,15 @@ raster_data(Bin,Pix,RowFun,St0,Height,Ri,Rs,Width) ->
     raster_data(Bin1,Pix,RowFun,St1,Height,Ri+Rs,Rs,Width).
     
 
+attribute(Name, List, Default) ->
+    case lists:keysearch(Name, 1, List) of
+	false ->
+	    Default;
+	{value,{_,Value}} ->
+	    Value
+    end.
+
+	    
 
 
 	    

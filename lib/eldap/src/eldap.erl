@@ -40,6 +40,8 @@
 %%-define(PRINT(S, A), io:fwrite("~w(~w): " ++ S, [?MODULE,?LINE|A])).
 -define(PRINT(S, A), true).
 
+-define(elog(S, A), error_logger:info_msg("~w(~w): "++S,[?MODULE,?LINE|A])).
+
 %%% ====================================================================
 %%% Exported interface
 %%% ====================================================================
@@ -676,9 +678,9 @@ do_recv(S, Data, Len, Timeout) when Data#eldap.use_tls == true ->
 recv_response(S, Data) ->
     Timeout = get(req_timeout), % kludge...
     case do_recv(S, Data, 0, Timeout) of
-	{ok, Data} ->
-	    check_tag(Data),
-	    case asn1rt:decode('ELDAPv3', 'LDAPMessage', Data) of
+	{ok, Packet} ->
+	    check_tag(Packet),
+	    case asn1rt:decode('ELDAPv3', 'LDAPMessage', Packet) of
 		{ok,Resp} -> {ok,Resp};
 		Error     -> throw(Error)
 	    end;

@@ -28,7 +28,7 @@ sum(Values) -> lists:foldl(fun(X, Sum) -> X + Sum end, 0, Values).
 mean(Values) -> sum(Values) / length(Values).
 mdev(Values) ->
     M = mean(Values),
-    sum([abs(V - M) || V <- Values]).
+    sum([abs(V - M) || V <- Values]) / length(Values).
 
 %% Call Fun N times and return the list of running times.
 runtimes(N, Fun) -> runtimes(N, Fun, []).

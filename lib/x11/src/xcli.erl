@@ -167,10 +167,12 @@ main(Display,Socket,Queue) ->
 	    main(Display, Socket, queue:in(From,Queue));
 	{tcp_closed,Socket} ->
 	    io:format("main: X server close connection\n"),
-	    {error, closed};
+	    %%{error, closed};
+	    exit({error, "X server closed connection"});
 	{tcp_error,Socket,Error} ->
 	    io:format("main: tcp_error ~p\n", [Error]),
-	    Error;
+	    %%Error;
+	    exit({tcp_error, Error});
 	Other ->
 	    io:format("main: unknown input ~p\n", [Other]),
 	    main(Display, Socket, Queue)
@@ -289,6 +291,9 @@ event_window(Ev) ->
 	_ -> none
     end.
 	    
+decode_event(N, B0) when N>127 ->
+    %% FIXME Tag the event as a send_event somehow!
+    decode_event(N band 127, B0);
 decode_event(?KeyPress,B0) -> ?xKeyPressedEvent_dec(B0);
 decode_event(?KeyRelease,B0) -> ?xKeyReleasedEvent_dec(B0);
 decode_event(?ButtonPress,B0) -> ?xButtonPressedEvent_dec(B0);

@@ -1,0 +1,232 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html> <head>
+<title>pan HOWTO</title>
+</head>
+
+<body>
+<h1>pan HOWTO</h1>
+<h2>intro</h2>
+  pan was developed to solve this common problem; what resources (CPU
+time and memory consumption) does a set of actions (a test case)
+consume? the basic idea is that you start the measurement, perform the
+test case and stop the measurement. this will generate a set of data
+files containing a wealth of information, which can then be processed
+to present e.g.
+<ul>
+  <li>how much CPU time and memory each erlang process consumed
+  <li>how much memory was added to each ets table
+  <li>what did the call stack look like when some function was called
+  <li>what messages were sent between processes
+</ul>
+at the current stage the program is similar in functionality to the OTP
+applications <code>dbg</code> and <code>eprof</code>, and the unix
+application <code>top</code>, as well as some extras. it is designed to run
+with minimal impact (which is sometimes huge) in an embedded
+environment. <p>
+alas, it is not a product, so your mileage will vary.
+
+<hr>
+<h2>basic</h2>
+pan should be run from an erlang node (the host). the host must be able to
+attach itself to the distributed erlang network that is the
+AXD301. when started, it will load itself on a number of the AXD301
+nodes (the target(s)), and start a tracing process. the target process
+will generate a number of data files containing information about the
+operating system and the erlang emulator, as well as about the erlang
+processes and the erlang data tables. when the target process(es) are
+terminated the data files will be moved to the host.
+<p>
+  the data files are stored in a file tree that uses the name of the
+test case, the name of the CP and the timestamp to generate unique
+names. they can be analyzed in different fashions.
+
+<hr>
+<h2>data taking</h2>
+<h3>pan:start/stop</h3>
+<code>pan:start(Tc,CPs,Procs,Flags,Matches).</code>
+<p>
+<code>pan:stop()</code>
+<p>
+  see the <a href="pan.html">reference</a> for a detailed description of the
+parameters. briefly; <code>Tc</code> (test case) is a tag used to label the
+data files, <code>CPs</code> is a list of CPs to run on, <code>Procs</code> is
+a list of processes to trace on, <code>Flags</code> is a list of tracing flags
+and Matches is a list of match specifications (see erlang tracing 
+<a href="erlang_trace.html">doc</a>). (if the parameters are not given as lists
+they will be treated as lists of length 1).
+<p>
+<code>Tc</code> can be the special atom <code>ip</code>, which means that the
+tracing info will display on the host terminal instead of being sent to file.
+<p>
+  for the casual user the <code>Flags</code> parameter is typically either the
+<code>prof</code> or <code>perf</code> aliases or, for the expert, a list of
+trace flags. the resulting files are typically analyzed with the functions
+<code>pan:prof</code>, <code>pan:perf</code> or <code>pan:scan</code>,
+respectively.
+
+
+<hr>
+<h2>analysis</h2>
+<h3>pan:perf</h3>
+the pan:perf function provide information about;
+<ul>
+  <li>the os environment, things like context switches,
+      interrupts, system calls etc (see the <code>mpstat</code>
+      man page for details)
+      <pre>
+###############################################################################
+CPU minf mjf xcal  intr ithr  csw icsw migr smtx  srw syscl  usr sys  wt idl
+0    0   0    0   308  107  335   59    0   34    0   649    1   1   0  98
+0  166   0    0   399  189  509   92    0   36    0  3699   19   7   1  73
+      </pre>
+  <li>the ets/dets tables, changes in size (number of object) and
+      memory (number of bytes)
+      <pre>
+###############################################################################
+type id           name                             size   diff mem_Byte    diff
+Change ========================================================================
+ets  x            ftmIfpMap                        2025    743   198392   72496
+ets  292          mnesia_index                     2025    743   190292   69524
+ets  x            prmMib                           1382    319   231900   55024
+ets  365          snmp_index                        828    378    99416   45360
+</pre>
+
+  <li>erlang processes, the number of microseconds used by each
+      process.<br>
+
+      in this case <code>pan</code> has generated a file using the command
+      <code>pan:start(migOm,'axd301@cp1-19','',perf)</code>
+      running <code>pan:perf("/tmp/pan/migOm")</code> we'll see the erlang
+      processes sorted after how much cpu time they consumed
+      (<code>cpu</code>). the <code>pid</code> is replaced by a count
+      if there were more than one process with that <code>id</code>. the
+      <code>id</code> is the registered name or, lacking that, the initial
+      call. some initial calls are recognized and mangled to be more useful.
+      <code>gc</code>is the number of garbage collects on the process, and
+      <code>in</code> is the number of times the process was scheduled to run.
+<pre>
+pan: /tmp/pan/migOm/axd301@cp1-19
+pid           id                                            gc     in       cpu
+===============================================================================
+<122.5440.0>  dpComServer                                   73    849    548900
+<122.5574.0>  plcMemory                                      0    170    192779
+<122.5435.0>  cpmServer                                      7     58    119229
+<122.5569.0>  sbm                                            3     69     68211
+38            {sysTimer,do_apply_after,5}                    0     75     13055
+5             {inet_tcp_dist,do_accept,6}                   10     39     11257
+2             {pthTcpNetHandler,init,1}                      8     36      8757
+<122.6819.0>  pthTcpCh2                                     16     28      8296
+<122.6229.0>  {jive_broker,init,2}                           5     15      7948
+<122.6818.0>  pthTcpOm1                                     16     27      7494
+<122.6778.0>  pthOm                                          6     31      7431
+2             {sysTimer,do_apply_interval,6}                 4     16      4083
+<122.6781.0>  pthOmTimer                                     1     22      2784
+<122.17.0>    net_kernel                                     0      7      1697
+<122.10.0>    rex                                            1      6      1037
+</pre>
+</ul>
+<h3>pan:prof</h3>
+  <code>pan:prof</code> implements a profiler, i.e. a tool that shows cpu usage
+per function. in this example the data was taken using the command
+<code>pan:start(tst,'axd301@cp1-19','',prof,{'_',local})</code>
+
+  <code>pan:prof/1</code> shows the cpu usage per process (similar to
+<code>pan:perf</code>). 
+
+<pre>
+> pan:prof("/tmp/pan/tst").                          
+cb_eprof:28: end of trace
+all; N = 29, 1127459 us 1127459 us/proc (100.0000)
+  process tag                                                    procs    cpu%
+  dpComServer.................................................     1.0    53.7
+  plcMemory...................................................     1.0    17.1
+  cpmServer...................................................     1.0    11.7
+  sbm.........................................................     1.0     6.1
+</pre>
+
+<code>pan:prof/2</code> shows the cpu usage per function for a process (in this case plcMemory).
+<pre>
+> pan:prof("/tmp/pan/tst",plcMemory).
+plcMemory; N = 1, 192779 us 192779 us/proc (100.000)
+  MFA                                                            calls    cpu%
+  {ets,local_info,3}..........................................  2430.0    30.2
+  {ets,db_info,2}.............................................  2430.0    27.6
+  {plcMemory,do_calculate,6}..................................     1.0    24.6
+  {ets,info,2}................................................  2430.0    14.7
+  {ets,all,0}.................................................     1.0     1.7
+  {ets,insert,2}..............................................    32.0     0.4
+  {ets,lookup,2}..............................................    30.0     0.3
+</pre>
+
+<code>pan:prof/3</code> shows the cpu usage per function for a given
+process and stack.
+<pre>
+> pan:prof("/tmp/pan/tst",plcMemory,[{plcMemory,check_loop,5},{timer,tc,3},{plcMemory,calculate,3},{plcMemory,do_calculate,6}]).
+MFA                                                            calls       cpu%
+{plcMemory,check_loop,5}.....................................      0       0.0%
+{timer,tc,3}.................................................      1       0.0%
+{plcMemory,calculate,3}......................................      1       0.0%
+{plcMemory,do_calculate,6}...................................      1      24.6%
+   , {ets,info,2}............................................   2430      72.6%
+   , {ets,insert,2}..........................................     30       0.4%
+   , {ets,lookup,2}..........................................     30       0.3%
+   , {ets,delete,1}..........................................      1       0.1%
+   , {ets,rename,2}..........................................      1       0.0%
+   , {ets,new,2}.............................................      1       0.0%
+total                                                                     98.0%
+</pre>
+
+the special case where the stack is the empty atom <code>''</code> finds the
+most expensive stack;
+<pre>
+> pan:prof("/tmp/pan/tst",plcMemory,'').
+MFA                                                            calls       cpu%
+{plcMemory,check_loop,5}.....................................      0       0.0%
+{timer,tc,3}.................................................      1       0.0%
+{plcMemory,calculate,3}......................................      1       0.0%
+{plcMemory,do_calculate,6}...................................      1      24.6%
+{ets,info,2}.................................................   2430      14.7%
+{ets,local_info,3}...........................................   2430      30.2%
+{ets,db_info,2}..............................................   2430      27.6%
+total                                                                     97.3%
+</pre>
+<h3>pan:scan</h3>
+scans the contents of a trace file, filters each trace message and (optionally)
+prints it.the filter can be either a (list of) term(s), in which case the
+trace message is printed if it contains the term(s), or a callback function.
+the callback function can do anything it wants with the messages.
+<p>
+<ul>
+  <li><code>pan:scan("foo",'',bla)</code> prints all trace messages from the
+      file "foo" that contains the atom 'bla' to the screen
+  <li><code>pan:scan("foo","aik",losers,0,100)</code> prints all trace
+      messages out of the first 100 from the file "foo" that contains the
+      atom 'losers' to the file "aik"
+</ul>
+<hr>
+<h2>debugging</h2>
+<h3>pan:dbg</h3> provides functionality similar to the OTP
+application <code>dbg</code>.
+<ul>
+  <li><code>pan:dbg(start,["^mdisp",ccLib],'axd301@cp1-1')</code> shows all
+      calls to functions in ccLib or in modules that starts with 'mdisp' on
+      the node 'axd301@cp1-1'.
+</ul>
+<hr>
+the <a href="pan.html">reference</a>
+<hr>
+<h3>installation</h3>
+a recent version of the tool should be here;<br>
+<code>http://avweb.etxb.ericsson.se/~etxmacr/export/pan/pan-*.tgz</code><br>
+unpack like this (gtar is the GNU tar):<br>
+<code>cd &lt;some-dir&gt; ; gtar -xzvf &lt;tgz-file&gt;</code><br>
+this will create the dir <code>&lt;some-dir&gt;/&lt;version&gt;</code><br>
+run this;<br>
+<code>&lt;some-dir&gt;/&lt;version&gt;/pan</code><br>
+this will start up a correctly configured erlang shell
+<hr>
+<address>mats.cronqvist@ericsson.com</address>
+<!-- hhmts start -->
+Last modified: Wed Aug 14 11:31:20 MET DST 2002
+<!-- hhmts end -->
+</body> </html>

@@ -1,0 +1,74 @@
+#! /bin/tcsh -f
+
+setenv OTP_ROOT /EDUP/Erlang/R8B-2
+setenv PATH "$OTP_ROOT/bin:"$PATH
+
+set SELF_PATH = `which $0`
+if ( `echo $SELF_PATH | grep '^/'`  == "" ) then
+    set SELF_PATH = `pwd`/$SELF_PATH:h
+else
+    set SELF_PATH = $SELF_PATH:h
+endif
+if ( `echo $SELF_PATH | grep '/\.$'`  != "" ) then
+    set SELF_PATH = $SELF_PATH:h
+endif
+
+set SNAME = `echo $SELF_PATH:t | sed "s/\.//g" | sed "s/-/_/g"`
+set U1 = "usage: $0 [-setcookie <cookie>] [-nocookie]"
+set U2 = "[-pa <path>] [-tick <netticktime>] [-name <node name>] [-spawn]"
+set usage = "$U1 $U2"
+
+set xpat
+set tick = "-kernel net_ticktime 8"
+set cookie = "-setcookie nc1"
+while ($#argv)
+    switch ($1)
+    case "-help":
+    case "-h":
+    case "-?":
+	echo "$usage"
+	exit
+    case "-setcookie":
+	set cookie = "-setcookie $2"
+	shift
+	breaksw
+    case "-nocookie":
+	set cookie = ""
+	breaksw
+    case "-spawn":
+	set spawn
+	breaksw
+    case "-pa":
+	set xpat = "$xpat -pa $2"
+	shift
+	breaksw
+    case "-tick":
+	set tick = "-kernel net_ticktime $2"
+	shift
+	breaksw
+    case "-name":
+	set SNAME = $2
+	shift
+	breaksw
+    default:
+	echo "bad switch: $1"
+	echo "$usage"
+	exit
+    endsw
+    shift
+end
+
+echo SELF_PATH $SELF_PATH
+echo SNAME $SNAME
+echo xpat $xpat
+echo tick $tick
+echo cookie $cookie
+
+set CMD1 = "$OTP_ROOT/bin/erl -hidden -boot start_sasl -sasl errlog_type error"
+set CMD2 = "-pa $SELF_PATH $xpat -sname $SNAME $cookie $tick"
+set CMD = "$CMD1 $CMD2"
+if ( $?spawn ) then
+    xterm -sb -sl 9999 -geometry 80x24 -bg lightcyan -T $SNAME -e $CMD &
+else
+    $CMD
+endif

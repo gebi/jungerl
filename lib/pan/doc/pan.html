@@ -1,0 +1,217 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html> <head>
+<title>pan</title>
+</head>
+
+<body>
+<h1>pan</h1>
+
+<hr>
+<code>pan:start([File [,Nodes [,Procs [,Flags [,TPs]]]]]).</code><br>
+starts a pan trace.
+use the empty atom '' to get the default argument.
+<ul>
+  <li><b>File</b> TC|IP|Wrap - directs output<br>
+      <b>TC</b>    atom() - send output to regular file. TC is used to
+      construct the directory name - default is timestamp()<br>
+      <b>IP</b>    ip|{ip, <b>CallBack</b>} - send trace messages to the host
+      over IP<br>
+      <b>CallBack</b>   atom() - name of callback module
+      <b>Wrap</b>  {wrap, TC}|{wrap, TC, Cnt}|{wrap, TC, Cnt, Siz} - send
+      output to wrap log files<br>
+      <b>Cnt</b>   integer() - number of wrap files - default is 8<br>
+      <b>Siz</b>   integer() - max size of wrap files (bytes) - default is 128k<br>
+  <li><b>Nodes</b>  axd|all|Node|[Node] - nodes to run trace on - default is axd<br>
+      <b>axd</b> - expands to all nodes matching "axd301@cp*"<br>
+      <b>all</b> - expands to all known nodes<br>
+      <b>Node</b>  atom() - erlang node name<br>
+  <li><b>Procs</b>  all|Proc|[Proc] - processes to trace - default is all<br>
+      <b>all</b> - all processes<br>
+      <b>new</b> - all processes that are created after the start of the trace<br>
+      <b>existing</b> - all processes that existes at the start of the trace<br>
+      <b>Proc</b>  RegName|Pid <br>
+      <b>RegName</b>  atom() - registered name<br>
+      <b>Pid</b>  pid()
+  <li><b>Flags</b>  Flag|[Flag] - see <a href="erlang_trace.html">erlang:trace/3</a>
+      for description of flags - default is [procs, set_on_spawn]<br>
+      Flag can also be the aliases;<br>
+      dbg =  [set_on_spawn,timestamp,call]<br>
+      gc =   [set_on_spawn,timestamp,call,garbage_collection]<br>
+      proc = [set_on_spawn,timestamp,call,garbage_collection,running,
+              send,'receive']
+      perf = [set_on_spawn,timestamp,call,garbage_collection,running,procs]<br>
+      prof = [set_on_spawn,timestamp,call,garbage_collection,running,procs,
+              return_to,arity]
+      all = [set_on_spawn,timestamp,call,garbage_collection,running,procs,
+             return_to,arity,send,'receive']
+      
+  <li>
+      <b>TPs</b>  [TP] - specifies which functions are seen in a call trace
+      <ul>
+	<li><b>TP</b> - Mre|{Mre, MS}|M|{M}|{M, MS}|{M,F}|{M,F,MS}|
+	    {M,F,A}|{M,F,A,MS}
+	<li><b>Mre</b> string() - Mre is a regexp that is matched
+	    against all module names
+	<li><b>M</b>  atom() - module
+	<li><b>F</b>  atom() - function
+	<li><b>A</b>  integer() - arity
+	<li><b>MS</b> list() - match specification, see OTP erts doc<br>
+	    the match spec aliases<br>
+	    <code>stack -> {'_',[],[{message,{process_dump}}]}</code><br> and
+	    <br><code>return -> {'_',[],[{return_trace}]};</code><br>
+	    can be used to get stack and return value info, respectively.
+      </ul>
+      the atom <code>local</code> can be appended to all <b>TP</b>
+      tuples to activate tracing on non-exported functions. By
+      default, the traing only applies to <code>global</code>
+      (i.e. exported) functions.
+      <p>
+  <li><b>Examples:</b>
+      <ul>
+	<li> perf trace on entire system (all procs)<br>
+	    <code>pan:start(perftrc,axd,'',perf).</code>
+
+	<li> call trace on some modules in half call processes<br>
+	    ("^cc" expands to all all exported functions in modules with names
+	    that begin with "cc")<br>
+	    <code>pan:start(unitrc,axd,mdispServer,call,["^cc",uniDecode,uniEncode]).</code>
+
+	<li> profiling trace on half call processes (pretty slow)<br>
+	    <code>pan:start(proftrc,axd,mdispServer,prof,[{'_', local}]).</code>
+
+	<li> debug (call,send,receive) trace on all exported functions
+	    in modules starting with "cc"<br>
+	    <code>pan:start(dbgtrc,axd,mdispServer,dbg,["^cc"]).</code>
+
+	<li> call trace on SAAL signalling <br>
+	    <code>pan:start(sigtrc,'','','',[{saalEncode,aal_data_req},{saalDecode,decode}]).</code>
+	<li> call trace on erlang:now/0 with process info via the ip port<br>
+	    <code>pan:start(ip,all,all,call,{erlang,now,[stack]}).</code>
+	<li> as above but with callback<br>
+	    <code>pan:start({ip, cb_stack},'','','',{erlang,now,[stack]}).</code>
+	<li> call trace on all exported functions in the
+	    <code>calendar</code> module with return value;
+	    <code>pan:start(ip,'','','',{calendar,[return]}).</code>
+      </ul>
+</ul>
+
+<hr>
+<code>pan:mark().</code><br>
+Stops the current pan trace and start a new one.<br>
+
+The second trace will run for as long a the first one did. The
+pan:?summ() functions will subtract the first from the second
+trace.<br>
+The idea idea is to start a trace, run a test case, mark the
+trace. This allows one to subtract out the background activities.
+
+<hr>
+<code>pan:stop().</code><br>
+Stops the current pan trace.
+<hr>
+<code>pan:scan(File [,OutFile [,Filter [,FirstMsg [,LastMsg]]]]).</code><br>
+Scans a pan trc file File for trace massages, applies Filter to each
+message and passes the result to Output.<br>
+use the empty atom '' to get the default argument.
+<ul>
+  <li><b>File</b>  string() - log file name
+  <li><b>OutFile</b> string() - output file name - default is the screen
+  <li><b>Filter</b> {cb, M}|Term - calls the function M:go([Msg, Line,
+      Out, State]) -&gt; NewState
+      or scans for messages containing Term<br>
+      M  atom() - callback function module name<br>
+      Term  term() - scan filter term<br>
+      Msg  {Tag, ProcI, Data, Timestamp} - trace message<br>
+      Tag atom() - trace message tag (see below)<br>
+      ProcI {Pid, Info} - process info<br>
+      Pid  pid()<br>
+      Info RegName|InitCall<br>
+      RegName  atom() - registered name<br>
+      InitCall  MFA - initial call <br>
+      MFA  {Module, Function, Arity}<br>
+      Data  term() - extra trace info (see below)<br>
+      Timestamp timestamp()|no_time<br>
+      Out  fd() - file descriptor of output file<br>
+      State  term() - callback functions state
+<pre><kbd>
+      Tag                           Data
+      'receive',                    Message
+      call,                         {M,F,A}
+      exit,                         Reason
+      return_to,                    {M,F,A}
+      spawn,                        Pid2
+      link,                         Pid2
+      unlink,                       Pid2
+      getting_linked,               Pid2
+      in,                           {M,F,A}
+      out,                          {M,F,A}
+      gc_start,                     Info
+      gc_end,                       Info
+      send,                         {Pid2, Msg}
+      send_to_non_existing_process, {Msg, Pid2}
+      return_from,                  {{M,F,A}, ReturnValue}
+</kbd></pre>
+
+  <li><b>FirstMsg</b> integer() - sequence number of first message to process
+  <li><b>LastMsg</b> integer() - sequence number of last message to process
+<p>
+  <li><b>Examples:</b>
+      <ul>
+	<li> call the callback function cb_cnt:go/1 once foreach message in 
+	    the trc file<br>
+	    </code>pan:scan("/home/etxmacr/dmp/axd301@cp1-19-010302-132820.trc",'',{cb,cb_cnt}).</code>
+
+	<li> print all messages that contain the atom get_cp
+	    </code>pan:scan("/tmp/pan/unitrc/axd301@cp1-1-010315-090446.trc",'',
+	    get_cp).</code>
+      </ul>
+</ul>
+<hr>
+<code>pan:perf(File [,OutFile]).</code><br>
+Summarizes a pan performance trace (processes and tables). Collapses
+identical process tags. trace file should be generated by
+<code>pan:start</code> with Flags set to 'perf'.
+<ul>
+  <li><b>File</b> string() - file name of the test case (typically /tmp/pan/&lt;TC&gt;)
+  <li><b>OutFile</b> string() - output file name - default is screen
+</ul>
+<hr>
+<code>pan:prof(File [,OutFile[,Stack]]).</code><br>
+Analyzes a pan profiling trace. trace file should be generated by
+<code>pan:start</code> with Flags set to 'prof'.
+<ul>
+  <li><b>File</b> string() - file name of the test case
+      (typically /tmp/pan/&lt;TC&gt;)
+  <li><b>Proc</b> string()|tuple() - display profiling for the process
+      Proc. Proc can be an atom (a registered name), an initial call
+      ({M,F,A}) or, if thee are more that one process with the same
+      initial call the tuple {{M,F,A}, N}, where the integer N is an
+      arbitrary index.
+  <li><b>Stack</b> list() - display profiling at Stack, where Stack is
+      a list of {M, F, A} tuples. if Stack is the empty atom '' the
+      most cpu expensive stack is shown.
+</ul>
+<hr>
+<code>pan:dbg(start[,TPs[,Nodes[,Procs]]]).</code><br>
+<code>pan:dbg(stop).</code><br>
+<code>pan:dbg(info).</code><br>
+<code>pan:dbg(add,TPs).</code><br>
+<code>pan:dbg(del,TPs).</code><br>
+handles a pan debugging session. this is similar to the OTP
+<code>dbg</code> application, but (supposedly) less intrusive.
+
+<ul>
+  <li><b>TPs</b> list() - list of TP (trace patterns).
+      see <code>pan:start</code>
+  <li><b>Nodes</b> list() - list of erlang node names to trace on
+  <li><b>Procs</b> list() - list of process names to trace on
+</ul>
+<hr>
+<code>pan:help().</code><br>
+help (this text)
+<hr>
+<address>mats.cronqvist@ericsson.com</address>
+<!-- hhmts start -->
+Last modified: Mon Feb 10 11:40:39 MET 2003
+<!-- hhmts end -->
+</body> </html>

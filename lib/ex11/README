@@ -1,0 +1,111 @@
+
+*** Thu Mar 11 14:50:29 EST 1999 ***
+
+ex11-0-11.tgz
+===========
+
+The package has changed name from x11 to ex11
+to avoid any confusion. Also, a few changes
+has been done so that it now should be possible
+to run on Windows (assuming you have an X server).
+
+/Tobbe, tobbe@serc.rmit.edu.au
+
+*** Tue Feb 23 11:10:00 EST 1999 ***
+
+x11-0-1.tgz
+===========
+
+This is an Erlang-X11 binding, i.e an implementation
+of the X11 protocol in Erlang. At the time of this
+writing about 10 % of all requests/events has been
+implemented. The rest of the protocol would probably
+only take 2-3 weeks to implement since a complete 
+framework exists already. Anyone interested in helping
+out with this should read README.developers. But before
+anything more are implemented I suggest that we wait
+for the new Erlang bit-syntax to be released.
+
+To compile both for JAM and BEAM, run: 
+
+  make
+
+or just:  
+
+  make jam
+  make beam
+
+if you only are running one of the machines.
+
+Check out the code in rcube.erl for an example on how 
+to use ex11. Run: 
+
+  rcube:start(HostName),
+
+where HostName is the name of the machine where your
+X-server is running (e.g rcube:start("campari").
+
+Enjoy ! /Tobbe, tobbe@serc.rmit.edu.au
+
+
+The following X11 requests are now implemented:
+===============================================
+clear_area
+copy_area
+create_gc
+change_gc
+create_pixmap
+create_window
+get_geometry         (and corresponding: get_geometry_reply )
+map_window
+poly_fill_rectangle
+poly_line
+poly_segment
+
+Implemented events:
+===================
+expose
+map_notify
+reparent_notify
+configure_notify
+event_nyi
+
+Error related records:
+======================
+refused_connection
+error
+
+The following records are used for holding values:
+==================================================
+gc_values
+point
+rectangle
+segment
+win_values
+
+Implemented error messages:
+===========================
+idchoice
+length
+request
+
+This is datastructures related to the display:
+==============================================
+display
+format
+screen
+depth
+visual
+
+Holding Xauthority data:
+========================
+xauth
+
+Purely internal datastructures:
+===============================
+xlib
+more
+
+Numerous constant definitions:
+==============================
+See ex11.hrl

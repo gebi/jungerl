@@ -1,0 +1,28 @@
+{name, "ex11"}.
+{vsn, {0,11}}.
+{summary, "An Erlang-X11 binding."}.
+{author, "Torbjörn Törnkvist", "tobbe@cslab.ericsson.se", "990223"}.
+{keywords, ["X11","graphics programming"]}.
+{needs, []}.
+{abstract,"This is an Erlang-X11 binding. Yes, that's right, a 
+binding ! Not another interface to a toolkit. This is the X11
+protocol implemented solely in Erlang. The release version
+indicates how much of the protocol that has been implemented
+so far (i.e Ver: 0.1 == 10%). However, this package also 
+consists of a complete framework for the protocol implementation,
+so the rest of the protocol would be very easy to implement.
+(I estimate that the remaining 90% of the protocol could be 
+implemented in 2-3 weeks). However, before anymore of the 
+protocol is implemented it is suggested that we await the
+new Erlang bitsyntax. A 'cool' example program comes along
+with the package. <b>NB: ex11 is the new name and replaces
+the old name x11</b>."}.
+
+
+
+
+
+
+
+ 
+ 

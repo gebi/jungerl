@@ -1,0 +1,121 @@
+
+*** Fri Feb 19 15:21:11 EST 1999 ***
+
+If you are interested in helping out implementing the full 
+X11 protocols + a toolkit on top of it, then let me know. 
+Basically to add a new request, add a record for the 
+request/event/error in the file ex11.hrl, then add the 
+corresponding decoding and/or encoding routines in ex11_proto.erl. 
+The examples below shows how to add a new event and a new request. 
+Adding new requests are a little more complicated but looking at 
+the existing code should be helpful.
+
+------------------------------------------------------------------------
+EXAMPLE: We add the MapNotify event
+
+ 1. Edit ex11.hrl and locate the 'EVENT MESSAGES' part.
+ 2. Under the 'Event Codes' heading, add:  
+
+      -define(EVENT_MAP_NOTIFY,        19).
+
+ 3. Under the 'Event Records' heading, add:
+
+      -record(map_notify, {seqno, event, window, override_redirect}).
+
+ 4. Under the 'Event guards' heading, add:
+
+      -define(IS_MAP_NOTIFY_EVENT(E), record(E,map_notify)).
+
+ 5. Under the 'Decoding event messages', add a new function clause:
+
+      decode_event([?EVENT_MAP_NOTIFY,_,S1,S0,E3,E2,E1,E0,W3,W2,W1,W0,V|D]) ->
+          {_,Rest} = split_list(19,D), % 19 unused bytes
+          E = #expose{seqno=i16(S1,S0),
+                      event=i32(W3,W2,W1,W0),
+                      window=i32(W3,W2,W1,W0),
+                      override_redirect=i16(V)},
+          {E,Rest};
+
+ 6. Write a test program which can receive the event.
+
+------------------------------------------------------------------------
+
+Example: We add the PolyLine request
+
+ 1. Edit the file ex11.hrl, and go to the 'REQUEST MESSAGES' part.
+
+ 2. Add a new request in alphabetic order among the other
+    requests. Each request part may consists of a header, 
+    value-constants, sub-records (with guard tests), the 
+    record and finally its guard test. So, we add:
+
+      %% ---------
+      %% PolyLine
+      
+      %% Coordinate-mode values
+      -define(POLY_COORDMODE_ORIGIN,    0).
+      -define(POLY_COORDMODE_PREVIOUS,  1).
+      
+      -record(point, {x, y}).
+      
+      %% Guard test
+      -define(IS_POINT(R), record(R,point)).
+      
+      -record(poly_line,
+              {opcode               = 65,
+      	       coord_mode           = ?POLY_COORDMODE_ORIGIN,
+	       len                  = 3,
+	       drawable,
+	       cid,
+	       points               % list of point records
+	      }).
+	 
+      %% Guard test
+      -define(IS_POLY_LINE(R), record(R,poly_line)).
+
+    Add default values (and comments) where suitable.
+
+ 3. Edit the ex11_proto.erl file, and find the 'ENCODING REQUEST MESSAGES'.
+    Read the comment about possible return values from the encode routine.
+
+ 4. Add a suitable clause to enc/2:
+
+      enc(X,Req) when ?IS_POLY_LINE(Req)           -> poly_line(X,Req);
+
+ 5. Implement the actual encode function (located in alphabetical 
+    order in the file):
+
+      %% ----------------------
+      %% The Poly Line request
+      
+      poly_line(X,R) when R#poly_line.drawable =/= undefined,
+                          R#poly_line.gc =/= undefined,
+		          list(R#poly_line.points) ->
+          PointsList = encode_points(R#poly_line.points),
+          {ok,
+           [R#poly_line.opcode,
+            R#poly_line.coord_mode, 
+            i16(3 + length(PointsList)),
+            i32(R#poly_line.drawable),
+            i32(R#poly_line.gc),
+            PointsList]}.
+
+      encode_points([H|T]) when ?IS_POINT(H) ->
+          [i16(H#point.x) ++ i16(H#point.y)|encode_points(T)];
+      encode_points([]) -> [].
+    
+    Add as many guards as possible. Don't perform any error
+    checking int the encode function. An eventual crash will
+    be 'caught' by the top-most function.
+
+ 6. Write a little test program that tests the added request.
+
+------------------------------------------------------------------------
+
+Good luck, and send me your additions so that I can
+add them to the standard distribution of the Erlang-
+X11 binding. 
+
+/Tobbe , tnt@home.se
+
+

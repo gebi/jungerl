@@ -18,12 +18,14 @@
 %% Port = integer() (UDP port for local endpoint)
 %% EndPoint = {IP, Port} (UDP endpoint of remote tunnel)
 start_link(Port, EPs) ->
-    spawn_link(?MODULE, init, [Port, EPs]).
+    start_link(Port, EPs, undefined).
+start_link(Port, EPs, Dev) ->
+    spawn_link(?MODULE, init, [Port, EPs, Dev]).
 
-init(Port, EPs) ->
+init(Port, EPs, Dev) ->
     register(eth2udp, self()),
     {ok, Socket} = gen_udp:open(Port, [binary]),
-    {ok, Tunnel} = init_tunnel(),
+    {ok, Tunnel} = init_tunnel(Dev),
     loop(Tunnel, Socket, EPs).
 
 loop(Tunnel, Socket, EPs) ->
@@ -40,9 +42,9 @@ loop(Tunnel, Socket, EPs) ->
     end,
     ?MODULE:loop(Tunnel, Socket, EPs).
 
-init_tunnel() ->
+init_tunnel(Dev) ->
     tuntap:init(),
-    Tun = tuntap:open_tap(),
+    Tun = tuntap:open_tuntap(tap, Dev),
     Dev = tuntap:device_name(Tun),
     io:format("Alive and kicking on ~p~n", [Dev]),
     {ok, Tun}.

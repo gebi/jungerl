@@ -1,4 +1,5 @@
 LIBS := \
+	builder \
 	ce \
 	edoc \
 	enfs \

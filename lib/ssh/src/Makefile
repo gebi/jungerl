@@ -23,6 +23,7 @@ APP_TARGET= ../ebin/$(APP_FILE)
 
 MODULES = \
 	$(ASN_MODULES) \
+	loop_tcp \
 	ssh_math \
 	ssh_rsa \
 	ssh_dsa \

@@ -50,6 +50,13 @@
 %%  Select this protocol based on node name
 %%  select(Node) => Bool
 %%  Node names MUST have the form <name> @ ssh: <hostname>
+%%  FIXME:
+%%      1. check flag -ssh_force true then use ssh
+%%      2. check -ssh_node node1 node2 ...
+%%      3. check access to epmd (i.e connect)
+%%         a) epmd accesible do not use ssh
+%%         b) try connect to epmd over ssh
+%% 
 %% ------------------------------------------------------------
 
 select(Node) ->

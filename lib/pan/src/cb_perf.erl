@@ -29,11 +29,11 @@ handle(Msg, State = #state{tab = Tab, in = In, prev = Prev}) ->
 	{out, _, 0, Now} ->
 	    ets_upd(Tab, {file_driver, in}, 1),
 	    State#state{fd = {Now}};
-	{out, P, _, Prev} ->		      %early r7b emu behaviour
+	{out, P, _, Prev} ->			       %early r7b emu behaviour
 	    handle({out, P, 0, Prev}, State);
 	{in, _, 0, Now} ->
 	    do_fd_out(Tab, Now, State);
-	{in, P, _, Now} when State#state.fd /= no -> %early r7b emu behaviour
+	{in, P, _, Now} when tuple(State#state.fd) ->  %early r7b emu behaviour
 	    handle({in, P, 0, Now}, State);
 	{gc_start, {Pid, ID}, Info, Now} ->
 	    ets_upd(Tab, {Pid, gc}, 1),
@@ -47,8 +47,8 @@ handle(Msg, State = #state{tab = Tab, in = In, prev = Prev}) ->
 	    do_out(Tab, Pid, Now, State);
 	{exit, {Pid, ID}, Reason, Now} ->
 	    case In of
-		no -> State;
-		_ -> do_out(Tab, Pid, Now, State)
+		{Pid,_} -> do_out(Tab, Pid, Now, State);
+		_ -> State
 	    end;
 	_ -> 
 	    State

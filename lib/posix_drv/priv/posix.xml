@@ -43,7 +43,7 @@
 #include &lt;grp.h>
 #include &lt;sys/types.h>
 #include &lt;sys/stat.h>
-#include &lt;sys/syslimits.h>
+/* BSD-specific? (for NGROUPS_MAX) #include &lt;sys/syslimits.h> */
 </verbatim>
 
 <atom name="stat"/>

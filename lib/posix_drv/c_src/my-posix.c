@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <sys/syslimits.h>
+/* BSD-specific? (for NGROUPS_MAX) #include <sys/syslimits.h> */
 #include <sys/stat.h>
 
 #include <erl_driver.h>

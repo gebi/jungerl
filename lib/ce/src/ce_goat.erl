@@ -37,7 +37,7 @@
 %%
 %% <p>A <code>goat</code> represents a middleground between a (dynamic) server
 %% and a (static) data structure.  Code that accesses a <code>goat</code> doesn't need
-%% to know or care whether the goat is dynamic or static, and indeed any
+%% to know or care whether the <code>goat</code> is dynamic or static, and indeed any
 %% given goat may switch from one state to the other throughout its lifetime.</p>
 %%
 %% <p>The intent of this module is to allow for an (experimental) coding style
@@ -54,9 +54,11 @@
 %% sent (synchronous) calls and (asynchronous) casts.  When a <code>goat</code>
 %% is active, it will be assigned a process which will react to these requests.
 %% When it is not active, it will react to calls, but it will become active
-%% before reacting to any casts.  It can also deactivate itself after a
-%% timeout.  It, and anything that accesses it, is otherwise oblivious to
-%% whether it is active or not.</p>
+%% before reacting to any casts.  Upon creation, a timeout value can be given.
+%% It will automatically deactivate itself after that timeout.</p>
+%%
+%% <p>The <code>goat</code>, and everything that accesses it, is otherwise
+%% oblivious to whether it is active or not.</p>
 %%
 %% <p>See also Ulf Wiger's <code>mdisp</code> package.</p>
 %%
@@ -214,10 +216,6 @@ static_call(#goat{ id = GoatId, handler = Handler, state = State } = Goat, Messa
     {ok, Reply, NewState} ->
       NewGoat = Goat#goat{ state = NewState },
       ets:insert(?MODULE, NewGoat),
-      {ok, Reply};
-    {deactivate, Reply, NewState} ->
-      NewGoat = Goat#goat{ state = NewState },
-      ets:insert(?MODULE, NewGoat),
       {ok, Reply}
   end.
 
@@ -247,24 +245,17 @@ goat_handler(Handler, GoatId, State, Timeout) ->
       case Handler:handle_call(GoatId, Message, State) of
         {ok, Reply, NewState} ->
           Parent ! {{self(), call, Ref}, Reply},
-          goat_handler(Handler, GoatId, NewState, Timeout);
-        {deactivate, Reply, NewState} ->
-          Parent ! {{self(), call, Ref}, Reply},
-	  leave_goat_handler(GoatId, NewState)
+          goat_handler(Handler, GoatId, NewState, Timeout)
       end;
     {{Parent, cast}, Message} ->
       case Handler:handle_cast(GoatId, Message, State) of
         {ok, NewState} ->
-          goat_handler(Handler, GoatId, NewState, Timeout);
-        {deactivate, NewState} ->
-          leave_goat_handler(GoatId, NewState)
+          goat_handler(Handler, GoatId, NewState, Timeout)
       end
     after Timeout ->
-      leave_goat_handler(GoatId, State)
+      Goat = retrieve(GoatId),
+      NewGoat = Goat#goat{ state = State },
+      ets:insert(?MODULE, NewGoat)
   end.
-leave_goat_handler(GoatId, State) ->
-  Goat = retrieve(GoatId),
-  NewGoat = Goat#goat{ state = State },
-  ets:insert(?MODULE, NewGoat).
 
 %%% END of ce_goat.erl %%%

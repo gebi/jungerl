@@ -48,7 +48,7 @@
 -export([start/0]).
 
 %% @spec handle_call(goat_id(), Message::term(), State::term()) ->
-%%   {ok, Reply, NewState} | {deactivate, Reply, NewState}
+%%   {ok, Reply, NewState}
 
 handle_call(GoatId, Message=inc, State) ->
   {ok, {got, Message}, State+1};
@@ -56,14 +56,14 @@ handle_call(GoatId, Message=dec, State) ->
   {ok, {got, Message}, State-1}.
 
 %% @spec handle_cast(goat_id(), Message::term(), State::term()) ->
-%%   ok | deactivate
+%%   {ok, NewState}
 
 handle_cast(GoatId, Message, State) ->
   io:fwrite("goat ~p got cast ~p while in state ~p~n", [GoatId, Message, State]),
   {ok, State}.
 
 %% @spec start() -> ok
-%% @doc Demo the <code>goat</code> subsystem.
+%% @doc Demonstration of the <code>goat</code> subsystem.
 
 start() ->
   ce_goat:start(),

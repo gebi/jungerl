@@ -159,6 +159,9 @@ handle_call({nfsproc_getattr_2, FH, Client}, From, State) ->
 		    {error, Error} ->
 			{error(Error), void}
 		end;
+	    {'EXIT', Rsn} ->
+		io:format("Error in lookup: ~p~n", [Rsn]),
+		{error(io), void};
 	    error ->
 		{'NFSERR_STALE', void}
 	end,
@@ -200,7 +203,8 @@ handle_call({nfsproc_lookup_2, {DirFH, NameBin}, C}, From, State) ->
 		Mod = fh2mod(DirFH),
 		case catch apply(Mod, lookup, [DirID, Name]) of
 		    {'EXIT', Rsn} ->
-			io:format("Error in lookup: ~p~n", [Rsn]);
+			io:format("Error in lookup: ~p~n", [Rsn]),
+			{error(io), void};
 		    {error, Error} ->
 			{error(Error), void};
 		    {ok, ChildID} ->
@@ -312,9 +316,10 @@ fattr(FH, Mod) ->
 			     {mtime, Timestamp},
 			     {atime, Timestamp}])};
 	{'EXIT', Rsn} ->
+	    io:format("getattr crashed: ~p~n", [Rsn]),
 	    {error, io}
     end.
-    
+
 entries(Mod, ID, [], N) ->
     void;
 entries(Mod, ID, [H|T], N) ->

@@ -114,11 +114,8 @@ stop() ->
 %% @spec new(module(), state()) -> goat_id()
 %% @equiv new(module(), state(), infinity)
 
-new(Handler, State) when is_atom(Handler) ->
-  GoatId = new_id(),
-  Goat = #goat{ id = GoatId, handler = Handler, state = State },
-  ets:insert(?MODULE, Goat),
-  GoatId.
+new(Handler, State) ->
+  new(Handler, State, infinity).
 
 %% @spec new(module(), state(), timeout()) -> goat_id()
 %%         module() = atom()

@@ -21,6 +21,7 @@
 
 -define(LDAP_VERSION, 3).
 -define(LDAP_PORT, 389).
+-define(LDAPS_PORT, 636).
 
 -record(eldap, {version = ?LDAP_VERSION,
 		host,                % Host running LDAP server
@@ -341,12 +342,32 @@ parse_args([], _, Data) ->
 
 try_connect([Host|Hosts], Data) ->
     TcpOpts = [{packet, asn1}, {active,false}],
-    case gen_tcp:connect(Host, Data#eldap.port, TcpOpts) of
+    %%case gen_tcp:connect(Host, Data#eldap.port, TcpOpts) of
+    case ssl_connect(Host, ?LDAPS_PORT, TcpOpts) of
 	{ok,Fd} -> {ok,Data#eldap{host = Host, fd = Fd}};
 	_       -> try_connect(Hosts, Data)
     end;
 try_connect([],_) ->
     {error,"connect failed"}.
+
+
+ssl_connect(Host, Port, Opts) ->
+    application:start(ssl),
+    Vsn = erlang:system_info(version),
+    if Vsn >= "5.3" ->
+	    %% In R9C, but not in R9B
+	    ssl:seed("ellynatefttidppohjeh");
+       true -> true
+    end,
+    {ok, CSock} = ssl:connect(Host, Port, [{verify,0}|Opts]),
+    io:fwrite("ssl_connect: connected.~n"),
+    if Vsn >= "5.3" ->
+	    %% In R9C, but not in R9B
+	    {ok, Cert} = ssl:peercert(CSock, [ssl, subject]),
+	    io:fwrite("ssl_connect: peer cert:~n~p~n", [Cert]);
+       true -> true
+    end,
+    {ok, CSock}.
 
     
 loop(Cpid, Data) ->
@@ -632,11 +653,13 @@ send_request(S, ID, Request) ->
     Message = #'LDAPMessage'{messageID  = ID,
 			     protocolOp = Request},
     {ok,Bytes} = asn1rt:encode('ELDAPv3', 'LDAPMessage', Message),
-    gen_tcp:send(S, Bytes).
+    %%gen_tcp:send(S, Bytes).
+    ssl:send(S, Bytes).
 
 recv_response(S) ->
     Timeout = get(req_timeout), % kludge...
-    case gen_tcp:recv(S, 0, Timeout) of
+    %%case gen_tcp:recv(S, 0, Timeout) of
+    case ssl:recv(S, 0, Timeout) of
 	{ok, Data} ->
 	    check_tag(Data),
 	    case asn1rt:decode('ELDAPv3', 'LDAPMessage', Data) of
@@ -649,9 +672,9 @@ recv_response(S) ->
 
 %%% Sanity check of received packet
 check_tag(Data) ->
-    case asn1rt_ber:decode_tag(Data) of
+    case asn1rt_ber_bin:decode_tag(b2l(Data)) of
 	{_Tag, Data1, _Rb} ->
-	    case asn1rt_ber:decode_length(Data1) of
+	    case asn1rt_ber_bin:decode_length(b2l(Data1)) of
 		{{_Len, _Data2}, _Rb2} -> ok;
 		_ -> throw({error,decoded_tag_length})
 	    end;
@@ -1028,4 +1051,7 @@ get_head(Str,Tail) ->
 %%% Should always succeed !
 get_head([H|Tail],Tail,Rhead) -> lists:reverse([H|Rhead]);
 get_head([H|Rest],Tail,Rhead) -> get_head(Rest,Tail,[H|Rhead]).
+
+b2l(B) when binary(B) -> B;
+b2l(L) when list(L)   -> list_to_binary(L).
 

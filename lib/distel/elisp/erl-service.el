@@ -905,7 +905,7 @@ variables."
   (with-temp-buffer
     (save-excursion (insert text))
     (while (re-search-forward "\\?[A-Za-z_]+" nil t)
-      (replace-match "deadmacro"))
+      (replace-match "deadmacro" t))
     (buffer-string)))
 
 ;;;; fdoc interface

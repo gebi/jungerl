@@ -24,5 +24,5 @@ clean:
 	$(CC) $(CFLAGS) -o tcp_echoserv tcp_echoserv.c `./Is-Solaris-link.sh`
 
 ../priv/%.so: %.o
-	ld -G -o $@ $<
+	$(LD_SHARED) -o $@ $<
 

@@ -15,6 +15,9 @@
 -include("pan.hrl").
 
 -define(DEFPID, no_pid).
+-define(DEFFLAGS, [running,timestamp]).
+-define(DEFPROCS, all).
+-define(DEFTPS, []).
 
 -define(CHUNKSIZE, 8192).
 -define(EXT, ".trc").
@@ -37,8 +40,9 @@ go(FileName, OProcs, OFlags, OTPs, HostPid) ->
     end.
 
 sanity(FileName) ->	    
-    case panLib:is_r7() of
-	yes ->
+    case panLib:emu_vers() of
+	{ok, 0} -> {error, old_emulator};
+	_ ->
 	    dbg:stop(),
 	    case whereis(?MODULE) of
 		P when pid(P) -> {error, {?MODULE, already_started}};
@@ -47,8 +51,7 @@ sanity(FileName) ->
 			{ip, _, _} -> {ok, ip};
 			_ -> {ok, panLib:get_dir(now())}
 		    end
-	    end;
-	no -> {error, beam_not_r7}
+	    end
     end.
 
 args(OProcs, OFlags, OTPs) ->
@@ -61,7 +64,11 @@ flags('') -> ?DEFFLAGS;
 flags(gc) ->   ?GCFLAGS;
 flags(dbg) ->  ?DBGFLAGS;
 flags(proc) -> ?PROCFLAGS;
-flags(perf) -> ?PERFFLAGS;
+flags(perf) -> 
+    case panLib:emu_vers() of
+	{ok,9} -> [cpu_timestamp|?PERFFLAGS];
+	_ -> ?PERFFLAGS
+    end;
 flags(prof) -> ?PROFFLAGS;
 flags(all) ->  ?ALLFLAGS;
 flags(Flag) when atom(Flag) -> [Flag];
@@ -163,8 +170,12 @@ trace_port(Dir, Fname) ->
 
 start_tracing(Procs, Flags) ->
     Ps = [{reg(P), catch erlang:trace(P, true, Flags)} || P <- Procs],
-    erlang:trace(self(), false, Flags),
-    [erlang:trace(P, false, Flags) || P <- processes(), filt(P)],
+    case lists:member(cpu_timestamp, Flags) of 
+	true -> ok;
+	false ->
+	    erlang:trace(self(), false, Flags),
+	    [erlang:trace(P, false, Flags) || P <- processes(), filt(P)]
+    end,
     Ps.
 
 filt(P) -> filt(reg(P), proc_info(P, initial_call)).

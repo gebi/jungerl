@@ -1,0 +1,127 @@
+%%% Copyright (C) 2003 Ericsson AB
+%%% File    : control.erl
+%%% Created : 20 Jan 2003 by Ulf Wiger <ulf.wiger@ericsson.com>
+
+-module(control).	% asynch_0 (asynch model, blocking hardware API)
+
+-compile(export_all).
+
+-record(s, {state = idle}).
+
+start() ->
+    asynch_main:event_loop(?MODULE, #s{}).
+
+
+
+offhook(lim, #s{state = idle} = S) ->
+    lim:start_tone(dial),
+    S#s{state = getting_first_digit};
+offhook(lim, #s{state = {ringing_B_side, PidA}} = S) ->
+    lim:stop_ringing(),
+    PidA ! {self(), connect},
+    S#s{state = {speech, PidA}};
+offhook(From, S) ->
+    io:format("Got unknown message in ~p: ~p~n",
+	      [S#s.state, {From, offhook}]),
+    S.
+
+
+
+onhook(lim, #s{state = getting_first_digit} = S) ->
+    lim:stop_tone(),
+    S#s{state = idle};
+onhook(lim, #s{state = {getting_number, {Number, ValidSeqs}}} = S) ->
+    S#s{state = idle};
+onhook(lim, #s{state = {calling_B, PidB}} = S) ->
+    S#s{state = idle};
+onhook(lim, #s{state = {ringing_A_side, PidB}} = S) ->
+    PidB ! {self(), cancel},
+    lim:stop_tone(),
+    S#s{state = idle};
+onhook(lim, #s{state = {speech, OtherPid}} = S) ->
+    lim:disconnect_from(OtherPid),
+    OtherPid ! {self(), cancel},
+    S#s{state = idle};
+onhook(lim, #s{state = {wait_on_hook, HaveTone}} = S) ->
+    case HaveTone of
+	true ->
+	    lim:stop_tone();
+	false ->
+	    ok
+    end,
+    S#s{state = idle};
+onhook(From, S) ->
+    io:format("Got unknown message in ~p: ~p~n",
+	      [S#s.state, {From, onhook}]),
+    S.
+
+
+digit(lim, Digit, #s{state = getting_first_digit} = S) ->
+    lim:stop_tone(),
+    case number:analyse(Digit, number:valid_sequences()) of
+	invalid ->
+	    f_invalid_number(S);
+	valid ->
+	    f_valid_number(Digit, S);
+	{incomplete, ValidSeqs} ->
+	    S#s{state = {getting_number, {Digit, ValidSeqs}}}
+    end;
+digit(lim, Digit, #s{state = idle} = S) ->
+    S;
+digit(lim, Digit, #s{state = {getting_number, {Number, ValidSeqs}}} = S) ->
+    NewNumber = 10 * Number + Digit,
+    case number:analyse(Digit, ValidSeqs) of
+	invalid ->
+	    f_invalid_number(S);
+	valid ->
+	    f_valid_number(NewNumber, S);
+	{incomplete, NewValidSeqs} ->
+	    S#s{state = {getting_number, {NewNumber, NewValidSeqs}}}
+    end;
+digit(lim, Digit, S) ->
+    S.
+
+f_invalid_number(S) ->
+    lim:start_tone(fault),
+    S#s{state = {wait_on_hook, true}}.
+
+f_valid_number(Number, S) ->
+    PidB = lim:pid_with_phone_number(Number),
+    PidB ! {self(), request_connection},
+    S#s{state = {calling_B, PidB}}.
+
+
+request_connection(Pid, #s{state = idle} = S) ->
+    Pid ! {self(), accept},
+    lim:start_ringing(),
+    S#s{state = {ringing_B_side, Pid}};
+request_connection(Pid, S) ->
+    Pid ! {self(), reject},
+    S.
+
+accept(PidB, #s{state = {calling_B, PidB}} = S) ->
+    lim:start_tone(ring),
+    S#s{state = {ringing_A_side, PidB}}.
+
+reject(PidB, #s{state = {calling_B, PidB}} = S) ->
+    lim:start_tone(busy),
+    S#s{state = {wait_on_hook, true}}.
+
+connect(PidB, #s{state = {ringing_A_side, PidB}} = S) ->
+    lim:stop_tone(),
+    lim:connect_to(PidB),
+    S#s{state = {speech, PidB}};
+connect(From, S) ->
+    io:format("Got unknown message in ~p: ~p~n",
+	      [S#s.state, {From, connect}]),
+    S.
+
+cancel(PidA, #s{state = {ringing_B_side, PidA}} = S) ->
+    lim:stop_ringing(),
+    S#s{state = idle};
+cancel(OtherPid, #s{state = {speech, OtherPid}} = S) ->
+    S#s{state = {wait_on_hook, false}};
+cancel(From, S) ->
+    io:format("Got unknown message in ~p: ~p~n",
+	      [S#s.state, {From, cancel}]),
+    S.

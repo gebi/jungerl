@@ -1,0 +1,239 @@
+%%% Copyright (C) 2003 Ericsson AB
+%%% File    : control.erl
+%%% Created : 20 Jan 2003 by Ulf Wiger <ulf.wiger@ericsson.com>
+
+-module(control).	% asynch_1 (asynch model, non-blocking hardware API)
+
+-compile(export_all).
+
+-record(s, {state}).
+
+start() ->
+    asynch_main:event_loop(?MODULE, #s{state = idle}).
+
+
+
+offhook(lim, #s{state = idle} = S) ->
+    switch:a_start_tone(dial),
+    S#s{state = {await_dial_tone, getting_first_digit}};
+offhook(lim, #s{state = {ringing_B_side, PidA}} = S) ->
+    switch:a_stop_ringing(),
+    PidA ! {self(), connect},
+    S#s{state = {await_ringing_stop, {speech, PidA}}};
+offhook(From, S) ->
+    io:format("Got unknown message in ~p: ~p~n",
+	      [S#s.state, {From, offhook}]),
+    S.
+
+%% Since we talk to the switch in a non-blocking fashion, we
+%% must add a function for each type of reply the switch can
+%% give us. The commands used in this module are:
+%% - start_tone		=> start_tone_reply
+%% - start_ringing		=> start_ringing_reply
+%% - stop_ringing		=> stop_ringing_reply
+%% - stop_tone			=> stop_tone_reply
+%% - pid_with_phone_number	=> pid_with_telnr_reply
+%% - connect_to			=> connect_reply
+%% - disconnect_from		=> disconnect_reply
+%%
+%% The basic approach here is to introduce a "wait state", where
+%% we wait for the switch to respond before moving on to the
+%% next state. For example, we do not start accepting digits until
+%% there is actually a dial tone.
+%%
+%% A few other details:
+%% - we do not handle a negative response from the switch. This
+%%   is not handled in the original code either. In a real implementation,
+%%   we would of course handle fault situations as well.
+%% - If one of the switch replies arrives in a state other than the
+%%   appropriate "wait state", this is considered an error.
+%%   In the code below, this will manifest itself as a 'function_clause'
+%%   exception (the same is true for negative responses.) This is one
+%%   reason for having e.g. an explicit response for each type of tone.
+%%
+start_tone_reply(switch, {dial, yes},
+		#s{state = {await_dial_tone, NextState}} = S) ->
+    case NextState of
+	onhook_received ->
+	    switch:a_stop_tone(),
+	    S#s{state = {await_tone_stop, idle}};
+	_ ->
+	    S#s{state = NextState}
+    end;
+start_tone_reply(switch, {fault, yes},
+		 #s{state = {await_fault_tone, NextState}} = S) ->
+    case NextState of
+	onhook_received ->
+	    switch:a_stop_tone(),
+	    S#s{state = {await_tone_stop, idle}};
+	_ ->
+	    S#s{state = NextState}
+    end;
+start_tone_reply(switch, {ring, yes},
+		#s{state = {await_ring_tone, NextState}} = S) ->
+    case NextState of
+	{f_connect_received, PidB} ->
+	    f_connect_received(PidB, S);
+	_ ->
+	    S#s{state = NextState}
+    end;
+start_tone_reply(switch, {busy, yes},
+		#s{state = {await_busy_tone, NextState}} = S) ->
+    case NextState of
+	onhook_received ->
+	    switch:a_stop_tone(),
+	    S#s{state = {await_tone_stop, idle}};
+	_ ->
+	    S#s{state = NextState}
+    end.
+
+start_ringing_reply(switch, _, % strange return value from 'switch'
+		#s{state = {await_ringing_start, NextState}} = S) ->
+    S#s{state = NextState}.
+
+stop_ringing_reply(switch, _, % strange return value from 'switch'
+		   #s{state = {await_ringing_stop, NextState}} = S) -> 
+    S#s{state = NextState}.
+
+stop_tone_reply(switch, yes,
+		#s{state = {await_tone_stop, NextState}} = S) ->
+    case NextState of
+	invalid_number ->
+	    f_invalid_number(S#s{state = undefined});
+	{valid_number, Number} ->
+	    f_valid_number(Number, S#s{state = undefined});
+	{connect_to, PidB} ->
+	    switch:a_connect_to(PidB),
+	    S#s{state = {await_connect, {speech, PidB}}};
+	_ ->
+	    S#s{state = NextState}
+    end.
+
+pid_with_telnr_reply(switch, {pid,Pid},
+		#s{state = {await_pid_with_number, request_connection}} = S) ->
+    Pid ! {self(), request_connection},
+    S#s{state = {calling_B, Pid}}.
+
+connect_reply(switch, yes,
+		#s{state = {await_connect, NextState}} = S) ->
+    S#s{state = NextState}.
+
+disconnect_reply(switch, yes,
+		#s{state = {await_disconnect, NextState}} = S) ->
+    S#s{state = NextState}.
+
+
+onhook(lim, #s{state = getting_first_digit} = S) ->
+    switch:a_stop_tone(),
+    S#s{state = {await_tone_stop, idle}};
+onhook(lim, #s{state = {getting_number, {Number, ValidSeqs}}} = S) ->
+    S#s{state = idle};
+onhook(lim, #s{state = {calling_B, PidB}} = S) ->
+    S#s{state = idle};
+onhook(lim, #s{state = {ringing_A_side, PidB}} = S) ->
+    PidB ! {self(), cancel},
+    switch:a_stop_tone(),
+    S#s{state = {await_tone_stop, idle}};
+onhook(lim, #s{state = {speech, OtherPid}} = S) ->
+    switch:a_disconnect_from(OtherPid),
+    OtherPid ! {self(), cancel},
+    S#s{state = {await_disconnect, idle}};
+onhook(lim, #s{state = {wait_on_hook, HaveTone}} = S) ->
+    case HaveTone of
+	true ->
+	    switch:a_stop_tone(),
+	    S#s{state = {await_tone_stop, idle}};
+	false ->
+	    S#s{state = idle}
+    end;
+onhook(lim, #s{state = {await_dial_tone, _}} = S) ->  % TimingDep
+    S#s{state = {await_dial_tone, onhook_received}};
+onhook(lim, #s{state = {await_fault_tone, _}} = S) -> % TimingDep
+    S#s{state = {await_fault_tone, onhook_received}};
+onhook(lim, #s{state = {await_busy_tone, _}} = S) ->  % TimingDep
+    S#s{state = {await_busy_tone, onhook_received}};
+onhook(From, S) ->
+    io:format("Got unknown message in ~p: ~p~n",
+	      [S#s.state, {From, onhook}]),
+    S.
+
+
+digit(lim, Digit, #s{state = getting_first_digit} = S) ->
+    switch:a_stop_tone(),
+    analysis(number:analyse(Digit, number:valid_sequences()), Digit, 0,
+	     S#s{state = {await_tone_stop, undefined}});
+digit(lim, Digit, #s{state = {await_tone_stop,
+			      {getting_number, {Number, ValidSeqs}}}} = S) ->
+    %% TimingDep
+    analysis(number:analyse(Digit, ValidSeqs), Digit, Number, S);
+digit(lim, Digit, #s{state = idle} = S) ->
+    S;
+digit(lim, Digit, #s{state = {getting_number, {Number, ValidSeqs}}} = S) ->
+    analysis(number:analyse(Digit, ValidSeqs), Digit, Number, S);
+digit(lim, Digit, S) ->
+    S.
+
+analysis(Result, Digit, Number, S) ->
+%    io:format("analysis(~p, ~p, ~p, ~p)~n", [Result, Digit, Number, S]),
+    NewNumber = 10 * Number + Digit,
+    case Result of
+	invalid ->
+	    f_invalid_number(S);
+	valid ->
+	    f_valid_number(NewNumber, S);
+	{incomplete, ValidSeqs} ->
+	    next_state({getting_number, {NewNumber, ValidSeqs}}, S)
+    end.
+
+next_state(Next, #s{state = {await_tone_stop,_}} = S) ->
+    S#s{state = {await_tone_stop, Next}};
+next_state(Next, S) ->
+    S#s{state = Next}.
+
+f_invalid_number(#s{state = {await_tone_stop, _}} = S) ->
+%    io:format("f_invalid_number(~p) -> awaiting tone stop.~n", [S]),
+    %% TimingDep
+    S#s{state = {await_tone_stop, invalid_number}};
+f_invalid_number(S) ->
+%    io:format("f_invalid_number(~p) -> starting fault tone.~n", [S]),
+    switch:a_start_tone(fault),
+    S#s{state = {await_fault_tone, {wait_on_hook, true}}}.
+
+f_valid_number(Number, #s{state = {await_tone_stop, _}} = S) ->
+    S#s{state = {await_tone_stop, {valid_number, Number}}};
+f_valid_number(Number, S) ->
+    switch:a_pid_with_telnr(Number),
+    S#s{state = {await_pid_with_number, request_connection}}.
+
+
+request_connection(Pid, #s{state = idle} = S) ->
+    Pid ! {self(), accept},
+    switch:a_start_ringing(),
+    S#s{state = {await_ringing_start, {ringing_B_side, Pid}}};
+request_connection(Pid, S) ->
+    Pid ! {self(), reject},
+    S.
+
+accept(PidB, #s{state = {calling_B, PidB}} = S) ->
+    switch:a_start_tone(ring),
+    S#s{state = {await_ring_tone, {ringing_A_side, PidB}}}.
+
+reject(PidB, #s{state = {calling_B, PidB}} = S) ->
+    switch:a_start_tone(busy),
+    S#s{state = {await_busy_tone, {wait_on_hook, true}}}.
+
+connect(PidB, #s{state = {ringing_A_side, PidB}} = S) ->
+    f_connect_received(PidB, S);
+connect(PidB, #s{state = {await_ring_tone, {ringing_A_side, PidB}}} = S) ->
+    %% TimingDep
+    S#s{state = {await_ring_tone, {f_connect_received, PidB}}}.
+
+f_connect_received(PidB, S) ->
+    switch:a_stop_tone(),
+    S#s{state = {await_tone_stop, {connect_to, PidB}}}.
+
+cancel(PidA, #s{state = {ringing_B_side, PidA}} = S) ->
+    switch:a_stop_ringing(),
+    S#s{state = {await_ringing_stop, idle}};
+cancel(OtherPid, #s{state = {speech, OtherPid}} = S) ->
+    S#s{state = {wait_on_hook, false}}.

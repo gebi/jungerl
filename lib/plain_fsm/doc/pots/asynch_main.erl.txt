@@ -1,0 +1,22 @@
+%%% Copyright (C) 2003 Ericsson AB
+%%% File    : control.erl
+%%% Created : 20 Jan 2003 by Ulf Wiger <ulf.wiger@ericsson.com>
+
+
+-module(asynch_main).
+
+-export([event_loop/2]).
+
+
+event_loop(M, S) ->
+    receive
+	{From, {Event, Arg}} ->
+	    S1 = M:Event(From, Arg, S),
+	    event_loop(M, S1);
+	{From, Event} when atom(Event) ->
+	    S1 = M:Event(From, S),
+	    event_loop(M, S1);
+	Other ->
+	    io:format("event_loop received unknown msg: ~p~n", [Other]),
+	    exit({unknown_msg, Other})
+    end.

@@ -1,0 +1,415 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+<HEAD>
+   <TITLE>Programming Models for Concurrency</TITLE>
+
+
+<BODY TEXT="#000000" BGCOLOR="#FFFFFF">
+
+<H1>Programming Models for Concurrency</H1>
+
+<p></p><hr>
+
+    <h2>1: Abstract</h2>
+    <p></p>
+    
+    <h2>2: Introduction</h2>
+
+    <p>There is no widely accepted best practice for programming
+    highly concurrent complex control systems.
+      <a
+	 href="http://www.omg.org/technology/documents/formal/uml.htm">
+	UML 1.4</a> can perhaps be viewed as the most ambitious
+      current attempt to provide a standard model for concurrency
+      programming.</p>
+    
+    <p>In 
+      <a
+	 href="http://cgi.omg.org/docs/formal/01-09-73.pdf">
+         Chapter 2</a>,
+    the precise semantics of UML 1.4 are described. These involve:
+    <ul>
+      <li><i>A central event loop for each state machine</i></li>
+      <li><i>Run-to-completion event processing</i> (a new event cannot be
+	processed until the state machine returns control to the
+	event loop)</li>
+      <li><i>Asynchronous communication between state machines</i> (the
+	sender does not wait for a response)</li>
+      <li><i>A message that is not specifically handled in the current
+	  state is discarded</i> (unless specifically "deferred" for later
+	processing)</li>
+    </ul>
+  </p>
+
+    <p>This model is the one most commonly used when programming
+      concurrency in e.g. C++. It is also quite similar to e.g. <a
+      href="http://www.math.chalmers.se/~nordland/ohaskell/">OHaskell</a>,
+      a fairly recent attempt at offering concurrency support in the
+      popular functional programming language Haskell. Ericsson
+      programmers may also find it rather similar to the semantics of 
+      the Ericsson-proprietary language <a href="http://garbowww.ericsson.se/plex/">PLEX</a>.</p>
+
+    <p>Looking at the developments in telecoms, the programming
+    languages
+      <a
+      href="http://www1.informatik.uni-jena.de/languages/chill/chill.htm">
+	Chill</a>, EriPascal,
+      <a href="http://homepage.uab.ericsson.se/~hlplex/">HLPLEX</a> and
+      <a href="http://www.erlang.org">Erlang</a> (the most recent and
+      most widely used of these languages), all use a slightly
+      different approach:
+    <ul>
+      <li><i>State-oriented programming</i></li>
+      <li><i>Selective receive with implicit buffering</i></li>
+      <li><i>Ability to (syntactically) block while waiting for a
+      message</i></li>
+    </ul>
+
+    <p>These languages evolved out of experiences from building
+      complex telecom software. This document attempts to illustrate
+      the qualitative differences between the "UML" approach and the
+      "Erlang" approach, when applied to a typical telecom problem.</p>
+      
+	 <h2>3: Setup</h2>
+
+    <h2>4: Experiments</h2>
+
+    <p>I decided to use a POTS example similar to that found in the
+    book "Concurrent Programming in Erlang" (Armstrong et al, ISBN
+    0-13-508301-X, page 240.) This example clearly illustrates
+    the problems of writing control systems for telecoms.
+    For various reasons, the program used here and the one in the
+    book are not the same.
+    In the book, a "middleware" layer, tele_os, is provided that
+    interfaces to the hardware. The corresponding middleware layer
+    in this example is called 'lim', for Line Interface Module.</p>
+
+    <h3>4.1: Original Implementation</h3>
+
+    <p>The <a href="orig/control.erl.txt">original implementation</a>
+      uses the classical Erlang programming model of
+    <ul>
+      <li>each state represented by a function</li>
+      <li>pre-emptive multi-tasking of lightweight tasks
+      <li>memory-protection between tasks, and no global data
+    </ul>
+
+    <h4>Measurements</h4>
+
+    <p>In the following table, I have collected a few code
+    metrics. Briefly explained,
+    <ul>
+      <li><i>Lines of code</i> obviously accounts for the code
+	  volume (whitespace and comments excluded)</li>
+      <li><i>Branches</i>, in Erlang amounts to counting the "arrows"
+	  ('-&gt;'). In general terms, this indicates the number of
+	  decision points in the code.</li>
+      <li><i>Functions</i>, the number of function definitions.</li>
+      <li><i>Timing dependencies</i> indicates the number of places
+	  in the code where we have to explicitly handle messages
+	  arriving "out of order". Normally, this means that we have
+	  introduced an ordering between messages from different
+	  senders, where no such (external) order is defined.
+	  This does not include timing dependencies that exist in the
+	  specification (such as 'off_hook' is expected before
+	  'digit'). No timing dependencies means that there are no
+	  special cases needed to handle message sequences other than
+	  what is obvious from the specification.</li>
+    </ul>
+    <table border="1">
+      <thead>
+	<tr>
+	  <td>&nbsp;</td>
+	  <td>Original</td>
+	</tr>
+      </thead>
+      <tr>
+	<td>Lines of code</td>
+	<td>161</td>
+      </tr>
+      <tr>
+	<td>Branches</td>
+	<td>50</td>
+      </tr>
+      <tr>
+	<td>Functions</td>
+	<td>16</td>
+      </tr>
+      <tr>
+	<td>Timing Dependencies</td>
+	<td>0</td>
+      </tr>
+    </table>
+
+    <h3>4.2: Event-based Programming, blocking APIs (asynch_0)</h3>
+
+    <p>In order to implement an event-based control module in Erlang,
+    I wrote a small <a href="asynch_main.erl.txt">event loop</a>:</p>
+
+    <p>The <a href="asynch_0/control.erl.txt">actual program</a> was
+    quite easy to write in Erlang (and in fact, the commonly used
+    <a href="http://www.erlang.org/doc/r9b/doc/design_principles/gen_server.html#4.1.2">"generic server" framework</a> in Erlang is based on this
+    "event-driven" programming. The resulting module is in fact
+    significantly shorter than the original. A subjective opinion is
+    that it is more difficult to follow, given this particular
+    problem.</p>
+
+    <p>It should be noted that this module "cheats", in the sense that
+    is still uses a hardware API with blocking semantics. This API is
+    implemented using synchronous wrappers, each sending an
+    asynchronous message to the hardware and then blocking until the
+    answer arrives (implicitly buffering all other messages in the
+    meantime.) This assumes the possibility to program a "blocking
+    RPC", something that you can readily do in Erlang, but not in
+    OHaskell or UML 1.4. It should be noted that a blocking RPC
+    method is introduced in UML 1.5, even though the UML semantics
+    do not allow the programmer to easily describe such functionality
+    in UML itself.</p>
+
+    <p>Another thing to note is that the code relies rather heavily on
+    function-head pattern matching, which is a rather unique Erlang
+    feature. One could have written the code using case statements
+    instead. This would have increased the number of branches in the
+    code by roughly the number of functions. The same goes for the
+    later examples, where this factor would become more dominant.
+    It is unclear whether this would make the comparison more or
+    less fair, so I have strived to write the code the way I
+    thought best.</p>
+    
+    <h4>Measurements</h4>
+    <table border="1">
+      <thead>
+	<tr>
+	  <td>&nbsp;</td>
+	  <td>Original</td>
+	  <td>asynch_0</td>
+	</tr>
+      </thead>
+      <tr>
+	<td>Lines of code</td>
+	<td>161
+	<td>104</td>
+      </tr>
+      <tr>
+	<td>Branches</td>
+	<td>50</td>
+	<td>34</td>
+      </tr>
+      <tr>
+	<td>Functions</td>
+	<td>16
+	<td>18</td>
+      </tr>
+      <tr>
+	<td>Timing Dependencies</td>
+	<td>0</td>
+	<td>0</td>
+      </tr>
+    </table>
+
+    <h4>Semantics</h4>
+
+    <p>Are the two implementations equivalent? Actually, no.
+    Both do, as far as I can tell, solve the problem and adhere to the
+    specification (however, note that the specification is quite
+    primitive.)</p>
+    <p>Let's consider a specific message sequence to illustrate the
+    differences:</p>
+    <b>{lim,offhook} - {lim,onhook} - {Pid,request_connection}</b>
+    <p>If the <code>A:onhook</code> and
+    <code>Pid:request_connection</code> arrive at roughly the same
+    time, internal scheduling details may determine which message
+    appears first in the message queue of subscriber A. In the
+    original implementation, this doesn't matter; the onhook message
+    will be serviced first, as it appears first in the list of
+    patterns in the 'receive' clause. The
+    <code>request_connection</code> message will then be serviced in
+    the <code>idle</code> state and will be accepted. Note that in
+    this programming model, we can actually <i>control</i> the
+    behaviour in this situation, by prioritizing the match patterns.</p>
+    <p>In the <code>async_0</code> implementation, the message that
+    arrives first will be serviced first, so if the
+    <code>request_connection</code> message arrives before the
+    <code>onhook</code>, the connection request will be rejected. We
+    have very little control of this aspect in this programming model.
+    </p>
+    <p>The behaviours in this case are both valid. From a user's point
+    of view, it is perhaps more desireable that the call be serviced
+    when possible. On the other hand, even in the original
+    implementation, the "optimized" behaviour is only possible if the
+    <code>onhook</code> message is actually in the message queue. This
+    is a delicate timing matter, and in this particular case, we may
+    well be prepared to ignore the subtle difference. However, we will
+    see other variations on the same theme below, with more dire
+    consequences.</p>
+    
+    
+
+    <h3>4.3: Event-based, One non-blocking API (asynch_1)</h3>
+
+    <p><a href="asynch_1/control.erl.txt">This version</a> is based on
+    the previous example (asynch_0), but with the hardware API
+    changed to non-blocking semantics. This complicates the state
+    machine, and introduces a number of timing dependencies.
+    This is intended to simulate the style of programming required
+    to solve the problem in e.g. OHaskell or UML 1.4.</p>
+
+    <p>I have tested the basic functionality, but not the
+    timing-dependent code. This type of code is generally difficult to
+    test, as it often requires tricky fault injection techniques. One
+    may run a profiler on the code to make sure that all the code has
+    been covered, but there may still be timing dependencies that the
+    programmer hasn't thought of that are not represented in the
+    code. I encountered a number of such bugs when writing the code.</p>
+    
+    <h4>Measurements</h4>
+    <table border="1">
+      <thead>
+	<tr>
+	  <td>&nbsp;</td>
+	  <td>Original</td>
+	  <td>asynch_0</td>
+	  <td>asynch_1</td>
+	</tr>
+      </thead>
+      <tr>
+	<td>Lines of code</td>
+	<td>161
+	<td>104</td>
+	<td>175</td>
+      </tr>
+      <tr>
+	<td>Branches</td>
+	<td>50</td>
+	<td>34</td>
+	<td>64</td>
+      </tr>
+      <tr>
+	<td>Functions</td>
+	<td>16
+	<td>18</td>
+	<td>37</td>
+      </tr>
+      <tr>
+	<td>Timing Dependencies</td>
+	<td>0</td>
+	<td>0</td>
+	<td>6</td>
+      </tr>
+    </table>
+
+    <h3>4.4: Event-based, Two non-blocking APIs (asynch_2)</h3>
+
+    <p><a href="asynch_2/control.erl.txt">This version</a> goes one
+      step further and also makes the number analysis API
+      non-blocking. Even though the number analysis API consists of
+      only one function, and it is only used within a limited segment
+      of the state machine, implementation complexity grows
+      substantially. The reason is that the existing timing
+      dependencies interact with the new ones, multiplying the
+      effect.</p>
+
+    <h4>Measurements</h4>
+    <table border="1">
+      <thead>
+	<tr>
+	  <td>&nbsp;</td>
+	  <td>Original</td>
+	  <td>asynch_0</td>
+	  <td>asynch_1</td>
+	  <td>asynch_2</td>
+	</tr>
+      </thead>
+      <tr>
+	<td>Lines of code</td>
+	<td>161
+	<td>104</td>
+	<td>175</td>
+	<td>203</td>
+      </tr>
+      <tr>
+	<td>Branches</td>
+	<td>50</td>
+	<td>34</td>
+	<td>64</td>
+	<td>70</td>
+      </tr>
+      <tr>
+	<td>Functions</td>
+	<td>16</td>
+	<td>18</td>
+	<td>37</td>
+	<td>37</td>
+      </tr>
+      <tr>
+	<td>Timing Dependencies</td>
+	<td>0</td>
+	<td>0</td>
+	<td>6</td>
+	<td>13</td>
+      </tr>
+    </table>
+
+    <h2>5. Conclusion</h2>
+
+    <p>Some work remains on finding truly language-neutral comparison
+      techniques, but there seems to be a clear indication that the
+      non-blocking event-based programming style leads to increasingly
+      complex code as more asynchronous APIs are introduced.</p>
+    
+    <p>An important observation is that the timing dependencies
+      introduced in the implementations do not correspond to actual timing
+      dependencies in the real world. There is, for example, no actual
+      correlation between the pressing of a digit on the telephone and
+      the sending of a tone request reply from our switch hardware. The
+      dependencies exist in our implementation solely due to the
+      programming model.</p>
+    
+    <p>The original program is free from such arbitrary timing
+      dependencies. This makes it stable in the sense that it
+      is not affected if parts of the code are distributed, if
+      hardware is upgraded, changing the capacity and thereby
+      the timing aspects of the system, or if a supporting component
+      is made more (or less) complex.</p>
+    
+    <p>It should be noted that the 'defer' semantics in UML make it
+    possible to avoid some of the complexity described
+    above. However, it doesn't eliminate the timing dependencies,
+    since messages to be deferred must be declared explicitly. This
+    means that one also needs to clearly identify all vital
+    messages and carefully verify that these messages cannot be
+    accidentally discarded in any state where the message might
+    arrive. This must of course be repeated each time the model is
+    altered or extended, as new states or new messages are
+    introduced. An alternative would be to enforce the convention
+    that all unknown messages are always deferred. An obvious
+    problem with this is that deferred messages must also be
+    explicitly "recalled"; thus one must first know that a
+    message has been deferred in order to recall it. I believe
+    that there is a "recall_all" function, but this should
+    probably only be used to flush unknown messages.</p>
+
+    
+    <p>Looking more closely at what makes the first program
+      stable, we can identify the following core requirements:</p>
+    
+    <ul>
+      <li>Each process must be able to block when waiting for a
+	certain message</li>
+      <li>It must be possible to single out one or a few senders while
+	buffering all other messages. This does not break the
+	requirement that we must preserve the order of messages; we are
+	free to ignore the actual order in which unrelated messages
+	actually entered our message queue.</li>
+    </ul>
+    
+
+<p></p><hr>
+    <address><a href="mailto:ulf.wiger@ericsson.com">Ulf Wiger</a>
+    </address>
+      <!-- hhmts start -->
+Last modified: Fri Feb  6 13:58:56 MET 2004
+<!-- hhmts end -->
+  </body>
+</html>
+

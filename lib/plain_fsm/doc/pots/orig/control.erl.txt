@@ -1,0 +1,163 @@
+%%% Copyright (C) 1998 Ericsson Software Technology AB, Erlang Systems
+%%% File    : control.erl
+%%% Created : 12 Jun 1998 by Håkan Huss <hakan@erlang.ericsson.se>
+
+-module(control).
+
+-export([start/0]).
+
+start() ->
+    idle().
+
+idle() ->
+    receive
+	{lim, offhook} ->
+	    lim:start_tone(dial),
+	    getting_first_digit();
+	{lim, {digit, _Digit}} ->
+	    idle();
+	{Pid, request_connection} ->
+	    Pid ! {self(), accept},
+	    lim:start_ringing(),
+	    ringing_B_side(Pid);
+	Other ->
+	    io:format("Got unknown message in idle: ~p~n", [Other]),
+	    idle()
+    end.
+
+getting_first_digit() ->
+    receive
+	{lim, onhook} ->
+	    lim:stop_tone(),
+	    idle();
+	{lim, {digit, Digit}} ->
+	    lim:stop_tone(),
+	    getting_number(Digit,
+			   number:analyse(Digit, number:valid_sequences()));
+	{Pid, request_connection} ->
+	    Pid ! {self(), reject},
+	    getting_first_digit();
+	Other ->
+	    io:format("Got unknown message in getting_first_digit: ~p~n",
+		      [Other]),
+	    getting_first_digit()
+    end.
+
+getting_number(_Number, invalid) ->
+    lim:start_tone(fault),
+    wait_on_hook(true);
+getting_number(Number, valid) ->
+    PidB = lim:pid_with_phone_number(Number),
+    PidB ! {self(), request_connection},
+    calling_B(PidB);
+getting_number(Number, {incomplete, ValidSeqs}) ->
+    receive
+	{lim, onhook} ->
+	    idle();
+	{lim, {digit, Digit}} ->
+	    getting_number(10 * Number + Digit,
+			   number:analyse(Digit, ValidSeqs));
+	{Pid, request_connection} ->
+	    Pid ! {self(), reject},
+	    getting_number(Number, {incomplete, ValidSeqs});
+	Other ->
+	    io:format("Got unknown message in getting_number: ~p~n", [Other]),
+	    getting_number(Number, {incomplete, ValidSeqs})
+    end.
+
+calling_B(PidB) ->
+    receive
+	{lim, onhook} ->
+	    idle();
+	{lim, {digit, _Digit}} ->
+	    calling_B(PidB);
+	{PidB, accept} ->
+	    lim:start_tone(ring),
+	    ringing_A_side(PidB);
+	{PidB, reject} ->
+	    lim:start_tone(busy),
+	    wait_on_hook(true);
+	{Pid, request_connection} ->
+	    Pid ! {self(), reject},
+	    calling_B(PidB);
+	Other ->
+	    io:format("Got unknown message in calling_B: ~p~n", [Other]),
+	    calling_B(PidB)
+    end.
+
+ringing_A_side(PidB) ->
+    receive
+	{PidB, connect} ->
+	    lim:stop_tone(),
+	    lim:connect_to(PidB),
+	    speech(PidB);
+	{lim, onhook} ->
+	    PidB ! {self(), cancel},
+	    lim:stop_tone(),
+	    idle();
+	{lim, {digit, _Digit}} ->
+	    ringing_A_side(PidB);
+	{Pid, request_connection} ->
+	    Pid ! {self(), reject},
+	    ringing_A_side(PidB);
+	Other ->
+	    io:format("Got unknown message in ringing_A_side: ~p~n", [Other]),
+	    ringing_A_side(PidB)
+    end.
+
+speech(OtherPid) ->
+    receive
+	{lim, onhook} ->
+	    lim:disconnect_from(OtherPid),
+	    OtherPid ! {self(), cancel},
+	    idle();
+	{lim, {digit, _Digit}} ->
+	    speech(OtherPid);
+	{OtherPid, cancel} ->
+	    wait_on_hook(false);
+	{Pid, request_connection} ->
+	    Pid ! {self(), reject},
+	    speech(OtherPid);
+	Other ->
+	    io:format("Got unknown message in speech: ~p~n", [Other]),
+	    speech(OtherPid)
+    end.
+
+wait_on_hook(Have_tone) ->
+    receive
+	{lim, onhook} ->
+	    case Have_tone of
+		true ->
+		    lim:stop_tone();
+		_ ->
+		    nothing
+	    end,
+	    idle();
+	{lim, {digit, _Digit}} ->
+	    wait_on_hook(Have_tone);
+	{Pid, request_connection} ->
+	    Pid ! {self(), reject},
+	    wait_on_hook(Have_tone);
+	Other ->
+	    io:format("Got unknown message in wait_on_hook: ~p~n", [Other]),
+	    wait_on_hook(Have_tone)
+    end.
+
+ringing_B_side(PidA) ->
+    receive
+	{lim, offhook} ->
+	    lim:stop_ringing(),
+	    PidA ! {self(), connect},
+	    speech(PidA);
+	{PidA, cancel} ->
+	    lim:stop_ringing(),
+	    idle();
+	{lim, {digit, _Digit}} ->
+	    ringing_B_side(PidA);
+	{Pid, request_connection} ->
+	    Pid ! {self(), reject},
+	    ringing_B_side(PidA);
+	Other ->
+	    io:format("Got unknown message in ringing_B_side: ~p~n", [Other]),
+	    ringing_B_side(PidA)
+    end.

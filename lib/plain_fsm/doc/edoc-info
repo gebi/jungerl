@@ -1,0 +1,3 @@
+{application,plain_fsm}.
+{packages,[]}.
+{modules,[fsm_example,plain_fsm]}.

@@ -1,0 +1,10 @@
+Note for Jungerl users.
+
+The edoc parts of plain_fsm were written to take advantage of 
+the latest edoc, and the makefile does so as well. Until the 
+new edoc is available in Jungerl, the edoc files cannot be rebuilt
+properly.
+
+You can either download Richard Carlsson's beta version (0.4) of edoc
+at http://user.it.uu.se/~richardc/edoc/ and rebuild doc/plain_fsm.html
+manually, or leave it as is for now.

@@ -34,7 +34,7 @@ car([[Car|_]]) -> Car.
 cdr([[_|Cdr]]) -> Cdr.
 
 'pair?'([[_|_]]) -> true;
-'pair?'([[_|_]]) -> false.
+'pair?'([_])     -> false.
 
 list(L) -> L.
 

@@ -33,7 +33,7 @@
 -define(EXPORTER, 'EXPORTER').
 
 %% We use a constant line number because the generated code will
-%% always be correct. </strightface>
+%% always be correct. </straightface>
 -define(LINE0, 0).
 
 %% Like erlang:apply/3 but using the EXPORTER function.

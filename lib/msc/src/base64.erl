@@ -73,10 +73,8 @@ from_string(String) ->
     end.
 
 str_2_b64(String) ->
-    case from_string_nonl(String, []) of
-	{ok,Line,[]} -> Line;
-	{more, Cont} -> from_end(Cont)
-    end.
+    {more, Cont} = from_string_nonl(String, []),
+    from_end(Cont).
 
 str_2_base64(Str) -> from_string(Str).
 
@@ -111,16 +109,16 @@ from_string_nonl(S, Out) ->
 %%  End a base64 conversion.  Assume we have run from_string
 %%  until end.
 
-from_end({[C1,C2],Out,N}) ->
+from_end({[C1,C2],Out,_N}) ->
     O1 = e(C1 bsr 2),
     O2 = e(((C1 band 16#03) bsl 4) bor (C2 bsr 4)),
     O3 = e((C2 band 16#0f) bsl 2),
     reverse(Out, [O1,O2,O3,$=]);
-from_end({[C1],Out,N}) ->
+from_end({[C1],Out,_N}) ->
     O1 = e(C1 bsr 2),
     O2 = e((C1 band 16#03) bsl 4),
     reverse(Out, [O1,O2,$=,$=]);
-from_end({[],Out,N}) -> reverse(Out);
+from_end({[],Out,_N}) -> reverse(Out);
 from_end([]) -> [].
 
 %%                    Table 1: The Base64 Alphabet

@@ -2,7 +2,8 @@
   (:use :common-lisp)
   (:export :erlang-variable :erlang-atom :quoted-erlang-atom
            :atom? :variable?
-           :test :file)
+           :test :file
+           :call :match-case :primop)
   (:documentation "Main package for the CLAW compiler."))
 
 (defpackage :var
@@ -16,8 +17,8 @@
 
 (defpackage :|erlang|
   (:nicknames :bif)
-  (:shadow :< :> :* :- :+)
-  (:export :< :> :* :- :+
+  (:shadow :< :> :* :- :+ :and :or)
+  (:export :< :> :* :- :+ :and :or
            :display)
   (:use :common-lisp)
   (:documentation "Erlang built-in-functions (BIFs.)"))
@@ -48,7 +49,7 @@
                             #.(code-char #xFF))))
      (control (range #\null #.(code-char #x1F)))
      (space   #x20)
-     (namechar (or uppercase lowercase digit "@_<>+-*"))
+     (namechar (or uppercase lowercase digit "@_<>+-*=:/^"))
      (varchar  (or uppercase lowercase digit "_"))
      (escape (and "\\" (or octal
                            (and "^" ctrlchar)
@@ -129,8 +130,11 @@
 			   (%4 (nth 3 ,args))
 			   (%5 (nth 4 ,args))
 			   (%6 (nth 5 ,args))
-			   (%7 (nth 6 ,args)))
-	   ,@body))))
+			   (%7 (nth 6 ,args))
+                           (%8 (nth 7 ,args))
+                           (%9 (nth 8 ,args))
+                           (%10 (nth 9 ,args)))
+             ,@body))))
 
 (defmacro comp ((exp-type &rest args))
   (let ((compiler-function (intern (format nil "~a~a" 'compile- exp-type))))
@@ -200,33 +204,53 @@
 
   (value-list --> #\< #\>
               (comp (value-list '())))
-  (value-list --> #\< values #\> -->
+  (value-list --> #\< values #\>
               (comp (value-list %2)))
 
-  (values --> annotated-single-expr        #'list)
-  (values --> annotated-single-expr values #'cons)
+  (values --> annotated-single-expr
+          #'list)
+  (values --> annotated-single-expr #\, values
+          (action (cons %1 %3)))
 
   (annotated-single-expr --> #\( single-expr :annotation single-expr #\)
                          (args-in-list #'second))
   (annotated-single-expr --> single-expr #'identity)
 
+;;  (single-expr --> nil #'identity)
   (single-expr --> atomic #'identity)
   (single-expr --> variable #'identity)
-  (single-expr --> function-name #'identity)
+  (single-expr --> function-ref #'identity)
   (single-expr --> tuple #'identity)
   (single-expr --> list #'identity)
   (single-expr --> let #'identity)
   (single-expr --> case #'identity)
   (single-expr --> fun #'identity)
-;  (single-expr --> letrec #'identity)
+  (single-expr --> letrec #'identity)
   (single-expr --> application #'identity)
   (single-expr --> remote-call #'identity)
   (single-expr --> primop-call #'identity)
-;  (single-expr --> try #'identity)
+  (single-expr --> try #'identity)
 ;  (single-expr --> receive #'identity)
 ;  (single-expr --> sequencing #'identity)
 ;  (single-expr --> catch #'identity)
   (single-expr --> do #'identity)
+
+  (function-ref --> :atom #\/ :integer
+                (comp (function-ref %1 %3)))
+
+  (letrec --> :letrec local-fdefs :in expr
+          (comp (letrec %2 %4)))
+
+  (local-fdefs --> local-fdef
+               (action (list %1)))
+  (local-fdefs --> local-fdef local-fdefs
+               (action (cons %1 %2)))
+
+  (local-fdef --> function-name #\= fun
+              (comp (local-fdef %1 %3)))
+
+  (try --> :try expr :catch #\( variable #\, variable #\) :arrow expr
+       (comp (try %2 %5 %7 %10)))
 
   (do --> :do annotated-single-expr annotated-single-expr
       (comp (do %2 %3)))
@@ -237,10 +261,10 @@
           (comp (atom %1)))
   (atomic --> :string
           (comp (string %1)))
-  (atomic --> nil
-          #'identity)
+;;  (atomic --> nil
+;;          #'identity)
 
-  (nil --> #\( #\)     (lambda (&rest i) i  '()))
+;;  (nil --> #\[ #\]     (lambda (&rest i) i  '()))
 
   (tuple    --> #\{ #\}
             (comp (tuple '())))
@@ -251,8 +275,10 @@
   (expr-list --> annotated-single-expr #\, expr-list   (lambda (e i0 es)
                                                          (cons e es)))
 
-  (list --> #\[ list-exprs #\]  (args-in-list #'second))
-  (list --> #\[ #\]             (lambda (&rest i) i  '()))
+  (list --> #\[ list-exprs #\]
+        (comp (list %2)))
+  (list --> #\[ #\]
+        (action '()))
   (list-exprs --> annotated-single-expr #'list)
   (list-exprs --> expr #\, list-exprs   (lambda (e i0 es)  i0  (cons e es)))
   (list-exprs --> expr #\| expr         (lambda (e1 i0 e2) i0  (cons e1 e2)))
@@ -295,20 +321,24 @@
   (pattern-list --> pattern #\, pattern-list
                 (lambda (p i0 ps) i0  (cons p ps)))
 
-  (pattern-cons-list --> pattern  #'identity)
-  (pattern-cons-list --> pattern #\, pattern-list
-                     (lambda (p i0 ps) i0  (cons p ps)))
-  (pattern-cons-list --> pattern #\| pattern
-                     (lambda (p1 i0 p2) i0  (cons p1 p2)))
-
   (pattern --> atomic
            (action %1))
   (pattern --> #\{ pattern-list #\}
            (comp (tuple %2)))
   (pattern --> #\[ pattern-cons-list #\]
            (action %2))
+  (pattern --> #\[ #\]
+           (action '()))
   (pattern --> variable
            (action %1))
+  (pattern --> variable #\= pattern
+           (action `(:alias ,%1 ,%3)))
+
+  (pattern-cons-list --> pattern  #'list)
+  (pattern-cons-list --> pattern #\, pattern-cons-list
+                     (lambda (p i0 ps) i0  (cons p ps)))
+  (pattern-cons-list --> pattern #\| pattern
+                     (lambda (p1 i0 p2) i0  (cons p1 p2)))
 
   (guard --> :when annotated-single-expr  (args-in-list #'second))
 
@@ -335,6 +365,7 @@
   (let* ((*package* (make-package module-name))
          (*module-package* *package*)
          (lexer (make-core-lexer input)))
+    (use-package '(:claw))
     (flet ((next-input ()
              (let ((x (funcall lexer)))
 ;;               (print x)
@@ -350,12 +381,23 @@
   (with-open-file (s "fact.core" :direction :input)
     (claw::core-compile "fact" s)))
 
-(defun file (name &optional load)
-  (with-open-file (s (concatenate 'string name ".core") :direction :input)
-    (let ((module (core-compile name s)))
-      (if load
-          (let ((*package* *package*)) (eval module))
-          module))))
+(defun file (name &rest compile-keywords)
+  (let ((infile  (concatenate 'string name ".core"))
+        (outfile (concatenate 'string name ".cl"))
+        module)
+    (with-open-file (s infile :direction :input)
+      (setq module (core-compile name s)))
+    (format t "Converted to Lisp..~%")
+    (with-open-file (out outfile :direction :output)
+      (let ((*print-case* :downcase)
+            (*package* (find-package name)))
+        (mapc (lambda (form)
+                (format out "~s~%" form)
+                (terpri out))
+              (cdr module))))
+    (format t "Wrote ~s, compiling..~%" outfile)
+    (let ((*readtable* *claw-readtable*))
+      (apply #'compile-file outfile compile-keywords))))
 
 ;; ----------------------------------------------------------------------
 ;; Compiler
@@ -369,7 +411,7 @@
 (defun compile-module (name exports attributes defs)
   `(progn
     (defpackage ,name
-      (:use)
+      (:use :claw :cl)
       (:export ,@(mapcar #'symbol-name exports)))
     (in-package ,name)
     (defvar ,(intern "*attributes*" (find-package name)) ',attributes)
@@ -386,7 +428,9 @@
   (apply #'vector elems))
 
 (defun compile-let (vars vexp exp)
-  `(multiple-value-bind ,vars ,vexp ,exp))
+  (if (= (length vars) 1)
+      `(let ((,(car vars) ,vexp)) ,exp)
+      `(multiple-value-bind ,vars ,vexp ,exp)))
 
 (defun compile-atom (name)
   `(quote ,(make-atom name)))
@@ -399,6 +443,9 @@
 
 (defun compile-function-name (name arity)
   (intern (format nil "~a/~a" name arity)))
+
+(defun compile-function-ref (name arity)
+  `(function ,(compile-function-name name arity)))
 
 (defun compile-fdef (name fun)
   ;; We pull apart the FUN's lambda expression to create a DEFUN
@@ -413,8 +460,8 @@
   `(match-case ,e ,@clauses))
 
 (defun compile-application (fexp args)
-  (if (local-function-name? fexp)
-      `(,fexp ,@args)
+  (if (local-function-ref? fexp)
+      `(,(cadr fexp) ,@args)
       `(funcall ,fexp ,@args)))
 
 (defun compile-call (module function args)
@@ -429,6 +476,29 @@
   (if (eq (car e2) 'progn)
       `(progn ,e1 ,@(cdr e2))
       `(progn ,e1 ,e2)))
+
+(defun compile-letrec (named-funs e)
+  `(labels ,named-funs ,e))
+
+(defun compile-local-fdef (name fun)
+  (destructuring-bind (lambda args &rest body) fun
+    (declare (ignore lambda))
+    `(,name ,args ,@body)))
+
+(defun local-function-ref? (x)
+  (and (consp x)
+       (eq (car x) 'function)
+       (symbolp (cadr x))
+       (eq (symbol-package (cadr x)) *module-package*)))
+
+(defun compile-list (x)
+  (if (consp x)
+      `(cons ,(car x) ,(compile-list (cdr x)))
+      x))
+
+(defun compile-try (exp1 v1 v2 exp2)
+  ;; Not properly implemented, since there is no "throw" yet. FIXME.
+  exp1)
 
 ;; ----------------------------------------------------------------------
 ;; Core^2 language
@@ -454,9 +524,19 @@
     (labels ((pat (e)
                (cond ((variable? e)
                       (push e *variables*)
-                      `(setq ,e it))
-                     ((or (numberp e) (symbolp e))
+                      `(prog1 t (setq ,e it)))
+                     ((numberp e)
                       `(equalp it ,e))
+                     ((symbolp e)
+                      `(equalp it ',e))
+                     ((and (consp e)
+                           (eq (car e) :alias))
+                      (destructuring-bind (alias v p) e
+                        (declare (ignore alias))
+                        (push v *variables*)
+                        `(when ,(pat p)
+                          (setq ,v it)
+                          t)))
                      ((consp e)
                       `(and (consp it)
                             (let ((it (car it)))  ,(pat (car e)))
@@ -472,10 +552,6 @@
         `(let ,*variables*
           (when (and ,test (eq ,guard 'atom::|true|))
             ,body))))))
-
-(defun local-function-name? (x)
-  (and (symbolp x)
-       (eq (symbol-package x) *module-package*)))
 
 (defmacro call (mod fun &rest args)
   `(funcall (remote-fname ,mod ,fun) ,@args))
@@ -506,13 +582,14 @@
 (defun atom-literal-symbol (x)
   (cadr x))
 
+(defun primop (name arg)
+  (error "primop: ~s ~s" name arg))
+
 ;; ----------------------------------------------------------------------
 ;; Syntactic sugar
 ;;
-;; Atom syntax:     @foo       =>  'atom::foo
-;;                  'atom::foo => @foo
-;;                  atom::foo  => @foo
-;; Variable syntax: $foo  <=>  var::foo
+;; Atom syntax:     @foo <=> 'atom::foo
+;; Variable syntax: $foo <=> var::foo
 ;; ----------------------------------------------------------------------
 
 (defvar *claw-readtable* nil)
@@ -575,6 +652,9 @@
 
 (in-package :|erlang|)
 
+(defvar *true*  'atom::|true|)
+(defvar *false* 'atom::|false|)
+
 ;; wrappers to enforce number of arguments
 (defun < (x y) (true/false (cl:< x y)))
 (defun > (x y) (true/false (cl:> x y)))
@@ -583,11 +663,16 @@
 (defun * (x y) (cl:* x y))
 (defun display (x)
   (print x))
-
+(defun and (x y)
+  (unless (member x (list *true* *false*)) (error "badarg ~s" x))
+  (unless (member y (list *true* *false*)) (error "badarg ~s" x))
+  (true/false (cl:and (eq x *true*) (eq y *true*))))
 
 ;; support
 
-(defun true/false (x) (if x 'atom::|true| 'atom::|false|))
+(defun true/false (x) (if x *true* *false*))
+(defun true?  (x) (eq x 'atom::|true|))
+(defun false? (x) (eq x 'atom::|true|))
 
 ;; for ilisp
 (in-package :claw)

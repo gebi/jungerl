@@ -5,3 +5,4 @@
 
 int my_getgroups(gid_t *);
 int make_getgroups_list(struct descriptor *desc, callstate_t *c, ErlDrvTermData *msg, int *members, int *msgcount);
+int make_groups_list(struct descriptor *desc, callstate_t *c, ErlDrvTermData *msg, int *members, int *msgcount);

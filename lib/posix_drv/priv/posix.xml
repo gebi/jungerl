@@ -38,16 +38,22 @@
 </verbatim>
 
 <verbatim place="top_cpp_stuff">
+#include &lt;stdio.h>
+#include &lt;string.h>
 #include &lt;unistd.h>
 #include &lt;pwd.h>
 #include &lt;grp.h>
 #include &lt;sys/types.h>
 #include &lt;sys/stat.h>
+#include &lt;signal.h>
 /* BSD-specific? (for NGROUPS_MAX) #include &lt;sys/syslimits.h> */
 
 #ifndef NGROUPS_MAX
 #define NGROUPS_MAX     64      /* Big, but we'll be safe */
 #endif  /* !NGROUPS_MAX */
+
+#include &lt;posix_drv.h>
+#include &lt;my-posix.h>
 
 </verbatim>
 
@@ -67,13 +73,13 @@
  <arg name="name" ctype="char *"
       ser_type="binary" nulterm="1"/>
  <return name="ret_grptr" ctype="struct group *" expect="!= NULL"
-         xreturn="group"/>
+         expect_errval="0" xreturn="group"/>
 </func>
 
 <func name="getgrgid">
  <arg name="gid" ctype="gid_t" ser_type="unsigned-integer"/>
  <return name="ret_grptr" ctype="struct group *" expect="!= NULL"
-         xreturn="group"/>
+         expect_errval="0" xreturn="group"/>
 </func>
 
 <func name="getgroups" cname="my_getgroups" async_op="0">
@@ -87,13 +93,13 @@
  <arg name="login" ctype="char *"
       ser_type="binary" nulterm="1"/>
  <return name="ret_pwptr" ctype="struct passwd *" expect="!= NULL"
-         xreturn="passwd"/>
+         expect_errval="0" xreturn="passwd"/>
 </func>
 
 <func name="getpwuid">
  <arg name="uid" ctype="uid_t" ser_type="unsigned-integer"/>
  <return name="ret_pwptr" ctype="struct passwd *" expect="!= NULL"
-         xreturn="passwd"/>
+         expect_errval="0" xreturn="passwd"/>
 </func>
 
 <func name="getuid" async_op="0">
@@ -106,7 +112,7 @@
 
 <func name="getlogin" async_op="0">
  <return ctype="char *" name="ret_char_p" etype="binary" nulterm="1"
-         expect="!= NULL"/>
+         expect="!= NULL" expect_errval="0"/>
 </func>
 
 <func name="getpgrp" async_op="0">
@@ -228,9 +234,7 @@
      	val="c->o.ret_grptr->gr_passwd"
 	offset="0" length="strlen(c->o.ret_grptr->gr_passwd)"/>
      <xtra_val etype="integer" val="c->o.ret_grptr->gr_gid"/>
-     <xtra_val etype="binary" valtype="static_buf"
-     	val="c->o.ret_grptr->gr_mem"
-	offset="0" length="strlen(c->o.ret_grptr->gr_mem)"/>
+     <xtra_val etype="list" procname="make_groups_list"/>
    </xtra_val>
   </xtra_ok>
   <xtra_error>

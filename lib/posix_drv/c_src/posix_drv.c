@@ -46,16 +46,22 @@
 
 /* <verbatim place="top_cpp_stuff"> */
 
+#include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <pwd.h>
 #include <grp.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <signal.h>
 /* BSD-specific? (for NGROUPS_MAX) #include <sys/syslimits.h> */
 
 #ifndef NGROUPS_MAX
 #define NGROUPS_MAX     64      /* Big, but we'll be safe */
 #endif  /* !NGROUPS_MAX */
+
+#include <posix_drv.h>
+#include <my-posix.h>
 
 
 /* </verbatim --place="top_cpp_stuff"--> */
@@ -629,7 +635,7 @@ invoke__getgrnam(void *data)
         c->o.__expect = 1;
     } else {
         c->o.__expect = 0;
-        c->o.__expect_errval = c->o.ret_grptr;
+        c->o.__expect_errval = 0;
         /* Danger!  Do not put debugging statement before saving error val! */
         edtk_debug("%s: threadid = %lx expectation failed!", __FUNCTION__, pthread_self());
     }
@@ -650,7 +656,7 @@ invoke__getgrgid(void *data)
         c->o.__expect = 1;
     } else {
         c->o.__expect = 0;
-        c->o.__expect_errval = c->o.ret_grptr;
+        c->o.__expect_errval = 0;
         /* Danger!  Do not put debugging statement before saving error val! */
         edtk_debug("%s: threadid = %lx expectation failed!", __FUNCTION__, pthread_self());
     }
@@ -692,7 +698,7 @@ invoke__getpwnam(void *data)
         c->o.__expect = 1;
     } else {
         c->o.__expect = 0;
-        c->o.__expect_errval = c->o.ret_pwptr;
+        c->o.__expect_errval = 0;
         /* Danger!  Do not put debugging statement before saving error val! */
         edtk_debug("%s: threadid = %lx expectation failed!", __FUNCTION__, pthread_self());
     }
@@ -713,7 +719,7 @@ invoke__getpwuid(void *data)
         c->o.__expect = 1;
     } else {
         c->o.__expect = 0;
-        c->o.__expect_errval = c->o.ret_pwptr;
+        c->o.__expect_errval = 0;
         /* Danger!  Do not put debugging statement before saving error val! */
         edtk_debug("%s: threadid = %lx expectation failed!", __FUNCTION__, pthread_self());
     }
@@ -773,7 +779,7 @@ invoke__getlogin(void *data)
         c->o.__expect = 1;
     } else {
         c->o.__expect = 0;
-        c->o.__expect_errval = c->o.ret_char_p;
+        c->o.__expect_errval = 0;
         /* Danger!  Do not put debugging statement before saving error val! */
         edtk_debug("%s: threadid = %lx expectation failed!", __FUNCTION__, pthread_self());
     }
@@ -1218,7 +1224,6 @@ reply_xtra_passwd(descriptor_t *desc, callstate_t *c)
                  tmpbin = edtk_alloced_ptr2ErlDrvBinary(tmp);
                  msgcount = LOAD_BINARY(msg, msgcount, tmpbin, 0, strlen(c->o.ret_pwptr->pw_name));
                  /* driver_output_term() incrs refc, and we're done, so decr refc LATER */
-                 /*QQQDELETEME XXX BUG?? CORE DUMPS UNDER LINUX: tofree[num_tofree++] = edtk_alloced_ptr2ErlDrvBinary(tmpbin); */
                  tofree[num_tofree++] = tmpbin;
                  members++;
                  if ((tmp = edtk_driver_alloc_wrapper(strlen(c->o.ret_pwptr->pw_passwd))) == NULL) {
@@ -1228,7 +1233,6 @@ reply_xtra_passwd(descriptor_t *desc, callstate_t *c)
                  tmpbin = edtk_alloced_ptr2ErlDrvBinary(tmp);
                  msgcount = LOAD_BINARY(msg, msgcount, tmpbin, 0, strlen(c->o.ret_pwptr->pw_passwd));
                  /* driver_output_term() incrs refc, and we're done, so decr refc LATER */
-                 /*QQQDELETEME XXX BUG?? CORE DUMPS UNDER LINUX: tofree[num_tofree++] = edtk_alloced_ptr2ErlDrvBinary(tmpbin); */
                  tofree[num_tofree++] = tmpbin;
                  members++;
                  msgcount = LOAD_INT(msg, msgcount, c->o.ret_pwptr->pw_uid);
@@ -1242,7 +1246,6 @@ reply_xtra_passwd(descriptor_t *desc, callstate_t *c)
                  tmpbin = edtk_alloced_ptr2ErlDrvBinary(tmp);
                  msgcount = LOAD_BINARY(msg, msgcount, tmpbin, 0, strlen(c->o.ret_pwptr->pw_gecos));
                  /* driver_output_term() incrs refc, and we're done, so decr refc LATER */
-                 /*QQQDELETEME XXX BUG?? CORE DUMPS UNDER LINUX: tofree[num_tofree++] = edtk_alloced_ptr2ErlDrvBinary(tmpbin); */
                  tofree[num_tofree++] = tmpbin;
                  members++;
                  if ((tmp = edtk_driver_alloc_wrapper(strlen(c->o.ret_pwptr->pw_dir))) == NULL) {
@@ -1252,7 +1255,6 @@ reply_xtra_passwd(descriptor_t *desc, callstate_t *c)
                  tmpbin = edtk_alloced_ptr2ErlDrvBinary(tmp);
                  msgcount = LOAD_BINARY(msg, msgcount, tmpbin, 0, strlen(c->o.ret_pwptr->pw_dir));
                  /* driver_output_term() incrs refc, and we're done, so decr refc LATER */
-                 /*QQQDELETEME XXX BUG?? CORE DUMPS UNDER LINUX: tofree[num_tofree++] = edtk_alloced_ptr2ErlDrvBinary(tmpbin); */
                  tofree[num_tofree++] = tmpbin;
                  members++;
                  if ((tmp = edtk_driver_alloc_wrapper(strlen(c->o.ret_pwptr->pw_shell))) == NULL) {
@@ -1262,7 +1264,6 @@ reply_xtra_passwd(descriptor_t *desc, callstate_t *c)
                  tmpbin = edtk_alloced_ptr2ErlDrvBinary(tmp);
                  msgcount = LOAD_BINARY(msg, msgcount, tmpbin, 0, strlen(c->o.ret_pwptr->pw_shell));
                  /* driver_output_term() incrs refc, and we're done, so decr refc LATER */
-                 /*QQQDELETEME XXX BUG?? CORE DUMPS UNDER LINUX: tofree[num_tofree++] = edtk_alloced_ptr2ErlDrvBinary(tmpbin); */
                  tofree[num_tofree++] = tmpbin;
                  members++;
                  msgcount = LOAD_TUPLE(msg, msgcount, members); /* XXX */
@@ -1325,7 +1326,6 @@ reply_xtra_group(descriptor_t *desc, callstate_t *c)
                  tmpbin = edtk_alloced_ptr2ErlDrvBinary(tmp);
                  msgcount = LOAD_BINARY(msg, msgcount, tmpbin, 0, strlen(c->o.ret_grptr->gr_name));
                  /* driver_output_term() incrs refc, and we're done, so decr refc LATER */
-                 /*QQQDELETEME XXX BUG?? CORE DUMPS UNDER LINUX: tofree[num_tofree++] = edtk_alloced_ptr2ErlDrvBinary(tmpbin); */
                  tofree[num_tofree++] = tmpbin;
                  members++;
                  if ((tmp = edtk_driver_alloc_wrapper(strlen(c->o.ret_grptr->gr_passwd))) == NULL) {
@@ -1335,20 +1335,16 @@ reply_xtra_group(descriptor_t *desc, callstate_t *c)
                  tmpbin = edtk_alloced_ptr2ErlDrvBinary(tmp);
                  msgcount = LOAD_BINARY(msg, msgcount, tmpbin, 0, strlen(c->o.ret_grptr->gr_passwd));
                  /* driver_output_term() incrs refc, and we're done, so decr refc LATER */
-                 /*QQQDELETEME XXX BUG?? CORE DUMPS UNDER LINUX: tofree[num_tofree++] = edtk_alloced_ptr2ErlDrvBinary(tmpbin); */
                  tofree[num_tofree++] = tmpbin;
                  members++;
                  msgcount = LOAD_INT(msg, msgcount, c->o.ret_grptr->gr_gid);
                  members++;
-                 if ((tmp = edtk_driver_alloc_wrapper(strlen(c->o.ret_grptr->gr_mem))) == NULL) {
-                  return reply_error(desc, ENOMEM);
+                 {
+                     int members = 0;
+                     
+                     make_groups_list(desc, c, msg, &members, &msgcount);
+                     msgcount = LOAD_LIST(msg, msgcount, members); /* XXX */
                  }
-                 memcpy(tmp,  c->o.ret_grptr->gr_mem, strlen(c->o.ret_grptr->gr_mem));
-                 tmpbin = edtk_alloced_ptr2ErlDrvBinary(tmp);
-                 msgcount = LOAD_BINARY(msg, msgcount, tmpbin, 0, strlen(c->o.ret_grptr->gr_mem));
-                 /* driver_output_term() incrs refc, and we're done, so decr refc LATER */
-                 /*QQQDELETEME XXX BUG?? CORE DUMPS UNDER LINUX: tofree[num_tofree++] = edtk_alloced_ptr2ErlDrvBinary(tmpbin); */
-                 tofree[num_tofree++] = tmpbin;
                  members++;
                  msgcount = LOAD_TUPLE(msg, msgcount, members); /* XXX */
              }

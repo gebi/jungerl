@@ -106,8 +106,6 @@ typedef struct callstate {
         gid_t           gidset[NGROUPS_MAX];
         struct stat     sb;
     } o;
-    struct {
-    } k;
 } callstate_t;
 
 /*
@@ -115,8 +113,8 @@ typedef struct callstate {
 **  script = ../../edtk/c_h_template.gsl
 **  filename = posix.xml
 **  gslgen version = 2.000 Beta 1
-**  date = 2003/04/22
-**  time =  3:53:44
+**  date = 2003/05/09
+**  time = 22:42:08
 */
 
 #endif  /* __POSIX_DRV_H */

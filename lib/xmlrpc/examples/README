@@ -1,6 +1,10 @@
-This directory contains four example Erlang XML-RPC servers. The
-servers are small and silly but together they utilize a majority of
-the functionality provided by the library.
+This directory contains five example Erlang XML-RPC servers. Four of
+them are desribed in this README file. The fifth server is an example
+of robust banking system and is described in a separate tutorial
+(robust_banking.txt).
+
+The servers are small and silly but together they utilize a majority
+of the functionality provided by the library.
 
 The first example (fib_server.erl) calculates Fibonacci values and is
 a non-keepalive server. The second example (echo_server.erl) echoes

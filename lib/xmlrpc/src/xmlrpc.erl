@@ -29,7 +29,7 @@
 -export([call/3, call/4, call/5, call/6]).
 -export([start_link/1, start_link/5, start_link/6, stop/1]).
 
--include("xmlrpc.hrl").
+-include("log.hrl").
 
 -record(header, {
 	  %% int()
@@ -85,7 +85,7 @@ send(Socket, URI, Header, Payload) ->
 	["POST ", URI, " HTTP/1.1\r\n",
 	 "Content-Length: ", integer_to_list(lists:flatlength(Payload)),
 	 "\r\n",
-	 "User-Agent: Erlang XML-RPC Client 1.1\r\n",
+	 "User-Agent: Erlang XML-RPC Client 1.12\r\n",
 	 "Content-Type: text/xml\r\n",
 	 Header, "\r\n",
 	 Payload],
@@ -174,14 +174,9 @@ start_link(Port, MaxSessions, Timeout, Handler, State) ->
     start_link(all, Port, MaxSessions, Timeout, Handler, State).
 
 start_link(IP, Port, MaxSessions, Timeout, Handler, State) ->
-    SessionHandler = {xmlrpc_http, handler, [Timeout, Handler, State]},
-    Args = [self(), Port, MaxSessions,
-	    [{active, false}, {reuseaddr, true}|ip(IP)], SessionHandler],
-    Pid = spawn_link(tcp_serv, init, Args),
-    receive
-	{Pid, started} -> {ok, Pid};
-	{Pid, Reason} -> Reason
-    end.
+    OptionList = [{active, false}, {reuseaddr, true}|ip(IP)],
+    SessionHandler = {xmlrpc_http, handler, [Timeout, Handler, State]}, 
+    tcp_serv:start_link([Port, MaxSessions, OptionList, SessionHandler]).
 
 ip(all) -> [];
 ip(IP) when tuple(IP) -> {ip, IP}.

@@ -62,9 +62,9 @@ Result = {ok, ResponsePayload} | {error, Reason} | {ok, Socket, ResponsePayload}
 Reason = term()
 .LP
 Calls an XML\-RPC server listening on \fIHost\fR:\fIPort\fR. The
-\fIURI\fR and \fIPayload\fR is used in the HTTP POST request sent to
-the server. The \fIValue\fR is converted to XML (see \fBDATA TYPES\fR
-below) and is used as request body.
+\fIURI\fR and \fIPayload\fR is used in the HTTP POST request being
+sent to the server. The \fIValue\fR is converted to XML (see \fBDATA
+TYPES\fR below) and is used as request body.
 .LP
 If \fIKeepAlive\fR is \fBtrue\fR a \fISocket\fR is returned. The
 socket can be used to send several calls on the same connection in
@@ -112,11 +112,10 @@ the server accepts no new connections for 5 seconds, i.e. blocking new
 connect attempts.
 .LP
 \fIHandler\fR is a callback, implemented by \fIModule\fR:\fIFunction\fR/2,
-which is used to instantiate your own XML\-RPC server. The
-\fITimeout\fR value is used if the handler is keepalive
-oriented. \fIState\fR is the initial state given to
-\fIModule\fR:\fIFunction\fR/2. The resulting \fIPid\fR can be used as
-input to \fBxmlrpc:stop/1\fR. 
+which is used to instantiate an XML\-RPC server. The \fITimeout\fR
+value is used if the handler is keepalive oriented. \fIState\fR is the
+initial state given to \fIModule\fR:\fIFunction\fR/2. The resulting
+\fIPid\fR can be used as input to \fBxmlrpc:stop/1\fR. 
 .LP
 See \fBModule:Function/2\fR and \fBEXAMPLES\fR below.
 .RE
@@ -149,9 +148,9 @@ ResponsePayload = <See above>
 Timeout = integer()
 .LP
 It is up to you to implement \fIFunction\fR clauses in \fIModule\fR to
-instantiate your own XML\-RPC server. Every time an XML-RPC call
-arrives the \fIValue\fR in the \fIPayload\fR it is converted to Erlang
-format and is passed on to \fIModule\fR:\fIFunction\fR/2.
+instantiate an XML\-RPC server. Every time an XML-RPC call arrives the
+\fIValue\fR in the \fIPayload\fR gets converted to Erlang format and
+is passed on to \fIModule\fR:\fIFunction\fR/2.
 .LP
 A \fIFunction\fR clause is supposed to return either a 2-tuple or a
 4-tuple. \fIKeepAlive\fR \fBmust\fR be \fBfalse\fR in a 2-tuple and
@@ -263,8 +262,8 @@ timeout settings. The fourth example (\fIvalidator.erl\fR) is a
 validation server which can be used to validate the library using the
 \fIhttp://validator.xmlrpc.org/\fR service.
 .LP
-Some extract from the \fIexamples/\fR directory. The Fibonacci
-callback module:
+A snippet from the Fibonacci callback module in the \fIexamples/\fR
+directory:
 .LP
 .ft CW
 .nf

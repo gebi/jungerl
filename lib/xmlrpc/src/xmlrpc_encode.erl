@@ -67,10 +67,7 @@ payload(Payload) -> {error, {bad_payload, Payload}}.
 encode_params(Params) -> encode_params(Params, []).
 
 encode_params([], []) -> [];
-encode_params([], Acc) ->
-    ["<params>",
-     Acc,
-     "</params>"];
+encode_params([], Acc) -> ["<params>", Acc, "</params>"];
 encode_params([Param|Rest], Acc) ->
     case encode(Param) of
 	{error, Reason} -> {error, Reason};

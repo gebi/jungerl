@@ -1,21 +1,21 @@
 # Update the APACHE_XMLRPC_PATH variable to point at your Apache
-# XML-RPC installation. This is only necessary if you intend to
-# compile the Java clients.
-APACHE_XMLRPC_PATH=../../apache/xmlrpc/bin/xmlrpc-1.1.jar
+# XML-RPC installation.
+APACHE_XMLRPC_PATH=xmlrpc-1.1.jar
 
 # Do not change anything below this line.
+ERL=erl
 ERLC=erlc
 ERLC_FLAGS=-W
-MODULES=date_server echo_server fib_server validator
+MODULES=test
 EBIN_FILES=$(MODULES:%=%.beam)
 JAVAC=javac
 JAVAC_FLAGS=-classpath $(APACHE_XMLRPC_PATH):.
-JAVA_FILES=FibClient EchoClient DateClient BankClient
+JAVA_FILES=T50 T60
 CLASS_FILES=$(JAVA_FILES:%=%.class)
 
-all: $(EBIN_FILES) 
-
-java_clients:  $(CLASS_FILES)
+test: build
+	$(ERL) -pa ../ebin -pa ../../xmerl/ebin -pa . -s test all -s erlang halt
+build: $(EBIN_FILES) $(CLASS_FILES)
 
 %.beam: %.erl
 	$(ERLC) $(ERLC_FLAGS) $<

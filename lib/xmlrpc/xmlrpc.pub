@@ -1,6 +1,6 @@
 {author,"Joakim Grebenö","jocke@gleipnir.com","030107"}.
 {name,"xmlrpc"}.
-{vsn,{1, 1}}.
+{vsn,%VSN%}.
 {summary,"An XML-RPC client/server library"}.
 {keywords,["XML","XML-RPC","RPC"]}.
 {needs,[{"xmerl",{0,18}}]}.

@@ -26,10 +26,10 @@
 
 -module(tcp_serv).
 -author('jocke@gleipnir.com').
--export([init/5]).
--export([start_session/3]). % internal
+-export([start_link/1, start_link/2]).
+-export([init/2, start_session/3]).
 
--include("xmlrpc.hrl").
+-include("log.hrl").
 
 -record(state, {
 	  %% int()
@@ -44,9 +44,21 @@
 	  listen_socket
 	 }).
 
-%% Exported: init/4
+%% Exported: start_link/{1,2}
 
-init(Parent, Port, MaxSessions, OptionList, SessionHandler) ->
+start_link(Args) -> start_link(Args, infinity).
+    
+start_link(Args, Timeout) ->
+    Pid = spawn_link(?MODULE, init, [self(), Args]),
+    receive
+	{Pid, started} -> {ok, Pid};
+	{Pid, Reason} -> Reason
+    after Timeout -> {error, timeout}
+    end.
+
+%% Exported: init/2 (internal)
+
+init(Parent, [Port, MaxSessions, OptionList, SessionHandler]) ->
     process_flag(trap_exit, true),
     case gen_tcp:listen(Port, OptionList) of
 	{ok, ListenSocket} ->
@@ -63,8 +75,7 @@ init(Parent, Port, MaxSessions, OptionList, SessionHandler) ->
 loop(#state{session_list = SessionList,
 	    listen_socket = ListenSocket} = State) ->
     receive
-	stop ->
-	    gen_tcp:close(ListenSocket);
+	stop -> gen_tcp:close(ListenSocket);
 	start_session when length(SessionList) > State#state.max_sessions ->
 	    timer:sleep(5000),
 	    self() ! start_session,
@@ -87,7 +98,7 @@ loop(#state{session_list = SessionList,
 	    loop(State)
     end.
 
-%% Exported: start_seesion/3 (internal)
+%% Exported: start_seesion/3
 
 start_session(Parent, {M, F, A}, ListenSocket) ->
     case gen_tcp:accept(ListenSocket) of

@@ -19,4 +19,7 @@ examples/ directory.
 Do not forget to read doc/xmlrpc.3 (or xmlrpc.txt, xmlrpc.ps,
 xmlrpc.pdf) for a detailed API description.
 
-Joakim Grebenö <jocke@gleipnir.com>
+Get the latest version of this library at
+http://www.gleipnir.com/xmlrpc/.
+
+Send questions and/or suggestions to jocke@gleipnir.com.

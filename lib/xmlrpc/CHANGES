@@ -10,3 +10,16 @@
 * xmlrpc.pub added to make addition to http://www.erlang.org/user.html
   possible. 
 * Not possible to start several servers in single Erlang node.
+
+== Fri Feb 14 08:43:51 CET 2003
+== Version 1.11
+
+* A new tutorial on how to build a robust banking system has been
+  added (doc/robust_banking.txt).
+* Cosmetic changes to documentation and source code.
+
+== Tue Feb 25 08:58:36 CET 2003
+== Version 1.12
+
+* Makefile structure updated to harmonize with the jungerl code
+  respository (http://sourceforge.net/projects/jungerl/).

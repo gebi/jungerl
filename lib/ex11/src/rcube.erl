@@ -18,7 +18,7 @@
 %%%
 %%% --------------------------------------------------------------------
 -vc('$Id$ ').
--export([start/1,init/1,kicker/2]).
+-export([start/0, start/1,init/1,kicker/2]).
 
 -import(matrix44,[multiply14/2,mk_rotate_matrix/2,mk_hcord/3,
 		  mk_translate_matrix/3]).
@@ -34,6 +34,9 @@
 	       pix_w,       % The pixmap width
 	       pix_h        % Te pixmap height
 	      }).
+
+start() ->
+    start("localhost").
 
 start(Host) ->
     spawn(?MODULE,init,[Host]).

@@ -1,0 +1,3 @@
+#!/bin/sh
+
+erl -pa ebin -s rcube start 

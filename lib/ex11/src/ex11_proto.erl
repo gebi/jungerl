@@ -45,57 +45,54 @@
 %% -----------------------------------------------------
 
 setup_connection([]) ->
-    [?MSB_BYTEORDER,         % Erlang byte-order
-     0,                      % unused
-     i16(11),                % proto-major-ver
-     0,0,                    % proto-minor-ver
-     i16(0),                 % proto-name-len
-     i16(0),                 % proto-data-len
-     0,0];                   % unused (pad)
+    <<?MSB_BYTEORDER:8,         % Erlang byte-order
+     0:8,                      % unused
+     11:16,                % proto-major-ver
+     0:16,                    % proto-minor-ver
+     0:16,                 % proto-name-len
+     0:16,                 % proto-data-len
+     0,0>>;                   % unused (pad)
 setup_connection(Cookie) ->
-    [?MSB_BYTEORDER,         % Erlang byte-order
-     0,                      % unused
-     i16(11),                % proto-major-ver
-     0,0,                    % proto-minor-ver
-     i16(18),                % proto-name-len
-     i16(length(Cookie)),    % proto-data-len
-     0,0,                    % unused
+    Len = length(Cookie),
+    Pad = add_pad(Cookie),
+    <<?MSB_BYTEORDER:8,         % Erlang byte-order
+     0:8,                      % unused
+     11:16,                % proto-major-ver
+     0:16,                    % proto-minor-ver
+     18:16,                % proto-name-len
+     Len:16,    % proto-data-len
+     0:16,                    % unused
      "MIT-MAGIC-COOKIE-1",   % auth-proto-name
-     0,0,                    % pad
+     0:16,                    % pad
      Cookie,                 % auth-proto-data
-     add_pad(Cookie)].       % pad
+     Pad>>.       % pad
 
-decode_refused_connection([Len,Pa1,Pa0,Pi1,Pi0,T1,T0|D0]) ->
-    ProtoMaj = i16(Pa1,Pa0),
-    ProtoMin = i16(Pi1,Pi0),
-    TotLen   = i16(T1,T0),
-    {Reason,D1} = split_list(Len,D0),
+decode_refused_connection(<<Len,ProtoMaj:16,ProtoMin:16,_TotLen:16,D/binary>>) ->
+    <<ReasonB:Len/binary, _D1/binary>> = D,
+    Reason = binary_to_list(ReasonB),
     #refused_connection{maj_proto=ProtoMaj,
 			min_proto=ProtoMin,
 			reason=Reason}.
     
 decode_connect_reply(Fd,Msg) ->
-    [_,_,_,_,L1,L0|D1] = Msg,
-    Len = i16(L1,L0),
-    [R3,R2,R1,R0|D99] = D1,
-    RelNo = i32(R3,R2,R1,R0),
-    [B3,B2,B1,B0|D2] = D99,
-    ResBase = i32(B3,B2,B1,B0),
-    [M3,M2,M1,M0|D3] = D2,
-    ResMask0 = i32(M3,M2,M1,M0),
+    <<_:32, _Len:16, RelNo:32, ResBase:32, ResMask0:32,
+     MbufSz:32, VendorLen:16, MaxReqLen:16,
+     Screens, Formats,
+     ImOrder, BmapOrder, BmapScanU, BmapScanP,
+     MinKCode, MaxKCode, _:32,
+     B/binary>> = list_to_binary(Msg),
+    VendorPad = bpad(VendorLen),
+    PmapFormLen = 8*Formats,
+    <<VendorB:VendorLen/binary,
+     _:VendorPad,
+     PmapForm:PmapFormLen/binary,
+     PmapScreen/binary>> = B,
+
     {ResMask,ResShift} = resource_calc(ResMask0),
-    [Z3,Z2,Z1,Z0,V1,V0|D98] = D3,
-    MbufSz = i32(Z3,Z2,Z1,Z0),
-    VendorLen = i16(V1,V0),
-    [X1,X0,Screens,Formats|D4] = D98,
-    MaxReqLen = i16(X1,X0),
-    [ImOrder,BmapOrder,BmapScanU,BmapScanP|D5] = D4,
-    [MinKCode,MaxKCode,_,_,_,_|D6] = D5,
-    {Vendor,D7 } = split_list(VendorLen,D6),
-    D8 = rm_pad(pad(length(Vendor)),D7),
-    {PmapForm,D9} = split_list(8*Formats,D8),
+    Vendor = binary_to_list(VendorB),
     Format = decode_format(Formats,PmapForm),
-    Screen = decode_screen(Screens,D9),
+    Screen = decode_screen(Screens,PmapScreen),
+
     Display = #display{
       resource_mask=ResMask,
       resource_base=ResBase,
@@ -127,36 +124,31 @@ resource_calc(ResMask,Mask,ResShift) when (Mask bor 1) =/= 0 ->
 resource_calc(ResMask,Mask,ResShift) ->
     resource_calc(ResMask,Mask bsr 1,ResShift+1).
 
-decode_format(0,[]) -> [];
-decode_format(N,[Depth,Bpp,ScanlinePad,_,_,_,_,_|T]) when N>0 ->
-    [#format{depth=Depth,
-	     bpp=Bpp,
-	     scanline_pad=ScanlinePad
-	    }|decode_format(N-1,T)].
+decode_format(0, _) -> [];
+decode_format(N, <<Depth,
+		  Bpp,
+		  ScanlinePad,
+		  _:40,
+		  T/binary>>) when N>0 ->
+    Format = #format{depth=Depth,
+		     bpp=Bpp,
+		     scanline_pad=ScanlinePad
+	    },
+    [Format | decode_format(N-1,T)].
 
-decode_screen(0,[]) -> [];
-decode_screen(N,[W3,W2,W1,W0|D1]) when N>0 ->
-    Window = i32(W3,W2,W1,W0),
-    [C3,C2,C1,C0|D2] = D1,
-    Colormap = i32(C3,C2,C1,C0),
-    [H3,H2,H1,H0|D3] = D2,
-    WhitePixel = i32(H3,H2,H1,H0),
-    [B3,B2,B1,B0|D4] = D3,
-    BlackPixel = i32(B3,B2,B1,B0),
-    [M3,M2,M1,M0|D5] = D4,
-    CinpMask = i32(M3,M2,M1,M0),
-    [Wp1,Wp0,Hp1,Hp0,Wm1,Wm0,Hm1,Hm0|D6] = D5,
-    WidthInPixel = i16(Wp1,Wp0),
-    HeightInPixel = i16(Hp1,Hp0),
-    WidthInMm = i16(Wm1,Wm0),
-    HeightInMm = i16(Hm1,Hm0),
-    [Mi1,Mi0,Ma1,Ma0|D7] = D6,
-    MinInstMaps = i16(Mi1,Mi0),
-    MaxInstMaps = i16(Ma1,Ma0),
-    [R3,R2,R1,R0|D8] = D7,
-    RootVisual = i32(R3,R2,R1,R0),
-    [Bs,Su,Rd,Nd|D9] = D8,
-    {Depths,Rest} = decode_depth(Nd,D9),
+decode_screen(0, _) -> [];
+decode_screen(N, <<Window:32,
+		  Colormap:32,
+		  WhitePixel:32, BlackPixel:32,
+		  CinpMask:32,
+		  WidthInPixel:16, HeightInPixel:16,
+		  WidthInMm:16, HeightInMm:16,
+		  MinInstMaps:16, MaxInstMaps:16,
+		  RootVisual:32,
+		  Bs, Su, Rd, Nd,
+		  D/binary>>) when N>0 ->
+
+    {Depths, Rest} = decode_depth(Nd,D),
     Screen = #screen{root=Window,
 		     cmap=Colormap,
 		     white_pixel=WhitePixel,
@@ -173,40 +165,32 @@ decode_screen(N,[W3,W2,W1,W0|D1]) when N>0 ->
 		     save_unders=Su,
 		     depths=Depths,
 		     root_depth=Rd},
-    [Screen|decode_screen(N-1,Rest)].
+    [Screen | decode_screen(N-1,Rest)].
     
 decode_depth(Nd,D) -> decode_depth(Nd,D,[]).
 
 decode_depth(0,Rest,Acc) -> {lists:reverse(Acc),Rest};
-decode_depth(Nd,[Depth,_,V1,V0,_,_,_,_|T],Acc) when Nd>0 ->
-    NoVisuals = i16(V1,V0),
-    {Vis,Rest} = split_list(24*NoVisuals,T),
-    Visuals = decode_visuals(NoVisuals,Vis),
+decode_depth(Nd,<<Depth,_,NoVisuals:16,_:32,T/binary>>,Acc) when Nd>0 ->
+    NV = 24*NoVisuals,
+    <<Vis:NV/binary,Rest/binary>> = T,
+    Visuals = decode_visuals(NoVisuals, Vis),
     D = #depth{depth=Depth,
 	       nvisuals=NoVisuals,
 	       visuals=Visuals},
-    decode_depth(Nd-1,Rest,[D|Acc]).
+    decode_depth(Nd-1, Rest, [D|Acc]).
 
-decode_visuals(0,Rest) -> [];
-decode_visuals(Nv,[V3,V2,V1,V0,Class,BpRGB|D0]) when Nv>0 ->
-    VisualId = i32(V3,V2,V1,V0),
-    [C1,C0|D1] = D0, 
-    ColMapEnt = i16(C1,C0),
-    [R3,R2,R1,R0,G3,G2,G1,G0|D2] = D1,
-    RedMask = i32(R3,R2,R1,R0),
-    GreenMask = i32(G3,G2,G1,G0),
-    [B3,B2,B1,B0,_,_,_,_|Rest] = D2,
-    BlueMask = i32(B3,B2,B1,B0),
-    [#visual{visualid=VisualId,
-	     class=Class,
-	     bits_per_rgb=BpRGB,
-	     map_entries=ColMapEnt,
-	     red_mask=RedMask,
-	     green_mask=GreenMask,
-	     blue_mask=BlueMask}
-     |decode_visuals(Nv-1,Rest)].
-
-
+decode_visuals(0,_) -> [];
+decode_visuals(Nv,<<VisualId:32,Class,BpRGB,ColMapEnt:16,
+		   RedMask:32, GreenMask:32, BlueMask:32,
+		   _:32, Rest/binary>>) when Nv>0 ->
+    Visual = #visual{visualid=VisualId,
+		     class=Class,
+		     bits_per_rgb=BpRGB,
+		     map_entries=ColMapEnt,
+		     red_mask=RedMask,
+		     green_mask=GreenMask,
+		     blue_mask=BlueMask},
+    [Visual | decode_visuals(Nv-1,Rest)].
 
 %% ----------------------------------------------------
 %% ENCODING REQUEST MESSAGES
@@ -246,32 +230,33 @@ enc(_,_)                                     -> {error,unknown_request}.
 %% -----------------------
 %% The Change GC request
 
-change_gc(X,R) when R#change_gc.cid =/= undefined ->
-    ValueMask = R#change_gc.value_mask,
-    ValueList = encode_gc_valuelist(ValueMask,R#change_gc.value_list),
+change_gc(X,#change_gc{opcode=Opcode, cid=Cid, value_mask=ValueMask}=R) 
+  when Cid =/= undefined ->
+    ValueList = encode_gc_valuelist(ValueMask, R#change_gc.value_list),
+    Len = 3 + length(ValueList),
     {ok,
-     [R#change_gc.opcode,
+     <<Opcode, 
       0, % unused
-      i16(3 + length(ValueList)),
-      i32(R#change_gc.cid),
-      i32(ValueMask),
-      ValueList]}.
+      Len:16,
+      Cid:32,
+      ValueMask:32,
+      ValueList>>}.
 
 %% -----------------------
 %% The clear area request
 
-clear_area(X,R) when R#clear_area.window =/= undefined,
-		     R#clear_area.width =/= undefined,
-		     R#clear_area.height =/= undefined ->
+clear_area(X,#clear_area{}=R) when R#clear_area.window =/= undefined,
+				   R#clear_area.width =/= undefined,
+				   R#clear_area.height =/= undefined ->
     {ok,
-     [R#clear_area.opcode,
-      R#clear_area.exposures,
-      i16(4),
-      i32(R#clear_area.window),
-      i16(R#clear_area.x),
-      i16(R#clear_area.y),
-      i16(R#clear_area.width),
-      i16(R#clear_area.height)]}.
+     <<(R#clear_area.opcode),
+      (R#clear_area.exposures),
+      4:16,
+      (R#clear_area.window):32,
+      (R#clear_area.x):16,
+      (R#clear_area.y):16,
+      (R#clear_area.width):16,
+      (R#clear_area.height):16>>}.
       
 %% ----------------------
 %% The copy area request
@@ -286,18 +271,18 @@ copy_area(X,R) when R#copy_area.src =/= undefined,
 		    R#copy_area.width =/= undefined,
 		    R#copy_area.height =/= undefined ->
     {ok,
-     [R#copy_area.opcode,
+     <<(R#copy_area.opcode),
       0, % unused
-      i16(7),
-      i32(R#copy_area.src),
-      i32(R#copy_area.dst),
-      i32(R#copy_area.cid),
-      i16(R#copy_area.src_x),
-      i16(R#copy_area.src_y),
-      i16(R#copy_area.dst_x),
-      i16(R#copy_area.dst_y),
-      i16(R#copy_area.width),
-      i16(R#copy_area.height)]}.
+      7:16,
+      (R#copy_area.src):32,
+      (R#copy_area.dst):32,
+      (R#copy_area.cid):32,
+      (R#copy_area.src_x):16,
+      (R#copy_area.src_y):16,
+      (R#copy_area.dst_x):16,
+      (R#copy_area.dst_y):16,
+      (R#copy_area.width):16,
+      (R#copy_area.height):16>>}.
       
 %% ---------------------
 %% The Create GC request
@@ -317,7 +302,7 @@ create_gc(X,R) when R#create_gc.drawable =/= undefined ->
     ValueMask = R#create_gc.value_mask,
     ValueList = encode_gc_valuelist(ValueMask,R#create_gc.value_list),
     {ok,
-     [R#create_gc.opcode,
+     [(R#create_gc.opcode),
       0, % unused
       i16(4 + length(ValueList)),
       i32(Cid),
@@ -702,11 +687,15 @@ event_cont(Event) ->
 %% ---------------
 
 pad(E) -> (4 - (E rem 4)) rem 4.
+bpad(E) -> pad(E)*8.
 
 rm_pad(0,L)         -> L;
 rm_pad(1,[_|L])     -> L;
 rm_pad(2,[_,_|L])   -> L;
-rm_pad(3,[_,_,_|L]) -> L.
+rm_pad(3,[_,_,_|L]) -> L;
+rm_pad(1,<<_:8, L>>)     -> L;
+rm_pad(2,<<_:16, L>>)     -> L;
+rm_pad(3,<<_:24, L>>)     -> L.
 
 add_pad(Data) -> add_pad_0(pad(length(Data))).
 

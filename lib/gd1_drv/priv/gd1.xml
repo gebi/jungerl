@@ -1,0 +1,650 @@
+<erldriver name="gd1_drv" abbrev="" default_async_calls="0"
+           default_debug_verbose="0">
+
+<summary>An Erlang driver interface for libgd version 1</summary>
+
+<cpy>Copyright (c) 2002, Scott Lystig Fritchie.  All rights reserved.</cpy>
+<cpy>See the file "LICENSE" at the top of the source distribution for</cpy>
+<cpy>full license terms.</cpy>
+
+<stash size="4"/>
+
+<verbatim place="top_cpp_stuff">
+#include &lt;stdio.h>
+#include &lt;string.h>
+#include &lt;errno.h>
+
+#include &lt;gd.h>
+#include &lt;my-gd1.h>
+</verbatim>
+
+<func name="gdImageCreate">
+ <arg name="sx" ctype="int"/>
+ <arg name="sy" ctype="int"/>
+ <return ctype="gdImagePtr" name="ret_gdImagePtr"
+         valmap_name="imageptr" valmap_type="start"
+         expect="!= NULL" expect_errval="0"/>
+</func>
+
+<func name="gdImageCreateFromJpeg" cname="my_gdImageCreateFromJpeg">
+ <arg name="filename" ctype="char *" ser_type="binary" nulterm="1"/>
+ <arg name="status" ctype="int" noerlcall="1" argtype="out"/>
+ <return ctype="gdImagePtr" name="ret_gdImagePtr"
+         valmap_name="imageptr" valmap_type="start"
+         expect="!= NULL" expect_errval="c->o.status"/>
+</func>
+
+<func name="gdImageCreateFromPng" cname="my_gdImageCreateFromPng">
+ <arg name="filename" ctype="char *" ser_type="binary" nulterm="1"/>
+ <arg name="status" ctype="int" noerlcall="1" argtype="out"/>
+ <return ctype="gdImagePtr" name="ret_gdImagePtr"
+         valmap_name="imageptr" valmap_type="start"
+         expect="!= NULL" expect_errval="c->o.status"/>
+</func>
+
+<!-- XXX We won't support gdImageCreateFromPngSource() -->
+
+<func name="gdImageCreateFromGd" cname="my_gdImageCreateFromGd">
+ <arg name="filename" ctype="char *" ser_type="binary" nulterm="1"/>
+ <arg name="status" ctype="int" noerlcall="1" argtype="out"/>
+ <return ctype="gdImagePtr" name="ret_gdImagePtr"
+         valmap_name="imageptr" valmap_type="start"
+         expect="!= NULL" expect_errval="c->o.status"/>
+</func>
+
+<func name="gdImageCreateFromGd2" cname="my_gdImageCreateFromGd2">
+ <arg name="filename" ctype="char *" ser_type="binary" nulterm="1"/>
+ <arg name="status" ctype="int" noerlcall="1" argtype="out"/>
+ <return ctype="gdImagePtr" name="ret_gdImagePtr"
+         valmap_name="imageptr" valmap_type="start"
+         expect="!= NULL" expect_errval="c->o.status"/>
+</func>
+
+<func name="gdImageCreateFromGd2Part" cname="my_gdImageCreateFromGd2Part">
+ <arg name="filename" ctype="char *" ser_type="binary" nulterm="1"/>
+ <arg name="srcX" ctype="int"/>
+ <arg name="srcY" ctype="int"/>
+ <arg name="h" ctype="int"/>
+ <arg name="w" ctype="int"/>
+ <arg name="status" ctype="int" noerlcall="1" argtype="out"/>
+ <return ctype="gdImagePtr" name="ret_gdImagePtr"
+         valmap_name="imageptr" valmap_type="start"
+         expect="!= NULL" expect_errval="c->o.status"/>
+</func>
+
+<func name="gdImageCreateFromXpm" cname="my_gdImageCreateFromXpm">
+ <arg name="filename" ctype="char *" ser_type="binary" nulterm="1"/>
+ <arg name="status" ctype="int" noerlcall="1" argtype="out"/>
+ <return ctype="gdImagePtr" name="ret_gdImagePtr"
+         valmap_name="imageptr" valmap_type="start"
+         expect="!= NULL" expect_errval="c->o.status"/>
+</func>
+
+<func name="gdImageColorAllocate">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="r" ctype="int"/>
+ <arg name="g" ctype="int"/>
+ <arg name="b" ctype="int"/>
+ <return ctype="int" name="ret_int"
+         expect=">= 0" expect_errval="-1"/>
+</func>
+
+<func name="gdImageColorClosest">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="r" ctype="int"/>
+ <arg name="g" ctype="int"/>
+ <arg name="b" ctype="int"/>
+ <return ctype="int" name="ret_int"
+         expect=">= 0" expect_errval="-1"/>
+</func>
+
+<func name="gdImageColorExact">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="r" ctype="int"/>
+ <arg name="g" ctype="int"/>
+ <arg name="b" ctype="int"/>
+ <return ctype="int" name="ret_int"
+         expect=">= 0" expect_errval="-1"/>
+</func>
+
+<func name="gdImageColorResolve">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="r" ctype="int"/>
+ <arg name="g" ctype="int"/>
+ <arg name="b" ctype="int"/>
+ <return ctype="int" name="ret_int"
+         expect=">= 0" expect_errval="-1"/>
+</func>
+
+<func name="gdImageColorsTotal">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <return ctype="int" name="ret_int"
+         expect=">= 0" expect_errval="-1"/>
+</func>
+
+<func name="gdImageGetInterlaced">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <return ctype="int" name="ret_int"
+         expect=">= 0" expect_errval="-1"/>
+</func>
+
+<func name="gdImageGetTransparent">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <return ctype="int" name="ret_int"
+         expect=">= 0" expect_errval="-1"/>
+</func>
+
+<func name="gdImageColorDeallocate">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="color" ctype="int"/>
+ <return ctype="void"/>
+</func>
+
+<func name="gdImageColorTransparent">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="color" ctype="int"/>
+ <return ctype="void"/>
+</func>
+
+<func name="gdImageSetPixel">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="x" ctype="int"/>
+ <arg name="y" ctype="int"/>
+ <arg name="color" ctype="int"/>
+ <return ctype="void"/>
+</func>
+
+<func name="gdImageLine">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="x1" ctype="int"/>
+ <arg name="y1" ctype="int"/>
+ <arg name="x2" ctype="int"/>
+ <arg name="y2" ctype="int"/>
+ <arg name="color" ctype="int"/>
+ <return ctype="void"/>
+</func>
+
+<!-- We will not support gdImageDashedLine(): GD has deprecated it! -->
+
+<func name="gdImagePolygon" cname="my_gdImagePolygon">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="points" ctype="char *" ser_type="binary" binlen2stash="0"/>
+ <arg name="pointsTotal" ctype="int"/>
+ <arg name="color" ctype="int"/>
+ <return ctype="int" name="ret_int"
+         expect="== 0" expect_errval="-1"/>
+ <hack place="post-deserialize" type="verbatim">
+	if (c->i.pointsTotal != (c->i.__stash[0] / (sizeof(long) * 2))) {
+		goto error;
+	}
+ </hack>
+</func>
+
+<func name="gdImageFilledPolygon" cname="my_gdImageFilledPolygon">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="points" ctype="char *" ser_type="binary" binlen2stash="0"/>
+ <arg name="pointsTotal" ctype="int"/>
+ <arg name="color" ctype="int"/>
+ <return ctype="int" name="ret_int"
+         expect="== 0" expect_errval="-1"/>
+</func>
+
+<func name="gdImageRectangle">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="x1" ctype="int"/>
+ <arg name="y1" ctype="int"/>
+ <arg name="x2" ctype="int"/>
+ <arg name="y2" ctype="int"/>
+ <arg name="color" ctype="int"/>
+ <return ctype="void"/>
+</func>
+
+<func name="gdImageFilledRectangle">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="x1" ctype="int"/>
+ <arg name="y1" ctype="int"/>
+ <arg name="x2" ctype="int"/>
+ <arg name="y2" ctype="int"/>
+ <arg name="color" ctype="int"/>
+ <return ctype="void"/>
+</func>
+
+<func name="gdImageArc">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="cx" ctype="int"/>
+ <arg name="cy" ctype="int"/>
+ <arg name="w" ctype="int"/>
+ <arg name="h" ctype="int"/>
+ <arg name="s" ctype="int"/>
+ <arg name="e" ctype="int"/>
+ <arg name="color" ctype="int"/>
+ <return ctype="void"/>
+</func>
+
+<func name="gdImageFillToBorder">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="x" ctype="int"/>
+ <arg name="y" ctype="int"/>
+ <arg name="border" ctype="int"/>
+ <arg name="color" ctype="int"/>
+ <return ctype="void"/>
+</func>
+
+<func name="gdImageFill">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="x" ctype="int"/>
+ <arg name="y" ctype="int"/>
+ <arg name="color" ctype="int"/>
+ <return ctype="void"/>
+</func>
+
+<func name="gdImageSetBrush">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="brush" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <return ctype="void"/>
+</func>
+
+<func name="gdImageSetTile">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="brush" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <return ctype="void"/>
+</func>
+
+<func name="gdImageSetStyle" cname="my_gdImageSetStyle">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="style" ctype="char *" ser_type="binary" binlen2stash="0"/>
+ <arg name="styleLength" ctype="int"/>
+ <return ctype="int" name="ret_int"
+         expect="== 0" expect_errval="-1"/>
+</func>
+
+<func name="gdImageGetPixel">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="x" ctype="int"/>
+ <arg name="y" ctype="int"/>
+ <return ctype="int" name="ret_int"/>
+</func>
+
+<func name="gdImageRed">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="color" ctype="int"/>
+ <return ctype="int" name="ret_int"/>
+</func>
+
+<func name="gdImageGreen">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="color" ctype="int"/>
+ <return ctype="int" name="ret_int"/>
+</func>
+
+<func name="gdImageBlue">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="color" ctype="int"/>
+ <return ctype="int" name="ret_int"/>
+</func>
+
+<func name="gdImageBoundsSafe">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="x" ctype="int"/>
+ <arg name="y" ctype="int"/>
+ <return ctype="int" name="ret_int"/>
+</func>
+
+<func name="gdImageSX">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <return ctype="int" name="ret_int"/>
+</func>
+
+<func name="gdImageSY">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <return ctype="int" name="ret_int"/>
+</func>
+
+<func name="gdImagePng" cname="my_gdImagePng">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="filename" ctype="char *" ser_type="binary" nulterm="1"/>
+ <return ctype="int" name="ret_int"
+         expect="== 0" expect_errval="c->o.ret_int"/>
+</func>
+
+<func name="gdImagePngPtr">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="size" ctype="int" noerlcall="1" argtype="out"/>
+ <return ctype="void *" name="ret_void_p"
+         etype="binary" offset="0" length="c->o.size"
+	 expect="!= NULL" expect_errval="-1"/>
+ <hack place="ready_async-post-reply" type="verbatim">
+	if (c->o.ret_void_p != NULL) gdFree(c->o.ret_void_p);
+ </hack>
+</func>
+
+<func name="gdImagePngPtr_QQQ_deleteme" cname="gdImagePngPtr">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="size" ctype="int" noerlcall="1" argtype="out"/>
+ <return ctype="void *" name="ret_void_p"
+         xreturn="void_p_and_size"
+	 expect="!= NULL" expect_errval="-1"/>
+ <hack place="ready_async-post-reply" type="verbatim">
+	if (c->o.ret_void_p != NULL) gdFree(c->o.ret_void_p);
+ </hack>
+</func>
+
+<func name="gdImageJpeg" cname="my_gdImageJpeg">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="filename" ctype="char *" ser_type="binary" nulterm="1"/>
+ <arg name="quality" ctype="int"/>
+ <return ctype="int" name="ret_int"
+         expect="== 0" expect_errval="c->o.ret_int"/>
+</func>
+
+<func name="gdImageJpegPtr">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="size" ctype="int" noerlcall="1" argtype="out"/>
+ <arg name="quality" ctype="int"/>
+ <return ctype="void *" name="ret_void_p"
+         etype="binary" offset="0" length="c->o.size"
+	 expect="!= NULL" expect_errval="-1"/>
+ <hack place="ready_async-post-reply" type="verbatim">
+	if (c->o.ret_void_p != NULL) gdFree(c->o.ret_void_p);
+ </hack>
+</func>
+
+<func name="gdImageWBMP" cname="my_gdImageWBMP">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="fg" ctype="int"/>
+ <arg name="filename" ctype="char *" ser_type="binary" nulterm="1"/>
+ <return ctype="int" name="ret_int"
+         expect="== 0" expect_errval="c->o.ret_int"/>
+</func>
+
+<func name="gdImageWBMPPtr">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="size" ctype="int" noerlcall="1" argtype="out"/>
+ <arg name="fg" ctype="int"/>
+ <return ctype="void *" name="ret_void_p"
+         etype="binary" offset="0" length="c->o.size"
+	 expect="!= NULL" expect_errval="-1"/>
+ <hack place="ready_async-post-reply" type="verbatim">
+	if (c->o.ret_void_p != NULL) gdFree(c->o.ret_void_p);
+ </hack>
+</func>
+
+<func name="gdImageGd" cname="my_gdImageGd">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="filename" ctype="char *" ser_type="binary" nulterm="1"/>
+ <return ctype="int" name="ret_int"
+         expect="== 0" expect_errval="c->o.ret_int"/>
+</func>
+
+<func name="gdImageGdPtr">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="size" ctype="int" noerlcall="1" argtype="out"/>
+ <return ctype="void *" name="ret_void_p"
+         etype="binary" offset="0" length="c->o.size"
+	 expect="!= NULL" expect_errval="-1"/>
+ <hack place="ready_async-post-reply" type="verbatim">
+	if (c->o.ret_void_p != NULL) gdFree(c->o.ret_void_p);
+ </hack>
+</func>
+
+<func name="gdImageGd2" cname="my_gdImageGd2">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="filename" ctype="char *" ser_type="binary" nulterm="1"/>
+ <arg name="chunkSize" ctype="int"/>
+ <arg name="fmt" ctype="int"/>
+ <return ctype="int" name="ret_int"
+         expect="== 0" expect_errval="c->o.ret_int"/>
+</func>
+
+<func name="gdImageGd2Ptr">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="chunkSize" ctype="int"/>
+ <arg name="fmt" ctype="int"/>
+ <arg name="size" ctype="int" noerlcall="1" argtype="out"/>
+ <return ctype="void *" name="ret_void_p"
+         etype="binary" offset="0" length="c->o.size"
+	 expect="!= NULL" expect_errval="-1"/>
+ <hack place="ready_async-post-reply" type="verbatim">
+	if (c->o.ret_void_p != NULL) gdFree(c->o.ret_void_p);
+ </hack>
+</func>
+
+<func name="fopen">
+ <arg name="path" ctype="char *" ser_type="binary" nulterm="1"/>
+ <arg name="fmode" ctype="char *" ser_type="binary" nulterm="1"/>
+ <return ctype="FILE *" name="filep"
+         valmap_name="FILE_P" valmap_type="start"
+         expect="!= NULL" expect_errval="errno"/>
+</func>
+
+<func name="fclose">
+ <arg name="filep" ctype="FILE *" valmap_name="FILE_P"/>
+ <return ctype="int" name="ret_int"
+         valmap_name="FILE_P" valmap_type="stop"
+         expect="== 0" expect_errval="errno"/>
+</func>
+
+
+<func name="gdImagePngFILE" cname="gdImagePng">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="outFile" ctype="FILE *" valmap_name="FILE_P"/>
+ <return ctype="void"/>
+</func>
+
+<func name="gdImageJpegFILE" cname="gdImageJpeg">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="outFile" ctype="FILE *" valmap_name="FILE_P"/>
+ <arg name="quality" ctype="int"/>
+ <return ctype="void"/>
+</func>
+
+<func name="gdImageDestroy">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <return ctype="void" valmap_name="imageptr" valmap_type="stop"/>
+</func>
+
+<func name="getFontPtr" cname="my_GetFontPtr">
+ <arg name="font_idx" ctype="int"/>
+ <return ctype="gdFontPtr" name="ret_gdFontPtr"
+         valmap_name="fontptr" valmap_type="start"
+         expect="!= NULL" expect_errval="0"/>
+</func>
+
+<func name="gdImageChar">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="font" ctype="gdFontPtr" valmap_name="fontptr"/>
+ <arg name="x" ctype="int"/>
+ <arg name="y" ctype="int"/>
+ <arg name="c" ctype="int"/>
+ <arg name="color" ctype="int"/>
+ <return ctype="void"/>
+</func>
+
+<func name="gdImageCharUp">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="font" ctype="gdFontPtr" valmap_name="fontptr"/>
+ <arg name="x" ctype="int"/>
+ <arg name="y" ctype="int"/>
+ <arg name="c" ctype="int"/>
+ <arg name="color" ctype="int"/>
+ <return ctype="void"/>
+</func>
+
+<func name="gdImageString">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="font" ctype="gdFontPtr" valmap_name="fontptr"/>
+ <arg name="x" ctype="int"/>
+ <arg name="y" ctype="int"/>
+ <arg name="string" ctype="unsigned char *" ser_type="binary" nulterm="1"/>
+ <arg name="color" ctype="int"/>
+ <return ctype="void"/>
+</func>
+
+<!-- XXX gdImageString16() and gdImageStringUp16() not supported
+     'cause I don't know how to test them adequately. -->
+
+<func name="gdImageStringUp">
+ <arg name="im" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="font" ctype="gdFontPtr" valmap_name="fontptr"/>
+ <arg name="x" ctype="int"/>
+ <arg name="y" ctype="int"/>
+ <arg name="string" ctype="unsigned char *" ser_type="binary" nulterm="1"/>
+ <arg name="color" ctype="int"/>
+ <return ctype="void"/>
+</func>
+
+<!-- XXX The True-Type font functions, e.g. gdImageStringFT(), are not
+     supported because 1. I don't have the fonts installed on my machine,
+     and 2. EDTK cannot currently pass floating-point values in
+     either direction. -->
+
+<func name="gdImageCopy">
+ <arg name="dst" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="src" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="dstX" ctype="int"/>
+ <arg name="dstY" ctype="int"/>
+ <arg name="srcX" ctype="int"/>
+ <arg name="srcY" ctype="int"/>
+ <arg name="w" ctype="int"/>
+ <arg name="h" ctype="int"/>
+ <return ctype="void"/>
+</func>
+
+<func name="gdImageCopyResized">
+ <arg name="dst" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="src" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="dstX" ctype="int"/>
+ <arg name="dstY" ctype="int"/>
+ <arg name="srcX" ctype="int"/>
+ <arg name="srcY" ctype="int"/>
+ <arg name="destW" ctype="int"/>
+ <arg name="destH" ctype="int"/>
+ <arg name="srcW" ctype="int"/>
+ <arg name="srcH" ctype="int"/>
+ <return ctype="void"/>
+</func>
+
+<func name="gdImageCopyMerge">
+ <arg name="dst" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="src" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="dstX" ctype="int"/>
+ <arg name="dstY" ctype="int"/>
+ <arg name="srcX" ctype="int"/>
+ <arg name="srcY" ctype="int"/>
+ <arg name="w" ctype="int"/>
+ <arg name="h" ctype="int"/>
+ <arg name="pct" ctype="int"/>
+ <return ctype="void"/>
+</func>
+
+<func name="gdImageCopyMergeGray">
+ <arg name="dst" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="src" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="dstX" ctype="int"/>
+ <arg name="dstY" ctype="int"/>
+ <arg name="srcX" ctype="int"/>
+ <arg name="srcY" ctype="int"/>
+ <arg name="w" ctype="int"/>
+ <arg name="h" ctype="int"/>
+ <arg name="pct" ctype="int"/>
+ <return ctype="void"/>
+</func>
+
+<func name="gdImagePaletteCopy">
+ <arg name="dst" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="src" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <return ctype="void"/>
+</func>
+
+<func name="gdImageCompare">
+ <arg name="dst" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="src" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <return ctype="int" name="ret_int"/>
+</func>
+
+<func name="gdImageInterlace">
+ <arg name="dst" ctype="gdImagePtr" valmap_name="imageptr"/>
+ <arg name="interlace" ctype="int"/>
+ <return ctype="void"/>
+</func>
+
+<valmap name="imageptr" ctype="gdImagePtr" maxsize="32" initial_val="NULL"
+        cleanup_func="gdImageDestroy"/>
+
+<valmap name="FILE_P" ctype="FILE *" maxsize="8" initial_val="NULL"
+        cleanup_func="fclose"/>
+
+<!-- for fontptr valmap, _no_ cleanup_func! -->
+<valmap name="fontptr" ctype="gdFontPtr" maxsize="32" initial_val="NULL"/>
+
+<xtra_return name="void_p_and_size">
+  <xtra_ok>
+    <xtra_val etype="binary" valtype="static_buf" val="c->o.ret_void_p"
+            offset="0" length="c->o.size"/>
+  </xtra_ok>
+  <xtra_error>
+    <xtra_val etype="integer" val="-1"/>
+  </xtra_error>
+</xtra_return>
+
+<const name="MAX_POLYGON_VERTICES" value="512" comment="Max vertices/polygon"/>
+<const name="MAX_STYLE_LENGTH" value="512" comment="Max ints for style length"/>
+
+<const name="FONT_TINY" value="1" comment="gdFontTiny"/>
+<const name="FONT_SMALL" value="2" comment="gdFontSmall"/>
+<const name="FONT_MEDIUMBOLD" value="3" comment="gdFontMediumBold"/>
+<const name="FONT_LARGE" value="4" comment="gdFontLarge"/>
+<const name="FONT_GIANT" value="5" comment="gdFontGiant"/>
+
+<verbatim place="end-hrl">
+
+%%%
+%%% Useful constants from gd.h
+%%%
+
+-define(GD2_VERS,			1).
+-define(GD2_ID,				"gd2").
+-define(GD2_FMT_RAW,			1).
+-define(GD2_FMT_COMPRESSED,		2).
+
+-define(GD2_gdMaxColors,		256).
+
+-define(GD2_gdStyled,			-2).
+-define(GD2_gdBrushed,			-3).
+-define(GD2_gdStyledBrushed,		-4).
+-define(GD2_gdTiled,			-5).
+
+-define(GD_CMP_IMAGE,			1).
+-define(GD_CMP_NUM_COLORS,		2).
+-define(GD_CMP_COLOR,			4).
+-define(GD_CMP_SIZE_X,			8).
+-define(GD_CMP_SIZE_Y,			16).
+-define(GD_CMP_TRANSPARENT,		32).
+-define(GD_CMP_BACKGROUND,		64).
+-define(GD_CMP_INTERLACE,		128).
+</verbatim>
+
+<custom_erl>
+ <export>
+-export([make_vertex_array/1, make_style_array/1]).
+ </export>
+ <code>
+make_vertex_array(L) ->
+    make_vertex_array(L, []).
+make_vertex_array([], Acc) ->
+    L = length(Acc),
+    if L > ?_MAX_POLYGON_VERTICES -> badarg;
+       true                       -> {L, lists:reverse(Acc)}
+    end;
+make_vertex_array([{X, Y}|Vs], Acc) ->
+    make_vertex_array(Vs, [&lt;&lt;X:32/signed-integer, Y:32/signed-integer>>|Acc]);
+make_vertex_array([X, Y|Vs], Acc) when integer(X), integer(Y) ->
+    make_vertex_array(Vs, [&lt;&lt;X:32/signed-integer, Y:32/signed-integer>>|Acc]).
+
+make_style_array(L) ->
+    [&lt;&lt;X:32/signed-integer>> || X &lt;- L].
+ </code>
+</custom_erl>
+
+</erldriver>
+

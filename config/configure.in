@@ -101,6 +101,21 @@ AC_CHECK_FUNC(connect, ,
             AC_MSG_ERROR(Function 'socket' not found.), $NSL_LIBS))
 AC_SUBST(SOCKET_LIBS)
 
+dnl
+dnl The "gd1_drv" driver for libgd 1.8.4 requires the following:
+dnl	libgd version 1 (as a shared library!), libpng, libjpeg, libXpm
+dnl If you have all of those things, then 
+dnl
+
+AC_MSG_CHECKING([whether to build gd1_drv driver])
+if test -f ../support/GDConfig.mk ; then
+  rm -f ../lib/gd1_drv/SKIP
+  AC_MSG_RESULT([yes])
+else
+  echo "Missing CVSROOT/jungerl/support/GDConfig.mk file" > ../lib/gd1_drv/SKIP
+  AC_MSG_RESULT([no, see CVSROOT/jungerl/lib/gd1_drv/GDConfig.mk.sample for instructions])
+fi
+
 dnl End.
 
 AC_OUTPUT(../support/include.mk ../bin/jerl)

@@ -1,0 +1,111 @@
+
+gd1_drv
+=======
+
+This driver is for GD, a library for dynamic creation of PNG and JPEG
+images: line drawing, polygons, text, and lots more.
+
+See http://www.boutell.com/gd/ for source distributions for GD, which
+is a prerequisite for attempting to build this driver.  Please follow
+the instructions later in this file to build the libgd.so shared
+library.
+
+The only functions in the GD API that are not supported are:
+gdImageCreateFromPngSource(), gdImageDashedLine(), gdImageString16()
+and gdImageStringUp16(), and True-Type font functions.  Why the
+True-Type font functions?
+
+  1. I don't have the fonts installed on my machine,
+
+  2. EDTK cannot currently pass floating-point values.
+
+Once you've compiled and installed libgd.so and the GD header files
+(gd.h, gd_io.h, ...), you'll *must* follow the instructions found in
+the file GDConfig.mk.sample.
+
+Once everything is compiled cleanly, run the regression test:
+
+     % cd CVSROOT/jungerl/lib/gd1_drv/test
+     % make test
+
+You should see the message "All regression tests PASSED."
+
+If you have problems compiling or using this driver, please email me
+at slfritchie at snookles dot com.
+
+
+Creating a shared library version of libgd
+==========================================
+
+You will need to compile & install the GD library (version 1.8.4,
+please!).  Unfortunately, the build scheme used by GD 1.8.4 does not
+create a shared library.  So, you'll have to resort to some brutal
+hacks to do so.  Fortunately, it's pretty easy to do.
+
+0. Get the source distribution for libgd version 1.8.4.  Unpack it
+   someplace.
+
+1. Apply the patch below to the top-level "Makefile".  This should
+   work if you're using GCC for your compiler.  If not, you may need
+   to do whatever equivalent things for your compiler & linker.  You
+   may need to use "-fpic" instead of "-fPIC", for example.
+
+   NOTE: The patch adds "-ljpeg" to the list of libraries added to the
+   libgd.so shared library.  If you do not include libjpeg, you will
+   probably have problems with unresolvable symbols later on.
+
+2. Follow the instructions in "index.html".  See the "How do I build
+   gd?" link near the top of that file to jump to the compilation
+   instructions.
+
+   You will want to build a version that has support for libpng and
+   libjpeg.  This driver does not implement GD's TrueType font
+   functions, so don't bother trying to compile for it.
+
+Here's the patch for "Makefile".  Change directory to the top of the
+GD source distribution, then run "patch < /path/to/this/README".
+
+--- gd-1.8.4/Makefile	Thu Feb 22 11:03:43 2001
++++ ./Makefile	Thu Oct 17 02:20:13 2002
+@@ -7,12 +7,12 @@
+ 
+ #If the ar command fails on your system, consult the ar manpage
+ #for your system. 
+-AR=ar
++AR="do not use AR variable"
+ 
+ #If you don't have FreeType, libjpeg and/or Xpm installed, including the
+ #header files, uncomment this (default). You really must install
+ #libpng and zlib to get anywhere if you wish to create PNG images.
+-CFLAGS=-O -DHAVE_LIBPNG -DHAVE_LIBJPEG
++CFLAGS=-O -DHAVE_LIBPNG -DHAVE_LIBJPEG -fPIC
+ 
+ #If you do have FreeType, libjpeg and/or Xpm fully installed, uncomment a
+ #variation of this and comment out the line above. See also LIBS below.
+@@ -30,7 +30,7 @@
+ #Some systems are very picky about link order. They don't all agree
+ #on the right order, either.
+ 
+-LIBS=-lgd -lpng -lz -lm
++LIBS=-lgd -lpng -lz -lm -ljpeg
+ 
+ #If you do have FreeType, JPEG and/or Xpm fully installed, uncomment a 
+ #variation of this and comment out the line above. Note that
+@@ -85,7 +91,7 @@
+ all: libgd.a $(PROGRAMS)
+ 
+ install: libgd.a $(BIN_PROGRAMS)
+-	sh ./install-item 644 libgd.a $(INSTALL_LIB)/libgd.a
++	sh ./install-item 755 libgd.so $(INSTALL_LIB)/libgd.so
+ 	sh ./install-item 755 pngtogd $(INSTALL_BIN)/pngtogd
+ 	sh ./install-item 755 pngtogd2 $(INSTALL_BIN)/pngtogd2
+ 	sh ./install-item 755 gdtopng $(INSTALL_BIN)/gdtopng
+@@ -144,7 +150,7 @@
+ 	gd_wbmp.o gdhelpers.o gd.h gdfontt.h gdfonts.h gdfontmb.h gdfontl.h \
+ 	gdfontg.h gdhelpers.h
+ 	rm -f libgd.a
+-	$(AR) rc libgd.a gd.o gd_gd.o gd_gd2.o gd_io.o gd_io_dp.o \
++	gcc -shared -o libgd.so gd.o gd_gd.o gd_gd2.o gd_io.o gd_io_dp.o \
+ 		gd_io_file.o gd_ss.o gd_io_ss.o gd_png.o gd_jpeg.o gdxpm.o \
+ 		gdfontt.o gdfonts.o gdfontmb.o gdfontl.o gdfontg.o \
+ 		gdtables.o gdft.o gdttf.o gdcache.o gdkanji.o wbmp.o \

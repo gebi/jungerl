@@ -1,0 +1,45 @@
+#
+# The autoconf magic required to automatically find your system's
+# header files and shared libraries for libgd, libpng, libjpeg, and
+# libXpm are too complex to bother with.  Instead, you must configure
+# them manually.  The process goes like this:
+#
+# 1. Create a file named CVSROOT/jungerl/config/GDConfig.mk
+#    Feel free to copy this file file as a template to make your
+#    life easier: copy it to ../../config/GDConfig.mk.
+#
+# 2. Edit the GDConfig.mk file to define the "make" variables that
+#    the gd1_drv Makefiles are expecting:
+#      LIBGD_CPPFLAGS, LIBGD_LDFLAGS, LIBPNG_CPPFLAGS, LIBPNG_LDFLAGS,
+#      LIBJPEG_CPPFLAGS, LIBJPEG_LDFLAGS, LIBXPM_CPPFLAGS, LIBXPM_LDFLAGS
+#
+# 3. Re-run "configure" using the following commands:
+#      % cd CVSROOT/jungerl/config
+#      % ./configure
+#
+# 4. Run "make" (or whatever your GNU Make binary is called) at the
+#    top level:
+#      % cd CVSROOT/jungerl
+#      % make 
+
+# NOTE: For the {LibName}_LDFLAGS variable, you can use
+# "-L/path/to/dir -lname".  Use "/path/to/libname.so" if the linker
+# is stubborn.  Solaris may require you to use "-R/path/to/dir" if
+# the shared library is installed in a non-standard directory.
+
+# Flags for libgd version 1 headers & shared library
+LIBGD_CPPFLAGS = -I/usr/local/include/gd1
+LIBGD_LDFLAGS = -L/usr/local/lib -lgd1
+
+# Flags for libpng headers & shared library
+LIBPNG_CPPFLAGS = -I/usr/local/include/libpng
+LIBPNG_LDFLAGS = -L/usr/local/lib -lpng
+
+# Flags for libjpeg headers & shared library
+LIBJPEG_CPPFLAGS = -I/usr/local/include
+LIBJPEG_LDFLAGS = -L/usr/local/lib -ljpeg
+
+# Flags for libXpm headers & shared library
+LIBXPM_CPPFLAGS = -I/usr/X11R6/include
+LIBXPM_LDFLAGS = -L/usr/X11R6/lib -lXpm -lX11
+

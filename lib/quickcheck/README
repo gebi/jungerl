@@ -1,0 +1,5 @@
+QuickCheck for Erlang.
+Homepage: http://www.math.chalmers.se/~rjmh/ErlangQC/
+
+This is a program testing tool presented by John Hughes at EUC'03.
+

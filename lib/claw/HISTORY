@@ -187,7 +187,7 @@ for atom and variable references. I took the character @ to mark atoms
 (they kinda rhyme), and $ to mark variables. So:
 
   @FooBar <=> 'ATOM::|FooBar|
-  $FooBar <=> VAR::FooBar
+  $FooBar <=> VAR::|FooBar|
 
 Note that @atoms are implicitly quoted, and that in each syntasx the
 symbol is treated case-sensitively without the need for |bars|. This

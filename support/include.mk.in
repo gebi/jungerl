@@ -6,6 +6,9 @@
 CC	:= @CC@
 CFLAGS	:= @CFLAGS@ @DEFS@
 
+LD_SHARED	:= @LD_SHARED@
+SLANG_INCLUDE	:= @SLANG_INCLUDE@
+
 ######################################################################
 ## Erlang
 
@@ -17,8 +20,12 @@ ERL_C_INCLUDE_DIR := $(ERLDIR)/usr/include
 
 ERLC_FLAGS := -W
 
-ifndef no_debug
+ifndef no_debug_info
   ERLC_FLAGS += +debug_info
+endif
+
+ifdef debug
+  ERLC_FLAGS += -Ddebug
 endif
 
 EBIN_DIR := ../ebin

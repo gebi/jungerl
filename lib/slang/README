@@ -1,0 +1,32 @@
+
+This is slang, an erlang interface to the amazing highly portable tty 
+interface that gave us such nice tty applications as mutt and slrn
+
+It's distributed as an erlang application (without a start mod) which makes
+it possible to integrate into a larger buld environment.
+We use this at bluetail to have a terminal application onto our
+actual target machine. It can be used to to anything that's possible
+to di with the slang lib itself.
+
+It's know to compile and run with slang version 1.4.2
+
+The API is one-to-one withe the normal C-api to slanglib.
+
+
+demo: contains some various demos
+doc:  well .. yes guess what
+config: contains configure scripts and stuff
+
+To compile: 
+
+$ (cd config; ./configure)
+$ make
+
+
+
+
+
+
+
+
+ 

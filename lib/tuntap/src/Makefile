@@ -5,5 +5,3 @@ all: $(ERL_OBJECTS)
 clean:
 	-rm $(ERL_OBJECTS)
 
-config: # nothing
-

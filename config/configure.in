@@ -14,5 +14,42 @@ dnl C header files
 
 AC_CHECK_HEADERS(linux/if_tun.h)
 
+dnl For the Slang driver
+
+AC_ARG_WITH(slang-include, [  --with-slang-include=DIR   installed slang library],
+    SLANG_INCLUDE=$withval,
+    if test "x$SLANG_INCLUDE" = x; then
+       SLANG_INCLUDE=/usr/include/slang
+    fi
+    )
+
+AC_SUBST(SLANG_INCLUDE)
+
+case "$target_os" in
+     *cygwin*)
+	:
+	dnl fix this later
+	;;
+      linux*)
+	AC_DEFINE(LINUX)
+	LD_SHARED="ld -shared"
+	;;
+      *bsd*)
+	AC_DEFINE(BSD)
+        LD_SHARED="ld -Bshareable"
+	;;
+      *solaris*)
+        AC_DEFINE(SOLARIS)
+        LD_SHARED="ld -G"
+	;;
+      *)
+        LD_SHARED="ld -shared"
+	;;
+esac
+
+AC_SUBST(LD_SHARED)
+
+dnl End.
+
 AC_OUTPUT(../support/include.mk)
 

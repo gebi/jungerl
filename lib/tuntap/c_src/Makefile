@@ -15,7 +15,5 @@ tun_drv.o: tun_drv.c
 clean:
 	-rm ../priv/tun_drv.so
 
-config: # nothing
-
 .INTERMEDIATE: tun_drv.o
 

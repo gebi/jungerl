@@ -1,0 +1,4870 @@
+SLsmg_fill_region
+
+ SYNOPSIS
+   Fill a rectangular region with a character
+
+ USAGE
+   void SLsmg_fill_region (r, c, nr, nc, ch)
+
+       int r
+       int c
+       unsigned int nr
+       unsigned int nc
+       unsigned char ch
+
+
+ DESCRIPTION
+   The `SLsmg_fill_region' function may be used to a 
+   rectangular region with the character `ch' in the current color.
+   The rectangle's upper left corner is at row `r' and column
+   `c', and spans `nr' rows and `nc' columns.  The position
+   of the virtual cursor will be left at (`r', `c').
+
+ SEE ALSO
+   SLsmg_write_char, SLsmg_set_color
+--------------------------------------------------------------
+
+SLsmg_set_char_set
+
+ SYNOPSIS
+   Turn on or off line drawing characters
+
+ USAGE
+   void SLsmg_set_char_set (int a);
+
+ DESCRIPTION
+   `SLsmg_set_char_set' may be used to select or deselect the line drawing
+   character set as the current character set.  If `a' is non-zero,
+   the line drawing character set will be selected.  Otherwise, the
+   standard character set will be selected.
+
+ NOTES
+   There is no guarantee that this function will actually enable the
+   use of line drawing characters.  All it does is cause subsequent
+   characters to be rendered using the terminal's alternate character
+   set.  Such character sets usually contain line drawing characters.
+
+ SEE ALSO
+   SLsmg_write_char, SLtt_get_terminfo
+--------------------------------------------------------------
+
+int SLsmg_Scroll_Hash_Border;
+
+ SYNOPSIS
+   Set the size of the border for the scroll hash
+
+ USAGE
+   int SLsmg_Scroll_Hash_Border = 0;
+
+ DESCRIPTION
+   This variable may be used to ignore the characters that occur at the
+   beginning and the end of a row when performing the hash calculation
+   to determine whether or not a line has scrolled.  The default value
+   is zero which means that all the characters on a line will be used.
+
+ SEE ALSO
+   SLsmg_refresh
+--------------------------------------------------------------
+
+SLsmg_suspend_smg
+
+ SYNOPSIS
+   Suspend screen management
+
+ USAGE
+   int SLsmg_suspend_smg (void)
+
+ DESCRIPTION
+   `SLsmg_suspend_smg' can be used to suspend the state of the
+   screen management facility during suspension of the program.  Use of
+   this function will reset the display back to its default state.  The
+   funtion `SLsmg_resume_smg' should be called after suspension.  
+   
+   It returns zero upon success, or -1 upon error.
+   
+   This function is similar to `SLsmg_reset_smg' except that the
+   state of the display prior to calling `SLsmg_suspend_smg' is saved.
+
+ SEE ALSO
+   SLsmg_resume_smg, SLsmg_reset_smg
+--------------------------------------------------------------
+
+SLsmg_resume_smg
+
+ SYNOPSIS
+   Resume screen management
+
+ USAGE
+   int SLsmg_resume_smg (void)
+
+ DESCRIPTION
+   `SLsmg_resume_smg' should be called after
+   `SLsmg_suspend_smg' to redraw the display exactly like it was
+   before `SLsmg_suspend_smg' was called.  It returns zero upon
+   success, or -1 upon error.
+
+ SEE ALSO
+   SLsmg_suspend_smg
+--------------------------------------------------------------
+
+SLsmg_erase_eol
+
+ SYNOPSIS
+   Erase to the end of the row
+
+ USAGE
+   void SLsmg_erase_eol (void);
+
+ DESCRIPTION
+   `SLsmg_erase_eol' erases all characters from the current
+   position to the end of the line.  The newly created space is given
+   the color of the current color.  This function has no effect on the
+   position of the virtual cursor.
+
+ SEE ALSO
+   SLsmg_gotorc, SLsmg_erase_eos, SLsmg_fill_region
+--------------------------------------------------------------
+
+SLsmg_gotorc
+
+ SYNOPSIS
+   Move the virtual cursor
+
+ USAGE
+   void SLsmg_gotorc (int r, int c)
+
+ DESCRIPTION
+   The `SLsmg_gotorc' function moves the virtual cursor to the row
+   `r' and column `c'.  The first row and first column is
+   specified by `r = 0' and `c = 0'.
+
+ SEE ALSO
+   SLsmg_refresh
+--------------------------------------------------------------
+
+SLsmg_erase_eos
+
+ SYNOPSIS
+   Erase to the end of the screen
+
+ USAGE
+   void SLsmg_erase_eos (void);
+
+ DESCRIPTION
+   The `SLsmg_erase_eos' is like `SLsmg_erase_eol' except that
+   it erases all text from the current position to the end of the
+   display.  The current color will be used to set the background of
+   the erased area.
+
+ SEE ALSO
+   SLsmg_erase_eol
+--------------------------------------------------------------
+
+SLsmg_reverse_video
+
+ SYNOPSIS
+   Set the current color to 1
+
+ USAGE
+   void SLsmg_reverse_video (void);
+
+ DESCRIPTION
+   This function is nothing more than `SLsmg_set_color(1)'.  
+
+ SEE ALSO
+   SLsmg_set_color
+--------------------------------------------------------------
+
+SLsmg_set_color (int)
+
+ SYNOPSIS
+   Set the current color
+
+ USAGE
+   void SLsmg_set_color (int c);
+
+ DESCRIPTION
+   `SLsmg_set_color' is used to set the current color.  The
+   parameter `c' is really a color object descriptor.  Actual
+   foreground and background colors as well as other visual attributes
+   may be associated with a color descriptor via the
+   `SLtt_set_color' function.
+
+ EXAMPLE
+   This example defines color `7' to be green foreground on black
+   background and then displays some text in this color:
+
+         SLtt_set_color (7, NULL, "green", "black");
+         SLsmg_set_color (7);
+         SLsmg_write_string ("Hello");
+         SLsmg_refresh ();
+
+
+ NOTES
+   It is important to understand that the screen managment routines
+   know nothing about the actual colors associated with a color
+   descriptor.  Only the descriptor itself is used by the `SLsmg'
+   routines.  The lower level `SLtt' interface converts the color
+   descriptors to actual colors.  Thus
+
+         SLtt_set_color (7, NULL, "green", "black");
+         SLsmg_set_color (7);
+         SLsmg_write_string ("Hello");
+         SLtt_set_color (7, NULL, "red", "blue");
+         SLsmg_write_string ("World");
+         SLsmg_refresh ();
+
+   will result in `"hello"' displayed in red on blue and _not_
+   green on black.
+
+ SEE ALSO
+   SLtt_set_color, SLtt_set_color_object
+--------------------------------------------------------------
+
+SLsmg_normal_video
+
+ SYNOPSIS
+   Set the current color to 0
+
+ USAGE
+   void SLsmg_normal_video (void);
+
+ DESCRIPTION
+   `SLsmg_normal_video' sets the current color descriptor to `0'.
+
+ SEE ALSO
+   SLsmg_set_color
+--------------------------------------------------------------
+
+SLsmg_printf
+
+ SYNOPSIS
+   Format a string on the virtual display
+
+ USAGE
+   void SLsmg_printf (char *fmt, ...)
+
+ DESCRIPTION
+   `SLsmg_printf' format a `printf' style variable argument
+   list and writes it on the virtual display.  The virtual cursor will
+   be moved to the end of the string.
+
+ SEE ALSO
+   SLsmg_write_string, SLsmg_vprintf
+--------------------------------------------------------------
+
+SLsmg_vprintf
+
+ SYNOPSIS
+   Format a string on the virtual display
+
+ USAGE
+   void SLsmg_vprintf (char *fmt, va_list ap)
+
+ DESCRIPTION
+   `SLsmg_vprintf' formats a string in the manner of _vprintf_
+   and writes the result to the display.  The virtual cursor is
+   advanced to the end of the string.
+
+ SEE ALSO
+   SLsmg_write_string, SLsmg_printf
+--------------------------------------------------------------
+
+SLsmg_write_string
+
+ SYNOPSIS
+   Write a character string on the display 
+
+ USAGE
+   void SLsmg_write_string (char *s)
+
+ DESCRIPTION
+   The function `SLsmg_write_string' displays the string `s' on
+   the virtual display at the current position and moves the position
+   to the end of the string.
+
+ SEE ALSO
+   SLsmg_printf, SLsmg_write_nstring
+--------------------------------------------------------------
+
+SLsmg_write_nstring
+
+ SYNOPSIS
+   Write the first n characters of a string on the display
+
+ USAGE
+   void SLsmg_write_nstring (char *s, unsigned int n);
+
+ DESCRIPTION
+   `SLsmg_write_nstring' writes the first `n' characters of
+   `s' to this virtual display.  If the length of the string
+   `s' is less than `n', the spaces will used until
+   `n' characters have been written.  `s' can be `NULL', in
+   which case `n' spaces will be written.
+
+ SEE ALSO
+   SLsmg_write_string, SLsmg_write_nchars
+--------------------------------------------------------------
+
+SLsmg_write_char
+
+ SYNOPSIS
+   Write a character to the virtual display
+
+ USAGE
+   void SLsmg_write_char (char ch);
+
+ DESCRIPTION
+   `SLsmg_write_char' writes the character `ch' to the virtual
+   display.
+
+ SEE ALSO
+   SLsmg_write_nchars, SLsmg_write_string
+--------------------------------------------------------------
+
+SLsmg_write_nchars
+
+ SYNOPSIS
+   Write n characters to the virtual display
+
+ USAGE
+   void SLsmg_write_nchars (char *s, unsigned int n);
+
+ DESCRIPTION
+   `SLsmg_write_nchars' writes at most `n' characters from the
+   string `s' to the display.  If the length of `s' is less
+   than `n', the whole length of the string will get written.
+   
+   This function differs from `SLsmg_write_nstring' in that
+   `SLsmg_write_nstring' will pad the string to write exactly
+   `n' characters.  `SLsmg_write_nchars' does not perform any
+   padding.
+
+ SEE ALSO
+   SLsmg_write_nchars, SLsmg_write_nstring
+--------------------------------------------------------------
+
+SLsmg_write_wrapped_string
+
+ SYNOPSIS
+   Write a string to the display with wrapping
+
+ USAGE
+   void SLsmg_write_wrapped_string (s, r, c, nr, nc, fill)
+
+       char *s
+       int r, c
+       unsigned int nr, nc
+       int fill
+
+
+ DESCRIPTION
+   `SLsmg_write_wrapped_string' writes the string `s' to the
+   virtual display.  The string will be confined to the rectangular
+   region whose upper right corner is at row `r' and column `c',
+   and consists of `nr' rows and `nc' columns.  The string will
+   be wrapped at the boundaries of the box.  If `fill' is non-zero,
+   the last line to which characters have been written will get padded
+   with spaces.
+
+ NOTES
+   This function does not wrap on word boundaries.  However, it will
+   wrap when a newline charater is encountered.
+
+ SEE ALSO
+   SLsmg_write_string
+--------------------------------------------------------------
+
+SLsmg_cls
+
+ SYNOPSIS
+   Clear the virtual display
+
+ USAGE
+   void SLsmg_cls (void)
+
+ DESCRIPTION
+   `SLsmg_cls' erases the virtual display using the current color.
+   This will cause the physical display to get cleared the next time
+   `SLsmg_refresh' is called.
+
+ NOTES
+   This function is not the same as
+
+        SLsmg_gotorc (0,0); SLsmg_erase_eos ();
+
+   since these statements do not guarantee that the physical screen
+   will get cleared.
+
+ SEE ALSO
+   SLsmg_refresh, SLsmg_erase_eos
+--------------------------------------------------------------
+
+SLsmg_refresh
+
+ SYNOPSIS
+   Update physical screen
+
+ USAGE
+   void SLsmg_refresh (void)
+
+ DESCRIPTION
+   The `SLsmg_refresh' function updates the physical display to
+   look like the virtual display.
+
+ SEE ALSO
+   SLsmg_suspend_smg, SLsmg_init_smg, SLsmg_reset_smg
+--------------------------------------------------------------
+
+SLsmg_touch_lines
+
+ SYNOPSIS
+   Mark lines on the virtual display for redisplay
+
+ USAGE
+   void SLsmg_touch_lines (int r, unsigned int nr)
+
+ DESCRIPTION
+   `SLsmg_touch_lines' marks the `nr' lines on the virtual
+   display starting at row `r' for redisplay upon the next call to
+   `SLsmg_refresh'.
+
+ NOTES
+   This function should rarely be called, if ever.  If you find that
+   you need to call this function, then your application should be
+   modified to properly use the `SLsmg' screen management routines.
+   This function is provided only for curses compatibility.
+
+ SEE ALSO
+   SLsmg_refresh
+--------------------------------------------------------------
+
+SLsmg_init_smg
+
+ SYNOPSIS
+   Initialize the var{SLsmg
+
+ USAGE
+   int SLsmg_init_smg (void)
+
+ DESCRIPTION
+   The `SLsmg_init_smg' function initializes the `SLsmg' screen
+   management routines.   Specifically, this function allocates space
+   for the virtual display and calls `SLtt_init_video' to put the
+   terminal's physical display in the proper state.  It is up to the
+   caller to make sure that the `SLtt' routines are initialized via
+   `SLtt_get_terminfo' before calling `SLsmg_init_smg'.
+   
+   This function should also be called any time the size of the
+   physical display has changed so that it can reallocate a new virtual
+   display to match the physical display.
+   
+   It returns zero upon success, or -1 upon failure.
+
+ SEE ALSO
+   SLsmg_reset_smg
+--------------------------------------------------------------
+
+SLsmg_reset_smg
+
+ SYNOPSIS
+   Reset the var{SLsmg
+
+ USAGE
+   int SLsmg_reset_smg (void);
+
+ DESCRIPTION
+   `SLsmg_reset_smg' resets the `SLsmg' screen management
+   routines by freeing all memory allocated while it was active.  It
+   also calls `SLtt_reset_video' to put the terminal's display in
+   it default state.
+
+ SEE ALSO
+   SLsmg_init_smg
+--------------------------------------------------------------
+
+SLsmg_char_at
+
+ SYNOPSIS
+   Get the character at the current position on the virtual display
+
+ USAGE
+   unsigned short SLsmg_char_at(void)
+
+ DESCRIPTION
+   The `SLsmg_char_at' function returns the character and its color
+   at the current position on the virtual display.
+
+ SEE ALSO
+   SLsmg_read_raw, SLsmg_write_char
+--------------------------------------------------------------
+
+SLsmg_set_screen_start
+
+ SYNOPSIS
+   Set the origin of the virtual display
+
+ USAGE
+   void SLsmg_set_screen_start (int *r, int *c)
+
+ DESCRIPTION
+   `SLsmg_set_screen_start' sets the origin of the virtual display
+   to the row `*r' and the column `*c'.  If either `r' or `c'
+   is `NULL', then the corresponding value will be set to `0'.
+   Otherwise, the location specified by the pointers will be updated to
+   reflect the old origin.
+   
+   See \tt{slang/demo/pager.c} for how this function may be used to
+   scroll horizontally.
+
+ SEE ALSO
+   SLsmg_init_smg
+--------------------------------------------------------------
+
+SLsmg_draw_hline
+
+ SYNOPSIS
+   Draw a horizontal line
+
+ USAGE
+   void SLsmg_draw_hline (unsigned int len)
+
+ DESCRIPTION
+   The `SLsmg_draw_hline' function draws a horizontal line of
+   length `len' on the virtual display.  The position of the
+   virtual cursor is left at the end of the line.
+
+ SEE ALSO
+   SLsmg_draw_vline
+--------------------------------------------------------------
+
+SLsmg_draw_vline
+
+ SYNOPSIS
+   Draw a vertical line
+
+ USAGE
+   void SLsmg_draw_vline (unsigned int len);
+
+ DESCRIPTION
+   The `SLsmg_draw_vline' function draws a vertical line of
+   length `len' on the virtual display.  The position of the
+   virtual cursor is left at the end of the line.
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+SLsmg_draw_object
+
+ SYNOPSIS
+   Draw an object from the alternate character set
+
+ USAGE
+   void SLsmg_draw_object (int r, int c, unsigned char obj)
+
+ DESCRIPTION
+   The `SLsmg_draw_object' function may be used to place the object
+   specified by `obj' at row `r' and column `c'.  The
+   object is really a character from the alternate character set and
+   may be specified using one of the following constants:
+
+       SLSMG_HLINE_CHAR         Horizontal line 
+       SLSMG_VLINE_CHAR         Vertical line 
+       SLSMG_ULCORN_CHAR        Upper left corner 
+       SLSMG_URCORN_CHAR        Upper right corner
+       SLSMG_LLCORN_CHAR        Lower left corner
+       SLSMG_LRCORN_CHAR        Lower right corner
+       SLSMG_CKBRD_CHAR         Checkboard character
+       SLSMG_RTEE_CHAR          Right Tee
+       SLSMG_LTEE_CHAR          Left Tee
+       SLSMG_UTEE_CHAR          Up Tee
+       SLSMG_DTEE_CHAR          Down Tee
+       SLSMG_PLUS_CHAR          Plus or Cross character
+
+
+ SEE ALSO
+   SLsmg_draw_vline, SLsmg_draw_hline, SLsmg_draw_box
+--------------------------------------------------------------
+
+SLsmg_draw_box
+
+ SYNOPSIS
+   Draw a box on the virtual display
+
+ USAGE
+   void SLsmg_draw_box (int r, int c, unsigned int dr, unsigned int dc)
+
+ DESCRIPTION
+   `SLsmg_draw_box' uses the `SLsmg_draw_hline' and
+   `SLsmg_draw_vline' functions to draw a rectangular box on the
+   virtual display.  The box's upper left corner is placed at row
+   `r' and column `c'.  The width and length of the box is
+   specified by `dc' and `dr', respectively.
+
+ SEE ALSO
+   SLsmg_draw_vline, SLsmg_draw_hline, SLsmg_draw_object
+--------------------------------------------------------------
+
+SLsmg_set_color_in_region
+
+ SYNOPSIS
+   Change the color of a specifed region
+
+ USAGE
+   void SLsmg_set_color_in_region (color, r, c, dr, dc)
+
+     int color;
+     int r, c;
+     unsigned int dr, dc;
+
+
+ DESCRIPTION
+   `SLsmg_set_color_in_region' may be used to change the color of a
+   rectangular region whose upper left corner is given by
+   (`r',`c'), and whose width and height is given by `dc'
+   and `dr', respectively.  The color of the region is given by the
+   `color' parameter.
+
+ SEE ALSO
+   SLsmg_draw_box, SLsmg_set_color
+--------------------------------------------------------------
+
+SLsmg_get_column
+
+ SYNOPSIS
+   Get the column of the virtual cursor
+
+ USAGE
+   int SLsmg_get_column(void);
+
+ DESCRIPTION
+   The `SLsmg_get_column' function returns the current column of
+   the virtual cursor on the virtual display.
+
+ SEE ALSO
+   SLsmg_get_row, SLsmg_gotorc
+--------------------------------------------------------------
+
+SLsmg_get_row
+
+ SYNOPSIS
+   Get the row of the virtual cursor
+
+ USAGE
+   int SLsmg_get_row(void);
+
+ DESCRIPTION
+   The `SLsmg_get_row' function returns the current row of the
+   virtual cursor on the virtual display.
+
+ SEE ALSO
+   SLsmg_get_column, SLsmg_gotorc
+--------------------------------------------------------------
+
+SLsmg_forward
+
+ SYNOPSIS
+   Move the virtual cursor forward n columns
+
+ USAGE
+   void SLsmg_forward (int n);
+
+ DESCRIPTION
+   The `SLsmg_forward' function moves the virtual cursor forward
+   `n' columns.
+
+ SEE ALSO
+   SLsmg_gotorc
+--------------------------------------------------------------
+
+SLsmg_write_color_chars
+
+ SYNOPSIS
+   Write characters with color descriptors to virtual display
+
+ USAGE
+   void SLsmg_write_color_chars (unsigned short *s, unsigned int len)
+
+ DESCRIPTION
+   The `SLsmg_write_color_chars' function may be used to write
+   `len' characters, each with a different color descriptor to the
+   virtual display.  Each character and its associated color are
+   encoded as an `unsigned short' such that the lower eight bits
+   form the character and the next eight bits form the color.
+
+ SEE ALSO
+   SLsmg_char_at, SLsmg_write_raw
+--------------------------------------------------------------
+
+SLsmg_read_raw
+
+ SYNOPSIS
+   Read characters from the virtual display
+
+ USAGE
+   unsigned int SLsmg_read_raw (unsigned short *buf, unsigned int len)
+
+ DESCRIPTION
+   `SLsmg_read_raw' attempts to read `len' characters from the
+   current position on the virtual display into the buffer specified by
+   `buf'.  It returns the number of characters actually read.  This
+   number will be less than `len' if an attempt is made to read
+   past the right margin of the display.
+
+ NOTES
+   The purpose of the pair of functions, `SLsmg_read_raw' and
+   `SLsmg_write_raw', is to permit one to copy the contents of one
+   region of the virtual display to another region.
+
+ SEE ALSO
+   SLsmg_char_at, SLsmg_write_raw
+--------------------------------------------------------------
+
+SLsmg_write_raw
+
+ SYNOPSIS
+   Write characters directly to the virtual display
+
+ USAGE
+   unsigned int SLsmg_write_raw (unsigned short *buf, unsigned int len)
+
+ DESCRIPTION
+   The `SLsmg_write_raw' function attempts to write `len'
+   characters specified by `buf' to the display at the current
+   position.  It returns the number of characters successfully written,
+   which will be less than `len' if an attempt is made to write
+   past the right margin.
+
+ NOTES
+   The purpose of the pair of functions, `SLsmg_read_raw' and
+   `SLsmg_write_raw', is to permit one to copy the contents of one
+   region of the virtual display to another region.
+
+ SEE ALSO
+   SLsmg_read_raw
+--------------------------------------------------------------
+
+SLallocate_load_type
+
+ SYNOPSIS
+   Allocate a SLang_Load_Type object
+
+ USAGE
+   SLang_Load_Type *SLallocate_load_type (char *name)
+
+ DESCRIPTION
+   The `SLallocate_load_type' function allocates and initializes
+   space for a `SLang_Load_Type' object and returns it.  Upon
+   failure, the function returns `NULL'.  The parameter `name'
+   must uniquely identify the object.  For example, if the object
+   represents a file, then `name' could be the absolute path name
+   of the file.
+
+ SEE ALSO
+   SLdeallocate_load_type, SLang_load_object
+--------------------------------------------------------------
+
+SLdeallocate_load_type
+
+ SYNOPSIS
+   Free a SLang_Load_Type object
+
+ USAGE
+   void SLdeallocate_load_type (SLang_Load_Type *slt)
+
+ DESCRIPTION
+   This function frees the memory associated with a
+   `SLang_Load_Type' object that was acquired from a call to the
+   `SLallocate_load_type' function.
+
+ SEE ALSO
+   SLallocate_load_type, SLang_load_object
+--------------------------------------------------------------
+
+SLang_load_object
+
+ SYNOPSIS
+   Load an object into the interpreter
+
+ USAGE
+   int SLang_load_object (SLang_Load_Type *obj)
+
+ DESCRIPTION
+   The function `SLang_load_object' is a generic function that may
+   be used to loaded an object of type `SLang_Load_Type' into the
+   interpreter.  For example, the functions `SLang_load_file' and
+   `SLang_load_string' are wrappers around this function to load a
+   file and a string, respectively.
+
+ SEE ALSO
+   SLang_load_file, SLang_load_string, SLallocate_load_type
+--------------------------------------------------------------
+
+SLclass_allocate_class
+
+ SYNOPSIS
+   Allocate a class for a new data type
+
+ USAGE
+   SLang_Class_Type *SLclass_allocate_class (char *name)
+
+ DESCRIPTION
+   The purpose of this function is to allocate and initialize space
+   that defines a new data type or class called `name'.  If
+   successful, a pointer to the class is returned, or upon failure the
+   function returns `NULL'.
+   
+   This function does not automatically create the new data type.
+   Callback functions must first be associated with the data type via
+   functions such as `SLclass_set_push_function', and the the data
+   type must be registered with the interpreter via
+   `SLclass_register_class'.  See the S-Lang library programmer's
+   guide for more information.
+
+ SEE ALSO
+   SLclass_register_class, SLclass_set_push_function
+--------------------------------------------------------------
+
+SLclass_register_class
+
+ SYNOPSIS
+   Register a new data type with the interpreter
+
+ USAGE
+   int SLclass_register_class (cl, type, sizeof_type, class_type)
+
+       SLang_Class_Type *cl
+       unsigned char type
+       unsigned int sizeof_type
+       unsigned char class_type
+
+
+ DESCRIPTION
+   The `SLclass_register_class' function is used to register a new
+   class or data type with the interpreter.  If successful, the
+   function returns `0', or upon failure, it returns `-1'.
+   
+   The first parameter, `cl', must have been previously obtained
+   via the `SLclass_allocate_class' function.
+   
+   The second parameter, `type' specifies the data type of the new
+   class.  It must be an unsigned character with value greater that
+   `127'.  The values in the range `0-127' are reserved for
+   internal use by the library.
+   
+   The size that the data type represents in bytes is specified by the
+   third parameter, `sizeof_type'.   This value should not be
+   confused with the sizeof the structure that represents the data
+   type, unless the data type is of class `SLANG_CLASS_TYPE_VECTOR'
+   or `SLANG_CLASS_TYPE_SCALAR'.  For pointer objects, the value
+   of this parameter is just `sizeof(void *)'.
+   
+   The final parameter specifies the class type of the data type.  It must
+   be one of the values:
+
+        SLANG_CLASS_TYPE_SCALAR
+        SLANG_CLASS_TYPE_VECTOR
+        SLANG_CLASS_TYPE_PTR
+        SLANG_CLASS_TYPE_MMT
+
+   The `SLANG_CLASS_TYPE_SCALAR' indicates that the new data type
+   is a scalar.  Examples of scalars in `SLANG_INT_TYPE' and
+   `SLANG_DOUBLE_TYPE'.
+   
+   Setting `class_type' to SLANG_CLASS_TYPE_VECTOR implies that the
+   new data type is a vector, or a 1-d array of scalar types.  An
+   example of a data type of this class is the
+   `SLANG_COMPLEX_TYPE', which represents complex numbers.
+   
+   `SLANG_CLASS_TYPE_PTR' specifies the data type is of a pointer
+   type.  Examples of data types of this class include
+   `SLANG_STRING_TYPE' and `SLANG_ARRAY_TYPE'.  Such types must
+   provide for their own memory management.
+   
+   Data types of class `SLANG_CLASS_TYPE_MMT' are pointer types
+   except that the memory management, i.e., creation and destruction of
+   the type, is handled by the interpreter.  Such a type is called a
+   _memory managed type_.  An example of this data type is the
+   `SLANG_FILEPTR_TYPE'.
+
+ NOTES
+   See the \slang-c-programmers-guide for more information.
+
+ SEE ALSO
+   SLclass_allocate_class
+--------------------------------------------------------------
+
+SLclass_set_string_function
+
+ SYNOPSIS
+   Set a data type's string representation callback
+
+ USAGE
+   int SLclass_set_string_function (cl, sfun)
+
+      SLang_Class_Type *cl
+      char *(*sfun) (unsigned char, VOID_STAR);
+
+
+ DESCRIPTION
+   The `SLclass_set_string_function' routine is used to define a
+   callback function, `sfun', that that will be used when a string
+   representation of an object of the data type represented by `cl'
+   is needed.  `cl' must have already been obtained via a call to
+   `SLclass_allocate_class'.  When called, `sfun' will be
+   passed two arguments: a unsigned char which represents the data
+   type, and the address of the object for which a string represetation
+   is required.  The callback function must return a _malloced_
+   string.
+   
+   Upon success, `SLclass_set_string_function' returns zero, or
+   upon error it returns -1.
+
+ EXAMPLE
+   A callback function that handles both `SLANG_STRING_TYPE' and
+   `SLANG_INT_TYPE' variables looks like:
+
+        char *string_and_int_callback (unsigned char type, VOID_STAR addr)
+        {
+           char buf[64];
+   
+   	switch (type)
+   	  {
+   	     case SLANG_STRING_TYPE:
+   	       return SLmake_string (*(char **)addr);
+   	     
+   	     case SLANG_INTEGER_TYPE:
+   	       sprintf (buf, "%d", *(int *)addr);
+   	       return SLmake_string (buf);
+             }
+           return NULL;
+        }
+
+
+ NOTES
+   The default string callback simply returns the name of the data type.
+
+ SEE ALSO
+   SLclass_allocate_class, SLclass_register_class
+--------------------------------------------------------------
+
+SLclass_set_destroy_function
+
+ SYNOPSIS
+   Set the destroy method callback for a data type
+
+ USAGE
+   int SLclass_set_destroy_function (cl, destroy_fun)
+
+       SLang_Class_Type *cl
+       void (*destroy_fun) (unsigned char, VOID_STAR);
+
+
+ DESCRIPTION
+   `SLclass_set_destroy_function' is used to set the destroy
+   callback for a data type.  The data type's class `cl' must have
+   been previously obtained via a call to `SLclass_allocate_class'.
+   When called, `destroy_fun' will be passed two arguments: a
+   unsigned char which represents the data type, and the address of the
+   object to be destroyed.
+   
+   `SLclass_set_destroy_function' returns zero upon success, and
+   -1 upon failure.
+
+ EXAMPLE
+   The destroy method for `SLANG_STRING_TYPE' looks like:
+
+       static void string_destroy (unsigned char type, VOID_STAR ptr)
+       {
+          char *s = *(char **) ptr;
+          if (s != NULL) SLang_free_slstring (*(char **) s);
+       }
+
+
+ NOTES
+   Data types of class SLANG_CLASS_TYPE_SCALAR do not require a destroy
+   callback.  However, other classes do.
+
+ SEE ALSO
+   SLclass_allocate_class, SLclass_register_class
+--------------------------------------------------------------
+
+SLclass_set_push_function
+
+ SYNOPSIS
+   Set the push callback for a new data type
+
+ USAGE
+   int SLclass_set_push_function (cl, push_fun)
+
+       SLang_Class_Type *cl
+       int (*push_fun) (unsigned char, VOID_STAR);
+
+
+ DESCRIPTION
+   `SLclass_set_push_function' is used to set the push callback
+   for a new data type specified by `cl', which must have been
+   previously obtained via `SLclass_allocate_class'.
+   
+   The parameter `push_fun' is a pointer to the push callback.  It
+   is required to take two arguments: an unsigned character
+   representing the data type, and the address of the object to be
+   pushed.  It must return zero upon success, or -1 upon failure.
+   
+   `SLclass_set_push_function' returns zero upon success, or -1
+   upon failure.
+
+ EXAMPLE
+   The push callback for `SLANG_COMPLEX_TYPE' looks like:
+
+         static int complex_push (unsigned char type, VOID_STAR ptr)
+         {
+            double *z = *(double **) ptr;
+            return SLang_push_complex (z[0], z[1]);
+         }
+
+
+ SEE ALSO
+   SLclass_allocate_class, SLclass_register_class
+--------------------------------------------------------------
+
+SLclass_set_pop_function
+
+ SYNOPSIS
+   Set the pop callback for a new data type
+
+ USAGE
+   int SLclass_set_pop_function (cl, pop_fun)
+
+       SLang_Class_Type *cl
+       int (*pop_fun) (unsigned char, VOID_STAR);
+
+
+ DESCRIPTION
+   `SLclass_set_pop_function' is used to set the callback for
+   popping an object from the stack for a new data type specified by
+   `cl', which must have been previously obtained via
+   `SLclass_allocate_class'. 
+   
+   The parameter `pop_fun' is a pointer to the pop callback
+   function, which is required to take two arguments: an unsigned
+   character representing the data type, and the address of the object
+   to be popped.  It must return zero upon success, or -1 upon
+   failure.
+   
+   `SLclass_set_pop_function' returns zero upon success, or -1
+   upon failure.
+
+ EXAMPLE
+   The pop callback for `SLANG_COMPLEX_TYPE' looks like:
+
+         static int complex_push (unsigned char type, VOID_STAR ptr)
+         {
+            double *z = *(double **) ptr;
+            return SLang_pop_complex (&z[0], &z[1]);
+         }
+
+
+ SEE ALSO
+   SLclass_allocate_class, SLclass_register_class
+--------------------------------------------------------------
+
+SLclass_get_datatype_name
+
+ SYNOPSIS
+   Get the name of a data type
+
+ USAGE
+   char *SLclass_get_datatype_name (unsigned char type)
+
+ DESCRIPTION
+   The `SLclass_get_datatype_name' function returns the name of the
+   data type specified by `type'.  For example, if `type' is
+   `SLANG_INT_TYPE', the string `"Integer_Type"' will be
+   returned.
+   
+   This function returns a pointer that should not be modified or freed.
+
+ SEE ALSO
+   SLclass_allocate_class, SLclass_register_class
+--------------------------------------------------------------
+
+SLang_free_mmt
+
+ SYNOPSIS
+   Free a memory managed type
+
+ USAGE
+   void SLang_free_mmt (SLang_MMT_Type *mmt)
+
+ DESCRIPTION
+   The `SLang_MMT_Type' function is used to free a memory managed
+   data type.
+
+ SEE ALSO
+   SLang_object_from_mmt, SLang_create_mmt
+--------------------------------------------------------------
+
+SLang_object_from_mmt
+
+ SYNOPSIS
+   Get a pointer to the value of a memory managed type
+
+ USAGE
+   VOID_STAR SLang_object_from_mmt (SLang_MMT_Type *mmt)
+
+ DESCRIPTION
+   The `SLang_object_from_mmt' function returns a pointer the the
+   actually object whose memory is being managed by the interpreter.
+
+ SEE ALSO
+   SLang_free_mmt, SLang_create_mmt
+--------------------------------------------------------------
+
+SLang_create_mmt
+
+ SYNOPSIS
+   Create a memory managed data type
+
+ USAGE
+   SLang_MMT_Type *SLang_create_mmt (unsigned char t, VOID_STAR ptr)
+
+ DESCRIPTION
+   The `SLang_create_mmt' function returns a pointer to a new
+   memory managed object.  This object contains information necessary
+   to manage the memory associated with the pointer `ptr' which
+   represents the application defined data type of type `t'.
+
+ SEE ALSO
+   SLang_object_from_mmt, SLang_push_mmt, SLang_free_mmt
+--------------------------------------------------------------
+
+SLang_push_mmt
+
+ SYNOPSIS
+   Push a memory managed type
+
+ USAGE
+   int SLang_push_mmt (SLang_MMT_Type *mmt)
+
+ DESCRIPTION
+   This function is used to push a memory managed type onto the
+   interpreter stack.  It returns zero upon success, or `-1' upon
+   failure.
+
+ SEE ALSO
+   SLang_create_mmt, SLang_pop_mmt
+--------------------------------------------------------------
+
+SLang_pop_mmt
+
+ SYNOPSIS
+   Pop a memory managed data type
+
+ USAGE
+   SLang_MMT_Type *SLang_pop_mmt (unsigned char t)
+
+ DESCRIPTION
+   The `SLang_pop_mmt' function may be used to pop a memory managed
+   type of type `t' from the stack.  It returns a pointer to the
+   memory managed object upon success, or `NULL' upon failure.  The
+   function `SLang_object_from_mmt' should be used to access the
+   actual pointer to the data type.
+
+ SEE ALSO
+   SLang_object_from_mmt, SLang_push_mmt
+--------------------------------------------------------------
+
+SLang_inc_mmt
+
+ SYNOPSIS
+   Increment a memory managed type reference count
+
+ USAGE
+   void SLang_inc_mmt (SLang_MMT_Type *mmt);
+
+ DESCRIPTION
+   The `SLang_inc_mmt' function may be used to increment the
+   reference count associated with the memory managed data type given
+   by `mmt'.
+
+ SEE ALSO
+   SLang_free_mmt, SLang_create_mmt, SLang_pop_mmt, SLang_pop_mmt
+--------------------------------------------------------------
+
+SLang_vmessage
+
+ SYNOPSIS
+   Display a message to the message device
+
+ USAGE
+   void SLang_vmessage (char *fmt, ...)
+
+ DESCRIPTION
+   This function prints a `printf' style formatted variable
+   argument list to the message device.  The default message device is
+   `stdout'.
+
+ SEE ALSO
+   SLang_verror
+--------------------------------------------------------------
+
+SLang_exit_error
+
+ SYNOPSIS
+   Exit the program and display an error message
+
+ USAGE
+   void SLang_exit_error (char *fmt, ...)
+
+ DESCRIPTION
+   The `SLang_exit_error' function terminates the program and
+   displays an error message using a `printf' type variable
+   argument list.  The default behavior to this function is to write
+   the message to `stderr' and exit with the `exit' system
+   call. 
+   
+   If the the function pointer `SLang_Exit_Error_Hook' is
+   non-NULL, the function to which it points will be called.  This
+   permits an application to perform whatever cleanup is necessary.
+   This hook has the prototype:
+
+        void (*SLang_Exit_Error_Hook)(char *, va_list);
+
+
+ SEE ALSO
+   SLang_verror, exit
+--------------------------------------------------------------
+
+SLang_init_slang
+
+ SYNOPSIS
+   Initialize the interpreter
+
+ USAGE
+   int SLang_init_slang (void)
+
+ DESCRIPTION
+   The `SLang_init_slang' function must be called by all
+   applications that use the S-Lang interpreter.  It initializes the
+   interpreter, defines the built-in data types, and adds a set of core
+   intrinsic functions.
+   
+   The function returns `0' upon success, or `-1' upon failure.
+
+ SEE ALSO
+   SLang_init_slfile, SLang_init_slmath, SLang_init_slunix
+--------------------------------------------------------------
+
+SLang_init_slfile
+
+ SYNOPSIS
+   Initialize the interpreter file I/O intrinsics
+
+ USAGE
+   int SLang_init_slfile (void)
+
+ DESCRIPTION
+   This function initializes the interpreters file I/O intrinsic
+   functions.  This function adds intrinsic functions such as
+   `fopen', `fclose', and `fputs' to the interpreter.
+   It returns `0' if successful, or `-1' upon error.
+
+ NOTES
+   Before this function can be called, it is first necessary to call
+   `SLang_init_slang'.  It also adds
+   the preprocessor symbol `__SLFILE__' to the interpreter.
+
+ SEE ALSO
+   SLang_init_slang, SLang_init_slunix, SLang_init_slmath
+--------------------------------------------------------------
+
+SLang_init_slmath
+
+ SYNOPSIS
+   Initialize the interpreter math intrinsics
+
+ USAGE
+   int SLang_init_slmath (void)
+
+ DESCRIPTION
+   The `SLang_init_slmath' function initializes the interpreter's
+   mathematical intrinsic functions and makes them available to the
+   language.  The intrinsic functions include `sin', `cos',
+   `tan', etc...  It returns `0' if successful, or `-1'
+   upon failure.
+
+ NOTES
+   This function must be called after `SLang_init_slang'.  It adds
+   the preprocessor symbol `__SLMATH__' to the interpreter.
+
+ SEE ALSO
+   SLang_init_slang, SLang_init_slfile, SLang_init_slunix
+--------------------------------------------------------------
+
+SLang_init_slunix
+
+ SYNOPSIS
+   Make available some unix system calls to the interpreter
+
+ USAGE
+   int SLang_init_slunix (void)
+
+ DESCRIPTION
+   The `SLang_init_slunix' function initializes the interpreter's
+   unix system call intrinsic functions and makes them available to the
+   language.  Examples of functions made available by
+   `SLang_init_slunix' include `chmod', `chown', and
+   `stat_file'.  It returns `0' if successful, or `-1'
+   upon failure.
+
+ NOTES
+   This function must be called after `SLang_init_slang'.  It adds
+   the preprocessor symbol `__SLUNIX__' to the interpreter.
+
+ SEE ALSO
+   SLang_init_slang, SLang_init_slfile, SLang_init_slmath
+--------------------------------------------------------------
+
+SLadd_intrin_fun_table
+
+ SYNOPSIS
+   Add a table of intrinsic functions to the interpreter
+
+ USAGE
+   int SLadd_intrin_fun_table(SLang_Intrin_Fun_Type *tbl, char *pp_name);
+
+ DESCRIPTION
+   The `SLadd_intrin_fun_table' function adds an array, or table, of
+   `SLang_Intrin_Fun_Type' objects to the interpreter.  The first
+   parameter, `tbl' specifies the table to be added.  The second
+   parameter `pp_name', if non-NULL will be added to the list of
+   preprocessor symbols.
+   
+   This function returns -1 upon failure or zero upon success.
+
+ NOTES
+   A table should only be loaded one time and it is considered to be an
+   error on the part of the application if it loads a table more than
+   once.
+
+ SEE ALSO
+   SLadd_intrin_var_table, SLadd_intrinsic_function, SLdefine_for_ifdef
+--------------------------------------------------------------
+
+SLadd_intrin_var_table
+
+ SYNOPSIS
+   Add a table of intrinsic variables to the interpreter
+
+ USAGE
+   int SLadd_intrin_var_table (SLang_Intrin_Var_Type *tbl, char *pp_name);
+
+ DESCRIPTION
+   The `SLadd_intrin_var_table' function adds an array, or table, of
+   `SLang_Intrin_Var_Type' objects to the interpreter.  The first
+   parameter, `tbl' specifies the table to be added.  The second
+   parameter `pp_name', if non-NULL will be added to the list of
+   preprocessor symbols.
+   
+   This function returns -1 upon failure or zero upon success.
+
+ NOTES
+   A table should only be loaded one time and it is considered to be an
+   error on the part of the application if it loads a table more than
+   once.
+
+ SEE ALSO
+   SLadd_intrin_var_table, SLadd_intrinsic_function, SLdefine_for_ifdef
+--------------------------------------------------------------
+
+SLang_load_file
+
+ SYNOPSIS
+   Load a file into the interpreter
+
+ USAGE
+   int SLang_load_file (char *fn)
+
+ DESCRIPTION
+   The `SLang_load_file' function opens the file whose name is
+   specified by `fn' and feeds it to the interpreter, line by line,
+   for execution.  If `fn' is `NULL', the function will take
+   input from `stdin'.
+   
+   If no error occurs, it returns `0'; otherwise,
+   it returns `-1', and sets `SLang_Error' accordingly.  For
+   example, if it fails to open the file, it will return `-1' with
+   `SLang_Error' set to `SL_OBJ_NOPEN'.
+
+ NOTES
+   If the hook `SLang_Load_File_Hook' declared as
+
+         int (*SLang_Load_File_Hook)(char *);
+
+   is non-NULL, the function point to by it will be used to load the
+   file.  For example, the jed editor uses this hook to load files
+   via its own routines.
+
+ SEE ALSO
+   SLang_load_object, SLang_load_string
+--------------------------------------------------------------
+
+SLang_restart
+
+ SYNOPSIS
+   Reset the interpreter after an error
+
+ USAGE
+   void SLang_restart (int full)
+
+ DESCRIPTION
+   The `SLang_restart' function should be called by the
+   application at top level if an error occurs.  If the parameter
+   `full' is non-zero, any objects on the S-Lang run time stack
+   will be removed from the stack; otherwise, the stack will be left
+   intact.  Any time the stack is believed to be trashed, this routine
+   should be called with a non-zero argument (e.g., if
+   `setjmp'/`longjmp' is called).
+   
+   Calling `SLang_restart' does not reset the global variable
+   `SLang_Error' to zero.  It is up to the application to reset
+   that variable to zero after calling `SLang_restart'.
+
+ EXAMPLE
+
+         while (1)
+           {
+   	   if (SLang_Error) 
+   	     {
+   	        SLang_restart (1);
+   		SLang_Error = 0;
+   	     }
+   	   (void) SLang_load_file (NULL);
+   	}
+
+
+ SEE ALSO
+   SLang_init_slang, SLang_load_file
+--------------------------------------------------------------
+
+SLang_byte_compile_file
+
+ SYNOPSIS
+   Byte-compile a file for faster loading
+
+ USAGE
+   int SLang_byte_compile_file(char *fn, int reserved)
+
+ DESCRIPTION
+   The `SLang_byte_compile_file' function ``byte-compiles'' the
+   file `fn' for faster loading by the interpreter.  This produces
+   a new file whose filename is equivalent to the one specified by
+   `fn', except that a `'c'' is appended to the name.  For
+   example, if `fn' is set to `init.sl', then the new file
+   will have the name exmp{init.slc}.  The meaning of the second
+   parameter, `reserved', is reserved for future use.  For now, set
+   it to `0'.
+   
+   The function returns zero upon success, or `-1' upon error and
+   sets SLang_Error accordingly.
+
+ SEE ALSO
+   SLang_load_file, SLang_init_slang
+--------------------------------------------------------------
+
+SLang_autoload
+
+ SYNOPSIS
+   Autoload a function from a file
+
+ USAGE
+   int SLang_autoload(char *funct, char *filename)
+
+ DESCRIPTION
+   The `SLang_autoload' function may be used to associate a
+   `slang' function name `funct' with the file `filename'
+   such that if `funct' has not already been defined when needed,
+   it will be loaded from `filename'.
+   
+   `SLang_autoload' has no effect if `funct' has already been
+   defined.  Otherwise it declares `funct' as a user-defined S-Lang
+   function.  It returns `0' upon success, or `-1' upon error.
+
+ SEE ALSO
+   SLang_load_file, SLang_is_defined
+--------------------------------------------------------------
+
+SLang_load_string
+
+ SYNOPSIS
+   Interpret a string
+
+ USAGE
+   int SLang_load_string(char *str)
+
+ DESCRIPTION
+   The `SLang_load_string' function feeds the string specified by
+   `str' to the interpreter for execution.  It returns zero upon
+   success, or `-1' upon failure.
+
+ SEE ALSO
+   SLang_load_file, SLang_load_object
+--------------------------------------------------------------
+
+SLdo_pop
+
+ SYNOPSIS
+   Delete an object from the stack
+
+ USAGE
+   int SLdo_pop(void)
+
+ DESCRIPTION
+   This function removes an object from the top of the interpeter's
+   run-time stack and frees any memory associated with it.  It returns
+   zero upon success, or `-1' upon error (most likely due to a
+   stack-underflow).
+
+ SEE ALSO
+   SLdo_pop_n, SLang_pop_integer, SLang_pop_string
+--------------------------------------------------------------
+
+SLdo_pop_n
+
+ SYNOPSIS
+   Delete n objects from the stack
+
+ USAGE
+   int SLdo_pop_n (unsigned int n)
+
+ DESCRIPTION
+   The `SLdo_pop_n' function removes the top `n' objects from
+   the interpreter's run-time stack and frees all memory associated
+   with the objects.  It returns zero upon success, or `-1' upon
+   error (most likely due to a stack-underflow).
+
+ SEE ALSO
+   SLdo_pop, SLang_pop_integer, SLang_pop_string
+--------------------------------------------------------------
+
+SLang_pop_integer
+
+ SYNOPSIS
+   Pop an integer off the stack
+
+ USAGE
+   int SLang_pop_integer (int *i)
+
+ DESCRIPTION
+   The `SLang_pop_integer' function removes an integer from the
+   top of the interpreter's run-time stack and returns its value via
+   the pointer `i'.  If successful, it returns zero.  However, if
+   the top stack item is not of type `SLANG_INT_TYPE', or the
+   stack is empty, the function will return `-1' and set
+   `SLang_Error' accordingly.
+
+ SEE ALSO
+   SLang_push_integer, SLang_pop_double
+--------------------------------------------------------------
+
+SLpop_string
+
+ SYNOPSIS
+   Pop a string from the stack
+
+ USAGE
+   int SLpop_string (char **strptr);
+
+ DESCRIPTION
+   The `SLpop_string' function pops a string from the stack and
+   returns it as a malloced pointer.  It is up to the calling routine
+   to free this string via a call to `free' or `SLfree'.  If
+   successful, `SLpop_string' returns zero.  However, if the top
+   stack item is not of type `SLANG_STRING_TYPE', or the stack is
+   empty, the function will return `-1' and set
+   `SLang_Error' accordingly.
+
+ EXAMPLE
+
+         define print_string (void)
+         {
+            char *s;
+   	 if (-1 == SLpop_string (&s))
+   	   return;
+   	 fputs (s, stdout);
+   	 SLfree (s);
+         }
+
+
+ NOTES
+   This function should not be confused with `SLang_pop_slstring',
+   which pops a _hashed_ string from the stack.
+
+ SEE ALSO
+   SLang_pop_slstring. SLfree
+--------------------------------------------------------------
+
+SLang_pop_string
+
+ SYNOPSIS
+   Pop a string from the stack
+
+ USAGE
+   int SLang_pop_string(char **strptr, int *do_free)
+
+ DESCRIPTION
+   The `SLpop_string' function pops a string from the stack and
+   returns it as a malloced pointer via `strptr'.  After the
+   function returns, the integer pointed to by the second parameter
+   will be set to a non-zero value if `*strptr' should be freed via 
+   `free' or `SLfree'.  If successful, `SLpop_string'
+   returns zero.  However, if the top stack item is not of type
+   `SLANG_STRING_TYPE', or the stack is empty, the function will
+   return `-1' and set `SLang_Error' accordingly.
+
+ NOTES
+   This function is considered obsolete and should not be used by
+   applications.  If one requires a malloced string for modification,
+   `SLpop_string' should be used.  If one requires a constant
+   string that will not be modifed by the application,
+   `SLang_pop_slstring' should be used.
+
+ SEE ALSO
+   SLang_pop_slstring, SLpop_string
+--------------------------------------------------------------
+
+SLang_pop_slstring
+
+ SYNOPSIS
+   Pop a hashed string from the stack
+
+ USAGE
+   int SLang_pop_slstring (char **s_ptr)
+
+ DESCRIPTION
+   The `SLang_pop_slstring' function pops a hashed string from the
+   S-Lang run-time stack and returns it via `s_ptr'.  It returns
+   zero if successful, or -1 upon failure.  The resulting string
+   should be freed via a call to `SLang_free_slstring' after use.
+
+ EXAMPLE
+
+      void print_string (void)
+      {
+         char *s;
+         if (-1 == SLang_pop_slstring (&s))
+           return;
+         fprintf (stdout, "%s\n", s);
+         SLang_free_slstring (s);
+      }
+
+
+ NOTES
+   `SLang_free_slstring' is the preferred function for popping
+   strings.  This is a result of the fact that the interpreter uses
+   hashed strings as the native representation for string data.
+   
+   One must _never_ free a hashed string using `free' or
+   `SLfree'.  In addition, one must never make any attempt to
+   modify a hashed string and doing so will result in memory
+   corruption.
+
+ SEE ALSO
+   SLang_free_slstring, SLpop_string
+--------------------------------------------------------------
+
+SLang_pop_double
+
+ SYNOPSIS
+   Pop a double from the stack
+
+ USAGE
+   int SLang_pop_double (double *dptr, int *iptr, int *conv)
+
+ DESCRIPTION
+   The `SLang_pop_double' function pops a double precision number
+   from the stack and returns it via `dptr'.  If the number was
+   derived from an integer, `*conv' will be set to `1' upon
+   return, otherwise, `*conv' will be set to `0'.  This
+   function returns 0 upon success, otherwise it returns -1 and sets
+   `SLang_Error' accordingly.
+
+ NOTES
+   If one does not care whether or not `*dptr' was derived from
+   an integer, `iptr' and `conv' may be passed as `NULL'
+   pointers.
+
+ SEE ALSO
+   SLang_pop_integer, SLang_push_double
+--------------------------------------------------------------
+
+SLang_pop_complex
+
+ SYNOPSIS
+   Pop a complex number from the stack
+
+ USAGE
+   int SLang_pop_complex (double *re, double *im)
+
+ DESCRIPTION
+   `SLang_pop_complex' pops a complex number from the stack and
+   returns it via the parameters `re' and `im' as the real and
+   imaginary parts of the complex number, respectively.  This function
+   automatically converts objects of type `SLANG_DOUBLE_TYPE' and
+   `SLANG_INT_TYPE' to `SLANG_COMPLEX_TYPE', if necessary.
+   It returns zero upon sucess, or -1 upon error setting
+   `SLang_Error' accordingly.
+
+ SEE ALSO
+   SLang_pop_integer, SLang_pop_double, SLang_push_complex
+--------------------------------------------------------------
+
+SLang_push_complex
+
+ SYNOPSIS
+   Push a complex number onto the stack
+
+ USAGE
+   int SLang_push_complex (double re, double im)
+
+ DESCRIPTION
+   `SLang_push_complex' may be used to push the complex number
+   whose real and imaginary parts are given by `re' and `im',
+   respectively.  It returns zero upon sucess, or -1 upon error
+   setting `SLang_Error' accordingly.
+
+ SEE ALSO
+   SLang_pop_complex, SLang_push_double
+--------------------------------------------------------------
+
+SLang_push_double
+
+ SYNOPSIS
+   Push a double onto the stack
+
+ USAGE
+   int SLang_push_double(double d)
+
+ DESCRIPTION
+   `SLang_push_double' may be used to push the double precision
+   floating point number `d' onto the interpreter's run-time
+   stack.  It returns zero upon success, or -1 upon error setting
+   `SLang_Error' accordingly.
+
+ SEE ALSO
+   SLang_pop_double, SLang_push_integer
+--------------------------------------------------------------
+
+SLang_push_string
+
+ SYNOPSIS
+   Push a string onto the stack
+
+ USAGE
+   int SLang_push_string (char *s)
+
+ DESCRIPTION
+   `SLang_push_string' pushes a copy of the string specified by
+   `s' onto the interpreter's run-time stack.  It returns zero
+   upon success, or -1 upon error setting `SLang_Error'
+   accordingly.
+
+ NOTES
+   If `s' is `NULL', this function pushes `NULL'
+   (`SLANG_NULL_TYPE') onto the stack.
+
+ SEE ALSO
+   SLang_push_malloced_string
+--------------------------------------------------------------
+
+SLang_push_integer
+
+ SYNOPSIS
+   Push an integer onto the stack
+
+ USAGE
+   int SLang_push_integer (int i)
+
+ DESCRIPTION
+   `SLang_push_integer' the integer `i' onto the interpreter's
+   run-time stack.  It returns zero upon success, or -1 upon error
+   setting `SLang_Error' accordingly.
+
+ SEE ALSO
+   SLang_pop_integer, SLang_push_double, SLang_push_string
+--------------------------------------------------------------
+
+SLang_push_malloced_string
+
+ SYNOPSIS
+   Push a malloced string onto the stack
+
+ USAGE
+   int SLang_push_malloced_string (char *s);
+
+ DESCRIPTION
+   `SLang_push_malloced_string' may be used to push a malloced
+   string onto the interpreter's run-time stack.  It returns zero upon
+   success, or -1 upon error setting `SLang_Error' accordingly.
+
+ EXAMPLE
+   The following example illustrates that it is up to the calling
+   routine to free the string if `SLang_push_malloced_string' fails:
+
+         int push_hello (void)
+         {
+            char *s = malloc (6);
+   	 if (s == NULL) return -1;
+   	 strcpy (s, "hello");
+   	 if (-1 == SLang_push_malloced_string (s))
+   	   {
+   	      free (s);
+   	      return -1;
+   	   }
+   	 return 0;
+         }
+
+
+ EXAMPLE
+   The function `SLang_create_slstring' returns a hashed string.
+   Such a string may not be malloced and should not be passed to
+   `SLang_push_malloced_string'.
+
+ NOTES
+   If `s' is `NULL', this function pushes `NULL'
+   (`SLANG_NULL_TYPE') onto the stack.
+
+ SEE ALSO
+   SLang_push_string, SLmake_string
+--------------------------------------------------------------
+
+SLang_is_defined
+
+ SYNOPSIS
+   Check to see if the interpreter defines an object
+
+ USAGE
+   int SLang_is_defined (char *nm)
+
+ DESCRIPTION
+   The `SLang_is_defined' function may be used to determine
+   whether or not a variable or function whose name is given by
+   `em' has been defined.  It returns zero if no such object has
+   been defined.  Othewise it returns a non-zero value whose meaning
+   is given by the following table:
+
+         1    intrinsic function  (SLANG_INTRINSIC)
+         2    user-defined slang function (SLANG_FUNCTION)
+        -1    intrinsic variable (SLANG_IVARIABLE)
+        -2    user-defined global variable (SLANG_GVARIABLE)
+
+
+ SEE ALSO
+   SLadd_intrinsic_function, SLang_run_hooks, SLang_execute_function
+--------------------------------------------------------------
+
+SLang_run_hooks
+
+ SYNOPSIS
+   Run a user-defined hook with arguments
+
+ USAGE
+   int SLang_run_hooks (char *fname, unsigned int n, ...)
+
+ DESCRIPTION
+   The `SLang_run_hooks' function may be used to execute a
+   user-defined function named `fname'.  Before execution of the
+   function, the `n' string arguments specified by the variable
+   parameter list are pushed onto the stack.  If the function
+   `fname' does not exist, `SLang_run_hooks' returns zero;
+   otherwise, it returns `1' upon successful execution of the
+   function, or -1 if an error occurred.
+
+ EXAMPLE
+   The jed editor uses `SLang_run_hooks' to setup the mode of a
+   buffer based on the filename extension of the file associated with
+   the buffer:
+
+         char *ext = get_filename_extension (filename);
+         if (ext == NULL) return -1;
+         if (-1 == SLang_run_hooks ("mode_hook", 1, ext))
+           return -1;
+         return 0;
+
+
+ SEE ALSO
+   SLang_is_defined, SLang_execute_function
+--------------------------------------------------------------
+
+SLang_execute_function
+
+ SYNOPSIS
+   Execute a user or intrinsic function
+
+ USAGE
+   int SLang_execute_function (char *fname)
+
+ DESCRIPTION
+   This function may be used to execute either a user-defined function
+   or an intrinisic function.  The name of the function is specified
+   by `fname'.  It returns zero if `fname' is not defined, or
+   `1' if the function was successfully executed, or -1 upon
+   error.
+
+ NOTES
+   The function `SLexecute_function' may be a better alternative
+   for some uses.
+
+ SEE ALSO
+   SLang_run_hooks, SLexecute_function, SLang_is_defined
+--------------------------------------------------------------
+
+SLang_verror
+
+ SYNOPSIS
+   Signal an error with a message
+
+ USAGE
+   void SLang_verror (int code, char *fmt, ...);
+
+ DESCRIPTION
+   The `SLang_verror' function sets `SLang_Error' to
+   `code' if `SLang_Error' is 0.  It also displays the error
+   message implied by the `printf' variable argument list using
+   `fmt' as the format.
+
+ EXAMPLE
+
+         FILE *open_file (char *file)
+         {
+            char *file = "my_file.dat";
+   	 if (NULL == (fp = fopen (file, "w")))
+   	   SLang_verror (SL_INTRINSIC_ERROR, "Unable to open %s", file);
+   	 return fp;
+         }
+
+
+ SEE ALSO
+   SLang_vmessage, SLang_exit_error
+--------------------------------------------------------------
+
+SLang_doerror
+
+ SYNOPSIS
+   Signal an error
+
+ USAGE
+   void SLang_doerror (char *err_str)
+
+ DESCRIPTION
+   The `SLang_doerror' function displays the string `err_str'
+   to the error device and signals a S-Lang error.
+
+ NOTES
+   `SLang_doerror' is considered to obsolete.  Applications should
+   use the `SLang_verror' function instead.
+
+ SEE ALSO
+   SLang_verror, SLang_exit_error
+--------------------------------------------------------------
+
+SLang_get_function
+
+ SYNOPSIS
+   Get a pointer to a slang function
+
+ USAGE
+   SLang_Name_Type *SLang_get_function (char *fname)
+
+ DESCRIPTION
+   This function returns a pointer to the internal S-Lang table entry
+   of a function whose name is given by `fname'.  It returns
+   `NULL' upon failure.  The value returned by this function can be
+   used used `SLexecute_function' to call the function directly
+   from C.
+
+ SEE ALSO
+   SLexecute_function
+--------------------------------------------------------------
+
+SLexecute_function
+
+ SYNOPSIS
+   Execute a slang or intrinsic function
+
+ USAGE
+   int SLexecute_function (SLang_Name_Type *nt)
+
+ DESCRIPTION
+   The `SLexecute_function' allows an application to call the
+   S-Lang function specified by the `SLang_Name_Type' pointer
+   `nt'.  This parameter must be non `NULL' and must have been
+   previously obtained by a call to `SLang_get_function'.
+
+ EXAMPLE
+   Consider the S-Lang function:
+
+        define my_fun (x)
+        {
+           return x^2 - 2;
+        }
+
+   Suppose that it is desired to call this function many times with
+   different values of x.  There are at least two ways to do this.
+   The easiest way is to use `SLang_execute_function' by passing
+   the string `"my_fun"'.  A better way that is much faster is to
+   use `SLexecute_function':
+
+         int sum_a_function (char *fname, double *result)
+         {
+            double sum, x, y;
+   	 SLang_Name_Type *nt;
+   
+   	 if (NULL == (nt = SLang_get_function (fname)))
+   	   return -1;
+   	 
+   	 sum = 0;
+   	 for (x = 0; x < 10.0; x += 0.1)
+   	   {
+   	      SLang_start_arg_list ();
+   	      if (-1 == SLang_push_double (x))
+   	        return -1;
+   	      SLang_end_arg_list ();
+   	      if (-1 == SLexecute_function (nt))
+   	        return -1;
+   	      if (-1 == SLang_pop_double (&y, NULL, NULL))
+   	        return -1;
+   	      
+   	      sum += y;
+   	   }
+   	 return sum;
+         }
+
+   Although not necessary in this case, `SLang_start_arg_list' and
+   `SLang_end_arg_list' were used to provide the function with
+   information about the number of parameters passed to it.
+
+ SEE ALSO
+   SLang_get_function, SLang_start_arg_list, SLang_end_arg_list
+--------------------------------------------------------------
+
+SLang_peek_at_stack
+
+ SYNOPSIS
+   Find the type of object on the top of the stack
+
+ USAGE
+   int SLang_peek_at_stack (void)
+
+ DESCRIPTION
+   The `SLang_peek_at_stack' function is useful for determining the
+   data type of the object at the top of the stack.  It returns the
+   data type, or -1 upon a stack-underflow error.  It does not remove
+   anything from the stack.
+
+ SEE ALSO
+   SLang_pop_string, SLang_pop_integer
+--------------------------------------------------------------
+
+SLmake_string
+
+ SYNOPSIS
+   Duplicate a string
+
+ USAGE
+   char *SLmake_string (char *s)
+
+ DESCRIPTION
+   The `SLmake_string' function creates a new copy of the string
+   `s', via `malloc', and returns it.  Upon failure it returns
+   `NULL'.  Since the resulting string is malloced, it should be
+   freed when nolonger needed via a call to either `free' or
+   `SLfree'.
+
+ NOTES
+   `SLmake_string' should not be confused with the function
+   `SLang_create_slstring', which performs a similar function.
+
+ SEE ALSO
+   SLmake_nstring, SLfree, SLmalloc, SLang_create_slstring
+--------------------------------------------------------------
+
+SLmake_nstring
+
+ SYNOPSIS
+   Duplicate a substring
+
+ USAGE
+   char *SLmake_nstring (char *s, unsigned int n)
+
+ DESCRIPTION
+   This function is like `SLmake_nstring' except that it creates a
+   null terminated string formed from the first `n' characters of
+   `s'.  Upon failure, it returns `NULL', otherwise it returns
+   the new string.  When nolonger needed, the returned string should be
+   freed with either `free' or `SLfree'.
+
+ SEE ALSO
+   SLmake_nstring, SLfree, SLang_create_nslstring
+--------------------------------------------------------------
+
+SLang_create_nslstring
+
+ SYNOPSIS
+   Created a hashed substring
+
+ USAGE
+   char *SLang_create_nslstring (char *s, unsigned int n)
+
+ DESCRIPTION
+   `SLang_create_nslstring' is like `SLang_create_slstring'
+   except that only the first `n' characters of `s' are used to
+   perform the string.  Upon error, it returns `NULL', otherwise it
+   returns the hashed substring.  Such a string must be freed by the
+   function `SLang_free_slstring'.
+
+ NOTES
+   Do not use `free' or `SLfree' to free the string returned by
+   `SLang_create_slstring' or `SLang_create_nslstring'.  Also
+   it is important that no attempt is made to modify the hashed string
+   returned by either of these functions.  If one needs to modify a
+   string, the functions `SLmake_string' or `SLmake_nstring'
+   should be used instead.
+
+ SEE ALSO
+   SLang_free_slstring, SLang_create_slstring, SLmake_nstring
+--------------------------------------------------------------
+
+SLang_create_slstring
+
+ SYNOPSIS
+   Create a hashed string
+
+ USAGE
+   char *SLang_create_slstring (char *s)
+
+ DESCRIPTION
+   The `SLang_create_slstring' creates a copy of `s' and
+   returns it as a hashed string.  Upon error, the function returns
+   `NULL', otherwise it returns the hashed string.  Such a string
+   must only be freed via the `SLang_free_slstring' function.
+
+ NOTES
+   Do not use `free' or `SLfree' to free the string returned by
+   `SLang_create_slstring' or `SLang_create_nslstring'.  Also
+   it is important that no attempt is made to modify the hashed string
+   returned by either of these functions.  If one needs to modify a
+   string, the functions `SLmake_string' or `SLmake_nstring'
+   should be used instead.
+
+ SEE ALSO
+   SLang_free_slstring, SLang_create_nslstring, SLmake_string
+--------------------------------------------------------------
+
+SLang_free_slstring
+
+ SYNOPSIS
+   Free a hashed string
+
+ USAGE
+   void SLang_free_slstring (char *s)
+
+ DESCRIPTION
+   The `SLang_free_slstring' function is used to free a hashed
+   string such as one returned by `SLang_create_slstring',
+   `SLang_create_nslstring', or `SLang_create_static_slstring'.
+   If `s' is `NULL', the routine does nothing.
+
+ SEE ALSO
+   SLang_create_slstring, SLang_create_nslstring, SLang_create_static_slstring
+--------------------------------------------------------------
+
+SLang_concat_slstrings
+
+ SYNOPSIS
+   Concatenate two strings to produce a hashed string
+
+ USAGE
+   char *SLang_concat_slstrings (char *a, char *b)
+
+ DESCRIPTION
+   The `SLang_concat_slstrings' function concatenates two strings,
+   `a' and `b', and returns the result as a hashed string.
+   Upon failure, `NULL' is returned.
+
+ NOTES
+   A hashed string can only be freed using `SLang_free_slstring'.
+   Never use either `free' or `SLfree' to free a hashed string,
+   otherwise memory corruption will result.
+
+ SEE ALSO
+   SLang_free_slstring, SLang_create_slstring
+--------------------------------------------------------------
+
+SLang_create_static_slstring
+
+ SYNOPSIS
+   Create a hashed string
+
+ USAGE
+   char *SLang_create_static_slstring (char *s_literal)
+
+ DESCRIPTION
+   The `SLang_create_static_slstring' creates a hashed string from
+   the string literal `s_literal' and returns the result.  Upon
+   failure it returns `NULL'.
+
+ EXAMPLE
+
+        char *create_hello (void)
+        {
+           return SLang_create_static_slstring ("hello");
+        }
+
+
+ NOTES
+   This function should only be used with string literals.
+
+ SEE ALSO
+   SLang_create_slstring, SLang_create_nslstring
+--------------------------------------------------------------
+
+SLmalloc
+
+ SYNOPSIS
+   Allocate some memory
+
+ USAGE
+   char *SLmalloc (unsigned int nbytes)
+
+ DESCRIPTION
+   This function uses `malloc' to allocate `nbytes' of memory.
+   Upon error it returns `NULL'; otherwise it returns a pointer to
+   the allocated memory.  One should use `SLfree' to free the
+   memory after used.
+
+ SEE ALSO
+   SLfree, SLrealloc, SLcalloc
+--------------------------------------------------------------
+
+SLcalloc
+
+ SYNOPSIS
+   Allocate some memory
+
+ USAGE
+   char *SLcalloc (unsigned int num_elem, unsigned int elem_size)
+
+ DESCRIPTION
+   This function uses `calloc' to allocate memory for
+   `num_elem' objects with each of size `elem_size' and returns
+   the result.  In addition, the newly allocated memory is zeroed. 
+   Upon error it returns `NULL'; otherwise it returns a pointer to
+   the allocated memory.  One should use `SLfree' to free the
+   memory after used.
+
+ SEE ALSO
+   SLmalloc, SLrealloc, SLfree
+--------------------------------------------------------------
+
+SLfree
+
+ SYNOPSIS
+   Free some allocated memory
+
+ USAGE
+   void SLfree (char *ptr)
+
+ DESCRIPTION
+   The `SLfree' function uses `free' to deallocate the memory
+   specified by `ptr', which may be `NULL' in which case the
+   function does nothing.
+
+ NOTES
+   Never use this function to free a hashed string returned by one of
+   the family of `slstring' functions, e.g.,
+   `SLang_pop_slstring'.
+
+ SEE ALSO
+   SLmalloc, SLcalloc, SLrealloc, SLmake_string
+--------------------------------------------------------------
+
+SLrealloc
+
+ SYNOPSIS
+   Resize a dynamic memory block
+
+ USAGE
+   char *SLrealloc (char *ptr, unsigned int new_size)
+
+ DESCRIPTION
+   The `SLrealloc' uses the `realloc' function to resize the
+   memory block specified by `ptr' to the new size `new_size'.
+   If `ptr' is `NULL', the function call is equivalent to
+   `SLmalloc(new_size)'.  Similarly, if `new_size' is zero,
+   the function call is equivalent to `SLfree(ptr)'.  
+   
+   If the function fails, or if `new_size' is zero, `NULL' is
+   returned.  Otherwise a pointer is returned to the (possibly moved)
+   new block of memory.
+
+ SEE ALSO
+   SLfree, SLmalloc, SLcalloc
+--------------------------------------------------------------
+
+SLcurrent_time_string
+
+ SYNOPSIS
+   Get the current time as a string
+
+ USAGE
+   char *SLcurrent_time_string (void)
+
+ DESCRIPTION
+   The `SLcurrent_time_string' function uses the C library function
+   call `ctime' to obtain a string representation of the the
+   current date and time in the form
+
+        "Wed Dec 10 12:50:28 1997"
+
+   However, unlike the `ctime' function, a newline character is not
+   present in the string.  
+   
+   The returned value points to a statically allocated memory block
+   which may get overwritten on subsequent function calls.
+
+ SEE ALSO
+   SLmake_string
+--------------------------------------------------------------
+
+SLatoi
+
+ SYNOPSIS
+   Convert a text string to an integer
+
+ USAGE
+   int SLatoi(unsigned char *str
+
+ DESCRIPTION
+   `SLatoi' parses the string `str' to interpret it as an
+   integer value.  Unlike `atoi', `SLatoi' can also parse
+   strings containing integers expressed in
+   hexidecimal (e.g., `"0x7F"') and octal (e.g., `"012"'.)
+   notation.
+
+ SEE ALSO
+   SLang_guess_type
+--------------------------------------------------------------
+
+SLang_pop_fileptr
+
+ SYNOPSIS
+   Pop a file pointer
+
+ USAGE
+   int SLang_pop_fileptr (SLang_MMT_Type **mmt, FILE **fp)
+
+ DESCRIPTION
+   `SLang_pop_fileptr' pops a file pointer from the S-Lang
+   run-time stack.  It returns zero upon success, or -1 upon failure.
+   
+   A S-Lang file pointer (SLANG_FILEPTR_TYPE) is actually a memory
+   managed object.  For this reason, `SLang_pop_fileptr' also
+   returns the memory managed object via the argument list.  It is up
+   to the calling routine to call `SLang_free_mmt' to free the
+   object.
+
+ EXAMPLE
+   The following example illustrates an application defined intrinsic
+   function that writes a user defined double precision number to a
+   file.  Note the use of `SLang_free_mmt':
+
+        int write_double (void)
+        {
+           double t;
+   	SLang_MMT_Type *mmt;
+   	FILE *fp;
+   	int status;
+   
+   	if (-1 == SLang_pop_double (&d, NULL, NULL))
+   	  return -1;
+   	if (-1 == SLang_pop_fileptr (&mmt, &fp))
+   	  return -1;
+   	
+   	status = fwrite (&d, sizeof (double), 1, fp);
+   	SLang_free_mmt (mmt);
+           return status;
+        }
+
+   This function can be used by a S-Lang function as follows:
+
+        define write_some_values ()
+        {
+           variable fp, d;
+   
+   	fp = fopen ("myfile.dat", "wb");
+   	if (fp == NULL)
+   	  error ("file failed to open");
+   	for (d = 0; d < 10.0; d += 0.1)
+   	  {
+   	     if (-1 == write_double (fp, d))
+   	       error ("write failed");
+   	  }
+   	if (-1 == fclose (fp))
+   	  error ("fclose failed");
+        }
+
+
+ SEE ALSO
+   SLang_free_mmt, SLang_pop_double
+--------------------------------------------------------------
+
+SLadd_intrinsic_function
+
+ SYNOPSIS
+   Add a new intrinsic function to the interpreter
+
+ USAGE
+   int SLadd_intrinsic_function (name, f, type, nargs, ...)
+
+       char *name
+       FVOID_STAR f
+       unsigned char type
+       unsigned int nargs
+
+
+ DESCRIPTION
+   The `SLadd_intrinsic_function' function may be used to add a new
+   intrinsic function.  The S-Lang name of the function is specified by
+   `name' and the actual function pointer is given by `f', cast
+   to `FVOID_STAR'.  The third parameter, `type' specifies the
+   return type of the function and must be one of the following values:
+
+       SLANG_VOID_TYPE   (returns nothing)
+       SLANG_INT_TYPE    (returns int)
+       SLANG_DOUBLE_TYPE (returns double)
+       SLANG_STRING_TYPE (returns char *)
+
+   The `nargs' parameter specifies the number of parameters to pass
+   to the function.  The variable argument list following `nargs'
+   must consists of `nargs' integers which specify the data type of
+   each argument.
+   
+   The function returns zero upon success or -1 upon failure.
+
+ EXAMPLE
+   The jed editor uses this function to change the `system'
+   intrinsic function to the following:
+
+        static int jed_system (char *cmd)
+        {
+           if (Jed_Secure_Mode)
+   	  {
+   	    msg_error ("Access denied.");
+   	    return -1;
+   	  }	  
+   	return SLsystem (cmd);
+        }
+
+   After initializing the interpreter with `SLang_init_slang',
+   jed calls `SLadd_intrinsic_function' to substitute the above
+   definition for the default S-Lang definition:
+
+        if (-1 == SLadd_intrinsic_function ("system", (FVOID_STAR)jed_system,
+                                             SLANG_INT_TYPE, 1,
+   					  SLANG_STRING_TYPE))
+          return -1;
+
+
+ SEE ALSO
+   SLadd_intrinsic_variable, SLadd_intrinsic_array
+--------------------------------------------------------------
+
+SLadd_intrinsic_variable
+
+ SYNOPSIS
+   Add an intrinsic variable to the interpreter
+
+ USAGE
+   int SLadd_intrinsic_variable (name, addr, type, rdonly)
+
+       char *name
+       VOID_STAR type
+       unsigned char type
+       int rdonly
+
+
+ DESCRIPTION
+   The `SLadd_intrinsic_variable' function adds an intrinsic
+   variable called `name' to the interpeter.  The second parameter
+   `addr' specifies the address of the variable (cast to
+   `VOID_STAR').  The third parameter, `type', specifies the
+   data type of the variable.  If the fourth parameter, `rdonly',
+   is non-zero, the variable will interpreted by the interpreter as
+   read-only.
+   
+   If successful, `SLadd_intrinsic_variable' returns zero,
+   otherwise it returns -1.
+
+ EXAMPLE
+   Suppose that `My_Global_Int' is a global variable (at least not
+   a local one):
+
+       int My_Global_Int;
+
+   It can be added to the interpreter via the function call
+
+       if (-1 == SLadd_intrinsic_variable ("MyGlobalInt",
+                                           (VOID_STAR)&My_Global_Int,
+   					SLANG_INT_TYPE, 0))
+         exit (1);
+
+
+ NOTES
+   The current implementation requires all pointer type intrinsic
+   variables to be read-only.  For example,
+
+       char *My_Global_String;
+
+   is of type `SLANG_STRING_TYPE', and must be declared as
+   read-only.  Finally, not that
+
+      char My_Global_Char_Buf[256];
+
+   is _not_ a `SLANG_STRING_TYPE' object.  This difference is
+   very important because internally the interpreter dereferences the
+   address passed to it to get to the value of the variable.
+
+ SEE ALSO
+   SLadd_intrinsic_function, SLadd_intrinsic_array
+--------------------------------------------------------------
+
+SLclass_add_unary_op
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLclass_add_unary_op (unsigned char,int (*) (int, unsigned char, VOID_STAR, unsigned int, VOID_STAR), int (*) (int, unsigned char, unsigned char *));
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+SLclass_add_app_unary_op
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLclass_add_app_unary_op (unsigned char, int (*) (int,unsigned char, VOID_STAR, unsigned int,VOID_STAR),int (*) (int, unsigned char, unsigned char *));
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+SLclass_add_binary_op
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLclass_add_binary_op (unsigned char, unsigned char,int (*)(int, unsigned char, VOID_STAR, unsigned int,unsigned char, VOID_STAR, unsigned int,VOID_STAR),int (*) (int, unsigned char, unsigned char, unsigned char *));
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+SLclass_add_math_op
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLclass_add_math_op (unsigned char,int (*)(int,unsigned char, VOID_STAR, unsigned int,VOID_STAR),int (*)(int, unsigned char, unsigned char *));
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+SLclass_add_typecast
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLclass_add_typecast (unsigned char, unsigned char int (*)_PROTO((unsigned char, VOID_STAR, unsigned int,unsigned char, VOID_STAR)),int);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+SLang_init_tty
+
+ SYNOPSIS
+   Initialize the terminal keyboard interface
+
+ USAGE
+   int SLang_init_tty (int intr_ch, int no_flow_ctrl, int opost)
+
+ DESCRIPTION
+   `SLang_init_tty' initializes the terminal for single character
+   input.  If the first parameter `intr_ch' is in the range 0-255,
+   it will be used as the interrupt character, e.g., under Unix this
+   character will generate a `SIGINT' signal.  Otherwise, if it is
+   `-1', the interrupt character will be left unchanged.  
+   
+   If the second parameter `no_flow_ctrl' is non-zero, flow control
+   (`XON'/`XOFF') processing will be
+   enabled.  
+   
+   If the last parmeter `opost' is non-zero, output processing by the
+   terminal will be enabled.  If one intends to use this function in
+   conjunction with the S-Lang screen management routines
+   (`SLsmg'), this paramete shold be set to zero.
+   
+   `SLang_init_tty' returns zero upon success, or -1 upon error.
+
+ NOTES
+   Terminal I/O is a complex subject.  The S-Lang interface presents a
+   simplification that the author has found useful in practice.  For
+   example, the only special character processing that
+   `SLang_init_tty' enables is that of the `SIGINT' character,
+   and the generation of other signals via the keyboard is disabled.
+   However, generation of the job control signal `SIGTSTP' is possible
+   via the `SLtty_set_suspend_state' function.
+   
+   Under Unix, the integer variable `SLang_TT_Read_FD' is used to
+   specify the input descriptor for the terminal.  If
+   `SLang_TT_Read_FD' represents a terminal device as determined
+   via the `isatty' system call, then it will be used as the
+   terminal file descriptor.  Otherwise, the terminal device
+   `/dev/tty' will used as the input device.  The default value of
+   `SLang_TT_Read_FD' is -1 which causes `/dev/tty' to be
+   used.  So, if you prefer to use `stdin' for input, then set
+   `SLang_TT_Read_FD' to `fileno(stdin)' _before_ calling
+   `SLang_init_tty'.
+   
+   If the variable `SLang_TT_Baud_Rate' is zero when this function
+   is called, the function will attempt to determine the baud rate by
+   querying the terminal driver and set `SLang_TT_Baud_Rate' to
+   that value.  
+
+ SEE ALSO
+   SLang_reset_tty, SLang_getkey, SLtty_set_suspend_state
+--------------------------------------------------------------
+
+SLang_reset_tty
+
+ SYNOPSIS
+   Reset the terminal
+
+ USAGE
+   void SLang_reset_tty (void)
+
+ DESCRIPTION
+   `SLang_reset_tty' resets the terminal interface back to the
+   state it was in before `SLang_init_tty' was called.
+
+ SEE ALSO
+   SLang_init_tty
+--------------------------------------------------------------
+
+SLtty_set_suspend_state
+
+ SYNOPSIS
+   Enable or disable keyboard suspension
+
+ USAGE
+   void SLtty_set_suspend_state (int s)
+
+ DESCRIPTION
+   The `SLtty_set_suspend_state' function may be used to enable or
+   disable keyboard generation of the `SIGTSTP' job control signal.
+   If `s' is non-zero, generation of this signal via the terminal
+   interface will be enabled, otherwise it will be disabled.
+   
+   This function should only be called after the terminal driver has be
+   initialized via `SLang_init_tty'.  The `SLang_init_tty'
+   always disables the generation of `SIGTSTP' via the keyboard.
+
+ SEE ALSO
+   SLang_init_tty
+--------------------------------------------------------------
+
+SLang_getkey
+
+ SYNOPSIS
+   Read a character from the keyboard
+
+ USAGE
+   unsigned int SLang_getkey (void);
+
+ DESCRIPTION
+   The `SLang_getkey' reads a single character from the terminal
+   and returns it.  The terminal must first be initialized via a call
+   to `SLang_init_tty' before this function can be called.  Upon
+   success, `SLang_getkey' returns the character read from the
+   terminal, otherwise it returns `SLANG_GETKEY_ERROR'.
+
+ SEE ALSO
+   SLang_init_tty, SLang_input_pending, SLang_ungetkey
+--------------------------------------------------------------
+
+SLang_ungetkey_string
+
+ SYNOPSIS
+   Unget a key string
+
+ USAGE
+   int SLang_ungetkey_string (unsigned char *buf, unsigned int n)
+
+ DESCRIPTION
+   The `SLang_ungetkey_string' function may be used to push the
+   `n' characters pointed to by `buf' onto the buffered input
+   stream that `SLgetkey' uses.  If there is not enough room for
+   the characters, -1 is returned and none are buffered.  Otherwise,
+   it returns zero.
+
+ NOTES
+   The difference between `SLang_buffer_keystring' and
+   `SLang_ungetkey_string' is that the `SLang_buffer_keystring'
+   appends the characters to the end of the getkey buffer, whereas
+   `SLang_ungetkey_string' inserts the characters at the beginning
+   of the input buffer.
+
+ SEE ALSO
+   SLang_ungetkey, SLang_getkey
+--------------------------------------------------------------
+
+SLang_buffer_keystring
+
+ SYNOPSIS
+   Append a keystring to the input buffer
+
+ USAGE
+   int SLang_buffer_keystring (unsigned char *b, unsigned int len)
+
+ DESCRIPTION
+   `SLang_buffer_keystring' places the `len' characters
+   specified by `b' at the _end_ of the buffer that
+   `SLang_getkey' uses.  Upon success it returns 0; otherwise, no
+   characters are buffered and it returns -1.
+
+ NOTES
+   The difference between `SLang_buffer_keystring' and
+   `SLang_ungetkey_string' is that the `SLang_buffer_keystring'
+   appends the characters to the end of the getkey buffer, whereas
+   `SLang_ungetkey_string' inserts the characters at the beginning
+   of the input buffer.
+
+ SEE ALSO
+   SLang_getkey, SLang_ungetkey, SLang_ungetkey_string
+--------------------------------------------------------------
+
+SLang_ungetkey
+
+ SYNOPSIS
+   Push a character back onto the input buffer
+
+ USAGE
+   int SLang_ungetkey (unsigned char ch)
+
+ DESCRIPTION
+   `SLang_ungetkey' pushes the character `ch' back onto the
+   `SLgetkey' input stream.  Upon success, it returns zero,
+   otherwise it returns 1.
+
+ EXAMPLE
+   This function is implemented as:
+
+       int SLang_ungetkey (unsigned char ch)
+       {
+          return SLang_ungetkey_string(&ch, 1);
+       }
+
+
+ SEE ALSO
+   SLang_getkey, SLang_ungetkey_string
+--------------------------------------------------------------
+
+SLang_flush_input
+
+ SYNOPSIS
+   Discard all keyboard input waiting to be read
+
+ USAGE
+   void SLang_flush_input (void)
+
+ DESCRIPTION
+   `SLang_flush_input' discards all input characters waiting to be
+   read by the `SLang_getkey' function.
+
+ SEE ALSO
+   SLang_getkey
+--------------------------------------------------------------
+
+SLang_input_pending
+
+ SYNOPSIS
+   Check to see if input is pending
+
+ USAGE
+   int SLang_input_pending (int tsecs)
+
+ DESCRIPTION
+   `SLang_input_pending' may be used to see if an input character
+   is available to be read without causing `SLang_getkey' to block.
+   It will wait up to `tsecs' tenths of a second if no characters
+   are immediately available for reading.  If `tsecs' is less than
+   zero, then `SLang_input_pending' will wait `-tsecs'
+   milliseconds for input, otherwise `tsecs' represents `1/10'
+   of a second intervals.
+
+ NOTES
+   Not all systems support millisecond resolution.
+
+ SEE ALSO
+   SLang_getkey
+--------------------------------------------------------------
+
+SLang_set_abort_signal
+
+ SYNOPSIS
+   Set the signal to trap SIGINT
+
+ USAGE
+   void SLang_set_abort_signal (void (*f)(int));
+
+ DESCRIPTION
+   `SLang_set_abort_signal' sets the function that gets
+   triggered when the user presses the interrupt key (`SIGINT') to
+   the function `f'.  If `f' is `NULL' the default handler
+   will get installed.
+
+ EXAMPLE
+   The default interrupt handler on a Unix system is:
+
+        static void default_sigint (int sig)
+        {
+           SLKeyBoard_Quit = 1;
+   	if (SLang_Ignore_User_Abort == 0) SLang_Error = SL_USER_BREAK;
+   	SLsignal_intr (SIGINT, default_sigint);
+      }
+
+
+ NOTES
+   For Unix programmers, the name of this function may appear
+   misleading since it is associated with `SIGINT' and not
+   `SIGABRT'.  The origin of the name stems from the original intent
+   of the function: to allow the user to abort the running of a S-Lang
+   interpreter function.
+
+ SEE ALSO
+   SLang_init_tty, SLsignal_intr
+--------------------------------------------------------------
+
+SLkm_define_key
+
+ SYNOPSIS
+   Define a key in a keymap
+
+ USAGE
+   int SLkm_define_key (char *seq, FVOID_STAR f, SLKeyMap_List_Type *km)
+
+ DESCRIPTION
+   `SLkm_define_key' associates the key sequence `seq' with the
+   function pointer `f' in the keymap specified by `km'.  Upon
+   success, it returns zero, otherwise it returns a negative integer
+   upon error.
+
+ SEE ALSO
+   SLkm_define_keysym, SLang_define_key
+--------------------------------------------------------------
+
+SLang_define_key
+
+ SYNOPSIS
+   Define a key in a keymap
+
+ USAGE
+   int SLang_define_key(char *seq, char *fun, SLKeyMap_List_Type *km)
+
+ DESCRIPTION
+   `SLang_define_key' associates the key sequence `seq' with
+   the function whose name is `fun' in the keymap specified by
+   `km'.
+
+ SEE ALSO
+   SLkm_define_keysym, SLkm_define_key
+--------------------------------------------------------------
+
+SLkm_define_keysym
+
+ SYNOPSIS
+   Define a keysym in a keymap
+
+ USAGE
+   int SLkm_define_keysym (seq, ks, km)
+
+         char *seq;
+         unsigned int ks;
+         SLKeyMap_List_Type *km;
+
+
+ DESCRIPTION
+   `SLkm_define_keysym' associates the key sequence `seq' with
+   the keysym `ks' in the keymap `km'.  Keysyms whose value is
+   less than or equal to `0x1000' is reserved by the library and
+   should not be used.
+
+ SEE ALSO
+   SLkm_define_key, SLang_define_key
+--------------------------------------------------------------
+
+SLang_undefine_key
+
+ SYNOPSIS
+   Undefined a key from a keymap
+
+ USAGE
+   void SLang_undefine_key(char *seq, SLKeyMap_List_Type *km);
+
+ DESCRIPTION
+   `SLang_undefine_key' removes the key sequence `seq' from the
+   keymap `km'.
+
+ SEE ALSO
+   SLang_define_key
+--------------------------------------------------------------
+
+SLang_create_keymap
+
+ SYNOPSIS
+   Create a new keymap
+
+ USAGE
+   SLKeyMap_List_Type *SLang_create_keymap (name, km)
+
+        char *name;
+        SLKeyMap_List_Type *km;
+
+
+ DESCRIPTION
+   `SLang_create_keymap' creates a new keymap called `name' by
+   copying the key definitions from the keymap `km'.  If `km'
+   is `NULL', the newly created keymap will be empty and it is up
+   to the calling routine to initialize it via the
+   `SLang_define_key' and `SLkm_define_keysym' functions.
+   `SLang_create_keymap' returns a pointer to the new keymap, or
+   `NULL' upon failure.
+
+ SEE ALSO
+   SLang_define_key, SLkm_define_keysym
+--------------------------------------------------------------
+
+SLang_do_key
+
+ SYNOPSIS
+   Read a keysequence and return its keymap entry
+
+ USAGE
+   SLang_Key_Type *SLang_do_key (kml, getkey)
+
+        SLKeyMap_List_Type *kml;
+        int (*getkey)(void);
+
+
+ DESCRIPTION
+   The `SLang_do_key' function reads characters using the function
+   specified by the `getkey' function pointer and uses the
+   key sequence to return the appropriate entry in the keymap specified
+   by `kml'.
+   
+   `SLang_do_key' returns `NULL' if the key sequence is not
+   defined by the keymap, otherwise it returns a pointer to an object
+   of type `SLang_Key_Type', which is defined in `slang.h' as
+
+        #define SLANG_MAX_KEYMAP_KEY_SEQ 14
+        typedef struct SLang_Key_Type
+        {
+          struct SLang_Key_Type *next;
+          union
+          {
+             char *s;
+   	  FVOID_STAR f;
+   	  unsigned int keysym;
+          }
+          f;
+          unsigned char type;	       /* type of function */
+        #define SLKEY_F_INTERPRET  0x01
+        #define SLKEY_F_INTRINSIC  0x02
+        #define SLKEY_F_KEYSYM     0x03
+          unsigned char str[SLANG_MAX_KEYMAP_KEY_SEQ + 1];/* key sequence */
+        }
+   SLang_Key_Type;
+   
+
+   The `type' field specifies which field of the union `f'
+   should be used.  If `type' is `SLKEY_F_INTERPRET', then
+   `f.s' is a string that should be passed to the interpreter for
+   evaluation.  If `type' is `SLKEY_F_INTRINSIC', then
+   `f.f' refers to function that should be called.  Otherwise,
+   `type' is `SLKEY_F_KEYSYM' and `f.keysym' represents the
+   value of the keysym that is associated with the key sequence.
+
+ SEE ALSO
+   SLkm_define_keysym, SLkm_define_key
+--------------------------------------------------------------
+
+SLang_find_key_function
+
+ SYNOPSIS
+   Obtain a function pointer associated with a keymap
+
+ USAGE
+   FVOID_STAR SLang_find_key_function (fname, km);
+
+       char *fname;
+       SLKeyMap_List_Type *km;
+
+
+ DESCRIPTION
+   The `SLang_find_key_function' routine searches through the
+   `SLKeymap_Function_Type' list of functions associated with the
+   keymap `km' for the function with name `fname'.
+   If a matching function is found, a pointer to the function will
+   be returned, otherwise `SLang_find_key_function' will return
+   `NULL'.
+
+ SEE ALSO
+   SLang_create_keymap, SLang_find_keymap
+--------------------------------------------------------------
+
+SLang_find_keymap
+
+ SYNOPSIS
+   Find a keymap
+
+ USAGE
+   SLKeyMap_List_Type *SLang_find_keymap (char *keymap_name);
+
+ DESCRIPTION
+   The `SLang_find_keymap' function searches through the list of
+   keymaps looking for one whose name is `keymap_name'.  If a
+   matching keymap is found, the function returns a pointer to the
+   keymap.  It returns `NULL' if no such keymap exists.
+
+ SEE ALSO
+   SLang_create_keymap, SLang_find_key_function
+--------------------------------------------------------------
+
+SLang_process_keystring
+
+ SYNOPSIS
+   Un-escape a key-sequence
+
+ USAGE
+   char *SLang_process_keystring (char *kseq);
+
+ DESCRIPTION
+   The `SLang_process_keystring' function converts an escaped key
+   sequence to its raw form by converting two-character combinations
+   such as `^A' to the _single_ character `Ctrl-A' (ASCII
+   1).  In addition, if the key sequence contains constructs such as
+   `^(XX)', where `XX' represents a two-character termcap
+   specifier, the termcap escape sequence will be looked up and
+   substituted.   
+   
+   Upon success, `SLang_process_keystring' returns a raw
+   key-sequence whose first character represents the total length of
+   the key-sequence, including the length specifier itself.  It returns
+   `NULL' upon failure.
+
+ EXAMPLE
+   Consider the following examples:
+
+        SLang_process_keystring ("^X^C");
+        SLang_process_keystring ("^[[A");
+
+   The first example will return a pointer to a buffer of three characters
+   whose ASCII values are given by `{3,24,3}'.  Similarly, the
+   second example will return a pointer to the four characters
+   `{4,27,91,65}'.  Finally, the result of
+
+        SLang_process_keystring ("^[^(ku)");
+
+   will depend upon the termcap/terminfo capability `"ku"', which
+   represents the escape sequence associated with the terminal's UP
+   arrow key.  For an ANSI terminal whose UP arrow produces
+   `"ESC [ A"', the result will be `5,27,27,91,65'.
+
+ NOTES
+   `SLang_process_keystring' returns a pointer to a static area
+   that will be overwritten on subsequent calls.
+
+ SEE ALSO
+   SLang_define_key, SLang_make_keystring
+--------------------------------------------------------------
+
+SLang_make_keystring
+
+ SYNOPSIS
+   Make a printable key sequence
+
+ USAGE
+   char *SLang_make_keystring (unsigned char *ks);
+
+ DESCRIPTION
+   The `SLang_make_keystring' function takes a raw key sequence
+   `ks' and converts it to a printable form by converting
+   characters such as ASCII 1 (ctrl-A) to `^A'.  That is, it
+   performs the opposite function of `SLang_process_keystring'.
+
+ NOTES
+   This function returns a pointer to a static area that will be
+   overwritten on the next call to `SLang_make_keystring'.
+
+ SEE ALSO
+   SLang_process_keystring
+--------------------------------------------------------------
+
+SLextract_list_element
+
+ SYNOPSIS
+   Extract a substring of a delimited string
+
+ USAGE
+   int SLextract_list_element (dlist, nth, delim, buf, buflen)
+
+       char *dlist;
+       unsigned int nth;
+       char delim;
+       char *buf;
+       unsigned int buflen;
+
+
+ DESCRIPTION
+   `SLextract_list_element' may be used to obtain the `nth'
+   element of a list of strings, `dlist', that are delimited by the
+   character `delim'.  The routine copies the `nth' element of
+   `dlist' to the buffer `buf' whose size is `buflen'
+   characters.  It returns zero upon success, or -1 if `dlist'
+   does not contain an `nth' element.
+
+ EXAMPLE
+   A delimited list of strings may be turned into an array of strings
+   as follows.  For conciseness, all malloc error checking has been
+   omitted.
+
+       int list_to_array (char *list, char delim, char ***ap)
+       {
+          unsigned int nth;
+          char **a;
+          char buf[1024];
+   
+          /* Determine the size of the array */
+          nth = 0;
+          while (0 == SLextract_list_element (list, nth, delim, buf, sizeof(buf)))
+            nth++;
+          
+          ap = (char **) SLmalloc ((nth + 1) * sizeof (char **));
+          nth = 0;
+          while (0 == SLextract_list_element (list, nth, delim, buf, sizeof(buf)))
+            {
+   	     a[nth] = SLmake_string (buf);
+   	     nth++;
+   	 }
+          a[nth] = NULL;
+          *ap = a;
+          return 0;
+       }
+
+
+ SEE ALSO
+   SLmalloc, SLmake_string
+--------------------------------------------------------------
+
+SLprep_open_prep
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLprep_open_prep (SLPreprocess_Type *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+SLprep_close_prep
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLprep_close_prep (SLPreprocess_Type *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+SLprep_line_ok
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLprep_line_ok (char *, SLPreprocess_Type *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+SLdefine_for_ifdef
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLdefine_for_ifdef (char *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+SLang_Read_Line_Type * SLang_rline_save_line (SLang_RLine_Info_Type *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   SLang_Read_Line_Type * SLang_rline_save_line (SLang_RLine_Info_Type *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLang_init_readline (SLang_RLine_Info_Type *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLang_init_readline (SLang_RLine_Info_Type *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLang_read_line (SLang_RLine_Info_Type *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLang_read_line (SLang_RLine_Info_Type *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLang_rline_insert (char *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLang_rline_insert (char *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLrline_redraw (SLang_RLine_Info_Type *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLrline_redraw (SLang_RLine_Info_Type *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLtt_flush_output (void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLtt_flush_output (void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_set_scroll_region(int, int);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_set_scroll_region(int, int);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_reset_scroll_region(void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_reset_scroll_region(void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_reverse_video (int);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_reverse_video (int);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_bold_video (void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_bold_video (void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_begin_insert(void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_begin_insert(void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_end_insert(void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_end_insert(void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_del_eol(void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_del_eol(void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_goto_rc (int, int);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_goto_rc (int, int);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_delete_nlines(int);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_delete_nlines(int);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_delete_char(void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_delete_char(void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_erase_line(void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_erase_line(void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_normal_video(void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_normal_video(void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_cls(void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_cls(void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_beep(void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_beep(void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_reverse_index(int);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_reverse_index(int);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_smart_puts(unsigned short *, unsigned short *, int, int);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_smart_puts(unsigned short *, unsigned short *, int, int);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_write_string (char *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_write_string (char *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_putchar(char);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_putchar(char);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLtt_init_video (void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLtt_init_video (void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLtt_reset_video (void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLtt_reset_video (void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_get_terminfo(void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_get_terminfo(void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_get_screen_size (void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_get_screen_size (void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLtt_set_cursor_visibility (int);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLtt_set_cursor_visibility (int);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLtt_initialize (char *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLtt_initialize (char *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_enable_cursor_keys(void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_enable_cursor_keys(void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_set_term_vtxxx(int *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_set_term_vtxxx(int *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_set_color_esc (int, char *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_set_color_esc (int, char *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_wide_width(void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_wide_width(void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_narrow_width(void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_narrow_width(void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLtt_set_mouse_mode (int, int);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLtt_set_mouse_mode (int, int);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_set_alt_char_set (int);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_set_alt_char_set (int);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLtt_write_to_status_line (char *, int);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLtt_write_to_status_line (char *, int);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_disable_status_line (void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_disable_status_line (void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+char *SLtt_tgetstr (char *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   char *SLtt_tgetstr (char *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLtt_tgetnum (char *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLtt_tgetnum (char *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLtt_tgetflag (char *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLtt_tgetflag (char *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+char *SLtt_tigetent (char *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   char *SLtt_tigetent (char *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+char *SLtt_tigetstr (char *, char **);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   char *SLtt_tigetstr (char *, char **);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLtt_tigetnum (char *, char **);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLtt_tigetnum (char *, char **);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+SLtt_Char_Type SLtt_get_color_object (int);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   SLtt_Char_Type SLtt_get_color_object (int);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_set_color_object (int, SLtt_Char_Type);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_set_color_object (int, SLtt_Char_Type);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_set_color (int, char *, char *, char *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_set_color (int, char *, char *, char *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_set_mono (int, char *, SLtt_Char_Type);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_set_mono (int, char *, SLtt_Char_Type);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_add_color_attribute (int, SLtt_Char_Type);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_add_color_attribute (int, SLtt_Char_Type);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLtt_set_color_fgbg (int, SLtt_Char_Type, SLtt_Char_Type);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLtt_set_color_fgbg (int, SLtt_Char_Type, SLtt_Char_Type);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLkp_define_keysym (char *, unsigned int);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLkp_define_keysym (char *, unsigned int);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLkp_init (void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLkp_init (void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLkp_getkey (void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLkp_getkey (void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLscroll_find_top (SLscroll_Window_Type *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLscroll_find_top (SLscroll_Window_Type *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLscroll_find_line_num (SLscroll_Window_Type *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLscroll_find_line_num (SLscroll_Window_Type *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+unsigned int SLscroll_next_n (SLscroll_Window_Type *, unsigned int);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   unsigned int SLscroll_next_n (SLscroll_Window_Type *, unsigned int);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+unsigned int SLscroll_prev_n (SLscroll_Window_Type *, unsigned int);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   unsigned int SLscroll_prev_n (SLscroll_Window_Type *, unsigned int);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLscroll_pageup (SLscroll_Window_Type *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLscroll_pageup (SLscroll_Window_Type *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLscroll_pagedown (SLscroll_Window_Type *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLscroll_pagedown (SLscroll_Window_Type *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+SLSig_Fun_Type *SLsignal (int, SLSig_Fun_Type *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   SLSig_Fun_Type *SLsignal (int, SLSig_Fun_Type *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+SLSig_Fun_Type *SLsignal_intr (int, SLSig_Fun_Type *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   SLSig_Fun_Type *SLsignal_intr (int, SLSig_Fun_Type *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLsig_block_signals (void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLsig_block_signals (void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLsig_unblock_signals (void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLsig_unblock_signals (void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLsystem (char *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLsystem (char *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLadd_at_handler (long *, char *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLadd_at_handler (long *, char *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLang_define_case(int *, int *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLang_define_case(int *, int *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLang_init_case_tables (void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLang_init_case_tables (void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+unsigned char *SLang_regexp_match(unsigned char *, unsigned int, SLRegexp_Type *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   unsigned char *SLang_regexp_match(unsigned char *, unsigned int, SLRegexp_Type *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLang_regexp_compile (SLRegexp_Type *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLang_regexp_compile (SLRegexp_Type *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+char *SLregexp_quote_string (char *, char *, unsigned int);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   char *SLregexp_quote_string (char *, char *, unsigned int);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLcmd_execute_string (char *, SLcmd_Cmd_Table_Type *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLcmd_execute_string (char *, SLcmd_Cmd_Table_Type *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLsearch_init (char *, int, int, SLsearch_Type *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLsearch_init (char *, int, int, SLsearch_Type *);
+
+ DESCRIPTION
+   ??
+   /* This routine must first be called before any search can take place.
+   * The second parameter specifies the direction of the search: greater than
+   * zero for a forwrd search and less than zero for a backward search.  The
+   * third parameter specifies whether the search is case sensitive or not.
+   * The last parameter is a pointer to a structure that is filled by this
+   * function and it is this structure that must be passed to SLsearch.
+   */
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+unsigned char *SLsearch (unsigned char *, unsigned char *, SLsearch_Type *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   unsigned char *SLsearch (unsigned char *, unsigned char *, SLsearch_Type *);
+
+ DESCRIPTION
+   ??
+   /* To use this routine, you must first call 'SLsearch_init'.  Then the first
+   * two parameters p1 and p2 serve to define the region over which the search
+   * is to take place.  The third parameter is the structure that was previously
+   * initialized by SLsearch_init.
+   *
+   * The routine returns a pointer to the match if found otherwise it returns
+   * NULL.
+   */
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+SLcomplex_abs
+
+ SYNOPSIS
+   Returns the norm of a complex number
+
+ USAGE
+   double SLcomplex_abs (double *z)
+
+ DESCRIPTION
+   The `SLcomplex_abs' function returns the absolute value or the
+   norm of the complex number given by `z'.
+
+ SEE ALSO
+   SLcomplex_times
+--------------------------------------------------------------
+
+double *SLcomplex_times (double *, double *, double *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   double *SLcomplex_times (double *, double *, double *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+double *SLcomplex_divide (double *, double *, double *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   double *SLcomplex_divide (double *, double *, double *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+double *SLcomplex_sin (double *, double *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   double *SLcomplex_sin (double *, double *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+double *SLcomplex_cos (double *, double *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   double *SLcomplex_cos (double *, double *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+double *SLcomplex_tan (double *, double *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   double *SLcomplex_tan (double *, double *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+double *SLcomplex_asin (double *, double *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   double *SLcomplex_asin (double *, double *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+double *SLcomplex_acos (double *, double *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   double *SLcomplex_acos (double *, double *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+double *SLcomplex_atan (double *, double *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   double *SLcomplex_atan (double *, double *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+double *SLcomplex_exp (double *, double *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   double *SLcomplex_exp (double *, double *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+double *SLcomplex_log (double *, double *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   double *SLcomplex_log (double *, double *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+double *SLcomplex_log10 (double *, double *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   double *SLcomplex_log10 (double *, double *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+double *SLcomplex_sqrt (double *, double *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   double *SLcomplex_sqrt (double *, double *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+double *SLcomplex_sinh (double *, double *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   double *SLcomplex_sinh (double *, double *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+double *SLcomplex_cosh (double *, double *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   double *SLcomplex_cosh (double *, double *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+double *SLcomplex_tanh (double *, double *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   double *SLcomplex_tanh (double *, double *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+double *SLcomplex_pow (double *, double *, double *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   double *SLcomplex_pow (double *, double *, double *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+double SLmath_hypot (double x, double y);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   double SLmath_hypot (double x, double y);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+double *SLcomplex_acosh (double *, double *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   double *SLcomplex_acosh (double *, double *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+double *SLcomplex_atanh (double *, double *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   double *SLcomplex_atanh (double *, double *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+char *SLdebug_malloc (unsigned long);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   char *SLdebug_malloc (unsigned long);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+char *SLdebug_calloc (unsigned long, unsigned long);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   char *SLdebug_calloc (unsigned long, unsigned long);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+char *SLdebug_realloc (char *, unsigned long);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   char *SLdebug_realloc (char *, unsigned long);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLdebug_free (char *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLdebug_free (char *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLmalloc_dump_statistics (void);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLmalloc_dump_statistics (void);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+char *SLstrcpy(register char *, register char *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   char *SLstrcpy(register char *, register char *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLstrcmp(register char *, register char *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLstrcmp(register char *, register char *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+char *SLstrncpy(char *, register char *, register  int);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   char *SLstrncpy(char *, register char *, register  int);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLmemset (char *, char, int);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLmemset (char *, char, int);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLexpand_escaped_string (register char *, register char *, register char *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLexpand_escaped_string (register char *, register char *, register char *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+void SLmake_lut (unsigned char *, unsigned char *, unsigned char);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   void SLmake_lut (unsigned char *, unsigned char *, unsigned char);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+
+int SLang_guess_type (char *);
+
+ SYNOPSIS
+   ??
+
+ USAGE
+   int SLang_guess_type (char *);
+
+ DESCRIPTION
+   ??
+
+ SEE ALSO
+   ??
+--------------------------------------------------------------
+

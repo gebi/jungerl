@@ -1,12 +1,8 @@
-
-LIBS = tuntap lersp
-
-LIB_DIRS = $(LIBS:%=lib/%)
-
-all: $(LIBS)
+all: conf
+	(cd lib; $(MAKE) $@)
 
 clean:
-	@for dir in $(LIB_DIRS); do (cd $$dir; $(MAKE) clean); done
+	(cd lib; $(MAKE) $@)
 
 $(LIBS): conf $(MK_INCLUDE)
 # Build a program, unless it has a file called SKIP in its top directory
@@ -17,6 +13,7 @@ $(MK_INCLUDE): $(MK_INCLUDE).in
 
 conf:
 	(cd config; make)
+	(cd lib; make $@)
 
 conf_clean:
 	(cd config; make clean)

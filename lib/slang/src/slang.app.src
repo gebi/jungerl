@@ -1,0 +1,8 @@
+{application,slang,
+ [{description,"tty interface"},
+  {vsn,"%VSN%"},
+  {modules,[slang]},
+  {registered,[]},
+  {env,[]},
+  {applications,[kernel,stdlib]}]}.
+

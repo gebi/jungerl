@@ -3,7 +3,7 @@ ifeq ($(SUBDIRS),)
 SUBDIRS	=	c_src src
 endif
 
-all clean config:
+all clean:
 	@set -e ; \
 	  for d in $(SUBDIRS) ; do \
 	    if [ -f $$d/Makefile ]; then \

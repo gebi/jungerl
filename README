@@ -23,7 +23,7 @@ Makefile in the lib/<appname> directory with three targets:
 
   'clean' should delete any object files.
 
-  'config' should do any necessary configuration. Most likely this is
+  'conf' should do any necessary configuration. Most likely this is
   nothing, but it can be used for e.g. application-specific autoconf
   scripts.
 

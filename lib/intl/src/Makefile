@@ -1,6 +1,7 @@
 
 MODULES = \
 	intl \
+	eintl \
 	mo \
 	egettext
 

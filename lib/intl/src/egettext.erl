@@ -45,7 +45,11 @@
 %%   -h, --help
 %%   -V, --version
 %%
-
+%% Optation mode:
+%% *  -j, --join-existing
+%% *  -x, --exclude-file=FILE.po
+%% *  -c, --add-comments[=TAG]
+%%
 -record(msgid,
 	{
 	  id,
@@ -233,19 +237,15 @@ file(File) ->
 fd(Fd, File) ->
     case epp_dodger:parse(Fd) of
 	{ok, Forms} ->
-	    case check_forms(Forms, File) of
-		ok ->
-		    Msg0 = lists:foldl(fun collect/2, [], Forms),
-		    %% add file to message locations (and reverse list)
-		    Msg1 = lists:foldl(
-			     fun(M,Acc) ->
-				     Line = M#msgid.location,
-				     [M#msgid { location = [{File,Line}]}|Acc]
-			     end,[], Msg0),
-		    {ok, Msg1};
-		error ->
-		    {error, "parse error"}
-	    end;
+	    check_forms(Forms, File), 
+	    Msg0 = lists:foldl(fun collect/2, [], Forms),
+	    %% add file to message locations (and reverse list)
+	    Msg1 = lists:foldl(
+		     fun(M,Acc) ->
+			     Line = M#msgid.location,
+			     [M#msgid { location = [{File,Line}]}|Acc]
+		     end,[], Msg0),
+	    {ok, Msg1};
 	Error ->
 	    Error
     end.
@@ -353,9 +353,9 @@ emit_header(Fd) ->
     {{Year,Mon,Day},{H,M,S}} = calendar:now_to_universal_time(now()),
     {Prefix,Suffix} = msgstr_wrap(),
     io:put_chars(Fd, "# SOME DESCRIPTIVE TITLE.\n"),
-    io:format(Fd, "# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER\n", []),
-    io:format(Fd, "# This file is distributed under the same license as the PACKAGE package.\n"),
-    io:format(Fd, "# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.\n",[]),
+    io:put_chars(Fd, "# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER\n"),
+    io:put_chars(Fd, "# This file is distributed under the same license as the PACKAGE package.\n"),
+    io:put_chars(Fd, "# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.\n"),
     io:put_chars(Fd, "#\n"),
     io:put_chars(Fd, "#, fuzzy\n"),
     io:put_chars(Fd, "msgid \"\"\n"),

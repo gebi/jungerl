@@ -5,7 +5,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"PO-Revision-Date: 2003-12-30 02:33+0100\n"
+"PO-Revision-Date: 2003-12-30 16:13+0100\n"
 "Last-Translator: Automatically generated\n"
 "Language-Team: none\n"
 "MIME-Version: 1.0\n"
@@ -14,7 +14,7 @@ msgstr ""
 "Plural-Forms: nplurals=1; plural=0;\n"
 
 #: test.erl:25
-#, no-c-format
+#, no-c-format, fuzzy
 msgid "Hello world\n"
 msgstr ""
 

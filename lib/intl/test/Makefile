@@ -5,9 +5,12 @@ MO_FILES = \
 	locale/fr/LC_MESSAGES/test.mo \
 	locale/ja/LC_MESSAGES/test.mo 
 
-all: $(MO_FILES) test.beam test
+all: $(MO_FILES) test.beam etest.beam test
 
 test.beam:	test.erl
+	erlc -o$@ $<
+
+etest.beam:	etest.erl
 	erlc -o$@ $<
 
 test:	test.o

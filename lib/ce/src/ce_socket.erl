@@ -35,6 +35,9 @@
 
 %% @doc Socket library.
 %%
+%% <p>This library contains functions which create TCP/IP socket
+%% servers and clients.</p>
+%%
 %% @end
 
 -module(ce_socket).
@@ -59,7 +62,7 @@ server(Mod, Func, Args, Port, Opts) ->
 %% @doc Implements a generic TCP/IP socket server.
 %% Opens a socket with the given options on the given
 %% port and spawns <code>Module:Function(Socket, Args...)</code> to handle
-%% each incoming connection, up to the specified maximum.
+%% each incoming connection, up to the specified maximum number of connections.
 
 server(Mod, Func, Args, Port, Opts, MaxCon) ->
   inet_db:start(),
@@ -73,23 +76,38 @@ server(Mod, Func, Args, Port, Opts, MaxCon) ->
   end.
 
 %% @spec server_setup(Mod::atom(), Func::atom(), Args::[term()],
-%%         lsocket(), Port::integer(), Opts::[option()],
+%%         LSock::listen_socket(), Port::integer(), Opts::[option()],
 %%         MaxCon::integer()) -> never_returns
 %% @doc Used by <code>server/6</code> to handle the listen socket.
 %% This function should not be called directly by users of this module.
 
-server_setup(Mod, Func, Args, LSock, Port, Opts, MaxCon) ->
-  Accepter = spawn(?MODULE, asynch_accept, [self(), LSock]),
-  process_flag(trap_exit, true),
-  server_loop(Mod, Func, Args, LSock, Port, Opts, MaxCon, Accepter).
-
-server_loop(Mod, Func, Args, LSock, Port, Opts, MaxCon=0, Accepter) ->
-  % io:fwrite("connections maxed out, killing accepter~n"),
-  Accepter ! {'EXIT', normal},
+server_setup(Mod, Func, Args, LSock, Port, Opts, MaxCon=0) ->
+  % When the maximum number of connections has been reached, wait
+  % until a socket connection dies before starting any more accepts.
   receive
     {'EXIT', Pid, Reason} ->
       server_setup(Mod, Func, Args, LSock, Port, Opts, MaxCon + 1)
   end;
+server_setup(Mod, Func, Args, LSock, Port, Opts, MaxCon) ->
+  % By setting the process flag trap_exit to true, we will recieve
+  % {'EXIT',Pid,Reason} messages for any linked processes that die
+  process_flag(trap_exit, true),
+  % Therefore, this call is not a spawn_link because we only want to
+  % get exit messages when the user socket handlers die
+  Accepter = spawn(?MODULE, asynch_accept, [self(), LSock]),
+  server_loop(Mod, Func, Args, LSock, Port, Opts, MaxCon, Accepter).
+
+%% @spec server_loop(Mod::atom(), Func::atom(), Args::[term()],
+%%         LSock::listen_socket(), Port::integer(), Opts::[option()],
+%%         MaxCon::integer(), Accepter::pid()) -> never_returns
+%% @doc Called by <code>server_setup/7</code> to handle the listen socket.
+%% This function waits around for something to happen:
+%% either for a message to arrive from the previous <code>asynch_accept/2</code>
+%% (meaning there is now one more connection), or for the exit signal of an
+%% existing socket process (meaning there is now one less connection.)  In the
+%% former case, a new asynchronous <code>accept</code> call is set up by
+%% looping back to <code>server_setup/7</code>.
+
 server_loop(Mod, Func, Args, LSock, Port, Opts, MaxCon, Accepter) ->
   receive
     {Accepter, {ok, Socket}} ->
@@ -106,11 +124,11 @@ server_loop(Mod, Func, Args, LSock, Port, Opts, MaxCon, Accepter) ->
       server_loop(Mod, Func, Args, LSock, Port, Opts, MaxCon + 1, Accepter)
   end.
 
-%% @spec asynch_accept(Parent::pid(), lsocket()) -> never_returns()
-%% @doc Used by <code>server_loop</code> to handle the listen socket.
-%% It waits for a connection and notifies the parent process which spawned it
-%% when a connection happens, allowing the parent to process other messages
-%% in the meantime.
+%% @spec asynch_accept(Parent::pid(), LSock::listen_socket()) -> never_returns
+%% @doc Used by <code>server_loop/8</code> to handle the listen socket.
+%% This function waits for a connection using <code>gen_tcp:accept/1</code>
+%% and notifies the parent process which spawned it when a connection happens,
+%% allowing the parent to process other messages in the meantime.
 %% This function should not be called directly by users of this module.
 
 asynch_accept(Parent, LSock) ->
@@ -126,7 +144,7 @@ asynch_accept(Parent, LSock) ->
 %% @spec client(module(), function(), args(), address(), port(), options()) -> pid() | {error, Reason}
 %% @doc Implements a generic socket client.
 %% Connects to a socket with the given options on the given
-%% port and spawns Module:Function(Socket, Args...) to handle
+%% port and spawns <code>Module:Function(Socket, Args...)</code> to handle
 %% the connection.
 
 client(Module, Function, Args, Address, Port, Options) ->
@@ -141,9 +159,10 @@ client(Module, Function, Args, Address, Port, Options) ->
       Other
   end.
 
-%% @spec client(address(), port(), options(), interval()) -> {ok, socket()} | {error, Reason}
+%% @spec client(address(), port(), options(), Interval::interval()) -> {ok, socket()} | {error, Reason}
 %% @doc Waits for a server to become available, connects to it, and
-%% returns a socket.  Tries the server every (interval) milliseconds.
+%% returns a socket.  This function tries to contact the server repeatedly,
+%% every <code>Interval</code> milliseconds.
 
 client(Host, Port, Options, Interval) ->
   case gen_tcp:connect(Host, Port, Options) of
@@ -165,8 +184,9 @@ couple(Socket) -> couple(Socket, self()).
 %% presumably coupled similarly.)  Likewise, messages sent from the other
 %% end of the connection will be delivered to the owner.
 %% In essence this allows two Erlang sessions to communicate with each other
-%% in the same manner as communicating with any other process, without
-%% relying on the distribution mechanism.
+%% in the same manner as communicating with any other process (that is,
+%% by sending Erlang messages,) without the nodes necessarily even being in
+%% the same distribution, or indeed any distribution at all.
 %% The socket should be opened in binary mode.
 
 couple(Socket, Pid) ->
@@ -177,6 +197,7 @@ couple(Socket, Pid) ->
 
 %% @spec coupler(socket(), pid()) -> ok
 %% @doc Used by couple/2 to achieve socket/process coupling.
+%% Translates tcp messages to Erlang terms and vice versa.
 %% This function should not be called directly by users of this module.
 
 coupler(Socket, Owner) ->

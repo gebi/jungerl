@@ -1,0 +1,55 @@
+(define #t 'true)
+(define #f 'false)
+
+(define (compose1 f g)
+  (lambda (x) (f (g x))))
+
+(define cadr (compose1 car cdr))
+(define cddr (compose1 cdr cdr))
+(define caddr (compose1 car cddr))
+
+(define (null? x) (=? x '()))
+
+(define %if
+  (lambda (test . rest)
+    (cond ((null? (cdr rest))
+           `(cond (,test ,(car rest))))
+          (else
+           `(cond (,test ,(car rest))
+                  (else  ,(cadr rest)))))))
+
+(defmacro if %if)
+
+(define (map f l)
+  (if (null? l)
+      '()
+      (cons (f (car l))
+            (map f (cdr l)))))
+
+(define %let
+  (lambda (bs . body)
+    `((lambda ,(map car bs) ,@body)
+      ,@(map cadr bs))))
+
+(defmacro let %let)
+
+(define %case
+  (lambda (e . clauses)
+    `(let ((%it ,e))
+       (cond ,@(map (lambda (c)
+                      (let ((match (car c)) (body (cdr c)))
+                        (if (=? match 'else)
+                            `(else ,@body)
+                            `((=? %it ,match) ,@body))))
+                    clauses)))))
+
+(defmacro case %case)
+
+(define not (lambda (x) (if x #f #t)))
+
+(define %when (lambda (a b) `(if ,a ,b #f)))
+(defmacro when %when)
+
+(define %unless (lambda (a b) `(if (not ,a) ,b #f)))
+(defmacro unless %unless)
+

@@ -13,12 +13,12 @@ $(LIBS): $(MK_INCLUDE)
 	(cd lib/$@; $(MAKE) all)
 
 $(MK_INCLUDE): $(MK_INCLUDE).in
-	$(MAKE) config
+	$(MAKE) conf
 
-config:
+conf:
 	(cd config; make)
 
-config_clean:
+conf_clean:
 	(cd config; make clean)
 
 config/configure: config/configure.in

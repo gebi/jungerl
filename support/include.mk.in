@@ -1,0 +1,33 @@
+## -*- makefile -*-
+
+######################################################################
+## C
+
+CC	:= @CC@
+CFLAGS	:= @CFLAGS@ @DEFS@
+
+######################################################################
+## Erlang
+
+ERL	:= @ERL@
+ERLC	:= @ERLC@
+
+ERLDIR	:= @ERLDIR@
+ERL_C_INCLUDE_DIR := $(ERLDIR)/usr/include
+
+ERLC_FLAGS := -W
+
+ifndef no_debug
+  ERLC_FLAGS += +debug_info
+endif
+
+EBIN_DIR := ../ebin
+EMULATOR := beam
+
+ERL_SOURCES := $(wildcard *.erl)
+ERL_HEADERS := $(wildcard *.hrl) $(wildcard ../include/*.hrl)
+ERL_OBJECTS := $(ERL_SOURCES:%.erl=$(EBIN_DIR)/%.$(EMULATOR))
+
+$(EBIN_DIR)/%.$(EMULATOR): %.erl $(ERL_HEADERS)
+	$(ERLC) $(ERLC_FLAGS) -o $(EBIN_DIR) $<
+

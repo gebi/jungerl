@@ -16,9 +16,9 @@
 %%
 %%   -module(foo).
 %%   -export([a/1]).
-%%   a(X)   -> foo:(X).
+%%   a(X)   -> foo:bar(X).
 %%   b()    -> true.
-%%   c(X,Y) -> bar(X, Y).
+%%   c(X,Y) -> pig:oink(X, Y).
 %%
 %% what we do is add on this:
 %%

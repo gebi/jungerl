@@ -6,6 +6,7 @@ LIBS := \
 	msc \
 	rpc \
 	tuntap \
+        wumpus \
 	xmerl \
 	xmlrpc
 

@@ -1,0 +1,18 @@
+AC_INIT
+
+dnl Programs
+
+AC_PROG_CC
+
+AC_PATH_PROG(ERL, erl, erl)
+AC_PATH_PROG(ERLC, erlc, erlc)
+
+ERLDIR=$(dirname $(dirname $ERL))
+AC_SUBST(ERLDIR)
+
+dnl C header files
+
+AC_CHECK_HEADERS(linux/if_tun.h)
+
+AC_OUTPUT(../support/include.mk)
+

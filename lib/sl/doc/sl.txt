@@ -1,0 +1,94 @@
+
+SL serial line interface
+
+intro
+-----
+
+sl is a unix (and nearly windows?)  interface for serial communications.
+It uses a simple interface for settings of all paramters needed for 
+starting programming serial line services.
+
+Parameter settings on the serial line are handle transaction wise,
+use "update" when after setting options on a open sl port.
+
+
+
+interface description
+---------------------
+
+start() -> Port
+
+ Load the driver, if needed,  and open a port to the driver.
+
+stop(Port) -> ok
+
+ Terminate the port, and cleanup if neccessary.
+
+options() -> [Opts]
+
+  Return a list of the options names possible to configure:
+
+     dev	- The device name i.e "/dev/ttyS0" "COM1"
+     baud       - The baud rate         (9600...115200 .. os specific)
+     csize      - Character size        (5,6,7,8)
+     bufsz      - Receive buffer size   (integer())
+     stopb      - Number of stop bits   (0,1,2)
+     parity     - The Parity bits       (0,1)
+     hwflow     - Hardware flow control (true/false)
+     swflow     - Software flow control (true/false)
+     xonchar    - Flow control char when swflow
+     xoffchar   - Flow control char when swflow
+     echo	- Echo mode
+
+
+getopts(Port, [Opt]) ->
+	      [{Opt,Value}]
+
+  For each option Opt return the pair {Opt,Value}
+
+setopt(P, Opt, Arg) -> ok | {error,Reason}
+
+  Set an option
+
+setopts(P, [{Opt,Arg}]) -> ok | {error,Reason}
+
+
+open(Dev, Opts) -> {ok,P} | {error,Reason}
+
+  A combined operation of start/setopts/open.
+
+
+open(P) -> ok | {error,Reason}
+
+
+  Open the device set by setopt(.., [{dev,Device}])
+
+close(P) -> ok
+
+  Closes the device opened by open/1.
+
+connect(P) -> ok.
+
+  Same as open.
+	   
+disconnect(P) -> ok.
+
+  Do a hangup then close.
+
+revert(P) -> ok.
+
+  Revert settings done by setopt.
+
+update(P) -> ok.
+
+  Update the parameters changed with setopt.
+
+
+send(P, Data) -> ok.
+
+  Transmit the io list in Data to the device in P
+
+
+
+   
+      

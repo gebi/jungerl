@@ -1,0 +1,7 @@
+{name, "sl"}.
+{vsn, {1,0}}.
+{summary, "Serial driver for Windows and Unix."}.
+{author, "Tony Rogvall", "tony@rogvall.com", "2002-10-10"}.
+{keywords, ["serial"]}.
+{needs, []}.
+{abstract,"A loadable module for serial com."}.

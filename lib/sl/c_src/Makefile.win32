@@ -1,0 +1,34 @@
+#
+# Make the sl (serial line driver)
+#
+
+DLL=dll
+OBJ=obj
+OUT=-o 
+LD_SHARED=ld -shared
+ERLDIR=C:/Program/erl5.1.2
+ERLC=$(ERLDIR)/bin/erlc
+
+CFLAGS +=  -I$(ERLDIR)/usr/include -mno-cygwin -D__WIN32__
+WIN_LIBS = -lkernel32 -luser32 -ladvapi32 -lgdi32 -lcomdlg32 # -lc
+
+DLL_LIBS = $(ERLDIR)/usr/lib/erl_dll.lib
+
+all: sl_drv.$(DLL) sl.beam slt.beam gterm.beam
+
+
+sl_drv.$(DLL): sl_drv.$(OBJ)
+	$(CC) -mno-cygwin $(OUT)$@ -shared sl_drv.$(OBJ) $(DLL_LIBS) $(WIN_LIBS)
+#	$(LD_SHARED) $(OUT)$@ sl_drv.$(OBJ) $(DLL_LIBS) $(WIN_LIBS)
+
+
+%.beam:	%.erl
+	$(ERLC) $<
+
+%.obj:	%.c
+	$(CC) -c -o $@ $< $(CFLAGS)
+
+clean : 
+	/bin/rm -f *.$(OBJ) sl_drv.$(DLL)
+
+

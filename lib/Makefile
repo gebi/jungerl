@@ -2,6 +2,7 @@ LIBS := \
         edoc \
 	enfs \
 	ermacs \
+	ex11 \
 	slang \
 	lersp \
 	msc \
@@ -11,7 +12,7 @@ LIBS := \
         wumpus \
         www_tools \
 	xmerl \
-	xmlrpc
+	xmlrpc 
 
 all: $(LIBS)
 

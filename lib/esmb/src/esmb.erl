@@ -18,7 +18,7 @@
 -export([dec_smb/1, tt_name/1]).
 -export([zeros/1,p14/1,s16x/1,s21_lm_session_key/1,ex/2,swab/1,
 	 lm_challenge_response/2, nt_challenge_response/2, 
-	 lmtest/0, nttest/0, e/2]).
+	 lmtest/0, nttest/0, e/2, s2k/1]).
 -include("esmb_lib.hrl").
 
 -define(PORT, 139).
@@ -1367,6 +1367,13 @@ s21_nt_session_key(Passwd) ->
 %%% do this...
 %%%
 %%% See libsmb/smbdes.c str_to_key(Str,Key)
+%%%
+%%% Here is an explanation from the samba.internals News group:
+%%%
+%%%   "str_to_key converts a 7 character string (7 bytes, 8 bits 
+%%%    per byte, total56 bits) to a DES key (8 bytes, 7 bits per 
+%%%    byte, total 56 bits). In an actual DES there is a parity 
+%%%    involved in the low order bit but this is not used by smbdes."
 %%%
 s2k(<<S0,S1,S2,S3,S4,S5,S6>>) ->
     K0 = S0 bsr 1,

@@ -33,11 +33,15 @@
 %%% OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 %%% POSSIBILITY OF SUCH DAMAGE. 
 
-%% @doc Simple SMTP client in Erlang.
+%% @doc Simple SMTP client and server written in Erlang.
 %% 
-%% <p>This SMTP client is very simple, but is capable of sending e-mail
+%% <p>The SMTP client is very simple, but is capable of sending e-mail
 %% via a standard SMTP server.  If something unexpected happens, the
 %% entire e-mail transaction is aborted.</p>
+%%
+%% <p>The SMTP server is likewise trivial, and does not constitute a
+%% full-fledged mail server.  A specified callback function is called
+%% for each piece of incoming mail received.</p>
 %%
 %% <p>This module was previously called <code>smtpe</code>.</p>
 %%
@@ -51,6 +55,7 @@
 -include_lib("kernel/include/inet.hrl").
 
 -export([send_email/1, client/9]).
+-export([server/1, server/4]).
 
 %% @spec send_email([option()]) -> ok | {error, Reason}
 %%         option() = {atom(), term()}
@@ -112,7 +117,7 @@ send_email0(HostIP, Host, Options, EnvHost, EnvUser) ->
 %% @spec client(socket(), pid(), Originator::string(), Sender::string(),
 %%         Recipients::[string()], Message::string(), MessageID::string(),
 %%         Headers::[string()], Subject::string()) -> exit
-%% @doc Called by send_email/1.  Should not be called directly by user code.
+%% @doc Called by <code>send_email/1</code>.  Should not be called directly by user code.
 
 client(Socket, Parent, Originator, Sender, Recipients,
  Message, MessageID, Headers, Subject) ->
@@ -164,6 +169,77 @@ client0(Socket, Parent, Originator, Sender, Recipients,
   end, Message),
   send_line(Socket, "."),
   expect(Socket, 250).
+
+%% @spec server([option()]) -> {ok, Pid} | {error, Reason}
+%% @doc Starts a simple SMTP server.  Options include:
+%% <ul>
+%% <li> <code>{host, string()}</code>
+%% <p> the name of the host that the SMTP server shall run on, i.e.
+%% the name of this computer.</p></li>
+%% <li> <code>{port, string()}</code>
+%% <p> the port on the host that shall run the SMTP service, if not 25.</p></li>
+%% <li> <code>{handler, {module(), function()}}</code>
+%% <p> the handler which is called whenever the server receives a valid
+%% incoming mail message.  The specified function (<code>/3</code>)
+%% is called with the reverse-path (FROM), a list of recipients (RCPT),
+%% and a list of strings (DATA).</p></li>
+%% </ul>
+
+server(Options) ->
+  application:load(?MODULE),
+  EnvHost = ce_lib:to_string(os:getenv("HOST")),
+  EnvUser = ce_lib:to_string(os:getenv("USER")),
+  Host = get_opt(Options, host, EnvHost),
+  log("host: ~p", [Host]),
+  Port = get_opt(Options, port, 25),
+  {Module, Function} = get_opt(Options, handler, no_handler_specified),
+  Pid = ce_socket:server(?MODULE, server,  [Host, Module, Function], Port,
+    [list, {active, false}, {packet, line}]),
+  {ok, Pid}.
+
+%% @spec server(socket(), Host::string(), Module::atom(), Function::atom()) -> never_returns
+%% @doc Called by <code>server/1</code>.  Should not be called directly by user code.
+
+server(Socket, Host, Module, Function) ->
+  send_line(Socket, "220 " ++ Host ++ " SMTP Service Ready"),
+  server_loop(Socket, Host, Module, Function, "", []).
+
+server_loop(Socket, Host, Module, Function, From, Rcpts) ->
+  case get_line(Socket) of
+    "HELO " ++ Helo ->
+      send_line(Socket, "250 " ++ Host ++ " OK"),
+      server_loop(Socket, Host, Module, Function, From, Rcpts);
+    "QUIT" ++ Quit ->
+      send_line(Socket, "221 " ++ Host ++ " SMTP Service Closing");
+    "MAIL " ++ NewFrom ->
+      send_line(Socket, "250 " ++ Host ++ " OK"),
+      server_loop(Socket, Host, Module, Function, NewFrom, Rcpts);
+    "RCPT " ++ NewRcpt ->
+      send_line(Socket, "250 " ++ Host ++ " OK"),
+      server_loop(Socket, Host, Module, Function, From, [NewRcpt | Rcpts]);
+    "DATA" ++ DataEOL ->
+      send_line(Socket, "354 " ++ Host ++ " Send Your Data"),
+      Data = server_data_loop(Socket, []),
+      Module:Function(From, lists:reverse(Rcpts), lists:reverse(Data)),
+      send_line(Socket, "250 " ++ Host ++ " Mail Sent"),
+      server_loop(Socket, Host, Module, Function, "", []);
+    _ ->
+      send_line(Socket, "502 " ++ Host ++ " Command Not Implemented"),
+      server_loop(Socket, Host, Module, Function, From, Rcpts)
+  end.
+
+server_data_loop(Socket, Data) ->
+  case get_line(Socket) of
+    "." ->
+      Data;
+    Line ->
+      server_data_loop(Socket, [Line | Data])
+  end.
+
+%%% --------- UTILITIES ----------
+
+%% @spec get_line(socket()) -> string()
+%% @doc Gets a line of text from the given socket.
   
 get_line(Socket) ->
   {ok, L} = gen_tcp:recv(Socket, 0),

@@ -12,4 +12,7 @@ Jungerl mainly to support my own submissions which already use it, but if
 you find it useful, you're welcome to use the functions in it, and to add
 functions and modules to it.
 
-The ce library was added to Jungerl at ce version 2003.0228.
+The ce library was added to Jungerl at ce version 2003.0228.  The version
+(-vsn()) in each of the modules was changed to 'JUNGERL' to clarify that
+this fork of the ce source tree is a fluid development branch from which
+future static snapshots will be taken.

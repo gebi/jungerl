@@ -895,7 +895,8 @@ test_response() ->
     
 
 challenge_response(Passwd, Challenge) -> 
-    ex(s21_lm_session_key(Passwd), Challenge).
+    %%ex(s21_lm_session_key(Passwd), Challenge).
+    ex(s21_nt_session_key(Passwd), Challenge).
 
 ex(<<K0:7/binary,K1:7/binary>>, Data) when size(Data) == 8 ->
     concat_binary([e(K0, Data),
@@ -918,6 +919,12 @@ s21_lm_session_key(Passwd) ->
     S16X  = s16x(Passwd),
     Zero5 = zeros(5),
     <<S16X/binary, Zero5/binary>>.
+
+s21_nt_session_key(Passwd) -> 
+    md4:start_link(),
+    {ok, S16}  = md4:digest(Passwd),
+    Zero5 = zeros(5),
+    <<S16/binary, Zero5/binary>>.
 
 %%%
 %%% See libsmb/smbdes.c str_to_key(Str,Key)

@@ -22,7 +22,9 @@ start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 digest(String) when length(String) =< 16 ->
-    gen_server:call(?SERVER, {digest, String}, infinity).
+    gen_server:call(?SERVER, {digest, String}, infinity);
+digest(Bin) when binary(Bin) ->
+    digest(binary_to_list(Bin)).
 
 %%%----------------------------------------------------------------------
 %%% Callback functions from gen_server

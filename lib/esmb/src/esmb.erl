@@ -11,10 +11,10 @@
 	 tree_connect/4, tree_connect/5, list_dir/3, called/1,
 	 open_file_ro/3, open_file_rw/3, stream_read_file/3,
 	 read_file/3, mkdir/3, rmdir/3, is_ok/2,
-	 astart/0, istart/0, ustart/0,
+	 astart/0, istart/0, ustart/0, start/0,
 	 client/2, aclient/2, iclient/2, uclient/2,
 	 close_file/2, write_file/4, delete_file/3, caller/0,
-	 exit_if_error/2, list_shares/3, list_shares/4, l/3]).
+	 exit_if_error/2, list_shares/3, list_shares/5, l/3]).
 -export([dec_smb/1, tt_name/1]).
 -export([zeros/1,p14/1,s16x/1,s21_lm_session_key/1,ex/2,swab/1,
 	 lm_challenge_response/2, nt_challenge_response/2, 
@@ -22,6 +22,12 @@
 -include("esmb_lib.hrl").
 
 -define(PORT, 139).
+
+
+start()->
+    iconv:start(),
+    md4:start().
+    
 
 
 %%%---------------------------------------------------------------------
@@ -81,24 +87,32 @@ share_type(?SHARETYPE_IPC)      -> "IPC".
     
 
 list_shares(Host, User, Passwd) ->
-    list_shares(Host, User, Passwd, ?DEFAULT_WORKGROUP).
+    list_shares(Host, User, Passwd, ?DEFAULT_WORKGROUP, []).
 
-list_shares(Host, User, Passwd, Workgroup) ->
+list_shares(Host, User, Passwd, Workgroup, SockOpts) ->
     Called = called(Host),
     Caller = caller(),
-    case connect(Caller, Called) of
+    case connect(Caller, Called, SockOpts) of
 	{ok,S,Neg} ->
 	    U = #user{pw = Passwd, name = User, primary_domain = Workgroup},
 	    Pdu0 = user_logon(S, Neg, U),
 	    exit_if_error(Pdu0, "Login failed"),
 	    Path = "\\\\" ++ Called ++ "\\IPC" ++ [$$], % make the Emacs mode happy...
-	    Pdu1 = tree_connect(S, Neg, Pdu0, Path, ?SERVICE_ANY_TYPE),
+	    Pdu1 = tree_connect(S, Neg, Pdu0, ipc_path(Neg, Path), ?SERVICE_ANY_TYPE),
 	    exit_if_error(Pdu1, "Tree connect failed"),
 	    {Req, Pdu2} = smb_list_shares_pdu(Pdu1),
 	    decode_list_shares_response(Req, nbss_session_service(S, Pdu2));
 	Else ->
 	    Else
     end.
+
+ipc_path(Neg, Path) when ?USE_UNICODE(Neg) ->    
+    {ok, Cd}    = iconv:open(?CSET_UCS2, ?CSET_ASCII),
+    {ok, Upath} = iconv:conv(Cd, Path),
+    iconv:close(Cd),
+    Upath;
+ipc_path(_Neg, Path) ->    
+    Path.
 
 
 decode_list_shares_response(Req, {ok, _, ResPdu}) ->
@@ -239,6 +253,7 @@ write_file(S, Neg, InReq, Finfo) ->
 
 write_file(S, Neg, InReq, Finfo, Bin, Written) when ?LT_BUFSIZE(Neg,Bin) ->
     {Req, Pdu} = smb_write_andx_pdu(InReq, Finfo, Bin, Written),
+    %%io:format("~p(~p): writing ~p bytes~n",[?MODULE,?LINE,size(Bin)]),
     case decode_smb_response(Req, nbss_session_service(S, Pdu)) of
 	{ok, Wrote} ->
 	    {ok, Wrote + Written};
@@ -246,7 +261,7 @@ write_file(S, Neg, InReq, Finfo, Bin, Written) when ?LT_BUFSIZE(Neg,Bin) ->
 	    {error, write_file}
     end;
 write_file(S, Neg, InReq, Finfo, Bin, Written) ->
-    {B1,B2} = split_binary(Bin, Neg#smb_negotiate_res.max_buffer_size),
+    {B1,B2} = split_binary(Bin, Neg#smb_negotiate_res.max_buffer_size - ?HEADER_SIZE),
     case write_file(S, Neg, InReq, Finfo, B1, Written) of
 	{ok, Wrote} ->
 	    write_file(S, Neg, InReq, Finfo, B2, Wrote);
@@ -278,35 +293,41 @@ read_file(S, InReq, Finfo) ->
 -define(MORE_TO_READ(F), (F#file_info.size > F#file_info.data_len)).
 
 read_file(S, InReq, Finfo, ?STREAM_READ, Acc) when ?READ_ENOUGH(Finfo) ->
-    ok;
+    {ok, trim_binary(concat_binary(lists:reverse(Acc)), 
+		     Finfo#file_info.data_len - Finfo#file_info.size)};
 read_file(S, InReq, Finfo, ?READ_ALL, Acc) when ?READ_ENOUGH(Finfo) ->
-    {B, _} = split_binary(concat_binary(lists:reverse(Acc)), 
-			  Finfo#file_info.size),
-    {ok, B};
+    {ok, trim_binary(concat_binary(lists:reverse(Acc)), 
+		     Finfo#file_info.size)};
 read_file(S, InReq, Finfo, Rtype, Acc) when ?MORE_TO_READ(Finfo) ->
     {Req, Pdu} = smb_read_andx_pdu(InReq, Finfo),
     case decode_smb_response(Req, nbss_session_service(S, Pdu)) of
 	{ok, Res, Data} -> 
 	    Dlen = Finfo#file_info.data_len + size(Data),
+	    NewFinfo = Finfo#file_info{data_len = Dlen},
 	    if (Rtype == ?STREAM_READ) ->
 		    Cont = fun() ->
 				   read_file(S, 
 					     InReq, 
-					     Finfo#file_info{data_len = Dlen},
+					     NewFinfo,
 					     Rtype,
 					     Acc)
 			   end,
 		    {more, Data, Cont};
-	       true ->
+	        true ->
 		    read_file(S, 
 			      InReq, 
-			      Finfo#file_info{data_len = Dlen}, 
+			      NewFinfo, 
 			      Rtype,
 			      [Data | Acc])
 	    end;
 	_ ->
 	    {error, decoding_read_andx}
     end.
+
+trim_binary(Bin, Size) when size(Bin) > Size -> 
+    element(1, split_binary(Bin, Size));
+trim_binary(Bin, _) -> 
+    Bin.
     
 
 open_file_ro(S, InReq, Path) ->
@@ -336,6 +357,7 @@ delete_file(S, InReq, Path) ->
 
 list_dir(S, InReq, Path) ->
     {Req, Pdu} = smb_trans2_find_first2_pdu(InReq, Path),
+    dbg_smb("list_dir: got trans2_find_first2", Req),
     case decode_smb_response(Req, nbss_session_service(S, Pdu)) of
 	X when X#find_result.eos == true -> 
 	    X#find_result.finfo;
@@ -375,24 +397,22 @@ user_logon(S, Neg, U) ->
     decode_smb_response(Req, nbss_session_service(S, Pdu)).
 
 
-print_res(What, U, Res) ->
-    io:format("~s~n"
-	      "  User    = ~s~n"
-	      "  Eclass  = ~p~n"
-	      "  Ecode   = ~p~n"
-	      "  Uid     = ~p~n"
-	      "  Tid     = ~p~n"
-	      "  Fid     = ~p~n"
-	      "  Fsize   = ~p~n",
-	      [What,
-	       U#user.name,
-	       Res#smbpdu.eclass,
-	       Res#smbpdu.ecode,
-	       Res#smbpdu.uid,
-	       Res#smbpdu.tid,
-	       Res#smbpdu.fid,
-	       Res#smbpdu.file_size
-	      ]).
+dbg_smb(What, Res) ->
+    ?dbg("~s ---"
+	"  Eclass  = ~p"
+	"  Ecode   = ~p"
+	"  Uid     = ~p"
+	"  Tid     = ~p"
+	"  Fid     = ~p"
+	"  Fsize   = ~p~n",
+	[What,
+	Res#smbpdu.eclass,
+	Res#smbpdu.ecode,
+	Res#smbpdu.uid,
+	Res#smbpdu.tid,
+	Res#smbpdu.fid,
+	Res#smbpdu.file_size
+       ]).
 
 
 %%% --------------------------------------------------------------------
@@ -1219,10 +1239,9 @@ wp_session_setup_andx(Neg, U, PwLen, UPwLen) ->
       UPwLen:16/little,          % UNICODE password length
       0:32/little,               % reserved
       ?CAP_UNICODE:32/little>>}. % client capabilities
-    
+
 
 bf_session_setup_andx(Neg, U, Passwd) when ?USE_UNICODE(Neg) ->
-    iconv:start(),
     {ok, Cd}    = iconv:open(?CSET_UCS2, ?CSET_ASCII),
     {ok, Uname} = iconv:conv(Cd, l2b(U#user.name)),
     {ok, Udom}  = iconv:conv(Cd, l2b(U#user.primary_domain)),
@@ -1259,7 +1278,6 @@ enc_lm_passwd(Neg, Passwd) ->
 
 enc_nt_passwd(Neg, Passwd, Cset) when ?NTLM_0_12(Neg), 
 				      ?USE_ENCRYPTION(Neg) ->
-    iconv:start_link(),
     {ok, Cd} = iconv:open(?CSET_UCS2, Cset),
     {ok, UCS2pw} = iconv:conv(Cd, l2b(Passwd)),
     iconv:close(Cd),
@@ -1305,7 +1323,6 @@ lmtest_response() ->
     
 nttest() ->
     EncKey = <<16#9d,16#5d,16#78,16#80,16#37,16#05,16#c2,16#2e>> ,
-    iconv:start(),
     {ok, Cd} = iconv:open(?CSET_UCS2, ?CSET_ASCII),
     {ok, UCS2pw} = iconv:conv(Cd, l2b("qwe123")),
     iconv:close(Cd),
@@ -1355,7 +1372,6 @@ s21_lm_session_key(Passwd) ->
     <<S16X/binary, Zero5/binary>>.
 
 s21_nt_session_key(Passwd) -> 
-    md4:start_link(),
     {ok, S16}  = md4:digest(Passwd),
     Zero5 = zeros(5),
     <<S16/binary, Zero5/binary>>.
@@ -1493,7 +1509,7 @@ nbss_session_service(S, SMB_pdu) ->
     send_recv(S, nbss_session_service_pdu(SMB_pdu)).
 
 send_recv(S, Packet) ->
-    gen_tcp:send(S,[Packet]),
+    gen_tcp:send(S, [Packet]),
     recv(S).
 
 recv(S) ->

@@ -1,0 +1,8 @@
+{application,esmb,
+ [{description,"esmb handling"},
+  {vsn,"%VSN%"},
+  {modules,[%MODULES%]},
+  {registered,[]},
+  {env, []},
+  {mod, {esmb_app, []}},
+  {applications,[kernel,stdlib,sasl]}]}.

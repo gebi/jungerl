@@ -113,15 +113,16 @@ code_change(_, _, _) ->
 %%%----------------------------------------------------------------------
 
 load_path(File) ->
-    case lists:filter(fun(D) ->
-                              case file:read_file_info(D ++ "/" ++ File) of
-                                  {ok, _} -> true;
-                                  _ -> false
-                              end
-                      end, code:get_path()) of
+    case lists:zf(fun(Ebin) ->
+			  Priv = Ebin ++ "/../priv/",
+			  case file:read_file_info(Priv ++ File) of
+			      {ok, _} -> {true, Priv};
+			      _ -> false
+			  end
+		  end, code:get_path()) of
         [Dir|_] ->
             {ok, Dir};
         [] ->
-            io:format("Error: ~s not found in code path\n", [File]),
+            error_logger:format("Error: ~s not found in code path\n", [File]),
             {error, enoent}
     end.

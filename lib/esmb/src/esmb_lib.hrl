@@ -157,8 +157,9 @@
 -define(BUF_FMT_VARIABLE_BLOCK, 16#05).
 
 
--define(MAX_BUFFER_SIZE, 8192).  % arbitrary default value...
-%-define(MAX_BUFFER_SIZE, 16644).  % arbitrary default value...
+-define(HEADER_SIZE, 100).        % max_data_sent = max_buffer_size - header_size
+%-define(MAX_BUFFER_SIZE, 8192).  
+-define(MAX_BUFFER_SIZE, 16644).  
 
 %%% This record hold the negotiation result.
 %%% (Add entries when more complex dialects are being implemented !)
@@ -292,8 +293,8 @@
 %%%  calendar:datetime_to_gregorian_seconds({{1601,1,1},{0,0,0}}).
 -define(GREG_SEC_0_TO_1601,  50522745600).
 
--ifdef(DEBUG).
--define(dbg(Fstr, Args), error_logger:info_msg(Fstr, Args)).
+-ifdef(debug).
+-define(dbg(Fstr, Args), io:format(Fstr, Args)).
 -else.
 -define(dbg(Fstr, Args), true).
 -endif.

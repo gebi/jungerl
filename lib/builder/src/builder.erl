@@ -721,22 +721,30 @@ make_sh_script(Dict) ->
     end.
 
 do_make_sh_script(ScriptF, Type, Dict) ->
-    ok = file:write_file(ScriptF, list_to_binary(sh_script(Type,Dict))),
+    ok = file:write_file(ScriptF, list_to_binary(
+				    sh_script(ScriptF, Type,Dict))),
     {ok,FI} = file:read_file_info(ScriptF),
     Mode = FI#file_info.mode bor 8#00100,
     ok = file:write_file_info(ScriptF, FI#file_info{mode = Mode}).
 
 
 
-sh_script(Mode,Dict) ->
+sh_script(Fname, Mode,Dict) ->
     OutDir = fetch(out_dir, Dict),
     AppDir = fetch(app_dir, Dict),
+    BaseName = filename:basename(Fname),
     XOpts = case dict:find(erl_opts, Dict) of
 		{ok, Opts} ->
-		    [" ", Opts];
+		    Opts;
 		error ->
-		    ""
+		    []
 	    end,
+    OptionalSname =
+	case regexp:match(XOpts, "-sname") of
+	    {match,_,_} -> false;
+	    nomatch -> true
+	end,
+    ?report(debug, "OptionalSname (~p) = ~p~n", [XOpts, OptionalSname]),
     %% mremond: The path it need to be sure the script is predictible	    
 %     Path = [" -pa ", filename:join(AppDir, "ebin")],
     RelName = fetch(rel_name, Dict),
@@ -753,9 +761,56 @@ sh_script(Mode,Dict) ->
     BootVars = [[" -boot_var ", Var, " ", Dir] ||
 		   {Var,Dir} <- dict:fetch(boot_vars, Dict)],
 %     ["#/bin/sh\n"
-%      "erl ", Path, Boot, Sys, BootVars, XOpts, "\n"].
-    ["#/bin/sh\n"
-     "erl ", Boot, Sys, BootVars, XOpts, "\n"].
+%      "erl ", Boot, Sys, BootVars, XOpts, "\n"].
+    ["#!/bin/bash\n",
+     "ERL=\"`which erl`\"\n",
+     case OptionalSname of
+	 true -> "SNAME=\"\"\n";
+	 false -> ""
+     end,
+     "\n"
+     "while [ \$# -gt 0 ]\n"
+     "  do\n"
+     "    case \$1 in\n"
+     "      -erl)\n"
+     "        ERL=\"\$2\"\n"
+     "        shift\n"
+     "        ;;\n",
+     case OptionalSname of
+	 true ->
+	     ("      -sname)\n"
+	      "        SNAME=\"\-sname $2\"\n"
+	      "        shift\n"
+	      "        ;;\n");
+	 false ->
+	     ""
+     end,
+     "      *)\n"
+     "        echo \"Faulty arguments: \$*\"\n"
+     "        echo \"usage: ", BaseName, (
+				 [" [-erl <ErlLocation>]",
+				  case OptionalSname of
+				      true -> " [-sname <Sname>]";
+				      false -> ""
+				  end, "\"\n"]),
+     "        exit 1\n"
+     "        ;;\n"
+     "      esac\n"
+     "      shift\n"
+     "  done\n"
+     "\n",
+     case OptionalSname of
+	 true ->
+	     ["\$ERL \$SNAME", Boot, Sys, BootVars, opt_space(XOpts), "\n"];
+	 false ->
+     	     ["\$ERL", Boot, Sys, BootVars, opt_space(XOpts), "\n"]
+     end
+    ].
+
+opt_space([]) ->
+    [];
+opt_space([_|_] = L) ->
+    [$\s|L].
 
 ensure_rel_file(Dict) ->
     OutDir = fetch(out_dir, Dict),
@@ -844,6 +899,7 @@ get_rel_filename(Dict) ->
 modules(Dict) ->
     Ebin = ebin_dir(Dict),
     Ext = code:objfile_extension(),
+    ?report(debug, "looking for modules (~p) in ~p~n", [Ext,Ebin]),
     L = recursive_list_dir(Ebin),
     ?report(debug, "L = ~p~n", [L]),
     Skip = fetch(skip, Dict),
@@ -862,6 +918,7 @@ modules(Dict) ->
 
 
 recursive_list_dir(Dir) ->
+    ?report(debug, "recursive_list_dir(~p)~n", [Dir]),
     {ok, Fs} = file:list_dir(Dir),
     lists:concat([f_expand(F,Dir) || F <- Fs]).
 

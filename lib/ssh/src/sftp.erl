@@ -78,8 +78,8 @@ read_link_info(Pid, Name) ->
 make_symlink(Pid, Old, New) ->
     gen_server:call(Pid, {mak_symlink, Old, New}, ?FILEOP_TIMEOUT).    
 
-rename(Pid, From, To) ->
-    gen_server:call(Pid, {rename, From, To}, ?FILEOP_TIMEOUT).
+rename(Pid, FromFile, ToFile) ->
+    gen_server:call(Pid, {rename, FromFile, ToFile}, ?FILEOP_TIMEOUT).
 
 delete(Pid, Name) ->
     gen_server:call(Pid, {delete, Name}, ?FILEOP_TIMEOUT).
@@ -116,7 +116,6 @@ read_file(Pid, Name) ->
 read_file_loop(Pid, Handle, PacketSz, Acc) ->
     case read(Pid, Handle, PacketSz) of
 	{ok, Data}  ->
-	    io:format("."),
 	    read_file_loop(Pid, Handle, PacketSz, [Data|Acc]);
 	eof ->
 	    {ok, list_to_binary(reverse(Acc))};
@@ -124,7 +123,8 @@ read_file_loop(Pid, Handle, PacketSz, Acc) ->
 	    Error
     end.
 
-
+write_file(Pid, Name, List) when list(List) ->
+    write_file(Pid, Name, list_to_binary(List));
 write_file(Pid, Name, Bin) ->
     case open(Pid, Name, [write, binary]) of
 	{ok, Handle} ->
@@ -143,7 +143,6 @@ write_file_loop(Pid, Handle, Pos, Bin, Remain, PacketSz) ->
 	    <<_:Pos/binary, Data:PacketSz/binary, _/binary>> = Bin,
 	    case write(Pid, Handle, Data) of
 		ok ->
-		    io:format("."),
 		    write_file_loop(Pid, Handle, 
 				    Pos+PacketSz, Bin, Remain-PacketSz,
 				    PacketSz);
@@ -354,9 +353,9 @@ handle_call({position,Handle,At}, From, State) ->
 	    {reply, Error, State}
     end;
 
-handle_call({rename, From, To}, From, State) ->
+handle_call({rename, FromFile, ToFile}, From, State) ->
     ReqID = State#state.reqid,
-    Rep = ssh_xfer:rename(State#state.xf, ReqID, From, To,[overwrite]),
+    Rep = ssh_xfer:rename(State#state.xf,ReqID,FromFile,ToFile,[overwrite]),
     xreply(Rep, ReqID, State);
 
 handle_call({delete, Name}, From, State) ->
@@ -465,9 +464,9 @@ xreply(Reply, ReqID, State) ->
 	    {reply, {ok,Handle}, State#state { reqid = NReqID  }};
 	{attrs, ReqID, A} ->
 	    {reply, {ok, attr_to_info(A)}, State#state { reqid = NReqID }};
-	{status, ReqID, {ok, Err, Lang, Reply}} ->
+	{status, ReqID, {ok, Err, _Lang, _Rep}} ->
 	    {reply, ok, State#state { reqid = NReqID }};
-	{status, ReqID, {Status, Err, Lang, Reply}} ->
+	{status, ReqID, {Status, Err, _Lang, _Rep}} ->
 	    {reply, {error,Status}, State#state { reqid = NReqID }};
 	Rep ->
 	    {reply, {error,Rep}, State#state { reqid = NReqID }}

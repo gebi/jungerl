@@ -244,7 +244,11 @@ service_request(SSH, Name) ->
     
     
 client_init(User, Host, Port, Opts) ->
-    case gen_tcp:connect(Host, Port, [{packet,line},{active,once}]) of
+    IfAddr = getopt(ifaddr, Opts, any),
+    Tmo    = getopt(connect_tmo, Opts, infinity),
+    case gen_tcp:connect(Host, Port, [{packet,line},
+				      {active,once},
+				      {ifaddr,IfAddr}], Tmo) of
 	{ok, S} ->
 	    SSH = ssh_init(S, client, Opts),
 	    Peer = if tuple(Host) -> inet_parse:ntoa(Host);
@@ -326,7 +330,7 @@ ssh_getopt(Opt, SSH, Default) ->
 getopt(Opt, Opts, Default) ->
     case lists:keysearch(Opt, 1, Opts) of
 	false -> Default;
-	{value,Val} -> Val
+	{value,{_,Val}} -> Val
     end.
 
 ssh_setopts(NewOpts, SSH) ->

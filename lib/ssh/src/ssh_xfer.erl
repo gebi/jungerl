@@ -117,14 +117,21 @@ remove(XF, ReqID, File) ->
 
 %% Rename a file/directory
 rename(XF, ReqID, Old, New, Flags) ->
-    Path1 = list_to_binary(Old),
-    Path2 = list_to_binary(Old),
-    F = encode_rename_flags(Flags),
+    Vsn = XF#ssh_xfer.vsn,
+    OldPath = list_to_binary(Old),
+    NewPath = list_to_binary(New),
+    FlagBits
+	= if Vsn >= 5 ->
+		  F0 = encode_rename_flags(Flags),
+		  ?uint32(F0);
+	     true ->
+		  (<<>>)
+	  end,
     frequest(XF, ReqID, ?SSH_FXP_RENAME, 
 	     [?uint32(ReqID),
-	      ?string(Path1),
-	      ?string(Path2),
-	      ?uint32(F)]).
+	      ?string(OldPath),
+	      ?string(NewPath),
+	      FlagBits]).
 
 
 

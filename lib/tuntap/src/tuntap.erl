@@ -11,6 +11,22 @@
 %% than root, you should chmod "/dev/net/tun" to be read/write by the
 %% appropriate user.
 
+%% To actually communicate between your host machine and Erlang via a
+%% tun/tap interface, you will probably want to assign it an IP
+%% address and setup routing. For example (on Linux):
+%%
+%%   ifconfig tun0 200.0.0.1 pointopoint 200.0.0.2
+%%
+%% Will configure the tun0 interface so that the host machine (Linux
+%% itself) has the address 200.0.0.1 and that it believes Erlang has
+%% the address 200.0.0.2 (i.e. it sets up routing of that address into
+%% the tunnel).
+%%
+%% The exact setup varies from unix to unix. The point is that you
+%% configure it exactly like a normal network interface: assign an
+%% address for the local machine to use and a route for any addresses
+%% you want to talk to "out there".
+
 -module(tuntap).
 
 -author('luke@bluetail.com').
@@ -59,7 +75,7 @@ device_name(Port) ->
 
 %% Returns: ok
 write(Port, Packet) ->
-    [?REPLY_OK] = erlang:port_control(Port, ?REQUEST_WRITE, Packet),
+    erlang:port_command(Port, Packet),
     ok.
 
 set_active(Port, false) -> set_active1(Port, ?ACTIVE_FALSE);

@@ -411,7 +411,7 @@ handle_call(recv_window, From, State) ->
     {reply, ssh_cm:recv_window(XF#ssh_xfer.cm, XF#ssh_xfer.channel), State};
 
 handle_call(stop, From, State) ->    
-    {stop, ok, normal, State};
+    {stop, normal, ok, State};
 
 handle_call(Call, From, State) ->    
     {reply, {error, bad_call}, State}.

@@ -8,6 +8,8 @@
 -module(pan).
 -author('etxmacr@avc386').
 
+-import(filename,[join/2,dirname/1]).
+
 -export([help/0]).
 -export([start/0,start/1,start/2,start/3,start/4,start/5]).
 -export([mark/0]).
@@ -17,7 +19,7 @@
 -export([prof/1, prof/2, prof/3, prof/4]).
 -export([dbg/0,dbg/1,dbg/2,dbg/3,dbg/4]).
 
--define(HELPFILE, "pan.html").
+-define(HELPFILE, "doc/pan.html").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 start() -> panHost:start().
@@ -52,7 +54,7 @@ dbg(start, TPs, Node, Proc) ->panDbg:do(start, TPs, Node, Proc).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 do_help() ->
-    Hfile = filename:join(filename:dirname(code:which(?MODULE)), ?HELPFILE),
+    Hfile = join(dirname(dirname(code:which(?MODULE))), ?HELPFILE),
     case file:open(Hfile, [read]) of
 	{ok, FD} -> do_help(FD, io:get_line(FD, ''), 0);
 	Err -> {no_help, Err, Hfile}

@@ -788,7 +788,7 @@ wp_close_file(Fid) ->
 
 smb_delete_file_pdu(InReq, Fname) ->
     {Wc,Wp} = wp_delete_file(),
-    Bf = bf_delete_file(Fname),
+    Bf = bf_delete_file(InReq, Fname),
     Rec = #smbpdu{cmd = ?SMB_DELETE,
 		  pid = InReq#smbpdu.pid,
 		  uid = InReq#smbpdu.uid,
@@ -806,14 +806,14 @@ wp_delete_file() ->
     {1,
      <<0:16/little>>}.   % SearchAttributes
 
-bf_delete_file(Fname) ->
+bf_delete_file(InReq, Fname) ->
     list_to_binary([?BUF_FMT_ASCII,   % Buffer format
-		    Fname,[0]]).      % Filename 
+		    Fname, null(InReq)]).      % Filename 
 
 %%% ---
 
 smb_delete_dir_pdu(InReq, Dir) ->
-    Bf = bf_delete_directory(Dir),
+    Bf = bf_delete_directory(InReq, Dir),
     Rec = #smbpdu{cmd = ?SMB_DELETE_DIRECTORY,
 		  pid = InReq#smbpdu.pid,
 		  uid = InReq#smbpdu.uid,
@@ -825,9 +825,9 @@ smb_delete_dir_pdu(InReq, Dir) ->
     %%io:format("delete_directory: ByteCount = ~p~n",[Rec#smbpdu.bc]),
     {Rec, enc_smb(Rec)}.
 
-bf_delete_directory(Dir) ->
+bf_delete_directory(InReq, Dir) ->
     list_to_binary([?BUF_FMT_ASCII,   % Buffer format
-		    Dir,[0]]).        % Dir path
+		    Dir, null(InReq)]).        % Dir path
 
 %%% ---
 
@@ -1135,16 +1135,11 @@ wp_tree_connect_andx(Neg) ->
       0:16/little,               % Flags
       1:16/little>>}.            % PasswordLength (incl. NULL)
 
-bf_tree_connect_andx(Neg, Path, Service) when ?NTLM_0_12(Neg) ->
-    list_to_binary([0,               % Password
-		    Path, null(Neg), % filesystem 
-		    Service, [0]]);  % service
-%%%
 bf_tree_connect_andx(Neg, Path, Service) ->
-    list_to_binary([0,           % Password
-		    Path, [0],   % filesystem
-		    Service, [0]]).  % service
-    
+    list_to_binary([0,                    % password
+		    Path, null(Neg),      % filesystem 
+		    Service, null(Neg)]). % service
+
 
 null(Neg) when record(Neg,smb_negotiate_res),
 	       ?USE_UNICODE(Neg) -> 

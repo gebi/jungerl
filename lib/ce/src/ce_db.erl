@@ -222,10 +222,11 @@ update_counter(Table, Key) ->
 %% FieldNames should be the output of <code>record_info(fields, Table)</code>
 
 export(IoDevice, Table, FieldNames) ->
+  io:fwrite(IoDevice, "~p.~n", [Table]),
   fold(Table, fun(Record, ok) ->
     io:fwrite(IoDevice, "~p.~n", [map_fields(Record, FieldNames)])
   end, ok),
-  io:fwrite(IoDevice, "end_of_records.~n").
+  io:fwrite(IoDevice, "~p.~n", [end_of_records]).
 
 map_fields(Record, FieldNames) ->
   map_fields(tl(tuple_to_list(Record)), FieldNames, []).
@@ -239,6 +240,14 @@ map_fields([Field | Fields], [FieldName | FieldNames], Acc) ->
 %% FieldNames should be the output of <code>record_info(fields, Table)</code>
 
 import(IoDevice, Table, FieldNames) ->
+  case io:read(IoDevice, '') of
+    {ok, Table} ->
+      import_loop(IoDevice, Table, FieldNames);
+    _ ->
+      {error, could_not_read_table_tag}
+  end.
+
+import_loop(IoDevice, Table, FieldNames) ->
   case io:read(IoDevice, '') of
     {ok, end_of_records} ->
       ok;

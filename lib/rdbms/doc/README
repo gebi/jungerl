@@ -1,0 +1,4 @@
+The documentation is only available in PDF format. That is why I did not put it
+into CVS (It is a rather large file: 110 Ko).
+You can find it in rdbms-1.3 archive:
+http://www.erlang.org/contrib/rdbms-1.3.tgz

@@ -1,0 +1,373 @@
+RDBMS vsn 1.3
+===============
+
+A relational database management layer on top of mnesia.
+
+Ulf Wiger
+Chief Designer
+Ericsson Telecom AB
+ATM Switch Development
+
+<ulf.wiger@ericsson.com>
+
+
+Changes
+-------
+
+Changes since 1.2
+
+- The 'oid' datatype is enforced as a 'required' attribute, without regard
+  to what has been specified in the dictionary. This kind of reveals a 
+  flaw in rdbms: the validity checking of metadata is not what it should be.
+  For example: 'required' = false for an attribute of type 'oid' is not 
+  allowed, but rdbms doesn't enforce this.
+
+- mnesia:write(Obj) where Obj is an #rdbms_obj record now works.
+
+- The default value of an attribute of type 'oid' is now a unique oid.
+
+
+Changes since 1.0:
+
+- The functions register_commit_action/1 and register_rollback_action/1
+  now work as they should even with nested transactions.
+
+- A new patch of mnesia_schema.erl has been included, to make RDBMS work
+  with OTP R6B
+
+- New functions: make_object/[1,2], make_record/1:
+  These functions allow the user to specify values in an unsorted 
+  key-value list, instead of using the record syntax. See the References
+  section below for an example of useage.
+
+- New types:
+  + {tuples, Arity, KeyPos} -- rdbms verifies that the element is 
+    in fact a list of tuples of given arity.
+
+  + oid -- constructed as {node(), erlang:now()}, which should be 
+    globally and persistently unique.
+
+- New referential actions: 'return' and 'ignore':
+  'ignore' means exactly what it says. 'return' means that we
+  return all related objects untouched, so that the user can
+  determine what to do with them.
+
+
+** NOTE: ** Vsn 1.2 is an update of the RDBMS contrib for otp R6B.
+The included patch of mnesia_schema.erl must not be applied to mnesia versions
+older than 3.8, and RDBMS will not work properly without it.
+
+
+Errata
+------
+
+I must confess that I seem to have thrown away the editable User Guide, and
+am left with only the PDF document. One or two things should be said about 
+commit and rollback actions:
+
+1. RDBMS does catch exits and produces error reports for commit and rollback 
+   actions that fail.
+
+2. It is not obvious from the documentation what will happen when a nested
+   transaction aborts, but is caught by the calling transaction. RDBMS will
+   run any registered rollback actions for the aborted inner transaction.
+   Thus, you may see a few rollback actions fire, while commit actions fire
+   for the rest of the transactions. Naturally commit actions are not run
+   for an aborted inner transaction -- they are removed.
+   Any commit actions for nested transactions will be run iff the outer
+   transaction succeeds.
+
+
+Introduction
+------------
+
+This application currently consists of:
+- a data dictionary
+- a type conversion library
+- a data import tool
+
+The programs began their life as utilities in the Ericsson ATM switch AXD 301,
+since some kind of data import tool was needed to manage initialization data.
+Since mnesia doesn't carry type information, some kind of dictionary was 
+needed. I decided to write a data dictionary and added some more features
+while I was at it.
+
+Recently, I have added checking of referential integrity. I haven't had time
+to document it much, but if you study C.J. Date, "A guide to the SQL standard"
+or similar, you should find it reasonably easy to grasp.
+
+
+Structure
+---------
+The application contains the normal directories:
+- src  (source code)
+- ebin (compiled code, initially empty)
+- doc  (a .pdf file with a manual for the dictionary)
+
+I had to make some changes to mnesia_schema.erl in order to support adding 
+multiple user properties to a table within one transaction. You will find my
+changes listed at the end of this document.
+
+To compile:
+
+$ cd rdbms-1.0/src
+$ erlc -o ../ebin *.erl
+
+If you want debug printouts turned on:
+
+$ erlc -o ../ebin -D debug *.erl
+
+
+Files
+-----
+
+I will follow up with more detailed information on the import utilities.
+
+
+	rdbms.erl
+	---------
+The data dictionary. In order for it to work, you must use the following
+function instead of mnesia:transaction/1:
+
+rdbms:activity(Fun)
+
+see the file rdbms-1.0/doc/rdbms.userGuide.pdf for information on how to 
+define metadata.
+
+
+
+	rdbms_import_server.erl
+	-----------------------
+A data import facility. The idea is this:
+
+Write an access function which understands the import file format.
+
+import(File, Type) ->
+   {Header, Data} = read_file_contents(File, Type),
+   {ok, Pid} = rdbms_import_server:start_link(),
+   rdbms_import_server:header(Pid, Header),
+   rdbms_import_server:data(Pid, Data),
+   rdbms_import_server:commit(Pid).     % the server terminates.
+
+The server accepts any number of calls to header/2 and data/2 before commit.
+Incoming data is matched against the last header/2 information. Example:
+
+   {ok, Pid} = rdbms_import_server:start_link(),
+   %% first batch
+   rdbms_import_server:header(Pid, Header1),
+   rdbms_import_server:data(Pid, Data11),
+   rdbms_import_server:data(Pid, Data12),
+   %% second batch
+   rdbms_import_server:header(Pid, Header2),
+   rdbms_import_server:data(Pid, Data21),
+   rdbms_import_server:data(Pid, Data22),
+   rdbms_import_server:commit(Pid).
+
+For documentation, see the source code comments for interface functions:
+- header/2
+- data/2
+- commit/1
+- abort/1
+
+	rdbms_mailmerge.erl
+	-------------------
+An example of a data import access module, which uses rdbms_import_server.
+Format: mailmerge (tab-delimited, first row is a header with Tab.Attr type
+annotation.) Some non-standard features are supported: erlang-style comments
+in the import data, and multiple sections: a single dot "." on one line
+followed by a new header line starts a new section.
+
+
+Reference
+=========
+
+Use of rdbms_obj records
+------------------------
+(rdbms@avc303)1> Ps.
+[{{attr,name,type},string},
+ {{attr,name,required},true},
+ {{attr,address,type},string},
+ {{attr,phone,type},string},
+ {{attr,phone,required},true}]
+(rdbms@avc303)2> mnesia:create_table(
+                        person,[{disc_copies,[node()]},
+                                {attributes,[name,address,phone]},
+                                {user_properties,Ps}]).
+{atomic,ok}
+
+(rdbms@avc303)3> rdbms:make_object(person).
+{rdbms_obj,person,
+           [{name,string,'#.[].#'},   
+            {address,string,'#.[].#'},
+            {phone,string,'#.[].#'}]}
+
+(rdbms@avc303)4> rdbms:make_record(person).
+{person,'#.[].#','#.[].#','#.[].#'}
+
+(rdbms@avc303)5> Uffe = rdbms:make_object(person,[{name,"Uffe"},
+                                                  {phone,"98195"}]).
+{rdbms_obj,person,
+           [{name,string,"Uffe"},
+            {address,string,'#.[].#'},
+            {phone,string,"98195"}]}  
+
+(rdbms@avc303)6> rdbms:activity(fun() -> mnesia:write(Uffe) end).
+ok
+
+(rdbms@avc303)7> ets:tab2list(person).
+[{person,"Uffe",'#.[].#',"98195"}]
+
+(rdbms@avc303)8> Rec = rdbms:make_record(Uffe).
+{person,"Uffe",'#.[].#',"98195"}
+
+(rdbms@avc303)9> rdbms:make_object(Rec).
+{rdbms_obj,person,
+           [{name,string,"Uffe"},
+            {address,string,'#.[].#'},
+            {phone,string,"98195"}]}
+
+
+
+mnesia_schema.erl
+-----------------
+
+Below is a listing of the changes I made to mnesia_schema.erl
+
+$ diff mnesia_schema.erl $OTP/lib/mnesia-3.8.2/src/mnesia_schema.erl
+18,21d17
+< %% Modified by Ulf Wiger <ulf.wiger@ericsson.com> 1999-12-18 to allow
+< %% more flexible adminitration of user properties.
+< %% My changes are highlighted with "UW"
+< %%
+87,90d82
+< %% UW 991218 added following exports
+< -export([schema_transaction/1, insert_schema_ops/2,
+<          do_create_table/1, do_write_table_property/2]).
+< 
+1434,1456c1426,1427
+< %    get_tid_ts_and_lock(Tab, none),
+< %    insert_schema_ops(TidTs, make_write_table_properties(Tab, [Prop])).
+<     %% UW mods: if we're creating the table in the same transaction
+<     %% we want to update the user_properties part of the create_table op.
+<     %% If there have been previous write_/delete_property ops on Tab in this
+<     %% transaction, we update the data of that op to reflect this new property.
+<     {_, _, Ts} = TidTs,
+<     Store = Ts#tidstore.store,
+<     case change_prop_in_existing_op(Tab, Prop, write_property, Store) of
+<         true ->
+<             mnesia_lib:verbose("change_prop_in_existing_op"
+<                                "(~p,~p,write_property,Store) -> true~n",
+<                                [Tab,Prop]),
+<             %% we have merged the table prop into the create_table op
+<             ok;
+<         false ->
+<             mnesia_lib:verbose("change_prop_in_existing_op"
+<                                "(~p,~p,write_property,Store) -> false~n",
+<                                [Tab,Prop]),
+<             %% this must be an existing table
+<             get_tid_ts_and_lock(Tab, none),
+<             insert_schema_ops(TidTs, make_write_table_properties(Tab, [Prop]))
+<     end.
+---
+>     get_tid_ts_and_lock(Tab, none),
+>     insert_schema_ops(TidTs, make_write_table_properties(Tab, [Prop])).
+1481,1502c1452,1453
+< %    get_tid_ts_and_lock(Tab, none),
+< %    insert_schema_ops(TidTs, make_delete_table_properties(Tab, [PropKey])).
+<     %% UW mods: if we're creating the table in the same transaction
+<     %% we want to update the user_properties part of the create_table op.
+<     {_, _, Ts} = TidTs,
+<     Store = Ts#tidstore.store,
+<     case change_prop_in_existing_op(Tab, PropKey, delete_property, Store) of
+<         true ->
+<             mnesia_lib:verbose("change_prop_in_existing_op"
+<                                "(~p,~p,delete_property,Store) -> true~n",
+<                                [Tab,PropKey]),
+<             %% we have merged the table prop into the create_table op
+<             ok;
+<         false ->
+<             mnesia_lib:verbose("change_prop_in_existing_op"
+<                                "(~p,~p,delete_property,Store) -> false~n",
+<                                [Tab,PropKey]),
+<             %% this must be an existing table
+<             get_tid_ts_and_lock(Tab, none),
+<             insert_schema_ops(TidTs, 
+<                               make_delete_table_properties(Tab, [PropKey]))
+<     end.
+---
+>     get_tid_ts_and_lock(Tab, none),
+>     insert_schema_ops(TidTs, make_delete_table_properties(Tab, [PropKey])).
+1550,1624d1500
+< %% =============== UW mods =========================
+< 
+< %%%%%%%%% UW: change_prop_in_existing_op(Tab, Property, Store)
+< %%%
+< %%% The idea is this: We scan the tidstore for a create_table op or 
+< %%% write_/delete_property on Tab.
+< %%% (this means we do enforce the rule that the table must be created
+< %%% before we update properties on it. Since the tidstore is a bag table
+< %%% and the order of ops is important, we extract all objects, possibly
+< %%% perform an update in place, and then recreate the entire tidstore.
+< %%% We return true or false, signaling whether we found a create_table op
+< %%% or a write_/delete_property op.
+< 
+< change_prop_in_existing_op(Tab, Prop, How, Store) ->
+<     Ops = ets:match_object(Store, '_'),
+<     case update_existing_op(Ops, Tab, Prop, How, Acc = []) of
+<         {true, Ops1} ->
+<             ets:match_delete(Store, '_'),
+<             [ets:insert(Store, Op) || Op <- Ops1],
+<             true;
+<         false ->
+<             false
+<     end.
+< 
+< update_existing_op([{op, Op, L = [{name,Tab}|_], OldProp}|Ops], 
+<                  Tab, Prop, How, Acc) when Op == write_property; 
+<                                            Op == delete_property ->
+<     %% Apparently, mnesia_dumper doesn't care about OldProp here -- just L,
+<     %% so we will throw away OldProp (not that it matters...) and insert Prop.
+<     %% as element 3.
+<     L1 = insert_prop(Prop, L, How),
+<     NewOp = {op, How, L1, Prop},
+<     {true, lists:reverse(Acc) ++ [NewOp|Ops]};
+< update_existing_op([Op = {op, create_table, L}|Ops], Tab, Prop, How, Acc) ->
+<     case lists:keysearch(name, 1, L) of
+<         {value, {_, Tab}} ->
+<             %% Tab is being created here -- insert Prop into L
+<           L1 = insert_prop(Prop, L, How),
+<             {true, lists:reverse(Acc) ++ [{op, create_table, L1}|Ops]};
+<         _ ->
+<             update_existing_op(Ops, Tab, Prop, How, [Op|Acc])
+<     end;
+< update_existing_op([Op|Ops], Tab, Prop, How, Acc) ->
+<     update_existing_op(Ops, Tab, Prop, How, [Op|Acc]);
+< update_existing_op([], _, _, _, _) ->
+<     false.
+< 
+< %% perhaps a misnomer. How could also be delete_property... never mind.
+< %% Returns the modified L.
+< insert_prop(Prop, L, How) ->
+<     Prev = find_props(L),
+<     MergedProps = merge_with_previous(How, Prop, Prev),
+<     replace_props(L, MergedProps).
+< 
+<  
+<  
+< find_props([{user_properties, P}|_]) -> P;
+< find_props([H|T]) -> find_props(T).
+< %% we shouldn't reach []
+<  
+< replace_props([{user_properties, _}|T], P) -> [{user_properties, P}|T];
+< replace_props([H|T], P) -> [H|replace_props(T, P)].
+< %% again, we shouldn't reach []
+<  
+< merge_with_previous(write_property, Prop, Prev) ->
+<     Key = element(1, Prop),
+<     Prev1 = lists:keydelete(Key, 1, Prev),
+<     lists:sort([Prop|Prev1]);
+< merge_with_previous(delete_property, PropKey, Prev) ->
+<     lists:keydelete(PropKey, 1, Prev).
+<  
+< %% =============== end UW mods =========================
+< 

@@ -1,0 +1,13 @@
+{application, rdbms,
+ [{description, "Relational Database Management System"},
+  {summary,"Relational Database Management System"},
+  {abstract,"Relational Database Management System"},
+  {vsn, "%VSN%"},
+  {modules, [
+	     rdbms,
+	     rdbms_import_server,
+	     rdbms_types,
+	     rdbms_mailmerge
+	    ]},
+  {registered, []},
+  {applications, [kernel, stdlib, mnesia]}]}.

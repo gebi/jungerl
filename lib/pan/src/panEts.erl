@@ -10,6 +10,7 @@
 -export([new/1,new/2]).
 -export([kill/1]).
 -export([upd/2,upd/3]).
+-export([lup/2]).
 
 new(Tab) -> new(Tab, []).
 new(Tab, Opts) ->
@@ -35,5 +36,12 @@ upd(Tab, Key) -> upd(Tab, Key, 1).
 upd(Tab, Key, Inc) ->
     case catch ets:update_counter(Tab, Key, Inc) of
         {'EXIT', _ } -> ets:insert(Tab, {Key, Inc}), Inc;
+        O -> O
+    end.
+
+lup(Tab, Key) ->
+    case catch ets:lookup(Tab, Key) of
+        [{Key,Val}] -> Val;
+	{'EXIT',_} -> [];
         O -> O
     end.

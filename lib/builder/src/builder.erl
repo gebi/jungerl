@@ -72,6 +72,13 @@
 %%%   other than <code>[AppName]</code> or whatever is in the 
 %%%   <code>.rel</code> file.</dd>
 %%%
+%%% <dt>{app_vsn, string()}</dt>
+%%%   <dd>This option can be used to assign a version to the current 
+%%%    application. If the application directory has a version suffix,
+%%%    the version suffix will override this option. If the directory
+%%%    has no suffix, the default vsn will be "BLDR", unless 'app_vsn'
+%%%    has been specified.</dd>
+%%%
 %%% <dt>{apps, [App : AppName | {AppName,Vsn} | {AppName,Vsn,EbinDir}]}</dt>
 %%%   <dd>This is a way to identify which applications should be included
 %%%     in the build. The way builder determines which applications should
@@ -815,7 +822,13 @@ get_app(Dict) ->
     %%  Now we assume that version number is "BLDR" by default.
     case string:tokens(hd(lists:reverse(string:tokens(AppDir, "/"))), "-") of
     	[App, Vsn] -> {AppDir, [App, Vsn]};
-	[App]      -> {AppDir, [App, "BLDR"]}
+	[App]      ->
+	    case dict:find(app_vsn, Dict) of
+		{ok, Vsn} ->
+		    {AppDir, [App, Vsn]};
+		error ->
+		    {AppDir, [App, "BLDR"]}
+	    end
     end.
 
 get_app_filename(App, Dict) ->
@@ -1005,26 +1018,27 @@ search_apps(Apps, Dict, AppInfo, InitAcc) ->
     Path = fetch(path, Dict),
     Ebin = ebin_dir(Dict),
     Path1 = Path ++ [Ebin],
-    MyApp = {dict:fetch(app_name,Dict),
-	     dict:fetch(app_vsn,Dict), ebin_dir(Dict)},
+    MyAppName = dict:fetch(app_name, Dict),
+    MyApp = {MyAppName, dict:fetch(app_vsn,Dict), ebin_dir(Dict)},
     ?report(debug, "Search Path = ~p~n", [Path1]),
-    case expand_path(Path ++ [Ebin], Apps, AppInfo, InitAcc) of
-	{FoundInfo, []} ->
-	    ?report(debug, "LeftApps = [], FoundInfo = ~p~n", [FoundInfo]),
-	    [MyApp|check_found(FoundInfo, Dict)];
-	{FoundInfo, LeftApps} ->
-	    %% LeftApps may still include applications for which we've
-	    %% found versions (but didn't know if they were the right ones)
-	    ?report(debug, "LeftApps = ~p,~nFoundInfo = ~p~n", 
-		[LeftApps, FoundInfo]),
-	    case [A || A <- LeftApps,
-		       not(lists:keymember(A, 1, FoundInfo))] of
-		[] ->
-		    [MyApp|check_found(FoundInfo, Dict)];
-		NotFound ->
-		    exit({not_found, NotFound})
-	    end
-    end.
+    Found = case expand_path(Path ++ [Ebin], Apps, AppInfo, InitAcc) of
+		{FoundInfo, []} ->
+		    ?report(debug, "LeftApps = [], FoundInfo = ~p~n", [FoundInfo]),
+		    check_found(FoundInfo, Dict);
+		{FoundInfo, LeftApps} ->
+		    %% LeftApps may still include applications for which we've
+		    %% found versions (but didn't know if they were the right ones)
+		    ?report(debug, "LeftApps = ~p,~nFoundInfo = ~p~n", 
+			[LeftApps, FoundInfo]),
+		    case [A || A <- LeftApps,
+			       not(lists:keymember(A, 1, FoundInfo))] of
+			[] ->
+			    check_found(FoundInfo, Dict);
+			NotFound ->
+			    exit({not_found, NotFound})
+		    end
+	    end,
+    replaceadd(MyAppName,1,Found,MyApp).
 	    
 check_found(FoundInfo, Dict) ->
     case lists:foldr(
@@ -1050,6 +1064,13 @@ check_found(FoundInfo, Dict) ->
 		" these apps:~n   ~p~n", [UnknownVsns]),
 	    Found
     end.
+
+replaceadd(Key,Pos,[H|T],Obj) when element(Pos,H) == Key ->
+    [Obj|T];
+replaceadd(Key,Pos,[H|T],Obj) ->
+    [H|replaceadd(Key,Pos,T,Obj)];
+replaceadd(Key,Pos,[],Obj) ->
+    [Obj].
 
 vsn_from_app_file(AppF) ->
     case file:consult(AppF) of
@@ -1092,10 +1113,12 @@ expand_path([Dir|Ds], Apps, AppInfo, Acc) ->
 			    %% App dir without version suffix -- legal,
 			    %% but we must extract the version somehow
 			    AppA = list_to_atom(App),
+			    AppF = filename:join(Dir, App ++ ".app"),
+			    Vsn = vsn_from_app_file(AppF),
 			    case lists:member(AppA, Apps) of
 				true ->
 				    {Acc1,Apps1} = 
-					maybe_save_app(AppA, unknown, Dir,
+					maybe_save_app(AppA, Vsn, Dir,
 						       Apps, AppInfo, Acc),
 				    expand_path(Ds, Apps1, AppInfo, Acc1);
 				false ->

@@ -13,9 +13,6 @@
 
 %%% default arguments
 -define(DEFTC, []).
--define(DEFFLAGS, [running,timestamp]).
--define(DEFPROCS, all).
--define(DEFTPS, []).
 
 -define(DEFIPPORT, 9666).
 -define(DEFIPQUE, 4096).

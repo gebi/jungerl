@@ -1,0 +1,21 @@
+This little program is very much inspired by Expect.
+See: http://expect.nist.gov/ for Expects home page.
+
+Erlspect is a simple tool for automating interactive text 
+based applications like telnet etc. And also for testing 
+such applications.
+
+Erlspect spawns a port with a command. The user can then interact
+with the started program and match on expected outcome(s).
+
+Check the testprograms two examples 
+test_erlspect:ls_beam().
+test_erlspect:telnet_http().
+
+The match expression is using Erlangs regexp library with its 
+deviations from ordinary regular expressions, so check out
+this in case you think your regular expression should match but
+fails to do so.
+
+Known problems:
+Can't interact with ftp sessions for some reason.

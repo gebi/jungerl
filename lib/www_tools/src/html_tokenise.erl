@@ -9,9 +9,10 @@
 % <p><b>html_tokenise:bin2toks(Bin)   -> Toks tokenises a binary
 % <p><b>html_tokenise:string2toks(String)   -> Toks. tokenises a string
 % <p><b>html_tokenise:toks2file(Toks, File) -> ok write Toks to File.html
+% <p><b>html_tokenise:toks2socket(Toks, Socket) -> ok send Toks to TCP/IP socket
 
 
--export([file2toks/1, bin2toks/1, string2toks/1, toks2file/2]).
+-export([file2toks/1, bin2toks/1, string2toks/1, toks2file/2, toks2socket/2]).
 
 -import(lists, [foreach/2, reverse/1]).
 
@@ -42,8 +43,17 @@ bin2toks(Bin) -> string2toks(binary_to_list(Bin)).
 toks2file(Toks, File) ->
     %% io:format("Dumping tokens to:~p~n", [File]),
     {ok, Out} = file:open(File ++ ".html", write),
-    foreach(fun(X) -> dump_token(Out, X) end, Toks),
+    OutFun = fun(Text) -> io:put_chars(Out, Text) end,
+    foreach(fun(X) -> dump_token(OutFun, X) end, Toks),
     file:close(Out),
+    true.
+
+%% -type toks2socket([token()], port()) -> true.
+
+toks2socket(Toks, Socket) ->
+    %% io:format("Dumping tokens to:~p~n", [Socket]),
+    OutFun = fun(Text) -> gen_tcp:send(Socket, Text) end,
+    foreach(fun(X) -> dump_token(OutFun, X) end, Toks),
     true.
 
 %% -type string2toks(string()) -> [token()].
@@ -312,18 +322,21 @@ amp_digits([], N) ->
     end.
 
 
+dump_token(O, Token) when is_pid(O) -> 
+  dump_token(fun(Text) -> io:put_chars(O, Text) end, Token);
+
 dump_token(O, {raw, R}) -> 
-    io:format(O, "~s", [R]);
+    O(io_lib:fwrite("~s", [R]));
 dump_token(O, {tagStart, Tag, Args}) ->
-    io:format(O, "<~s", [Tag]),
-    foreach(fun({Key,Val}) ->
-		   io:format(O, ' ~s="~s"', [Key,Val])
-	   end, Args),
-    io:format(O, ">", []);
+    O(io_lib:fwrite("<~s", [Tag]) ++
+      lists:foldl(fun({Key,Val},Acc) ->
+	      Acc ++ io_lib:fwrite(" ~s=\"~s\"", [Key,Val])
+	    end, "", Args) ++
+      io_lib:fwrite(">", []));
 dump_token(O, {tagStart, Tag}) ->
-    io:format(O, "<~s>", [Tag]);
+    O(io_lib:fwrite("<~s>", [Tag]));
 dump_token(O, {tagEnd, Tag}) ->
-    io:format(O, "</~s>", [Tag]);
+    O(io_lib:fwrite("</~s>", [Tag]));
 dump_token(O, Other) ->
     io:format("dump_token ????~p~n", [Other]).
 

@@ -105,7 +105,7 @@ h40(N, Payload) ->
 
 t50() ->
     {ok, Pid} = xmlrpc:start_link(4567, 1000, 60000, {test, h50}, undefined),
-    Cmd = "java -classpath ../../apache/xmlrpc/bin/xmlrpc-1.1.jar:. T50",
+    Cmd = "java -classpath xmlrpc-1.1.jar:. T50",
     io:format("t50: ~p~n", [Cmd]),
     "[[42, foo], {bar=45.5, baz=4711}]\norg.apache.xmlrpc.XmlRpcException: Unknown call: {call,foo,[]}\n" = os:cmd(Cmd),
     xmlrpc:stop(Pid).
@@ -119,7 +119,7 @@ h50(State, Payload) ->
 
 t60() ->
     {ok, Pid} = xmlrpc:start_link(4567, 1000, 60000, {test, h60}, 0),
-    Cmd = "java -classpath ../../apache/xmlrpc/bin/xmlrpc-1.1.jar:. T60",
+    Cmd = "java -classpath xmlrpc-1.1.jar:. T60",
     io:format("t60: ~p~n", [Cmd]),
     "[0, [42, foo], {bar=45.5, baz=4711}]\n[1, [42, foo], {bar=45.5, baz=4711}]\norg.apache.xmlrpc.XmlRpcException: Unknown call: {call,foo,[]}\n" =
 	os:cmd(Cmd),

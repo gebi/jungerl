@@ -7,8 +7,10 @@
 %%%-------------------------------------------------------------------
 -module(panOpt).
 
+-export([tmp_dir/0]).
 -export([mangle_ic/1]).
 -export([defnodes/0]).
 
+tmp_dir() -> "/tmp".
 mangle_ic(MFA) -> ok.
 defnodes() -> nodes().

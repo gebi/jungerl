@@ -1,0 +1,109 @@
+<erldriver name="unixdom_drv" abbrev="s1"
+           default_async_calls="0" default_debug_verbose="0">
+
+<summary>EDTK implementation of UNIX domain socket driver (incomplete!)</summary>
+
+<cpy>Copyright (c) 2004, Scott Lystig Fritchie.  All rights reserved.</cpy>
+<cpy>See the file "LICENSE" at the top of the source distribution for</cpy>
+<cpy>full license terms.</cpy>
+
+<stash size="3"/>
+
+<verbatim place="top_cpp_stuff">
+#include &lt;stdio.h>
+#include &lt;time.h>
+#include &lt;fcntl.h>
+#include &lt;errno.h>
+#include &lt;string.h>
+#include &lt;sys/types.h>
+#include &lt;sys/stat.h>
+#include &lt;sys/socket.h>
+#include &lt;sys/un.h>
+#include &lt;netinet/in.h>	/* htonl() et al. */
+
+#include &lt;my-unixdom.h>
+</verbatim>
+
+<include name="unixdom_drv.h" style="angle"/>
+
+<func name="null">
+ <return ctype="void"/>
+</func>
+
+<func name="open" cname="my_open">
+ <arg name="filename" ctype="char *" ser_type="binary" nulterm="1"/>
+ <arg name="flags" ctype="int"/>
+ <return ctype="int" name="ret_int" valmap_name="fd" valmap_type="start"
+         expect=">= 0" expect_errval="errno"/>
+</func>
+
+<!--
+  The getfd func is necessary because we want to use the valmap
+  feature to be able to clean up file descriptors if our owning Erlang
+  process crashes ... but valmaps also (intentionally) hide the value
+  of the values they store.  We want to expose the file descriptor
+  value, so use my_getfd().
+-->
+
+<func name="getfd" cname="my_getfd">
+ <arg name="fd" ctype="int" valmap_name="fd"/>
+ <return ctype="int" name="ret_int"/>
+</func>
+
+<func name="sendfd" cname="my_sendfd">
+ <arg name="unixdom_fd" ctype="int"/>
+ <arg name="fd_to_be_sent" ctype="int"/>
+ <return ctype="int" name="ret_int_t" etype="integer"
+         expect="== 0" expect_errval="errno"/>
+</func>
+
+<func name="receivefd" cname="my_receivefd">
+ <arg name="unixdom_fd" ctype="int"/>
+ <return ctype="int" name="ret_int_t" etype="integer"
+         expect=">= 0" expect_errval="errno"/>
+</func>
+
+<func name="close">
+ <arg name="fd" ctype="int" valmap_name="fd"/>
+ <!-- QQQ valmap return processing is a bit weird.  We specify
+      valmap_name on an input arg _and_ we specify it on the return
+      item, along with the 'valmap_type="stop"' attrib.
+ -->
+ <return ctype="int" name="ret_int" valmap_name="fd" valmap_type="stop"
+         expect="== 0" expect_errval="errno"/>
+</func>
+
+<func name="write">
+ <arg name="fd" ctype="int" valmap_name="fd"/>
+ <arg name="ptr" ctype="char *" ser_type="binary" binlen2stash="0"/>
+ <arg name="size" ctype="size_t" noerlcall="1" usestash="0"/>
+ <return ctype="ssize_t" name="ret_ssize_t" etype="integer"/>
+</func>
+
+<func name="read">
+ <arg name="fd" ctype="int" valmap_name="fd"/>
+ <arg name="ptr" ctype="char *" noerlcall="1"/>
+ <arg name="size" ctype="size_t" ser_type="integer"/>
+ <return ctype="ssize_t" name="ret_ssize_t" etype="integer"
+         xreturn="1_ptr_ssize_t"/>
+ <hack place="post-deserialize" type="verbatim">
+	edtk_debug("XXX c->i.size = %d\r\n", c->i.size);
+	if ((c->i.ptr = (char *) edtk_driver_alloc_wrapper(c->i.size)) == NULL) {
+	    goto error;
+	}
+ </hack>
+</func>
+
+<valmap name="fd" ctype="int" maxsize="32" initial_val="-1"
+        cleanup_func="close"/>
+
+<xtra_return name="1_ptr_ssize_t">
+ <xtra_ok>
+  <xtra_val etype="binary" valtype="erl_drv_bin" val="c->i.ptr"
+            offset="0" length="c->o.ret_ssize_t"/>
+ </xtra_ok>
+</xtra_return>
+
+
+</erldriver>
+

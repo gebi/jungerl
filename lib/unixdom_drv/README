@@ -1,0 +1,58 @@
+
+This is a very incomplete reimplementation of the UNIX domain socket driver
+that I wrote and added to the www.erlang.org "User Contributions"
+collection.
+
+There are two things that this driver can do that the original UNIX
+domain socket driver cannot:
+
+	1. It has a "getfd" call so that Erlang can discover the 
+	   underlying UNIX file descriptor for the socket.
+
+	2. Has the ability to use BSD-style file descriptor passing
+	   to pass file descriptors between Erlang nodes running
+	   on the same machine.
+
+The file descriptor passing has been tested under Linux and FreeBSD.  It
+should work under Solaris (minor tweaking perhaps necessary?) and any other
+platform that supports BSD-style file descriptor passing over UNIX domain
+sockets.
+
+To test the file descriptor passing, to the following:
+
+    On machine-A:
+
+	% make			... GNU make is required, sorry!
+	% cd test
+	% make
+	% make test		... optional, but shows some instructions
+	% erl -pz ../ebin
+	1> file:delete("/tmp/sock").
+	2> unixdom_test:tcp_listen(5555, "/tmp/sock").
+
+    On machine-A, but in another login session:
+
+	% cd test
+	% erl -pz ../ebin
+	1> unixdom_test:receive_fd("/tmp/sock").
+	[... some time later ...]
+	TCP socket fd 8 received, looping now
+
+    On machine-B:
+
+	% telnet machine-A 5555
+	Trying 10.1.1.1...
+	Connected to machine-A
+	Escape character is '^]'.
+	Hello, there!  Please type some stuff:
+
+If someone would like to fix this driver up, they are more than welcome to!
+I have only done enough to implement the file descriptor passing.  My
+intention was to create a minimal implementation this time, relying on
+using gen_tcp:fdopen() or prim_inet:fdopen() to create a full-featured
+socket port, rather than trying to re-invent the wheel (including all of
+the gadgets, like packet encoding types, that the inets driver currently
+supports!).
+
+-Scott
+23 February 2004

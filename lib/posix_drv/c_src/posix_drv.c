@@ -51,7 +51,12 @@
 #include <grp.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/syslimits.h>
+/* BSD-specific? (for NGROUPS_MAX) #include <sys/syslimits.h> */
+
+#ifndef NGROUPS_MAX
+#define NGROUPS_MAX     64      /* Big, but we'll be safe */
+#endif  /* !NGROUPS_MAX */
+
 
 /* </verbatim --place="top_cpp_stuff"--> */
 

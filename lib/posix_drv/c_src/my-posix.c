@@ -9,6 +9,10 @@
 /* BSD-specific? (for NGROUPS_MAX) #include <sys/syslimits.h> */
 #include <sys/stat.h>
 
+#ifndef NGROUPS_MAX
+#define NGROUPS_MAX     64      /* Big, but we'll be safe */
+#endif  /* !NGROUPS_MAX */
+
 #include <erl_driver.h>
 #include <erl_driver_tk.h>
 #include <posix_drv.h>

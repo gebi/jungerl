@@ -44,6 +44,11 @@
 #include &lt;sys/types.h>
 #include &lt;sys/stat.h>
 /* BSD-specific? (for NGROUPS_MAX) #include &lt;sys/syslimits.h> */
+
+#ifndef NGROUPS_MAX
+#define NGROUPS_MAX     64      /* Big, but we'll be safe */
+#endif  /* !NGROUPS_MAX */
+
 </verbatim>
 
 <atom name="stat"/>

@@ -1,0 +1,13 @@
+ce README.jungerl
+-----------------
+
+This is a Jungerlified version of my miscellaneous Erlang/OTP programming
+support library.  It is a container for a plethora of modules with little
+in common except that they may contain functions which I've found handy
+to use and reuse.  Most of these functions are neither efficient, nor do
+they have beautiful error handling.  It is also true that they give you a
+multitude of extra ways to shoot yourself in the foot.  They may, however,
+be useful for prototyping, as example code, etc.  ce is included in the
+Jungerl mainly to support my own submissions which already use it, but if
+you find it useful, you're welcome to use the functions in it, and to add
+functions and modules to it.

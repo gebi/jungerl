@@ -1,5 +1,6 @@
 LIBS := \
-        edoc \
+	ce \
+	edoc \
 	enfs \
 	ermacs \
 	ex11 \
@@ -29,6 +30,7 @@ $(LIBS):
 	fi
 
 # Dependencies between programs.
+ce: edoc
 edoc: syntax_tools xmerl
 ermacs: slang msc
 enfs: rpc

@@ -16,13 +16,15 @@
 -module(esmb_rpc).
 -export([rpc_samr_connect/3, rpc_samr_close/3, rpc_samr_enum_doms/3,
 	 rpc_samr_lookup_doms/4, rpc_samr_lookup_names/5,
-	 rpc_samr_open_user/5, open_srvsvc_pipe/2, open_samr_pipe/2,
-	 rpc_netr_share_enum/3]).
+	 rpc_samr_open_domain/5, rpc_samr_user_groups/4,
+	 rpc_samr_open_user/5, rpc_samr_open_user/6, 
+	 open_srvsvc_pipe/2, open_samr_pipe/2, rpc_samr_lookup_rids/5,
+	 rpc_netr_share_enum/3, rpc_bind/3]).
 
 %%% For testing
--export([test/0,test/1,test2/0,test2/1]).
+-export([test/0,skrak/0,test/3,test2/0,test2/1]).
 
--import(esmb, [unicode_p/1, to_ucs2/2, to_ucs2_and_null/2]).
+-import(esmb, [unicode_p/1, to_ucs2/2, to_ucs2_and_null/2, ucs2_to_ascii/1]).
 -import(esmb, [b2l/1, hexprint/1]).
 
 -include("esmb_lib.hrl").
@@ -58,17 +60,22 @@
 
 
 
+
 %%% @hidden
-
-%%%
-%%% List shares on server
-%%%
 test() ->
-    test("192.168.128.65").
+    test("192.168.128.65", "tobbe", "qwe123").
 
-test(Host) ->
+%%% @hidden
+skrak() ->
+    test("192.168.128.42", "tobbe", "qwe123").
+
+%%% @hidden
+test(Host, User, Passwd) ->
+    %%
+    %% List shares on server
+    %%
     {ok,S,Neg} = esmb:connect(Host),
-    U = #user{pw = "qwe123", name = "tobbe"},
+    U = #user{pw = Passwd, name = User},
     Pdu0 = esmb:user_logon(S, Neg, U),
     esmb:exit_if_error(Pdu0, "Login failed"),
     IPC = "\\\\"++Host++"\\IPC"++[$$],
@@ -102,14 +109,14 @@ dir_type(Else)           -> Else.
 
 
 %%% @hidden
-
-%%%
-%%% NTLM authenticate user
-%%%
 test2() ->
     test2("192.168.128.65").
 
+%%% @hidden
 test2(Host) ->
+    %%
+    %% NTLM authenticate user
+    %%
     {ok,S,Neg} = esmb:connect(Host),
     U = #user{pw = "qwe123", name = "tobbe"},
     Pdu0 = esmb:user_logon(S, Neg, U),
@@ -119,7 +126,7 @@ test2(Host) ->
     Pdu1 = esmb:tree_connect(S, Neg, Pdu0, Path1, ?SERVICE_NAMED_PIPE),
     esmb:exit_if_error(Pdu1, "Tree connect failed"),
     %%
-    Pdu2 = open_samr_pipe(S, Pdu1),
+    {ok,Pdu2} = open_samr_pipe(S, Pdu1),
     %%
     rpc_bind(S, Pdu2, ?ST_SAMR),
     IpStr = "\\\\192.168.128.51",     % FIXME
@@ -187,22 +194,24 @@ print_edom(E) ->
 
 %%%
 %%% @spec open_srvsvc_pipe(S::socket(), PDU::pdu()) ->
-%%%          pdu() | exception()
+%%%          {ok,pdu()} | exception()
 %%%
 %%% @doc Opens up the <em>srvsvc</em> pipe (NT Administrative
 %%%      Services). This is the first thing that needs to be
 %%%      done before any DCE/RPC requests can be issued.
+%%%      The returned pdu() record will contain the <em>FID</em>
+%%%      file descriptor.
 %%% @end
 %%%
 open_srvsvc_pipe(S, Pdu0) ->
-    Path = to_ucs2(unicode_p(Pdu0), "\\\\srvsvc"),
+    Path = to_ucs2(unicode_p(Pdu0), "\\srvsvc"),
     Pdu1 = esmb:open_file_rw(S, Pdu0, Path),
-    esmb:exit_if_error(Pdu0, "Open srvsvc pipe, failed"),
-    Pdu1.
+    esmb:exit_if_error(Pdu1, "Open srvsvc pipe, failed"),
+    {ok,Pdu1}.
 
 %%%
 %%% @spec open_samr_pipe(S::socket(), PDU::pdu()) ->
-%%%          pdu() | exception()
+%%%          {ok,pdu()} | exception()
 %%%
 %%% @doc Opens up the <em>samr</em> pipe (NT SAM Database
 %%%      Management Services). This is the first thing that 
@@ -211,16 +220,16 @@ open_srvsvc_pipe(S, Pdu0) ->
 %%% @end
 %%%
 open_samr_pipe(S, Pdu0) ->
-    Path = to_ucs2(unicode_p(Pdu0), "\\\\samr"),
+    Path = to_ucs2(unicode_p(Pdu0), "\\samr"),
     Pdu1 = esmb:open_file_rw(S, Pdu0, Path),
     esmb:exit_if_error(Pdu0, "Open samr pipe, failed"),
-    Pdu1.
+    {ok,Pdu1}.
 
 
 %%%
 %%% @spec rpc_bind(S::socket(), PDU::pdu(), 
 %%%                ST::serviceType()) ->
-%%%          ok | exception()
+%%%          {ok, pdu()} | exception()
 %%%
 %%% @doc This is where a RPC connection is setup. 
 %%%      The <em>ServiceType</em> input argument defines
@@ -229,10 +238,10 @@ open_samr_pipe(S, Pdu0) ->
 %%%
 rpc_bind(S, Pdu, ServiceType) ->
     Rpc = e_rpc_bind(ServiceType),
-    {ok,BindRes} = esmb:named_pipe_transaction(S, Pdu, Rpc),
+    {ok,BindRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, Rpc),
     case catch d_bind_response(BindRes) of
 	Ack when record(Ack, rpc_bind_ack) ->
-	    ok;
+	    {ok,Pdu2};
 	Else ->
 	    throw({error, Else})
     end.
@@ -241,28 +250,28 @@ rpc_bind(S, Pdu, ServiceType) ->
 %%%
 %%% @spec rpc_netr_share_enum(S::socket(), PDU::pdu(), 
 %%%                           IpStr::string()) ->
-%%%          nseEntries() | exception()
+%%%          {ok, nseEntries(), pdu()} | exception()
 %%%
 %%% @doc The <em>NetrShareEnum</em> request is used to retrieve
 %%%      information about the shares offered by the Server,
 %%%      including hidden shares (those ending with $).
 %%%      Works over the <em>srvsvc</em> pipe.
 %%%      <br/>Example:
-%%%      <pre>
-%%%        IpStr = "\\\\192.168.128.51",
-%%%        Nse = rpc_netr_share_enum(S, Pdu, IpStr),
-%%%      </pre>
+%%% ```
+%%%  IpStr = "\\\\192.168.128.51",
+%%%  Nse = rpc_netr_share_enum(S, Pdu, IpStr),
+%%% '''
 %%%      Where: Nse = [{nse_entry, ?DIR, "NETLOGON", "Logon Server Share"}, ...]
 %%% @end
 %%%
 rpc_netr_share_enum(S, Pdu, IpStr) ->
     UnicodeP = unicode_p(Pdu),
     SrvSvcPdu = e_rpc_netr_share_enum(UnicodeP, IpStr),
-    {ok,RpcRes} = esmb:named_pipe_transaction(S, Pdu, SrvSvcPdu),
+    {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SrvSvcPdu),
     case catch d_rpc_response(RpcRes) of
 	NseRes when record(NseRes, rpc_response) ->
 	    case catch d_rpc_netr_share_enum(UnicodeP, NseRes) of
-		{ok, Nse} -> Nse;
+		{ok, Nse} -> {ok,Nse,Pdu2};
 		Else ->
 		    ?elog("d_netr_share_enum failed: ~p~n",[Else]),
 		    throw({error, "netr_share_enum"})
@@ -278,7 +287,7 @@ rpc_netr_share_enum(S, Pdu, IpStr) ->
 %%%
 %%% @spec rpc_samr_connect(S::socket(), PDU::pdu(), 
 %%%                        IpStr::string()) ->
-%%%          CtxHandle | exception()
+%%%          {ok, CtxHandle, pdu()} | exception()
 %%%
 %%% @doc The <em>SamrConnect</em> request is the first call that
 %%%      must be made on the <em>samr pipe</em>. 
@@ -287,11 +296,11 @@ rpc_netr_share_enum(S, Pdu, IpStr) ->
 rpc_samr_connect(S, Pdu, IpStr) ->
     UnicodeP = unicode_p(Pdu),
     SamrPDU = e_rpc_samr_connect2(UnicodeP, IpStr),
-    {ok,RpcRes} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
+    {ok, RpcRes, Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
     case catch d_rpc_response(RpcRes) of
 	Resp1 when record(Resp1, rpc_response) ->
 	    case catch d_rpc_samr_connect2(UnicodeP, Resp1) of
-		{ok, CtxHandle}   -> CtxHandle;
+		{ok, CtxHandle}   -> {ok, CtxHandle, Pdu2};
 		{error, Rc} = Err -> throw(Err);
 		Else ->
 		    ?elog("d_samr_connect failed: ~p~n",[Else]),
@@ -306,7 +315,7 @@ rpc_samr_connect(S, Pdu, IpStr) ->
 %%%
 %%% @spec rpc_samr_close(S::socket(), PDU::pdu(), 
 %%%                      C::ctxHandle()) ->
-%%%          CtxHandle | throw(Error)
+%%%          {ok, pdu()} | throw(Error)
 %%%
 %%% @doc After any Policy Handles allocated by any SAM Database
 %%%      calls are no longer needed they must be freed with a
@@ -315,11 +324,11 @@ rpc_samr_connect(S, Pdu, IpStr) ->
 %%%
 rpc_samr_close(S, Pdu, CtxHandle) ->
     SamrPDU = e_rpc_samr_close(CtxHandle),
-    {ok,RpcRes} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
+    {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
     case catch d_rpc_response(RpcRes) of
 	Resp when record(Resp, rpc_response) ->
 	    case catch d_rpc_samr_close(Resp) of
-		ok                -> ok;
+		ok                -> {ok, Pdu2};
 		{error, Rc} = Err -> throw(Err);
 		Else ->
 		    ?elog("d_samr_close failed: ~p~n",[Else]),
@@ -334,7 +343,7 @@ rpc_samr_close(S, Pdu, CtxHandle) ->
 %%%
 %%% @spec rpc_samr_enum_doms(S::socket(), PDU::pdu(), 
 %%%                          C::ctxHandle()) ->
-%%%          CtxHandle | throw(Error)
+%%%          {ok, CtxHandle, pdu()} | throw(Error)
 %%%
 %%% @doc Obtains a list of Domains at the specified server.
 %%% @end
@@ -342,11 +351,11 @@ rpc_samr_close(S, Pdu, CtxHandle) ->
 rpc_samr_enum_doms(S, Pdu, CtxHandle) ->
     UnicodeP = unicode_p(Pdu),
     SamrPDU = e_rpc_samr_enum_doms(UnicodeP, CtxHandle),
-    {ok,RpcRes} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
+    {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
     case catch d_rpc_response(RpcRes) of
 	Resp1 when record(Resp1, rpc_response) ->
 	    case d_rpc_samr_enum_doms(UnicodeP, Resp1) of
-		{ok, Doms}        -> Doms;
+		{ok, Doms}        -> {ok, Doms, Pdu2};
 		{error, Rc} = Err -> throw(Err);
 		Else ->
 		    ?elog("d_samr_enum_dom failed: ~p~n",[Else]),
@@ -361,7 +370,7 @@ rpc_samr_enum_doms(S, Pdu, CtxHandle) ->
 %%%
 %%% @spec rpc_samr_lookup_doms(S::socket(), PDU::pdu(), 
 %%%                            C::ctxHandle(), D::domains()) ->
-%%%          domains() | throw(Error)
+%%%          {ok, domains(), pdu()} | throw(Error)
 %%%
 %%% @doc Obtains information about the Domains at the specified server.
 %%%      The information contains the SID (Security Identifier) to be
@@ -371,16 +380,15 @@ rpc_samr_enum_doms(S, Pdu, CtxHandle) ->
 rpc_samr_lookup_doms(S, Pdu, CtxHandle, Doms) ->
     UnicodeP = unicode_p(Pdu),
     Builtin = to_ucs2(UnicodeP, "Builtin"),
-    X = [D || D <- Doms,
-	      D#dom_entry.domain =/= Builtin],
+    X = [D || D <- Doms, D#dom_entry.domain =/= Builtin],
     %% Just one domain at the moment....
     Dom = hd(X),
     SamrPDU = e_rpc_samr_lookup_doms(UnicodeP, CtxHandle, Dom),
-    {ok,RpcRes} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
+    {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
     case catch d_rpc_response(RpcRes) of
 	Resp1 when record(Resp1, rpc_response) ->
 	    case d_rpc_samr_lookup_doms(UnicodeP, Resp1, Dom) of
-		{ok, Ds}          -> Ds;
+		{ok, Ds}          -> {ok, Ds, Pdu2};
 		{error, Rc} = Err -> throw(Err);
 		Else ->
 		    ?elog("d_samr_lookup_doms failed: ~p~n",[Else]),
@@ -395,7 +403,7 @@ rpc_samr_lookup_doms(S, Pdu, CtxHandle, Doms) ->
 %%% @spec rpc_samr_open_domain(S::socket(), PDU::pdu(), 
 %%%                          IpStr:: string(), C::ctxHandle(),
 %%%                          Dom::domain()) ->
-%%%          ctxHandle() | throw(Error)
+%%%          {ok, ctxHandle(), pdu()} | throw(Error)
 %%%
 %%% @doc Obtains the returned Policy Handle, to be used as input to
 %%%      other Domain operations.
@@ -403,11 +411,11 @@ rpc_samr_lookup_doms(S, Pdu, CtxHandle, Doms) ->
 %%%
 rpc_samr_open_domain(S, Pdu, IpStr, CtxHandle, Domain) ->
     SamrPDU = e_rpc_samr_open_domain(CtxHandle, Domain),
-    {ok,RpcRes} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
+    {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
     case catch d_rpc_response(RpcRes) of
 	Resp1 when record(Resp1, rpc_response) ->
 	    case d_rpc_samr_open_domain(Resp1) of
-		{ok, CtxHandle2}  -> CtxHandle2;
+		{ok, CtxHandle2}  -> {ok, CtxHandle2, Pdu2};
 		{error, Rc} = Err -> throw(Err);
 		Else ->
 		    ?elog("d_samr_open_domain failed: ~p~n",[Else]),
@@ -423,7 +431,7 @@ rpc_samr_open_domain(S, Pdu, IpStr, CtxHandle, Domain) ->
 %%% @spec rpc_samr_lookup_names(S::socket(), PDU::pdu(), 
 %%%                          IpStr:: string(), C::ctxHandle(),
 %%%                          N::names()) ->
-%%%          {rid(), ridType()} | throw(Error)
+%%%          {ok, rid(), ridType(), pdu()} | throw(Error)
 %%%
 %%% @doc Resolves User, Group, and Alias names in a Domain to
 %%%      Relative Identifiers (RIDs). The request takes a Domain
@@ -433,11 +441,11 @@ rpc_samr_open_domain(S, Pdu, IpStr, CtxHandle, Domain) ->
 %%%
 rpc_samr_lookup_names(S, Pdu, IpStr, CtxHandle, Names) ->
     SamrPDU = e_rpc_samr_lookup_names(Pdu, CtxHandle, Names),
-    {ok,RpcRes} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
+    {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
     case catch d_rpc_response(RpcRes) of
 	Resp1 when record(Resp1, rpc_response) ->
 	    case d_rpc_samr_lookup_names(Resp1) of
-		{ok, Rid, Type}   -> {Rid, Type};
+		{ok, Rid, Type}   -> {ok, Rid, Type, Pdu2};
 		{error, Rc} = Err -> throw(Err);
 		Else ->
 		    ?elog("d_samr_lookup_names failed: ~p~n",[Else]),
@@ -452,8 +460,22 @@ rpc_samr_lookup_names(S, Pdu, IpStr, CtxHandle, Names) ->
 %%%
 %%% @spec rpc_samr_open_user(S::socket(), PDU::pdu(), 
 %%%                          IpStr:: string(), C::ctxHandle(),
+%%%                          Name::string(), R::rid()) ->
+%%%          {ok,ctxHandle(),pdu()} | throw(Error)
+%%%
+%%% @doc Obtains the returned Policy Handle, to be used as input to
+%%%      other User operations.
+%%% @end
+%%%
+rpc_samr_open_user(S, Pdu, IpStr, CtxHandle, Name, Rid) ->
+    User = #name_entry{name = Name, rid = Rid},
+    rpc_samr_open_user(S, Pdu, IpStr, CtxHandle, User).
+
+%%%
+%%% @spec rpc_samr_open_user(S::socket(), PDU::pdu(), 
+%%%                          IpStr:: string(), C::ctxHandle(),
 %%%                          U::user()) ->
-%%%          ctxHandle() | throw(Error)
+%%%          {ok,ctxHandle(),pdu()} | throw(Error)
 %%%
 %%% @doc Obtains the returned Policy Handle, to be used as input to
 %%%      other User operations.
@@ -461,11 +483,11 @@ rpc_samr_lookup_names(S, Pdu, IpStr, CtxHandle, Names) ->
 %%%
 rpc_samr_open_user(S, Pdu, IpStr, CtxHandle, User) ->
     SamrPDU = e_rpc_samr_open_user(CtxHandle, User),
-    {ok,RpcRes} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
+    {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
     case catch d_rpc_response(RpcRes) of
 	Resp1 when record(Resp1, rpc_response) ->
 	    case d_rpc_samr_open_user(Resp1) of
-		{ok, CtxHandle2}  -> CtxHandle2;
+		{ok, CtxHandle2}  -> {ok,CtxHandle2,Pdu2};
 		{error, Rc} = Err -> throw(Err);
 		Else ->
 		    ?elog("d_samr_open_user failed: ~p~n",[Else]),
@@ -480,7 +502,7 @@ rpc_samr_open_user(S, Pdu, IpStr, CtxHandle, User) ->
 %%%
 %%% @spec rpc_samr_user_groups(S::socket(), PDU::pdu(), 
 %%%                          IpStr:: string(), C::ctxHandle()) ->
-%%%          nameEntries() | throw(Error)
+%%%          {ok, nameEntries(), pdu()} | throw(Error)
 %%%
 %%% @doc Obtains the RIDs of the groups a certain User belongs to.
 %%%      As input, the Policy Handle returned from an OpenUser
@@ -489,11 +511,11 @@ rpc_samr_open_user(S, Pdu, IpStr, CtxHandle, User) ->
 %%%
 rpc_samr_user_groups(S, Pdu, IpStr, CtxHandle) ->
     SamrPDU = e_rpc_samr_user_groups(CtxHandle),
-    {ok,RpcRes} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
+    {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
     case catch d_rpc_response(RpcRes) of
 	Resp1 when record(Resp1, rpc_response) ->
 	    case d_rpc_samr_user_groups(Resp1) of
-		{ok, RidList}     -> RidList;
+		{ok, RidList}     -> {ok,RidList,Pdu2};
 		{error, Rc} = Err -> throw(Err);
 		Else ->
 		    ?elog("d_samr_user_groups failed: ~p~n",[Else]),
@@ -509,7 +531,7 @@ rpc_samr_user_groups(S, Pdu, IpStr, CtxHandle) ->
 %%% @spec rpc_samr_lookup_rids(S::socket(), PDU::pdu(), 
 %%%                          IpStr:: string(), C::ctxHandle(),
 %%%                          nameEntries()) ->
-%%%          nameEntries() | throw(Error)
+%%%          {ok, nameEntries(), pdu()} | throw(Error)
 %%%
 %%% @doc Resolves User, Group, and Alias names in a Domain, from
 %%%      Relative Identifiers (RIDs). The request takes a Domain
@@ -518,11 +540,11 @@ rpc_samr_user_groups(S, Pdu, IpStr, CtxHandle) ->
 %%%
 rpc_samr_lookup_rids(S, Pdu, IpStr, CtxHandle, Ns0) ->
     SamrPDU = e_rpc_samr_lookup_rids(CtxHandle, Ns0),
-    {ok,RpcRes} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
+    {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
     case catch d_rpc_response(RpcRes) of
 	Resp1 when record(Resp1, rpc_response) ->
 	    case d_rpc_samr_lookup_rids(unicode_p(Pdu), Resp1, Ns0) of
-		{ok, Ns}          -> Ns;
+		{ok, Ns}          -> {ok,Ns,Pdu2};
 		{error, Rc} = Err -> throw(Err);
 		Else ->
 		    ?elog("d_samr_lookup_rids failed: ~p~n",[Else]),
@@ -1062,7 +1084,11 @@ parse_nse_bodies(UnicodeP, Blob, [H|T]) ->
      ActualCount:32/little,
      B0/binary>> = Blob,
     {Share, B1} = str_extract(UnicodeP, ActualCount, B0),
-    {Comment, Rest} = str_extract(UnicodeP, ActualCount, B0),
+    <<C_MaxCount:32/little,
+     C_Offset:32/little,
+     C_ActualCount:32/little,
+     B2/binary>> = B1,
+    {Comment, Rest} = str_extract2(UnicodeP, C_ActualCount, B2),
     [H#nse_entry{name    = Share,
 		 comment = Comment} |
      parse_nse_bodies(UnicodeP, Rest, T)].
@@ -1155,7 +1181,7 @@ d_bind_response(<<?RPC_VERSION, ?RPC_MINOR_VERSION,
 		 ?RPC_OP_BIND_NACK, B/binary>>) ->
     d_rpc_bind_nack(B);
 d_bind_response(B) ->
-    Emsg = "Bind-Response unknown",
+    Emsg = "DCE/RPC Bind-Response unknown",
     error_logger:info_msg("~s~n",[Emsg]),
     {error, Emsg}.
 
@@ -1296,27 +1322,6 @@ transfer_syntax() ->
      16#48,
      16#60>>.
 
-
-
-ucs2_to_ascii(Ustr) ->
-    ucs2_to_charset(Ustr, "ASCII").
-
-ucs2_to_charset(Ustr, Cset) ->
-    case iconv:open(esmb:ucase(Cset), ?CSET_UCS2LE) of
-	{ok, Cd} ->
-	    case iconv:conv(Cd, Ustr) of
-		{ok, Res} -> 
-		    iconv:close(Cd),
-		    Res;
-		{error, _Reason} -> 
-		    iconv:close(Cd),
-		    Ustr
-	    end;
-	{error, Reason} ->
-	    ?elog("ucs2_to_charset, open failed Reason=~p , Cset=~p~n",
-		[Reason, esmb:ucase(Cset)]),
-	    Ustr
-    end.
 
 
 

@@ -33,6 +33,7 @@ start(Path, User, Wgroup, Charset) ->
     iconv:start(),
     case host_share(Path) of
 	{Host, Share} ->
+	    io:format("Share=~p~n",[Share]),
 	    spawn(fun() -> init(Host, Share, User, Wgroup, Charset) end);
 	Else ->
 	    Else
@@ -45,11 +46,16 @@ init(Host, Share, User, Wgroup, Charset) ->
     U = #user{pw = Pw, name = User, primary_domain = Wgroup},
     Pdu0 = esmb:user_logon(S, Neg, U),
     esmb:exit_if_error(Pdu0, "Login failed"),
-    WinPath = mk_winpath(Neg, "//"++Host++"/"++User, Charset),
+    WinPath = mk_winpath(Neg, "//"++Host++"/"++Share, Charset),
     Path = to_ucs2(Neg, WinPath, Charset),
     Pdu1 = esmb:tree_connect(S, Neg, Pdu0, Path),
-    esmb:exit_if_error(Pdu1, "Tree connect failed"),
-    shell(S, Neg, {Pdu1, "\\\\"}).
+    case esmb:error_p(Pdu1) of
+	false -> 
+	    shell(S, Neg, {Pdu1, "\\\\"});
+	{true, _Ecode, Emsg} -> 
+	    io:format("<ERROR>: ~p~n", [Emsg]),
+	    {error, Emsg}
+    end.
 
 
 shell(S, Neg, {_Pdu, Cwd} = State) ->
@@ -114,12 +120,12 @@ get_file(S, Neg, {Pdu0, Cwd}, Fname0, Fun) ->
     Pdu1 = esmb:open_file_ro(S, Pdu0, Fname),
     Finfo = #file_info{name = Fname, size = Pdu1#smbpdu.file_size},
     io:format("Reading....~n", []),
-    {Time, {ok, Bin}} = timer:tc(esmb, read_file, [S, Pdu1, Finfo]),
+    {Time, {ok, Bin, Pdu2}} = timer:tc(esmb, read_file, [S, Pdu1, Finfo]),
     Size = size(Bin),
     io:format("Read ~p bytes (~p bytes/sec)~n", 
 	      [Size, Size/(Time/1000000)]),
     Fun(Bin, File),
-    Pdu = esmb:close_file(S, Pdu1),
+    Pdu = esmb:close_file(S, Pdu2, Pdu1#smbpdu.fid),
     {Pdu, Cwd}.
 
 
@@ -132,10 +138,10 @@ store(S, Neg, {Pdu0, Cwd}, Fname0) ->
     Pdu1 = esmb:open_file_rw(S, Pdu0, Fname),
     Finfo = #file_info{name = Fname, data = [Bin]},
     io:format("Writing....~n", []),
-    {Time,Res} = timer:tc(esmb, write_file, [S, Neg, Pdu1, Finfo]),
-    io:format("Wrote ~p bytes/sec,  res=~p~n", 
-	      [size(Bin)/(Time/1000000), Res]),
-    Pdu = esmb:close_file(S, Pdu1),
+    {Time, {ok, Wrote, Pdu2}} = timer:tc(esmb, write_file, [S, Neg, Pdu1, Finfo]),
+    io:format("Wrote ~p bytes/sec~n", 
+	      [size(Bin)/(Time/1000000)]),
+    Pdu = esmb:close_file(S, Pdu2, Pdu1#smbpdu.fid),
     {Pdu, Cwd}.
 
 
@@ -145,7 +151,7 @@ mkdir(S, Neg, {Pdu0, Cwd}, Fname0) ->
     WinPath = mk_winpath(Neg, Cwd ++ slash(Cset) ++ File, Cset),
     Fname = to_ucs2(Neg, WinPath, Cset),
     Pdu1 = esmb:mkdir(S, Pdu0, Fname),
-    Pdu = esmb:close_file(S, Pdu1),
+    Pdu = esmb:close_file(S, Pdu1, Pdu1#smbpdu.fid),
     {Pdu, Cwd}.
 
 rmdir(S, Neg, {Pdu0, Cwd}, Dir0) ->
@@ -169,8 +175,8 @@ ls(S, Neg, {Pdu, Cwd} = State) ->
     Cset = get(charset),
     WinPath = mk_winpath(Neg, Cwd, Cset),
     Udir = to_ucs2(Neg, add_wildcard(Neg, Cset, WinPath), Cset),
-    Finfo = esmb:list_dir(S, Pdu, Udir),
-    print_file_info(Neg, Finfo),
+    Rpdu = esmb:list_dir(S, Pdu, Udir),
+    print_file_info(Neg, Rpdu#smbpdu.finfo),
     State.
 
 print_file_info(Neg, L) ->
@@ -228,8 +234,9 @@ rm_space(Cs)      -> Cs.
 host_share([$\s|T])   -> 
     host_share(T);
 host_share("//" ++ T) -> 
-    {Host, Share} = eat_until(T, $/),
+    {Host, "/" ++ Share} = eat_until(T, $/),
     {Host, Share}.
+
 
 eat_until(Cs, X) ->
     eat_until(Cs, X, []).
@@ -425,8 +432,8 @@ g20get_file(S, Neg, {Pdu0, Cwd}, Fname0, Fun) ->
     Fname = to_ucs2(Neg, WinPath, Cset),
     Pdu1 = esmb:open_file_ro(S, Pdu0, Fname),
     Finfo = #file_info{name = Fname, size = Pdu1#smbpdu.file_size},
-    {ok, Bin} = esmb:read_file(S, Pdu1, Finfo),
+    {ok, Bin, Pdu2} = esmb:read_file(S, Pdu1, Finfo),
     Fun(Bin, File),
-    Pdu = esmb:close_file(S, Pdu1),
+    esmb:close_file(S, Pdu2),
     {ok, size(Bin)}.
 -endif.

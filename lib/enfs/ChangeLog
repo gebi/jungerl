@@ -1,0 +1,9 @@
+2003-02-22  Luke Gorrie  <luke@bluetail.com>
+
+	* src/nfs_server.erl: Minor bugfixes.
+
+	* src/nfs_procfs.erl: Added a new top-level to the directory tree:
+	list of nodes (each a directory containing the processes on that
+	node, as it used to be for the host node.)
+	
+

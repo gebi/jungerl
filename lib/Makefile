@@ -14,6 +14,7 @@ LIBS := \
         pan \
         pico \
 	posix_drv \
+	quickcheck \
 	rpc \
 	smart_exceptions \
 	spread_drv \

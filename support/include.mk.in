@@ -35,6 +35,6 @@ ERL_SOURCES := $(wildcard *.erl)
 ERL_HEADERS := $(wildcard *.hrl) $(wildcard ../include/*.hrl)
 ERL_OBJECTS := $(ERL_SOURCES:%.erl=$(EBIN_DIR)/%.$(EMULATOR))
 
-$(EBIN_DIR)/%.$(EMULATOR): %.erl $(ERL_HEADERS)
+$(EBIN_DIR)/%.$(EMULATOR): %.erl
 	$(ERLC) $(ERLC_FLAGS) -o $(EBIN_DIR) $<
 

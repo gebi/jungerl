@@ -232,6 +232,7 @@
 	  }).
 
 -define(CSET_UCS2,         "UCS2").
+-define(CSET_UTF8,         "UTF-8").
 -define(CSET_ASCII,        "ASCII").
 -define(CSET_ISO_8859_1,   "ISO-8859-1").
 

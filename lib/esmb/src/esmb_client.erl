@@ -6,7 +6,7 @@
 %%%
 %%% $Id$
 %%% --------------------------------------------------------------------
--export([start/2, start/3]).
+-export([start/2, start/4, astart/2, istart/2, ustart/2]).
 -export([swap/3]).
 
 -import(esmb, [ucase/1, lcase/1]).
@@ -17,18 +17,22 @@
 %%%
 %%% Example: start("//korp/tobbe", "tobbe").
 %%%
-start(Path, User) ->
-    start(Path, User, "WORKGROUP").
+start(Path, User) -> istart(Path, User).
 
-start(Path, User, Wgroup) ->
+astart(Path, User) -> start(Path, User, "WORKGROUP", ?CSET_ASCII).
+istart(Path, User) -> start(Path, User, "WORKGROUP", ?CSET_ISO_8859_1).
+ustart(Path, User) -> start(Path, User, "WORKGROUP", ?CSET_UTF8).
+
+start(Path, User, Wgroup, Charset) ->
     case host_share(Path) of
 	{Host, Share} ->
-	    spawn(fun() -> init(Host, Share, User, Wgroup) end);
+	    spawn(fun() -> init(Host, Share, User, Wgroup, Charset) end);
 	Else ->
 	    Else
     end.
 
-init(Host, Share, User, Wgroup) ->
+init(Host, Share, User, Wgroup, Charset) ->
+    put(charset, Charset),
     Called = ucase(Host),
     Caller = esmb:caller(),
     {ok,S,Neg} = esmb:connect(Caller, Called),
@@ -46,23 +50,23 @@ mk_path(Called, User) ->
 
 to_ucs2(Neg, Str) when ?USE_UNICODE(Neg) ->
     iconv:start(),
-    {ok, Cd}   = iconv:open(?CSET_UCS2, ?CSET_ISO_8859_1),
+    {ok, Cd}   = iconv:open(?CSET_UCS2, get(charset)),
     {ok, Ustr} = iconv:conv(Cd, l2b(Str)),
     iconv:close(Cd),
     Ustr;
 to_ucs2(_, Str) ->
     Str.
 
-to_iso8859_1(Neg, Str) when ?USE_UNICODE(Neg) ->
+to_charset(Neg, Str) when ?USE_UNICODE(Neg) ->
     iconv:start(),
-    {ok, Cd}   = iconv:open(?CSET_ISO_8859_1, ?CSET_UCS2),
+    {ok, Cd} = iconv:open(get(charset), ?CSET_UCS2),
     Astr = case iconv:conv(Cd, l2b(Str)) of
 	       {ok, Res}        -> Res;
 	       {error, _Reason} -> string:copies("?", length(b2l(Str)) div 2)
 	   end,
     iconv:close(Cd),
     Astr;
-to_iso8859_1(_, Str) ->
+to_charset(_, Str) ->
     Str.
 
 
@@ -171,7 +175,7 @@ ls(S, Neg, {Pdu, Cwd} = State) ->
 print_file_info(Neg, L) ->
     F = fun(X) ->
 		io:format("~-20s ~-20s SIZE ~-15w IS ~p~n", 
-			  [b2l(to_iso8859_1(Neg, X#file_info.name)),
+			  [b2l(to_charset(Neg, X#file_info.name)),
 			   dt(X#file_info.date_time),
 			   X#file_info.size,
 			   check_attr(X#file_info.attr)])

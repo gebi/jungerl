@@ -1,0 +1,23 @@
+;; This is a hand-transcribed (and somewhat abridged) core erlang
+;; factorial program.
+;;
+;; The frequently referenced 'e' package contains the Erlang language
+;; primitives. The Erlang names are written like |this| because that's
+;; Lisp syntax for case-sensitive symbols.
+
+(e:module |fact|
+    (e:exports (|fact/1|))
+    (e:attributes ())
+  (e:fdef |fact/1| (|x0|)
+    (e:case |x0|
+      ((|N|) (e:call erlang:> (|N| 0))
+       (e:let (|x1|)
+           (e:values (e:call erlang:- (|N| 1)))
+         (e:let (|x2|)
+             (e:values (e:apply |fact/1| (|x1|)))
+           (e:call erlang:* (|N| |x2|)))))
+      ((0) 'e:true
+       1)
+      ;; should have function-clause fail
+      )))
+

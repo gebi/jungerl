@@ -1,0 +1,25 @@
+CLAW is an embryonic compiler from Core Erlang to Common Lisp. Core
+Erlang is an intermediate language between Erlang and e.g. BEAM. It is
+simple, quite close to Lisp, and is used internally by the standard
+Erlang compiler. You can compile from Erlang to Core Erlang with
+
+  erlc +dcore foo.erl
+
+which generates "foo.core".
+
+CLAW is just for fun. It is currently only-just complete enough to
+compile and run a factorial program, written by hand in a Lispy syntax
+but using only Core Erlang constructs.
+
+The overall strategy is to write a compiler as much as possible by
+simple macro-transformation from Core Erlang to Lisp.
+
+To run the factorial program, just go into the source directory, start
+a fresh Common Lisp (e.g. CLISP or CMUCL), and enter:
+
+  (load "runme")
+
+Exciting, huh?
+
+-- luke@bluetail.com
+

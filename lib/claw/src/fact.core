@@ -1,0 +1,46 @@
+module 'fact' ['fact'/1,
+	       'module_info'/0,
+	       'module_info'/1]
+    attributes []
+'fact'/1 =
+    fun (_cor0) ->
+	case _cor0 of
+	  <N> when ( call 'erlang':'>'
+			 (N,
+			  0)
+		     -| [5] ) ->
+	      let <_cor1> =
+		  ( call 'erlang':'-'
+			(N, 1)
+		    -| [5] )
+	      in  let <_cor2> =
+		      apply 'fact'/1
+			  (_cor1)
+		  in  ( call 'erlang':'*'
+			    (N, _cor2)
+			-| [5] )
+	  <0> when 'true' ->
+	      1
+	  <_cor3> when 'true' ->
+	      primop 'match_fail'
+		  ({'function_clause',_cor3})
+	end
+'module_info'/0 =
+    fun () ->
+	case <> of
+	  <> when 'true' ->
+	      []
+	  <> when 'true' ->
+	      primop 'match_fail'
+		  ({'function_clause'})
+	end
+'module_info'/1 =
+    fun (_cor0) ->
+	case _cor0 of
+	  <_cor2> when 'true' ->
+	      []
+	  <_cor1> when 'true' ->
+	      primop 'match_fail'
+		  ({'function_clause',_cor1})
+	end
+end

@@ -9,7 +9,7 @@ SHLIB_OBJS = posix_drv.o my-posix.o erl_driver_tk.o
 all: $(POSIX_DRV_SO)
 
 $(POSIX_DRV_SO): $(SHLIB_OBJS)
-	ld -G -o $@ $^
+	$(LD_SHARED) -o $@ $^
 	# Symlink is only to help when using "jerl" script.
 	-ln -s $(POSIX_DRV_SO) ../ebin
 

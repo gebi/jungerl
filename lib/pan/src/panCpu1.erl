@@ -36,11 +36,11 @@ sum(FD_O, [{Pid, _, C0, _, G0, _}|R], P, C, G) ->
     sum(FD_O, R, add(P, Pid), add(C, C0), add(G, G0)).
 
 out(FD_O, []) -> ok;
-out({FD, O} = FD_O, [{P, I, Tin, In, Tgc, Gc}|R]) when O == excel->
-    io:fwrite(FD, format(O), [to_str(P), to_str(I), Gc, Tgc, In, Tin+Tgc]),
+out({FD, O} = FD_O, [{P, I, Ttot, In, Tgc, Gc}|R]) when O == excel->
+    io:fwrite(FD, format(O), [to_str(P), to_str(I), Gc, Tgc, In, Ttot]),
     out(FD_O, R);
-out({FD, O} = FD_O, [{P, I, Tin, In, Tgc, Gc}|R]) ->
-    io:fwrite(FD, format(O), [to_str(P), to_str(I), Gc, In, Tin+Tgc]),
+out({FD, O} = FD_O, [{P, I, Ttot, In, Tgc, Gc}|R]) ->
+    io:fwrite(FD, format(O), [to_str(P), to_str(I), Gc, In, Ttot]),
     out(FD_O, R).
 
 makem(no_file) -> [];
@@ -79,30 +79,32 @@ collapz(L) ->
     ets_new(panCpu1, [{keypos, 2}]), 
     keysortr(3, collapse(L)).
 collapse([]) -> ets_t2l(panCpu1);
-collapse([{P, I, Tin, In, Tgc, Gc} = Obj|R]) -> 
-    case filt(I) of
-	true -> collapse(Obj);
+collapse([Obj|R]) -> 
+    case filt(Obj) of
+	true -> ets_ins(panCpu1, obj(Obj));
 	_ -> ok
     end,
-    collapse(R);
-collapse(Obj) -> ets_ins(panCpu1, obj(Obj)).
+    collapse(R).
 
 obj({P, I, Tin, In, Tgc, Gc} = Obj) ->
     case ets_lup(panCpu1, I) of
 	[] -> 
-	    Obj;
-	{N, I, Tin0, In0, Tgc0, Gc0} when integer(N) -> 
-	    {N+1, I, add(Tin, Tin0), add(In, In0), add(Tgc, Tgc0), add(Gc, Gc0)};
-	{Pid, I, Tin0, In0, Tgc0, Gc0} -> 
-	    {2, I, add(Tin, Tin0), add(In, In0), add(Tgc, Tgc0), add(Gc, Gc0)}
+	    {P, I, add(Tin,Tgc), In, Tgc, Gc};
+	{N, I, Tin0, In0, Tgc0, Gc0}-> 
+	    upd_obj(N, P, I, Tin, Tin0, Tgc, Tgc0, In, In0, Gc, Gc0)
     end.
+upd_obj(N, P, I, Tin, Tin0, Tgc, Tgc0, In, In0, Gc, Gc0) ->
+    Ttot = add(Tgc, add(Tin, Tin0)),
+    {add(N, P), I, Ttot, add(In, In0), add(Tgc, Tgc0), add(Gc, Gc0)}.
 
 add(Y, X) when integer(X), integer(Y) -> X+Y;
+add(Pi, Pid) when pid(Pi), pid(Pid) -> 2;
 add(P, Pid) when pid(Pid) -> add(P, 1);
 add(A, _) -> A.
 
 keysortr(N, L) -> lists:reverse(lists:keysort(N, L)).
     
+filt({P, I, Tin, In, Tgc, Gc}) -> filt(I);
 %%%filt({erlang,apply,2}) -> false;
 filt(file_server) -> false;
 %%%filt({sysTimer,_,_}) -> false;

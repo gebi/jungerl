@@ -12,6 +12,7 @@ LIBS := \
 	msc \
         pan \
         pico \
+	posix_drv \
 	rpc \
         syntax_tools \
 	tuntap \

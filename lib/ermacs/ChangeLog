@@ -1,0 +1,103 @@
+2002-02-03  Luke Gorrie  <luke@bluetail.com>
+
+	* src/edit_help.erl: Added describe_key and find_source.
+
+	Using M-h for help prefix. find_source is fun - it will let you
+	enter a key and then take you to the code that runs when that key
+	is pressed. Use it when a key doesn't do its job properly :-)
+	
+2001-04-09  Luke Gorrie  <luke@bluetail.com>
+
+	* RELEASE: 0.6
+
+	* src/edit_lib.erl: Added search (not isearch yet) functions.
+
+2001-04-07  Luke Gorrie  <luke@bluetail.com>
+
+	* Completion: added filename completion.
+
+	* Goal_Column: Made goal column tab-friendly.
+	
+2001-03-26  Luke Gorrie  <luke@bluetail.com>
+
+	* src/edit_eval.erl: Group leader implemented, so that io:format's
+	get written into the buffer.
+
+2001-03-22  Luke Gorrie  <luke@bluetail.com>
+
+	* src/edit_util.erl: Changed bit-twiddly interpretation of Control
+	after talking with Per.
+
+	* src/edit_lib.erl: Added 'unix_command', i.e. "M-!"
+
+2001-03-20  Luke Gorrie  <luke@bluetail.com>
+
+	* src/edit_globalmap.erl: Bindings for arrow keys.
+
+2001-03-19  Luke Gorrie  <luke@bluetail.com>
+
+	* src/edit_erlang.erl: Rewrite of indentation code. Emacs and
+	Ermacs both agree on how edit_erlang.erl should be
+	indented. Great!
+
+	* Flushing_exits: Main edit process now flushes the exit messages
+	from its dispatcher processes. Growing the message queue made the
+	editor slowly bog down.
+
+2001-03-18  Luke Gorrie  <luke@bluetail.com>
+
+	* edit_display.erl: Performance hacking.
+
+2001-03-14  Luke Gorrie  <luke@bluetail.com>
+
+	* GTK: Now possible to use gterm as the terminal emulator - very
+	preliminary.
+
+	* In_Progress: Regexp searches over cords, erlang syntax
+	indentation. Both unfinished.
+
+2001-03-09  Luke Gorrie  <luke@bluetail.com>
+
+	* M-x: Added "M-x" which takes Mod:Func, e.g. "M-x
+	edit_file:find_file"
+
+	* ~/.ermacs: Now doing a file:eval/1 on ~/.ermacs during
+	initialization.
+
+2001-03-07  Luke Gorrie  <luke@bluetail.com>
+
+	* Cords: Changed balancing algorithm to do this
+	single-or-double-rotate as seen in a paper. Also added
+	new_from_file(Filename) as a slightly optimised way of reading
+	cords from files.
+
+	Killring now uses cords instead of lists. Turning huge cords into
+	lists on the kill ring turns out to be the cause of my previous
+	problems with editing big files.
+
+	Meg-or-so files seem just fine now.
+	
+	* Borrowed_buffers: Buffers can now be "borrowed" by custom
+	processes and used asynchronously. Only editor-dispatched
+	processes are supposed to do locking, as it's assumed that they
+	implicitly have everything that's not borrowed.
+	
+	edit_lib:buffer(State) now blocks waiting for the buffer to be
+	returned if someone has borrowed it.
+	
+	See edit_util:spawn_with/x for spawning asynchronous jobs with
+	borrowed buffers.
+	
+	* Aborts: New semantics for C-g: If the editor is dispatching a
+	command, that command is aborted. Otherwise, C-g is treated as a
+	normal key.
+
+	The new default binding in edit_globalmap for C-g will abort any
+	process that is 'borrowing' the current buffer. This is in line
+	with emacs panic semantics: hold down C-g and everything that's
+	freezing up your buffer will be brutally killed :-)
+
+	* edit_eval.erl: erlang-interaction-mode now evaluates expressions
+	asynchronously, by "borrowing" the buffer.
+
+

@@ -1,0 +1,36 @@
+Notes on how this bastard works
+===============================
+
+Overview:
+
+The editor is based on Emacs: same sort of buffers, similar commands, etc.
+It's written in Erlang and uses the S-Lang library for terminal control.
+
+Essential facts:
+
+- Text is stored as a tree of binaries
+- Buffers are small servers and are destructively updated (.. for now?)
+- Commands are executed serially, but buffers can be "loaned" to other
+  processes to work on them asynchronously.
+
+Hacking:
+
+To see how commands are implemented, look at the edit_lib module, it contains
+all the most basic commands. A rundown of the most important modules:
+
+* edit:           where it all begins, and main editor loop.
+* edit_lib:       basic command implementations
+* edit_eval:      erlang shell mode
+* cord:           text data structure
+* edit_buf:       buffer server
+* edit_globalmap: standard keymap definitions - look there to see what exists.
+* edit_display:   screen redraw
+* edit_extended:  "interactive" command runner (shows how to use minibuffer)
+* edit_var:       emacs-style variables (optionally persistent)
+
+Programming style:
+
+I've gone with do-it-yourself servers and message sending in a lot of places.
+I'd like to keep it that way, at least for now. It feels good to use
+selective receives and whatnot :-)
+

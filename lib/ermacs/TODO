@@ -1,0 +1,40 @@
+Needed for 0.5 (i.e. "semi-public" release):
+
++ hard-abort - different process handling so you can abort anything with C-g
++ good erlang shell
+- get slang's default colours under control
+
+Still needed for respectable 1.0:
+
+- buffer modified/unmodified flag
+- handle sigwinch
++ completions
+- window config save/restore for popups (e.g. after completion)
+- stabilize API - get rid of export_all's
+- some sort of "panic" procedure to ensure that crashes don't lose data
+- robustify: commands making bad calls to buffers shouldn't crash the editor!
++ M-x
++ be group_leader in Erlang Interaction mode, in some sensible way.
+- integrate with normal erlang shell
+
+For future versions:
+
+- colours / syntax highlighting
++ erlang programming mode
+- documentation browser - wiki-mode instead of texinfo?
+- isearch
+
+Things that it's really bothering me off not to have:
+
+- fill-paragraph
++ search
+- isearch
++ M-x
++ C-x 1
++ auto-mode-alist
++ tabs: count them properly for column-wise stuff (goal column)
++ find-file opens relative to current buffer
++ completions
++ contextual history in minibuffer
+- parenthesis matching
+- line numbers

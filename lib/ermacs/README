@@ -1,0 +1,13 @@
+
+Ermacs: an erlang clone of emacs.
+=================================
+
+To run:
+
+1. make
+2. bin/ermacs (add that dir to your path, or copy the script somewhere)
+
+Try opening doc/TOUR - it's an approximation of the emacs tutorial.
+
+-- luke@bluetail.com
+

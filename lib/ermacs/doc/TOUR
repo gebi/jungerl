@@ -1,0 +1,115 @@
+Interactive tour of the editor!
+
+Motion
+------
+
+Like emacs.
+
+Erlang Evaluation
+-----------------
+
+In emacs M-: lets you enter a lisp expression in the minibuffer. In ermacs
+it lets you enter an erlang expression.
+
+Try it, e.g:
+
+  M-: os:type(). RET
+
+There's also an erlang-interaction-mode. You can enter it by pressing
+"C-x i", and get back to Fundamental mode with "C-x f".
+
+Erlang interaction mode is an erlang shell, and its prompt looks like this:
+
+>> foo.
+
+When you press return in Erlang Interaction mode, it evaluates the expression
+between the point and the prompt (or start of buffer) and shows the result.
+
+Try it: now press "C-x i". Now press return at the end of the following line:
+>> (fun(X) -> X + 5 end)(10).
+
+And now press "C-x f" to get back into fundamental mode.
+
+In erlang-interaction-mode, your history is recorded. You can use:
+
+  M-p: previous input
+  M-n: next input
+  M-r: regexp search backwards through input history
+
+If you want, you can make this history persistent so that it's stored in a
+dets file in your home directory. To do that, go into erlang interaction mode
+and hit enter at the end of the following line.
+
+>> edit_var:permanent(erlang_interaction_history, true).
+
+Asynchronous I/O works too:
+
+>> spawn(fun() -> receive after 1000 -> io:format("bar~n") end end).
+
+Erlang Indentation
+------------------
+
+The editor can indent erlang code. To enter erlang-mode, press "C-x e". Then
+you can hit tab to indent these lines:
+
+one() ->
+ok.
+
+two(X) when X > 0,
+X < 10 ->
+X.
+
+three(X) ->
+[Y*2 || Y <- make_list(),
+Y < 10].
+
+four() ->
+if X == 1 ->
+if    Y == 2 ->
+ok;
+Z == 3 ->
+ok
+end
+end.
+
+five([]) ->
+0;
+five(List) ->
+Sum = lists:foldl(fun(X, Sum) ->
+X + Sum
+end,
+0,
+List),
+Sum / length(List).
+
+six(X) ->
+if X /= 1,
+X /= 2 ->
+X;
+true ->
+3
+end,
+six.
+
+Windows
+-------
+
+You can split windows.
+
+Type "C-x 2". Now type "C-x 0".
+
+Notice that if you scroll one window, the other scrolls too. This is a bug :-)
+
+Multiple buffers
+----------------
+
+You can use "C-x C-f" to open a new file, and then "C-x b" back here
+as you would in emacs (but without the completions).
+
+Other stuff
+-----------
+
+To see what else there is, look in the keymap definition:
+
+  C-x C-f ../src/edit_globalmap.erl RET
+

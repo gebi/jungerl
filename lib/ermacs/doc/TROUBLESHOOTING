@@ -1,0 +1,11 @@
+Random notes on trouble shooting:
+
+- io:formats go to /tmp/edit.out, which is re-created from scratch each time.
+
+- Sometimes colours go strange, particularly (for me) when running in a
+  shell on a remote machine. When this happens to me in xterm, I retry in
+  rxvt and it tends to work. However, on *my* computer the colours are ok :-)
+
+  Presumably some extra initialisation of the SLang library is needed.
+
+

@@ -1,0 +1,12 @@
+#!/bin/sh
+
+BASEDIR=%BASEDIR%
+
+SLANG_EBIN_DIR=${BASEDIR}/../slang/ebin
+
+erl -pa ${SLANG_EBIN_DIR} -pa ${BASEDIR}/ebin -pa ${BASEDIR}/mods/ebin \
+    -noshell -s edit start $*
+
+# Can I get bash to run this in response to SIGINT?
+stty sane
+

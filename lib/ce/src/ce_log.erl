@@ -62,7 +62,12 @@ open(LogFile) ->
 write(String) ->
   {Date, Time} = calendar:local_time(),
   DateString = ce_calendar:logfile_datetime({Date, Time}),
-  {Module, Function, Arity} = hd(tl(ce_lib:call_stack())),
+  {Module, Function, Arity} = case tl(ce_lib:call_stack()) of
+    [] ->
+      {'?', '?', '?'};
+    [Head | _] ->
+      Head
+  end,
   Term = {{Date, Time}, {Module, Function, Arity}, String},
   case disk_log:info(?MODULE) of
     List when is_list(List) ->

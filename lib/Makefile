@@ -3,6 +3,7 @@ LIBS := \
 	ce \
 	edoc \
 	enfs \
+	erl_cgi \
 	ermacs \
 	ex11 \
 	slang \

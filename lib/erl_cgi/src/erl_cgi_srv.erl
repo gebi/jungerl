@@ -124,7 +124,7 @@ srv_accept(Loop, Listen) ->
 	    Loop ! {next,self()},
 	    case catch main(S) of
 		{'EXIT', Reason} ->
-		    io:format("Process ~p died because of : ~p\n", [Reason]),
+		    io:format("Process ~p died because of : ~p\n", [self(), Reason]),
 		    {error,Reason};
 		Value ->
 		    Value

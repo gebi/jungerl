@@ -1,5 +1,6 @@
-ERLC= erlc
-ERLC_FLAGS=-I../include
+include ../../../support/include.mk
+
+ERL_CGI_ERLC_FLAGS = $(ERLC_FLAGS) -I../include
 EBIN=../ebin
 
 OBJS = \
@@ -17,4 +18,4 @@ clean:
 	rm $(OBJS)
 
 $(EBIN)/%.beam:	%.erl
-	$(ERLC) $(ERLC_FLAGS) -o$(EBIN) $<
+	$(ERLC) $(ERL_CGI_ERLC_FLAGS) -o$(EBIN) $<

@@ -23,7 +23,6 @@
 #define REPLY_OK    1
 
 #define REQUEST_GET_DEVICE 0
-#define REQUEST_WRITE      1
 #define REQUEST_ACTIVE     2
 
 #define ACTIVE_FALSE 0
@@ -134,12 +133,6 @@ static int tun_ctl(ErlDrvData data,
     switch (cmd) {
     case REQUEST_GET_DEVICE:
         return ctl_reply(REPLY_OK, state->dev, strlen(state->dev), rbuf, rsize);
-    case REQUEST_WRITE:
-        if (write(state->fd, buf, len) > 0) {
-            return ctl_reply(REPLY_OK, "", 0, rbuf, rsize);
-        } else {
-            return ctl_reply(REPLY_ERROR, "", 0, rbuf, rsize);
-        }
     case REQUEST_ACTIVE:
         state->active = (int)*buf;
         switch (state->active) {
@@ -170,6 +163,13 @@ static int tun_ctl(ErlDrvData data,
     default:
         return ctl_reply(REPLY_ERROR, "", 0, rbuf, rsize);
     }
+}
+
+static void tun_output(ErlDrvData data, char* buf, int len)
+{
+    struct tun_state *state = (struct tun_state *)data;
+    if (write(state->fd, buf, len) < 0)
+	driver_failure_posix(state->port, errno);
 }
 
 static void tun_input(ErlDrvData data, ErlDrvEvent nil)
@@ -240,6 +240,7 @@ ErlDrvEntry *driver_init(void)
     tun_driver_entry.stop = tun_stop;
     tun_driver_entry.ready_input = tun_input;
     tun_driver_entry.control = tun_ctl;
+    tun_driver_entry.output = tun_output;
     tun_driver_entry.driver_name = "tun_drv";
     return &tun_driver_entry;
 }

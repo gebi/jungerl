@@ -29,6 +29,7 @@
 -define(SL_SET_XONCHAR,    40).
 -define(SL_SET_XOFFCHAR,   42).
 -define(SL_SET_ECHO,   44).
+-define(SL_SET_MODE,   46).
 
 -define(SL_GET_DEV,    21).
 -define(SL_GET_BAUD,   23).
@@ -42,6 +43,7 @@
 -define(SL_GET_XONCHAR,    41).
 -define(SL_GET_XOFFCHAR,   43).
 -define(SL_GET_ECHO,   45).
+-define(SL_GET_MODE,   47).
 
 -define(SL_OK,    0).
 -define(SL_ERROR, 1).
@@ -50,19 +52,24 @@
 -define(SL_BOOL,  1).
 -define(SL_STRING,2).
 
+-define(SL_MODE_RAW,    0).
+-define(SL_MODE_LINE,   1).
+
 -compile(export_all).
 
-
 start() ->
+    start([]).
+
+start(OpenOpts) ->
     erl_ddll:load_driver(code:priv_dir(sl), "sl_drv"),
-    open_port({spawn, "sl_drv"}, []).
+    open_port({spawn, "sl_drv"}, OpenOpts).
 
 stop(P) when port(P) ->
     erlang:port_close(P).
 
 options() ->
     [dev, baud, csize, bufsz, buftm, stopb, parity,
-     hwflow, swflow, xonchar, xoffchar, echo].
+     hwflow, swflow, xonchar, xoffchar, echo, mode].
 
 
 getopts(P, [Opt|Opts]) ->
@@ -88,6 +95,12 @@ getopt(P, Opt) ->
 	xonchar    -> reply0(erlang:port_control(P, ?SL_GET_XONCHAR, []));
 	xoffchar   -> reply0(erlang:port_control(P, ?SL_GET_XOFFCHAR, []));
 	echo   -> reply0(erlang:port_control(P, ?SL_GET_ECHO, []));
+	mode  ->
+	    case reply0(erlang:port_control(P, ?SL_GET_MODE, [])) of
+		{ok,?SL_MODE_RAW} -> {ok, raw};
+		{ok,?SL_MODE_LINE} -> {ok, line};
+		Other -> Other
+	    end;
 	_ -> {error, {bad_opt, Opt}}
     end.
     
@@ -105,6 +118,17 @@ setopt(P, Opt, Arg) ->
 	xoffchar -> reply0(erlang:port_control(P, ?SL_SET_XOFFCHAR, <<Arg:32>> ));
 	xonchar  -> reply0(erlang:port_control(P, ?SL_SET_XONCHAR, <<Arg:32>>));
 	echo   -> reply0(erlang:port_control(P, ?SL_SET_ECHO, bool(Arg)));
+	binary -> ok;
+	mode   ->
+	    if integer(Arg) ->
+		    reply0(erlang:port_control(P, ?SL_SET_MODE,<<Arg:32>>));
+		Arg==raw -> 
+		    reply0(erlang:port_control(P, ?SL_SET_MODE, 
+					       <<?SL_MODE_RAW:32>>));
+		Arg==line ->
+		    reply0(erlang:port_control(P, ?SL_SET_MODE, 
+					       << ?SL_MODE_LINE:32 >>))
+            end;
 	_ -> {error, {bad_opt,Opt}}
     end.
 
@@ -124,12 +148,21 @@ setopts0(P, []) -> ok.
 
 	    
 open(Dev, Opts) ->
-    P = start(),
-    case setopts(P, [{dev,Dev}|Opts]) of
+    PortOpts = case lists:keysearch(binary, 1, Opts) of
+		   {value, {_, true}} -> [binary];
+		   _ -> []
+	       end,
+    P = start(PortOpts),
+    case setopt(P, dev, Dev) of
 	ok ->
 	    case open(P) of
-		ok -> {ok,P};
-		Error -> stop(P), Error
+		ok -> 
+		    case setopts(P, Opts) of
+			ok -> {ok,P};
+			Error -> stop(P), Error
+		    end;
+		Error ->
+		    stop(P), Error
 	    end;
 	Error ->
 	    stop(P),
@@ -162,7 +195,7 @@ send(P, Data) ->
 bool(true) ->  <<1:32>>;
 bool(false) -> <<0:32>>.
 
-reply0(R) when list(R) -> reply(list_to_binary(R));
+reply0(R) when list(R)   -> reply(list_to_binary(R));
 reply0(R) when binary(R) -> reply(R).
 
 reply(<<?SL_OK>>) -> ok;

@@ -78,84 +78,84 @@ static struct _rate {
 
 #ifdef __WIN32__
 {
-    {0,   0},
-    {75,BAUD_075},
-    {110,BAUD_110},
-    {134, BAUD_134_5},
-    {150, BAUD_150},
-    {300, BAUD_300},
-    {600, BAUD_600},
-    {1200,BAUD_1200},
-    {1800,BAUD_1800},
-    {2400,BAUD_2400},
-    {4800, BAUD_4800},
-    {7200,BAUD_7200},
-    {9600,BAUD_9600},
-    {14400,BAUD_14400},
-    {19200,BAUD_19200},
-    {38400,BAUD_38400},
-    {56000, BAUD_56K},
-    {57600,BAUD_57600},
-    {115200,BAUD_115200},
-    {128000,BAUD_128K},
-    { -1, 0}
+    {0,      0},
+    {75,     BAUD_075},
+    {110,    BAUD_110},
+    {134,    BAUD_134_5},
+    {150,    BAUD_150},
+    {300,    BAUD_300},
+    {600,    BAUD_600},
+    {1200,   BAUD_1200},
+    {1800,   BAUD_1800},
+    {2400,   BAUD_2400},
+    {4800,   BAUD_4800},
+    {7200,   BAUD_7200},
+    {9600,   BAUD_9600},
+    {14400,  BAUD_14400},
+    {19200,  BAUD_19200},
+    {38400,  BAUD_38400},
+    {56000,  BAUD_56K},
+    {57600,  BAUD_57600},
+    {115200, BAUD_115200},
+    {128000, BAUD_128K},
+    { -1,    0}
 };
 
 #else
 {
-    {0      , B0},
-    {50     , B50    },
-    {75     , B75    },
-    {110    , B110   },
-    {134    , B134   },
-    {150    , B150   },
-    {200    , B200   },
-    {300    , B300   },
-    {600    , B600   },
-    {1200   , B1200  },
-    {1800   , B1800  },
-    {2400   , B2400  },
-    {4800   , B4800  },
-    {9600   , B9600  },
+    {0,       B0     },
+    {50,      B50    },
+    {75,      B75    },
+    {110,     B110   },
+    {134,     B134   },
+    {150,     B150   },
+    {200,     B200   },
+    {300,     B300   },
+    {600,     B600   },
+    {1200,    B1200  },
+    {1800,    B1800  },
+    {2400,    B2400  },
+    {4800,    B4800  },
+    {9600,    B9600  },
 #ifdef B19200
-    {19200  , B19200 },
+    {19200,   B19200 },
 #elif defined(EXTA)
-    {19200, EXTA },
+    {19200,   EXTA },
 #endif
 #ifdef B38400
-    {38400  , B38400 },
+    {38400,   B38400 },
 #elif defined(EXTB)
-    {38400  , EXTB },
+    {38400,   EXTB },
 #endif
 #ifdef B57600
-    {57600  , B57600 },
+    {57600,   B57600 },
 #endif
 #ifdef B76800
-    {76800  , B76800 },
+    {76800,   B76800 },
 #endif
 #ifdef B115200
-    {115200 , B115200 },
+    {115200,  B115200 },
 #endif
 #ifdef B153600
-    {153600 , B153600 }, 	
+    {153600,  B153600 }, 	
 #endif
 #ifdef B230400
-    {230400 , B230400 }, 	
+    {230400,  B230400 }, 	
 #endif
 #ifdef B307200
-    {307200 , B307200 }, 	
+    {307200,  B307200 }, 	
 #endif
 #ifdef B460800
-    {460800 , B460800 }, 	
+    {460800,  B460800 }, 	
 #endif
 #ifdef B500000
-    {500000 , B500000 },
+    {500000,  B500000 },
 #endif
 #ifdef B576000
-    {576000, B576000 },
+    {576000,  B576000 },
 #endif
 #ifdef B921600 
-    {921600, B921600 },
+    {921600,  B921600 },
 #endif
 #ifdef B1000000
     {1000000, B1000000 },
@@ -186,18 +186,16 @@ static struct _rate {
 #endif
 
 
-
-
-#define SL_CONNECT     1
-#define SL_DISCONNECT  2
-#define SL_OPEN        3
-#define SL_CLOSE       4
-#define SL_XOFF        5
-#define SL_XON         6
-#define SL_BREAK       7
-#define SL_UPDATE      8
-#define SL_GET_RATES   9
-#define SL_REVERT      10
+#define SL_CONNECT      1
+#define SL_DISCONNECT   2
+#define SL_OPEN         3
+#define SL_CLOSE        4
+#define SL_XOFF         5
+#define SL_XON          6
+#define SL_BREAK        7
+#define SL_UPDATE       8
+#define SL_GET_RATES    9
+#define SL_REVERT       10
 
 #define SL_SET_DEV      20
 #define SL_SET_BAUD     22
@@ -211,6 +209,7 @@ static struct _rate {
 #define SL_SET_XONCHAR  40
 #define SL_SET_XOFFCHAR 42
 #define SL_SET_ECHO     44
+#define SL_SET_MODE     46
 
 #define SL_GET_DEV      21
 #define SL_GET_BAUD     23
@@ -224,6 +223,7 @@ static struct _rate {
 #define SL_GET_XONCHAR  41
 #define SL_GET_XOFFCHAR 43
 #define SL_GET_ECHO     45
+#define SL_GET_MODE     47
 
 #define SL_OK     0
 #define SL_ERROR  1
@@ -238,6 +238,8 @@ static struct _rate {
 #define SL_ERR_ACCESS  3
 #define SL_ERR_NOMEM   4
 
+#define SL_MODE_RAW    0
+#define SL_MODE_LINE   1
 
 #define FL_BAUD        0x0001
 #define FL_CSIZE       0x0004
@@ -250,7 +252,7 @@ static struct _rate {
 #define FL_XONCHAR     0x0200
 #define FL_XOFFCHAR    0x0400
 #define FL_ECHO        0x0800
-#define FL_FORCE       0x8000  /* force update */
+#define FL_MODE        0x8000  /* mode update */
 
 typedef struct _sl_t
 {
@@ -262,6 +264,7 @@ typedef struct _sl_t
     int        olen;     /* length of output buffer */
     char*      obuf;     /* Overlapped output buffer */
     int        opending; /* Output is pending */
+    int        cmode;    /* current mode */
 #ifdef __WIN32__
     OVERLAPPED in;       /* Overlapped input  */
     OVERLAPPED out;      /* Overlapped output */
@@ -283,6 +286,7 @@ typedef struct _sl_t
     int        xoffchar;  /* XOFF character (for swflow) */
     int        bufsz;     /* Number of bytes buffer */
     int        buftm;     /* Buffer fill timeout */
+    int        mode;      /* (pending mode RAW | LINE) */
 } sl_t;
 
 static ErlDrvEntry sl_entry;
@@ -295,20 +299,28 @@ static void sl_ready_output(ErlDrvData drv_data, ErlDrvEvent event);
 static unsigned int to_speed(int baud)
 {
     int i = 0;
+    int speed = 0;
 
     while((rtab[i].baud != -1) && (baud > rtab[i].baud))
 	i++;
     if (rtab[i].baud == -1)
-	return rtab[i-1].speed;
-    return rtab[i].speed;
+	speed = rtab[i-1].speed;
+    else 
+	speed = rtab[i].speed;
+    /* fprintf(stderr, "to_speed: baud=%d, speed=%d\n", baud, speed); */
+    return speed;
 }
 
 static int from_speed(unsigned int speed)
 {
     int i = 0;
+    int baud;
+
     while((rtab[i].baud != -1) && (rtab[i].speed != speed))
 	i++;
-    return rtab[i].baud;
+    baud = rtab[i].baud;
+    /* fprintf(stderr, "from_speed: speed=%d, baud=%d\n", speed, baud);  */
+    return baud;
 }
 
 
@@ -348,7 +360,7 @@ static int set_com_state(sl_t* slp)
 #endif
 }
 
-static void set_raw(sl_t* slp)
+static void set_raw_mode(sl_t* slp)
 {
 #ifdef __WIN32__
     slp->tio.fBinary = TRUE;
@@ -357,29 +369,82 @@ static void set_raw(sl_t* slp)
 			  INLCR |    /* disable NL-to-CR mapping */
 			  IGNCR |    /* disable ignore CR */
 			  ISTRIP |   /* disable stripping of eighth bit */
-			  IXON |     /* disable output flow control */
 			  BRKINT |   /* disable generate SIGINT on brk */
 			  IGNPAR |
-			  PARMRK |
 			  IGNBRK |
 			  INPCK);    /* disable input parity detection */
 
-    slp->tio.c_lflag &= ~(ICANON |   /* enable non-canonical mode */
-			  ECHO |     /* disable character echo */
-			  ECHOE |    /* disable visual erase */
+    slp->tio.c_lflag &= ~(ECHOE |    /* disable visual erase */
 			  ECHOK |    /* disable echo newline after kill */
 			  ECHOKE |   /* disable visual kill with bs-sp-bs */
 			  ECHONL |   /* disable echo nl when echo off */
 			  ISIG |     /* disable tty-generated signals */
 			  IEXTEN);   /* disable extended input processing */
 
-    slp->tio.c_cflag &= ~PARENB;     /* disable input parity check */
+    slp->tio.c_lflag &= ~ICANON;    /* enable non-canonical mode */
+
     slp->tio.c_oflag &= ~OPOST;      /* disable output processing */
     slp->tio.c_cflag |= CLOCAL;      /* ignore modem control lines??? */
     slp->tio.c_cc[VMIN]  = 1;
     slp->tio.c_cc[VTIME] = 0;
 #endif
+    slp->cmode = SL_MODE_RAW;
 }
+
+static void set_line_mode(sl_t* slp)
+{
+#ifdef __WIN32__
+    slp->tio.fBinary = TRUE;
+#else
+    slp->tio.c_iflag &= ~(ICRNL |    /* disable CR-to-NL mapping */
+			  INLCR |    /* disable NL-to-CR mapping */
+			  IGNCR |    /* disable ignore CR */
+			  ISTRIP |   /* disable stripping of eighth bit */
+			  BRKINT |   /* disable generate SIGINT on brk */
+			  IGNPAR |
+			  IGNBRK |
+			  INPCK);    /* disable input parity detection */
+
+    slp->tio.c_lflag &= ~(ECHOE |    /* disable visual erase */
+			  ECHOK |    /* disable echo newline after kill */
+			  ECHOKE |   /* disable visual kill with bs-sp-bs */
+			  ECHONL |   /* disable echo nl when echo off */
+			  ISIG |     /* disable tty-generated signals */
+			  IEXTEN);   /* disable extended input processing */
+
+    slp->tio.c_lflag |= ICANON;      /* enable canonical mode */
+
+
+    slp->tio.c_oflag &= ~OPOST;      /* disable output processing */
+    slp->tio.c_cflag |= CLOCAL;      /* ignore modem control lines??? */
+    slp->tio.c_cc[VINTR]    = 0;
+    slp->tio.c_cc[VQUIT]    = 0;
+    slp->tio.c_cc[VERASE]   = 0;
+    slp->tio.c_cc[VKILL]    = 0;
+    slp->tio.c_cc[VEOF]     = 0;
+    slp->tio.c_cc[VSWTC]    = 0;
+    slp->tio.c_cc[VSUSP]    = 0;
+    slp->tio.c_cc[VEOL]     = 0;
+#ifdef VDISCARD
+    slp->tio.c_cc[VDISCARD] = 0;
+#endif
+    /* disabled by ~IEXTEN */
+#ifdef VREPRINT
+    slp->tio.c_cc[VREPRINT] = 0;
+#endif
+#ifdef VWERASE
+    slp->tio.c_cc[VWERASE]  = 0;
+#endif
+#ifdef VLNEXT
+    slp->tio.c_cc[VLNEXT]   = 0;
+#endif
+#ifdef VEOL2
+    slp->tio.c_cc[VEOL2]    = 0;
+#endif
+#endif
+    slp->cmode = SL_MODE_LINE;
+}
+
 
 
 static void set_baud(sl_t* slp, int baud)
@@ -387,6 +452,7 @@ static void set_baud(sl_t* slp, int baud)
 #ifdef __WIN32__
     slp->tio.BaudRate = to_speed(baud);
 #else
+    /* fprintf(stderr, "set_baud: %d\n", baud); */
     cfsetispeed(&slp->tio, to_speed(baud));
     cfsetospeed(&slp->tio, to_speed(baud));
 #endif
@@ -426,13 +492,16 @@ static void set_parity(sl_t* slp, int parity)
 #else
     switch(parity) {
     case 0: /* none */
+	slp->tio.c_iflag &= ~PARMRK;
 	slp->tio.c_cflag &= ~PARENB;
 	break;
     case 1: /* odd */
+	slp->tio.c_iflag &= ~PARMRK;
 	slp->tio.c_cflag  |= PARODD;
 	slp->tio.c_cflag |= PARENB;
 	break;
     case 2: /* even */
+	slp->tio.c_iflag &= ~PARMRK;
 	slp->tio.c_cflag &= ~PARODD;
 	slp->tio.c_cflag |= PARENB;
 	break;
@@ -456,8 +525,7 @@ static int get_parity(sl_t* slp)
 	case MARKPARITY: return 3;
 	}
     }
-    else
-	return 0;
+    return 0;
 #else
     if (slp->tio.c_cflag & PARENB) {
 	if (slp->tio.c_iflag & PARMRK)
@@ -467,6 +535,7 @@ static int get_parity(sl_t* slp)
 	else
 	    return 2;
     }
+    return 0;
 #endif
 }
 
@@ -730,6 +799,13 @@ static void do_update(sl_t* slp)
     if ((slp->flags == 0) || (slp->com == INVALID))
 	return;
 
+    if (slp->flags & FL_MODE) {
+	if (slp->mode == SL_MODE_RAW)
+	    set_raw_mode(slp);
+	else if (slp->mode == SL_MODE_LINE)
+	    set_line_mode(slp);
+    }
+
     if (slp->flags & FL_BAUD)
 	set_baud(slp, slp->baud);
 
@@ -922,12 +998,37 @@ static int do_open(sl_t* slp)
     if (get_com_state(slp) < 0)
 	return -1;
 
-    set_raw(slp);     /* set raw mode */
-
+    /* setup default state if not set */
+    if (!(slp->flags & FL_MODE)) {
+	slp->mode = SL_MODE_RAW;
+	slp->flags |= FL_MODE;
+    }
+    if (!(slp->flags & FL_BAUD)) {
+	slp->baud = 9600;
+	slp->flags |= FL_BAUD;
+    }
+    if (!(slp->flags & FL_PARITY)) {
+	slp->parity = 0;
+	slp->flags |= FL_PARITY;
+    }
+    if (!(slp->flags & FL_ECHO)) {
+	slp->echo = 0;
+	slp->flags |= FL_ECHO;
+    }
+    if (!(slp->flags & FL_CSIZE)) {
+	slp->csize = 8;
+	slp->flags |= FL_CSIZE;
+    }
+    if (!(slp->flags & FL_HWFLOW)) {
+	slp->hwflow = 1;
+	slp->flags |= FL_HWFLOW;
+    }
+    if (!(slp->flags & FL_SWFLOW)) {
+	slp->swflow = 0;
+	slp->flags |= FL_SWFLOW;
+    }
     /* update pending changes */
-    slp->flags |= FL_FORCE;  /* force update of above stuff */
     do_update(slp);
-    
     return 0;
 }
 
@@ -1152,10 +1253,15 @@ static int sl_ctl(ErlDrvData data, unsigned int cmd, char* buf, int len,
 	return ctl_reply(SL_OK, NULL, 0, rbuf, rsize);
 
     case SL_GET_BAUD: /* get baud rate */
-	if (slp->flags & FL_BAUD) /* pending */
+	if (slp->flags & FL_BAUD) { /* pending */
+	    /* fprintf(stderr, "pending baud=%d\r\n", slp->baud);*/
 	    return ctl_reply_int(slp->baud, rbuf, rsize);
-	if (slp->com != INVALID)
-	    return ctl_reply_int(get_baud(slp), rbuf, rsize);
+	}
+	if (slp->com != INVALID) {
+	    int baud = get_baud(slp);
+	    /* fprintf(stderr, "baud = %d\r\n", baud);*/
+	    return ctl_reply_int(baud, rbuf, rsize);
+	}
 	else
 	    return ctl_error(SL_ERR_BADARG, rbuf, rsize);
 
@@ -1179,6 +1285,8 @@ static int sl_ctl(ErlDrvData data, unsigned int cmd, char* buf, int len,
 	    return ctl_error(SL_ERR_BADARG, rbuf, rsize);
 	if ((slp->bufsz = get_int32(buf)) < 1)
 	    slp->bufsz = 1;
+	else if (slp->bufsz > 255)
+	    slp->bufsz = 255;
 	slp->flags |= FL_BUFSZ;
 	return ctl_reply(SL_OK, NULL, 0, rbuf, rsize);
 
@@ -1309,6 +1417,32 @@ static int sl_ctl(ErlDrvData data, unsigned int cmd, char* buf, int len,
 	    return ctl_reply_bool(get_echo(slp), rbuf, rsize);
 	else
 	    return ctl_error(SL_ERR_BADARG, rbuf, rsize);
+
+    case SL_SET_MODE:
+	if (len != 4)
+	    return ctl_error(SL_ERR_BADARG, rbuf, rsize);
+	else {
+	    int mode = get_int32(buf);
+	    if (mode != slp->mode) {
+		if (mode == SL_MODE_RAW)
+		    slp->mode = SL_MODE_RAW;
+		else if (mode == SL_MODE_LINE)
+		    slp->mode = SL_MODE_LINE;
+		else
+		    return ctl_error(SL_ERR_BADARG, rbuf, rsize);
+		slp->flags |= FL_MODE;
+	    }
+	    return ctl_reply(SL_OK, NULL, 0, rbuf, rsize);
+	}
+
+    case SL_GET_MODE:
+	if (slp->flags & FL_MODE)
+	    return ctl_reply_int(slp->mode, rbuf, rsize);
+	else if (slp->com != INVALID)
+	    return ctl_reply_int(slp->cmode, rbuf, rsize);
+	else
+	    return ctl_error(SL_ERR_BADARG, rbuf, rsize);
+	
 
     case SL_CONNECT:
     case SL_OPEN:

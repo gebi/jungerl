@@ -1,0 +1,262 @@
+<erldriver name="posix_drv" abbrev="" default_async_calls="0"
+           default_debug_verbose="0">
+<summary>Simple POSIX system call driver</summary>
+<cpy>Copyright (c) 2003, Scott Lystig Fritchie.  All rights reserved.</cpy>
+<cpy>See the file "../LICENSE" for license details.</cpy>
+
+<verbatim place="end-hrl">
+-record(stat, {
+	st_dev,
+	st_ino,
+	st_mode,
+	st_nlink,
+	st_uid,
+	st_gid,
+	st_rdev,
+	st_atimespec,
+	st_mtimespec,
+	st_ctimespec,
+	st_size,
+	st_blocks,
+	st_blksize
+}).
+-record(passwd, {
+	pw_name,
+	pw_passwd,
+	pw_uid,
+	pw_gid,
+	pw_gecos,
+	pw_dir,
+	pw_shell
+}).
+-record(group, {
+	gr_name,
+	gr_passwd,
+	gr_gid,
+	gr_mem
+}).
+</verbatim>
+
+<verbatim place="top_cpp_stuff">
+#include &lt;unistd.h>
+#include &lt;pwd.h>
+#include &lt;grp.h>
+#include &lt;sys/types.h>
+#include &lt;sys/stat.h>
+#include &lt;sys/syslimits.h>
+</verbatim>
+
+<atom name="stat"/>
+<atom name="passwd"/>
+<atom name="group"/>
+
+<func name="getgid" async_op="0">
+ <return ctype="gid_t" name="ret_gid_t" expect=">= 0" expect_errval="errno"/>
+</func>
+
+<func name="getegid" async_op="0">
+ <return ctype="gid_t" name="ret_gid_t" expect=">= 0" expect_errval="errno"/>
+</func>
+
+<func name="getgrnam">
+ <arg name="name" ctype="char *"
+      ser_type="binary" nulterm="1"/>
+ <return name="ret_grptr" ctype="struct group *" expect="!= NULL"
+         xreturn="group"/>
+</func>
+
+<func name="getgrgid">
+ <arg name="gid" ctype="gid_t" ser_type="unsigned-integer"/>
+ <return name="ret_grptr" ctype="struct group *" expect="!= NULL"
+         xreturn="group"/>
+</func>
+
+<func name="getgroups" cname="my_getgroups" async_op="0">
+ <arg name="gidset" ctype="gid_t" carraysiz="NGROUPS_MAX" argtype="out"
+      noerlcall="1"/>
+ <return ctype="int" name="ret_int" expect=">= 0" expect_errval="errno"
+  xreturn="getgroups"/>
+</func>
+
+<func name="getpwnam">
+ <arg name="login" ctype="char *"
+      ser_type="binary" nulterm="1"/>
+ <return name="ret_pwptr" ctype="struct passwd *" expect="!= NULL"
+         xreturn="passwd"/>
+</func>
+
+<func name="getpwuid">
+ <arg name="uid" ctype="uid_t" ser_type="unsigned-integer"/>
+ <return name="ret_pwptr" ctype="struct passwd *" expect="!= NULL"
+         xreturn="passwd"/>
+</func>
+
+<func name="getuid" async_op="0">
+ <return ctype="uid_t" name="ret_uid_t" expect=">= 0" expect_errval="errno"/>
+</func>
+
+<func name="geteuid" async_op="0">
+ <return ctype="uid_t" name="ret_uid_t" expect=">= 0" expect_errval="errno"/>
+</func>
+
+<func name="getlogin" async_op="0">
+ <return ctype="char *" name="ret_char_p" etype="binary" nulterm="1"
+         expect="!= NULL"/>
+</func>
+
+<func name="getpgrp" async_op="0">
+ <return ctype="pid_t" name="ret_pid_t" expect=">= 0" expect_errval="errno"/>
+</func>
+
+<func name="getppid" async_op="0">
+ <return ctype="pid_t" name="ret_pid_t" expect=">= 0" expect_errval="errno"/>
+</func>
+
+<func name="getsid" async_op="0">
+ <arg name="pid" ctype="pid_t" noerlcall="1"/>
+ <return ctype="pid_t" name="ret_pid_t" expect=">= 0" expect_errval="errno"/>
+ <hack place="post-deserialize" type="verbatim">
+	c->i.pid = 0;
+ </hack>
+</func>
+
+<func name="kill" async_op="0">
+ <arg name="pid" ctype="pid_t"/>
+ <arg name="sig" ctype="int"/>
+ <return ctype="int" name="ret_int" expect=">= 0" expect_errval="errno"/>
+</func>
+
+<func name="lstat">
+ <arg name="path" ctype="char *"
+      ser_type="binary" nulterm="1"/>
+ <arg name="sb" ctype="struct stat"
+      noerlcall="1" argtype="out"/>
+ <return name="ret_int" ctype="int" expect=">= 0"
+         xreturn="stat"/>
+</func>
+
+<func name="mkfifo">
+ <arg name="path" ctype="char *"
+      ser_type="binary" nulterm="1"/>
+ <arg name="mode" ctype="mode_t"/>
+ <return name="ret_int" ctype="int" expect=">= 0" expect_errval="errno"/>
+</func>
+
+<func name="mknod">
+ <arg name="path" ctype="char *"
+      ser_type="binary" nulterm="1"/>
+ <arg name="mode" ctype="mode_t"/>
+ <arg name="dev" ctype="dev_t"/>
+ <return name="ret_int" ctype="int" expect=">= 0" expect_errval="errno"/>
+</func>
+
+<func name="umask">
+ <arg name="numask" ctype="mode_t"/>
+ <return name="ret_int" ctype="int" expect=">= 0" expect_errval="errno"/>
+</func>
+
+
+<xtra_return name="stat">
+  <xtra_ok>
+   <xtra_val etype="tuple">
+     <xtra_val etype="atom" val="stat"/>
+     <xtra_val etype="integer" val="c->o.sb.st_dev"/>
+     <xtra_val etype="integer" val="c->o.sb.st_ino"/>
+     <xtra_val etype="integer" val="c->o.sb.st_mode"/>
+     <xtra_val etype="integer" val="c->o.sb.st_nlink"/>
+     <xtra_val etype="integer" val="c->o.sb.st_uid"/>
+     <xtra_val etype="integer" val="c->o.sb.st_gid"/>
+     <xtra_val etype="integer" val="c->o.sb.st_rdev"/>
+     <xtra_val etype="tuple">
+       <xtra_val etype="integer" val="c->o.sb.st_atimespec.tv_sec"/>
+       <xtra_val etype="integer" val="c->o.sb.st_atimespec.tv_nsec"/>
+     </xtra_val>
+     <xtra_val etype="tuple">
+       <xtra_val etype="integer" val="c->o.sb.st_mtimespec.tv_sec"/>
+       <xtra_val etype="integer" val="c->o.sb.st_mtimespec.tv_nsec"/>
+     </xtra_val>
+     <xtra_val etype="tuple">
+       <xtra_val etype="integer" val="c->o.sb.st_ctimespec.tv_sec"/>
+       <xtra_val etype="integer" val="c->o.sb.st_ctimespec.tv_nsec"/>
+     </xtra_val>
+     <xtra_val etype="integer" val="c->o.sb.st_size"/>
+     <xtra_val etype="integer" val="c->o.sb.st_blocks"/>
+     <xtra_val etype="integer" val="c->o.sb.st_blksize"/>
+   </xtra_val>
+  </xtra_ok>
+  <xtra_error>
+    <!-- __expect_errval is EDTK "magic" -->
+    <xtra_val etype="integer"
+              val="errno"/>
+  </xtra_error>
+</xtra_return>
+
+<xtra_return name="passwd">
+  <xtra_ok>
+   <xtra_val etype="tuple">
+     <xtra_val etype="atom" val="passwd"/>
+     <xtra_val etype="binary" valtype="static_buf"
+     	val="c->o.ret_pwptr->pw_name"
+	offset="0" length="strlen(c->o.ret_pwptr->pw_name)"/>
+     <xtra_val etype="binary" valtype="static_buf"
+     	val="c->o.ret_pwptr->pw_passwd"
+	offset="0" length="strlen(c->o.ret_pwptr->pw_passwd)"/>
+     <xtra_val etype="integer" val="c->o.ret_pwptr->pw_uid"/>
+     <xtra_val etype="integer" val="c->o.ret_pwptr->pw_gid"/>
+     <xtra_val etype="binary" valtype="static_buf"
+     	val="c->o.ret_pwptr->pw_gecos"
+	offset="0" length="strlen(c->o.ret_pwptr->pw_gecos)"/>
+     <xtra_val etype="binary" valtype="static_buf"
+     	val="c->o.ret_pwptr->pw_dir"
+	offset="0" length="strlen(c->o.ret_pwptr->pw_dir)"/>
+     <xtra_val etype="binary" valtype="static_buf"
+     	val="c->o.ret_pwptr->pw_shell"
+	offset="0" length="strlen(c->o.ret_pwptr->pw_shell)"/>
+   </xtra_val>
+  </xtra_ok>
+  <xtra_error>
+    <!-- __expect_errval is EDTK "magic" -->
+    <xtra_val etype="integer"
+              val="c->o.__expect_errval"/>
+  </xtra_error>
+</xtra_return>
+
+<xtra_return name="group">
+  <xtra_ok>
+   <xtra_val etype="tuple">
+     <xtra_val etype="atom" val="group"/>
+     <xtra_val etype="binary" valtype="static_buf"
+     	val="c->o.ret_grptr->gr_name"
+	offset="0" length="strlen(c->o.ret_grptr->gr_name)"/>
+     <xtra_val etype="binary" valtype="static_buf"
+     	val="c->o.ret_grptr->gr_passwd"
+	offset="0" length="strlen(c->o.ret_grptr->gr_passwd)"/>
+     <xtra_val etype="integer" val="c->o.ret_grptr->gr_gid"/>
+     <xtra_val etype="binary" valtype="static_buf"
+     	val="c->o.ret_grptr->gr_mem"
+	offset="0" length="strlen(c->o.ret_grptr->gr_mem)"/>
+   </xtra_val>
+  </xtra_ok>
+  <xtra_error>
+    <!-- __expect_errval is EDTK "magic" -->
+    <xtra_val etype="integer"
+              val="c->o.__expect_errval"/>
+  </xtra_error>
+</xtra_return>
+
+<xtra_return name="getgroups">
+  <xtra_ok>
+   <xtra_val etype="tuple">
+     <xtra_val etype="integer" val="c->o.ret_int"/>
+     <xtra_val etype="list" procname="make_getgroups_list"/>
+   </xtra_val>
+  </xtra_ok>
+  <xtra_error>
+    <!-- __expect_errval is EDTK "magic" -->
+    <xtra_val etype="integer"
+              val="errno"/>
+  </xtra_error>
+</xtra_return>
+
+</erldriver>
+

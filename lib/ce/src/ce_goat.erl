@@ -73,7 +73,7 @@
 -export([behaviour_info/1]).
 
 -export([start/0, stop/0]).
--export([new/2, new_id/0, delete/1]).
+-export([new/2, new/3, delete/1]).
 -export([call/2, cast/2]).
 -export([goat_handler/2]).
 
@@ -82,7 +82,8 @@
   id      = undefined,     % the unique identifier for the goat
   pid     = undefined,     % the process of the goat, or undefined when static
   handler = undefined,     % module which contains callbacks for the goat
-  state   = undefined      % the internal state of the goat  
+  state   = undefined,     % the internal state of the goat
+  timeout = infinity       % how long this goat will stay active after a cast
 }).
 
 %% @spec behaviour_info(callbacks) -> [{atom(), integer()}]
@@ -111,15 +112,30 @@ stop() ->
   ok.
 
 %% @spec new(module(), state()) -> goat_id()
-%%         module() = atom()
-%%         state() = term()
-%%         goat_id() = goat_id()
-%% @doc Creates a new <code>goat</code> with the given handler module.  The handler
-%% will be used to react to all calls and casts sent to the <code>goat</code>.
+%% @equiv new(module(), state(), infinity)
 
 new(Handler, State) when is_atom(Handler) ->
   GoatId = new_id(),
   Goat = #goat{ id = GoatId, handler = Handler, state = State },
+  ets:insert(?MODULE, Goat),
+  GoatId.
+
+%% @spec new(module(), state(), timeout()) -> goat_id()
+%%         module() = atom()
+%%         state() = term()
+%%         timeout() = integer()
+%%         goat_id() = goat_id()
+%% @doc Creates a new <code>goat</code> with the given handler module.  The handler
+%% will be used to react to all calls and casts sent to the <code>goat</code>.
+
+new(Handler, State, Timeout) when is_atom(Handler), is_integer(Timeout) ->
+  GoatId = new_id(),
+  Goat = #goat{
+    id      = GoatId,
+    handler = Handler,
+    state   = State,
+    timeout = Timeout
+  },
   ets:insert(?MODULE, Goat),
   GoatId.
 
@@ -196,7 +212,6 @@ call(GoatId, Message) ->
           {ok, Reply}
       end
   end.
-
 static_call(#goat{ id = GoatId, handler = Handler, state = State } = Goat, Message) ->
   case Handler:handle_call(GoatId, Message, State) of
     {ok, Reply, NewState} ->
@@ -226,17 +241,16 @@ goat_handler(Handler, GoatId) ->
   Self = self(),
   receive
     synchronize ->
-      {ok, #goat{ pid = Self, state = State } = Goat} = retrieve(GoatId),
-      goat_handler(Handler, GoatId, State)
+      {ok, #goat{ pid = Self, state = State, timeout = Timeout }} = retrieve(GoatId),
+      goat_handler(Handler, GoatId, State, Timeout)
   end.
-  
-goat_handler(Handler, GoatId, State) ->
+goat_handler(Handler, GoatId, State, Timeout) ->
   receive
     {{Parent, call, Ref}, Message} ->
       case Handler:handle_call(GoatId, Message, State) of
         {ok, Reply, NewState} ->
           Parent ! {{self(), call, Ref}, Reply},
-          goat_handler(Handler, GoatId, NewState);
+          goat_handler(Handler, GoatId, NewState, Timeout);
         {deactivate, Reply, NewState} ->
           Parent ! {{self(), call, Ref}, Reply},
 	  leave_goat_handler(GoatId, NewState)
@@ -244,12 +258,13 @@ goat_handler(Handler, GoatId, State) ->
     {{Parent, cast}, Message} ->
       case Handler:handle_cast(GoatId, Message, State) of
         {ok, NewState} ->
-          goat_handler(Handler, GoatId, NewState);
+          goat_handler(Handler, GoatId, NewState, Timeout);
         {deactivate, NewState} ->
           leave_goat_handler(GoatId, NewState)
       end
+    after Timeout ->
+      leave_goat_handler(GoatId, State)
   end.
-
 leave_goat_handler(GoatId, State) ->
   Goat = retrieve(GoatId),
   NewGoat = Goat#goat{ state = State },

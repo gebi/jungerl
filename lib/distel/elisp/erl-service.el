@@ -973,7 +973,7 @@ The match positions are erl-mfa-regexp-{module,function,arity}-match.")
   (interactive
    (list (erl-target-node)
 	 current-prefix-arg))
-  (let* ((mfa (erl-get-call-mfa))
+  (let* ((mfa (erl-read-call-mfa))
 	 (defaultstr (if (null mfa)
 			 nil
 		       (concat (if (first mfa)  (format "%s:" (first mfa)) "")

@@ -24,6 +24,11 @@
 
 #define REQUEST_GET_DEVICE 0
 #define REQUEST_WRITE      1
+#define REQUEST_ACTIVE     2
+
+#define ACTIVE_FALSE 0
+#define ACTIVE_TRUE  1
+#define ACTIVE_ONCE  2
 
 /* Generous buffer size for reading single ethernet frames.
 
@@ -66,7 +71,7 @@ static int make_if(int mode, char *dev) {
     struct ifreq ifr;
     int fd, err;
     
-    if ((fd = open("/dev/net/tun", O_RDWR)) < 0) return -1;
+    if ((fd = open("/dev/net/tun", O_RDWR | O_NONBLOCK)) < 0) return -1;
 
     memset(&ifr, 0, sizeof(ifr));
     ifr.ifr_flags = mode | IFF_NO_PI;
@@ -93,6 +98,7 @@ struct tun_state {
     int fd;
     char dev[IFNAMSIZ];
     char buf[TUNNEL_BUF_SIZE];
+    int active;
 };
 
 static int ctl_reply(int rep, char *buf, int len, char **rbuf, int rsize)
@@ -111,6 +117,11 @@ static int ctl_reply(int rep, char *buf, int len, char **rbuf, int rsize)
     return len+1;
 }
 
+static void set_input(struct tun_state *state, int flag)
+{
+    driver_select(state->port, (ErlDrvEvent)state->fd, DO_READ, flag);
+}
+
 static int tun_ctl(ErlDrvData data,
                    unsigned int cmd,
                    char *buf,
@@ -123,12 +134,25 @@ static int tun_ctl(ErlDrvData data,
     case REQUEST_GET_DEVICE:
         return ctl_reply(REPLY_OK, state->dev, strlen(state->dev), rbuf, rsize);
     case REQUEST_WRITE:
-        /* sure hope this doesn't block.. */
         if (write(state->fd, buf, len) > 0) {
             return ctl_reply(REPLY_OK, "", 0, rbuf, rsize);
         } else {
             return ctl_reply(REPLY_ERROR, "", 0, rbuf, rsize);
         }
+    case REQUEST_ACTIVE:
+        state->active = (int)*buf;
+        switch (state->active) {
+        case ACTIVE_FALSE:
+            set_input(state, 0);
+            break;
+        case ACTIVE_TRUE:
+        case ACTIVE_ONCE:
+            set_input(state, 1);
+            break;
+        default:
+            assert(0);
+        }
+        return ctl_reply(REPLY_OK, "", 0, rbuf, rsize);
     default:
         return ctl_reply(REPLY_ERROR, "", 0, rbuf, rsize);
     }
@@ -143,12 +167,16 @@ static void tun_input(ErlDrvData data, ErlDrvEvent nil)
     if (len > 0) {
         driver_output(state->port, state->buf, len);
     }
+    if (state->active == ACTIVE_ONCE) {
+        state->active = ACTIVE_FALSE;
+        set_input(state, 0);
+    }
 }
 
 static void tun_stop(ErlDrvData data)
 {
     struct tun_state *state = (struct tun_state *)data;
-    driver_select(state->port, (ErlDrvEvent)state->fd, DO_READ, 0);
+    set_input(state, 0);
     close(state->fd);
     sys_free(state);
 }
@@ -177,8 +205,8 @@ static ErlDrvData tun_start(ErlDrvPort port, char *args)
     }
     state->port = port;
     state->fd = fd;
-
-    driver_select(port, (ErlDrvEvent)fd, DO_READ, 1);
+    state->active = ACTIVE_FALSE;
+    set_input(state, 0);
 
     return (ErlDrvData)state;
 }

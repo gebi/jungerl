@@ -17,13 +17,18 @@
 
 -export([init/0,
 	 open_tun/0, open_tap/0, open_tuntap/2,
-	 device_name/1, write/2]).
+	 device_name/1, write/2, set_active/2]).
 
 -define(REPLY_ERROR, 0).
 -define(REPLY_OK, 1).
 
 -define(REQUEST_GET_DEVICE, 0).
 -define(REQUEST_WRITE, 1).
+-define(REQUEST_ACTIVE, 2).
+
+-define(ACTIVE_FALSE, 0).
+-define(ACTIVE_TRUE,  1).
+-define(ACTIVE_ONCE,  2).
 
 %% Returns: ok
 init() ->
@@ -55,5 +60,13 @@ device_name(Port) ->
 %% Returns: ok
 write(Port, Packet) ->
     [?REPLY_OK] = erlang:port_control(Port, ?REQUEST_WRITE, Packet),
+    ok.
+
+set_active(Port, false) -> set_active1(Port, ?ACTIVE_FALSE);
+set_active(Port, true)  -> set_active1(Port, ?ACTIVE_TRUE);
+set_active(Port, once)  -> set_active1(Port, ?ACTIVE_ONCE).
+
+set_active1(Port, Arg) ->
+    [?REPLY_OK] = erlang:port_control(Port, ?REQUEST_ACTIVE, [Arg]),
     ok.
 

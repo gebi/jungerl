@@ -1,0 +1,12 @@
+{name, "ucs"}.
+{vsn, {0,3}}.
+{summary, "Simple Universal Character Set support (UCS, ISO 10646, Unicode)"}.
+{author, "Lon Willett", "Lon.Willett@sse.ie", "000103"}.
+{keywords, ["characters", "encoding", "UCS", "10646", "Unicode"]}.
+{needs, []}.
+{abstract,
+ "This module provides some basic support for decoding, encoding, and "
+ "handling ISO 10646 character strings (Universal Character Set strings, "
+ "aka Unicode, sort of). See the file ucs.doc for details. "
+ "The latest version can be found at http://sowap.sourceforge.net/ "
+}.

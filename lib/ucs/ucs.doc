@@ -1,0 +1,419 @@
+Module: ucs
+Version: 0.3
+Author: Lon Willett <Lon.Willett@sse.ie>, Johan Blom <johan.blom@mobilearts.se>
+
+Description:
+
+    This module provides some basic support for decoding, encoding,
+    and handling ISO 10646 character strings (Universal Character Set
+    strings, aka Unicode, sort of).
+
+------------------------------------------------------------------------
+
+Overview:
+
+    The most useful functions provided here are the conversions to and
+    from the various encodings of ISO-10646 strings.  UCS-4 (big and
+    little endian), UTF-16 (big and little endian), and UTF-8 are
+    supported.  These functions are pure library code, with no
+    processes, configuration data, or dependencies outside of the
+    "ucs" module (beyond light use of some "kernel" and "stdlib"
+    stuff).
+
+    Various miscellaneous character range classification predicates
+    are also provided.  These are all very simple, but can be handy.
+
+    In addition, an encoding using RFC-1345 style mnemonics is
+    provided.  This is useful for managing UCS strings in combination
+    with 8-bit or 7-bit character sets, and is even useful in some
+    contexts where "full" Unicode support is available, since it is
+    sometimes important to see the exact details of how a string is
+    represented, and it is rare for display devices to be able to
+    handle more than a relatively small subset of the Unicode
+    characters anyway.
+
+    This particular format was chosen because it is the most readable
+    representation of UCS strings using a restricted character set
+    that I am aware of.  These conversions require a database of
+    "mnemonic <-> code" mappings, which is provided by the "ucs_data"
+    module.
+
+    Finally, access to the unicode data, as defined by the
+    "UnicodeData.txt" file from the Unicode consortium, suitably
+    reformatted as Erlang terms, is also provided.  This database is
+    also handled by the "ucs_data" module, with the record format
+    defined in the "unidata.hrl" header file.
+
+    The "ucs_data" module provides a gen_server server, which is
+    currently started on-demand, supervised by the "kernel_safe_sup"
+    supervisor.  The required "dets" files are not automatically
+    built; one must call "ucs:rebuild_database" to construct them.
+
+    The source files used to construct the dets files are:
+
+	ucsmnem.edat -- file containing erlang terms that define the
+	RFC-1345 mnemonics.
+
+	UnicodeData.txt -- straight from the Unicode consortium.
+
+    The "dets" files live in the same directory ("priv"), and are:
+
+	ucsmnem1.dets -- mapping of UCS codes to RFC-1345 mnemonics.
+	ucsmnem2.dets -- reverse mapping of the preceding file.
+	unidata.dets -- maps UCS code to Unicode data ('unidata' record).
+
+    The issue of where the data files live is not resolved to my
+    satisfication, but the current code seems good enough for the time
+    being.  However, someone may want to rewrite the "get_data_dir"
+    function in the ucs_data module.
+
+    Once built, there should be no reason to rebuild the "dets" files,
+    other than when a new version of UnicodeData.txt is released by
+    the UnicodeConsortium (or a new version of "dets" is released).
+
+------------------------------------------------------------------------
+
+Notes on the RFC-1345 style mnemonic strings:
+
+    For those readers unfamiliar with RFC-1345 (most people, I
+    expect), it (among other things) defines an "escape" syntax to
+    encode a wide range of characters using a subset of ASCII (the
+    ISO-646 invariant characters, to be precise).  While the RFC
+    allows a variety of "escape" characters or character sequences,
+    the only "intro character sequence" supported by this module is
+    the character "&".
+
+    So the sequences are either of the form "&CC", for some two
+    characters CC, or "&_CCC_", for some sequence of characters CCC
+    (or "&&" for "&" itself).  The sequences (CC, CCC) are chosen to
+    have some mnemonic value, thus producing a much more readable
+    representation of strings than numeric-style escape sequences
+    (although such a sequence will be used as a fallback; see below).
+
+    RFC-1345 says that the mnemonics were taken from a draft of
+    POSIX.2, but I don't have access to that, so I don't know what
+    their status is there.
+
+    Some examples of these strings are:
+
+	Latin-1		Mnemonic	UCS "\" escapes
+	-------		--------	---------------
+	München		M&u:nchen	M\U+00FCnchen
+	zwölf		zw&o:lf		zw\U+00F6lf
+	Høeg		H&o/eg		H\U+00F8eg
+	£100		&Pd100		\U+00A3100
+	(none)		&G=&o=&r=&b=&a=&c%&e=&v=
+					\U+0413\U+043E\U...
+
+    While the "mnemonic" string definition used here is by and large
+    from RFC-1345, I haven't worried about precise compatibility.  The
+    reason for this is that to the best of my knowledge the RFC-1345
+    mnemonic representation isn't widely used enough for this to be
+    important.
+
+    More precisely, the differences and restrictions, as compared to the
+    RFC-1345 description, are:
+
+	-- The only "introducer" sequence (i.e. escape character)
+           supported is "&".
+
+	-- The character codes are always UCS (although you can always
+           apply another transformation to support non-UCS based
+           character sets).
+
+	-- The Asian character sets (GB 2312-1980, JIS X0208-1990, JIS
+           X0212-1990, and KS C 5601-1987) are not supported.
+
+	-- The sequences "&_?uNNNN_" (where "NNNN" is some non-empty
+           sequence of hexadecimal digits) is assumed to represent the
+           UCS character designated by the value NNNN.
+
+	-- Various fixes and tweaks have been applied to the
+           mnemonics.  The most significant of these were changing the
+           non-spacing accents to the Unicode combining accents,
+           removing the other RFC-1345 private additions, and adding:
+
+	   EU -> U+20AC	EURO SIGN
+	   ?? -> U+FFFD	REPLACEMENT CHARACTER
+
+------------------------------------------------------------------------
+
+Type definitions:
+
+	universal_char() = 0 .. 16#D7FF
+                         | 16#E000 .. 16#FFFD
+                         | 16#10000 .. 16#7FFFFFFF
+	universal_string() = universal_char() | [universal_string()]
+
+	mnemonic_string() = universal_string(), where any occurences of
+		the character "&" are followed by a valid RFC-1345 style
+		"mnemonic" (see below).
+	flat_mnemonic_string() = mnemonic_string(), but must be a flat list
+
+	octet_string() = binary() | list_to_binary_list()
+	list_to_binary_list() = valid arg for the list_to_binary/1 BIF
+
+------------------------------------------------------------------------
+
+Exports for encoding/decoding various flavours of UCS strings:
+
+    to_ucs4be(Str) -> octet_string()
+    from_ucs4be(Octets) -> Str
+    from_ucs4be(Octets,Tail) -> Str
+
+	Str = universal_string()
+	Octets = octet_string()
+	Tail = [universal_string()]
+
+	Converts to/from big-endian UCS-4 encoding.  The
+	octet_string() value of to_ucs4be/1 will be a list whose
+	structure reflects the structure of the (possibly) non-flat
+	input.  The result of from_ucs4be/1 is always a flat list.
+	from_ucs4be/2 is just a more efficient version of
+	"from_ucs4be(Octets)++Tail".
+
+
+    to_ucs4le(Str) -> octet_string()
+    from_ucs4le(Octets) -> Str
+    from_ucs4le(Octets,Tail) -> Str
+
+	Str = universal_string()
+	Octets = octet_string()
+	Tail = [universal_string()]
+
+	These functions are identical to the {to,from}_ucs4be
+	functions described above, but use the little-endian UCS-4
+	encoding, instead of the big-endian one.
+
+    to_utf16be(Str) -> octet_string()
+    from_utf16be(Octets) -> Str
+    from_utf16be(Octets,Tail) -> Str
+
+	Str = universal_string()
+	Octets = octet_string()
+	Tail = [universal_string()]
+
+	These functions are identical to the {to,from}_ucs4be
+	functions described above, but use the big-endian UTF-16
+	encoding, instead of the big-endian UCS-4 encoding.
+
+	Note that to_utf16be/1 will silently replace unrepresentable
+	characters with the UCS "replacement character" (U+FFFD).
+
+    to_utf16le(Str) -> octet_string()
+    from_utf16le(Octets) -> Str
+    from_utf16le(Octets,Tail) -> Str
+
+	Str = universal_string()
+	Octets = octet_string()
+	Tail = [universal_string()]
+
+	These functions are identical to the {to,from}_utf16be
+	functions described above, but use the little-endian UTF-16
+	encoding, instead of the big-endian one.
+
+    to_utf8(Str) -> octet_string()
+    from_utf8(Octets) -> Str
+    from_utf8(Octets,Tail) -> Str
+
+	Str = universal_string()
+	Octets = octet_string()
+	Tail = [universal_string()]
+
+	These functions are identical to the {to,from}_ucs4be
+	functions described above, but use the UTF-8 encoding instead
+	of the UCS-4 (big endian) encoding.
+
+	Note that from_utf8 will generate an error if the encoding is
+	non-canonical (as per RFC 2279 and recent Unicode consortium
+	recommendations, but not in line with the older Unicode
+	consortium recommendations).
+
+------------------------------------------------------------------------
+
+Exported character set predicates:
+
+    is_iso10646(X) -> bool()
+
+	true iff X is a UCS character code (i.e. universal_char()
+	type).  Note that this rules out the "surrogate" characters,
+	 U+FFFE, and U+FFFF.
+
+
+    is_unicode(X) -> bool()
+
+	true iff X is a UCS character code in the Unicode range,
+	i.e. the range capable of being encoded with UTF-16, i.e. less
+	than 16#110000.
+
+
+    is_bmpchar(X) -> bool()
+
+	true iff X is a UCS character code in the basic multi-lingual plane,
+	i.e. the range capable of being encoded with UCS-2, i.e. less
+	than 16#10000.
+
+
+    is_latin1(X) -> bool()
+
+	test for X in 0 .. 255.
+
+
+    is_ascii(X) -> bool()
+
+	test for X in 0 .. 127.
+
+
+    is_visible_latin1(X) -> bool()
+
+	true iff X is a Latin-1 character code representing a
+	non-control character, and additionally excluding the no-break
+	space character (but including the space character).
+
+
+    is_visible_ascii(X) -> bool()
+
+	true iff X is an ASCII character code representing a
+	non-control character (but including the space character).
+
+
+    is_iso646_basic(X) -> bool()
+
+	true iff X is a character code of a character from the ISO-646
+	invariant character set, i.e. one the of is_visible_ascii()
+	chars, but additionally excluding:
+
+		$ # @ [ \ ] ^ ` { | } ~
+
+------------------------------------------------------------------------
+
+Exports for encoding/decoding using a subset of UCS with the RFC-1345
+mnemonic "escape sequences":
+
+    to_mnemonic(UString) -> MString
+    to_mnemonic(UString,Pred) -> MString
+
+	UString = universal_string()
+	Pred(X) -> bool()
+	MString = mnemonic_string()
+
+	Pred should select a superset of ISO-646.basic character set,
+	optionally excluding the space character.  Any character codes
+	in UString that lie outside of this designated set are
+	replaced with RFC-1345 style mnemonic escape sequences.  If
+	there is no defined mnemonic, then the character is replaced
+	with the sequence "&_?uNNNN_", where NNNN is the 4 or 8 digit
+	hexadecimal representation of the character code.
+
+	Pred defaults to is_visible_ascii/1.  Note that if Pred
+	selects a subset of ASCII (or Latin-1), then the resulting
+	string will contain only ASCII (or Latin-1) codes, and will
+	therefore be usable directly for 7-bit (or 8-bit) I/O.  This
+	is the intended usage; it provides a reasonably nice
+	representation of Unicode strings suitable for storage or
+	display using a restricted character set.
+
+    from_mnemonic(MString) -> UString
+    from_mnemonic(MString,Tail) -> UString
+
+	MString = flat_mnemonic_string()
+	UString = universal_string()
+	Tail = [universal_string()]
+
+	Replaces the "mnemonic escape sequences" in MString with their
+	UCS codes.  Note that MString must be a _flat_ string; call
+	lists:flatten if needed.
+
+------------------------------------------------------------------------
+
+Unicode data support exports:
+
+    -include("unidata.hrl").
+    unicode_data(Char) -> Data
+
+	Char = universal_char()
+	Data = unicode_data()
+	unicode_data() = record(unidata)
+
+	This function returns the unicode data for the specified
+	character, assuming that the database has been correctly
+	built.  See the file "unidata.hrl" for the format of the data.
+
+	Note that if you intend to use the unicode data really
+	heavily, then you will probably want to apply optimisations
+	beyond what this does.
+
+
+    rebuild_database() -> ok | {error,Info}
+    rebuild_database(Which) -> ok | {error,Info}
+    rebuild_database([Which]) -> ok | {error,Info}
+
+	Which = unidata | mnemonics | both
+
+	Rebuilds the database (i.e. dets files) used by this module.
+	The source files are "UnicodeData.txt" and "ucsmnem.edat" in
+	the "priv" directory.  The database files are "unidata.dets",
+	"ucsmnem1.dets", and "ucsmnem2.dets", in the same directory.
+	The "unidata.dets" DB is only required by unicode_data/1.  The
+	"ucsmnem*.dets" DB files are used for the RFC-1345 style
+	mnemonic string conversions.
+
+------------------------------------------------------------------------
+
+Transformation to/from Unicode and character sets named by IANA
+See http://www.iana.org/assignments/character-sets for character set
+identifiers and http://www.unicode.org/Public/MAPPINGS/ for transformation
+tables.
+
+This is by default the IANA defined defined name, unless another name is
+declared as "preferred MIME name" in which case this name is chosen.
+Translation from defined aliases to this name is supported.
+
+
+The following functions make use of the mibenum.dets table in the priv
+directory.
+
+getMIB(Charset) -> integer() | {error,Info} | not_IANA_registered
+	Charset = atom()
+
+	Finds the MIBnum, as defined by IANA. Charset may be either the name or
+	an alias of the character set.
+
+
+getCharset(MIBnum) -> atom() | {error,Info}
+	MIBnum = integer()
+
+	Finds the name of a Character set, given the MIBnum as defined by IANA.
+
+
+
+The following functions make use of character mapping tables in the priv
+directory. Note that filenames holding the mapping tables MUST have names 
+'unicode-mapping-CHARSET.txt', where CHARSET is the IANA defined name of the
+character set in *lower case*. New tables might be downloaded and added at any
+time, but requires a rebuild of the databases.
+
+to_unicode(Input,Charset) -> list() | {error,Info}
+	Input = list()
+	Charset = atom()
+
+	Transforms a list of characters, represented in Charset, to a list of
+	unicode	represented by Erlang integers.
+	Charset might be an alias or the actual name as defined by IANA.
+
+
+from_unicode(Input,Charset) -> list() | {error,Info}
+	Input = list()
+	Charset = atom()
+
+	Transforms a list of characters, in unicode represented by Erlang
+	integers, to Charset.
+	Charset might be an alias or the actual name as defined by IANA.
+
+
+is_incharset(Char,Charset) -> true | false | {error,unsupported_charset}
+	Char = integer()
+	Charset = atom()
+
+	true iff Char is a character code representing a character in Charset
+	Charset might be an alias or the actual name as defined by IANA.

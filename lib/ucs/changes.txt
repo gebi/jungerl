@@ -1,0 +1,27 @@
+TODO:
+Add a unicode-mappings.hrl file containing a list
+[{CHARSET,BitMap},...]
+If no such definition is given, Erlang "integer" is chosen.
+
+
+KNOWN ISSUES
+- All mappings are made against an integer. There is currently no support
+  for different byte orders and e.g. 7 bit encoding/decoding.
+- Mappings between Unicode and some character sets has moved to a separate file
+  in the Unicide standard (v3.1). 
+
+
+Changes  0.2 -> 0.3 
+-------------------
+- Added support for non-IANA defined character sets (e.g. GSM 03.38)
+- Made the "preferred MIME name", if given, the defined name of a character set.
+- Improved performance for character sets known to Unicode subsets
+
+Changes  0.1 -> 0.2 
+-------------------
+- Added support for IANA character set names. Includes functions to lookup
+  IANA defined name/alias, given MIB number and vice versa.
+- Added a "first try" for generic transformation between Unicode and character
+  sets to where there are "mappings" defined.
+- Added function to test wheter a given character code has a character mapping
+  within a given character set.

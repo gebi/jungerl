@@ -184,7 +184,7 @@ get_port_cm(CM, Name0) ->
 	    ssh_cm:send(CM, Channel,[?int16(Len),?EPMD_PORT_PLEASE2_REQ,Name]),
 	    Reply = wait_for_port_reply(CM, Channel, []),
 	    case Reply of
-		closed ->
+		noport ->
 		    get_port_v0(CM, Name0);
 		Other ->
 		    Other

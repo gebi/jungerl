@@ -63,6 +63,9 @@ debug:  all
 depend:
 	edep -MM -o $(EBIN) $(ERLC_FLAGS) $(MODULES:%=%.erl) > depend.mk
 
+dialyze:
+	dialyzer --src -o dia.out $(ERLC_FLAGS) -c $(MODULES:%=%.erl)
+
 clean: 
 	rm -f $(ASN_ERLS) $(GEN_ERLS) $(ASN_HRLS) $(HRL_FILES) $(ASN_DBS) \
 		$(ASN_TABLES) $(TARGET_FILES)

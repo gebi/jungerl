@@ -21,7 +21,8 @@
 -export([start_link/2, start_link/3, start_link/4]).
 -export([dist_start/1, dist_start/2]).
 
-
+-define(DBG_SSHMSG, true).
+-define(DBG_SSHCM,  true).
 
 
 -record(channel,
@@ -67,22 +68,30 @@ start(Name, Host, Opts) ->
     start(Name, Host, ?SSH_DEFAULT_PORT, Opts).
 start(Name, Host, Port, Opts) ->
     Pid = spawn(?MODULE, connect_init,
-		[self(),Name,false,Host,?SSH_DEFAULT_PORT,Opts]),
+		[self(),Name,false,Host,Port,Opts]),
+    Ref = erlang:monitor(process, Pid),
     receive
+	{'DOWN', Ref, _, _, Reason} ->
+	    {error, Reason};
 	{Pid, Reply} ->
+	    erlang:demonitor(Ref),
 	    Reply
     end.
 
 start_link(Host, Opts) ->
     start_link(undefined, Host, Opts).
 start_link(Name, Host, Opts) ->
-    start_link(Host, ?SSH_DEFAULT_PORT, Opts).
+    start_link(Name, Host, ?SSH_DEFAULT_PORT, Opts).
 
 start_link(Name, Host, Port, Opts) ->
     Pid = spawn(?MODULE, connect_init,
-		[self(),Name,true,Host,?SSH_DEFAULT_PORT,Opts]),
+		[self(),Name,true,Host,Port,Opts]),
+    Ref = erlang:monitor(process, Pid),
     receive
+	{'DOWN', Ref, _, _, Reason} ->
+	    {error, Reason};
 	{Pid, Reply} ->
+	    erlang:demonitor(Ref),
 	    Reply
     end.
 %%
@@ -414,11 +423,6 @@ connect_messages() ->
 
 %% CM server 
 connect_init(User, Name, Link, Host, Port, Opts) ->
-    process_flag(trap_exit, true),
-    if Link == true ->
-	    link(User);
-       true -> ok
-    end,
     case connect_register(Name) of
 	ok ->
 	    case ssh_proto:connect(Host, Port, Opts) of
@@ -426,12 +430,18 @@ connect_init(User, Name, Link, Host, Port, Opts) ->
 		    case user_auth(SSH,Opts) of
 			ok ->
 			    SSH ! {ssh_install, connect_messages()},
+			    process_flag(trap_exit, true),
+			    if Link == true ->
+				    link(User);
+			       true -> ok
+			    end,
 			    User ! {self(), {ok, self()}},
 			    add_user(User),  %% add inital user
 			    CTab = ets:new(cm_tab, 
 					   [set,{keypos,#channel.local_id}]),
 			    cm_loop(SSH, CTab);
 			Error ->
+			    ssh_proto:disconnect(SSH, ?SSH_DISCONNECT_BY_APPLICATION),
 			    User ! {self(), Error}
 		    end;
 		Error ->
@@ -461,10 +471,14 @@ connect_register(_) ->
 cm_loop(SSH, CTab) ->
     receive
 	{ssh_msg, SSH, Msg} ->
+	    ?dbg(?DBG_SSHMSG, "cm_loop<~p>: ssh_msg ~p\n", 
+		 [SSH, Msg]),
 	    ssh_message(SSH, CTab, Msg),
 	    ?MODULE:cm_loop(SSH, CTab);
 
 	{ssh_cm, Sender, Msg} ->
+	    ?dbg(?DBG_SSHCM, "cm_loop<~p>: sender=~p, ssh_cm ~p\n", 
+		 [SSH, Sender, Msg]),
 	    %% only allow attached users (+ initial user)
 	    case is_user(Sender) of
 		false -> 
@@ -722,9 +736,22 @@ ssh_message(SSH, CTab, Msg) ->
 		    send_user(CTab, Channel, {signal,Channel,
 					      binary_to_list(SigName)});
 		_ ->
-		    ignore
+		    if WantReply == true ->
+			    channel_failure(SSH, Channel);
+		       true ->
+			    ignore
+		    end
 	    end;
 	    
+	#ssh_msg_global_request { name = Type,
+				  want_reply = WantReply,
+				  data = Data } ->
+	    if WantReply == true ->
+		    request_failure(SSH);
+	       true ->
+		    ignore
+	    end;
+	
 
 	#ssh_msg_disconnect { code = Code,
 			      description = Description,
@@ -1045,6 +1072,15 @@ channel_close(SSH, Channel) ->
     SSH ! {ssh_msg, self(), 
 	   #ssh_msg_channel_close { recipient_channel = Channel }}.
 
+channel_success(SSH, Channel) ->
+    SSH ! {ssh_msg, self(),
+	   #ssh_msg_channel_success { recipient_channel = Channel }}.
+
+channel_failure(SSH, Channel) ->
+    SSH ! {ssh_msg, self(),
+	   #ssh_msg_channel_failure { recipient_channel = Channel }}.
+
+
 channel_adjust_window(SSH, Channel, Bytes) ->
     SSH ! {ssh_msg, self(), 
 	   #ssh_msg_channel_window_adjust { recipient_channel = Channel,
@@ -1098,6 +1134,12 @@ send_global_request(SSH, Type, WantReply, Data) ->
 	   #ssh_msg_global_request { name = Type,
 				     want_reply = WantReply,
 				     data = Data }}.
+
+request_failure(SSH) ->
+    SSH ! {ssh_msg, self(), #ssh_msg_request_failure {}}.
+
+request_success(SSH,Data) ->
+    SSH ! {ssh_msg, self(), #ssh_msg_request_success { data=Data }}.
 
 
 decode_pty_opts(<<?TTY_OP_END>>) ->		     

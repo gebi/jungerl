@@ -36,8 +36,8 @@ sign(Private,Mb) ->
     rsassa_pkcs1_v1_5_sign(Private,Mb).
 
 verify(Public,Mb,Sb) ->
-    io:format("verify: Key=~p\n  Message=~p\n  Signature=~p\n",
-	      [Public, Mb, Sb]),
+    %% io:format("verify: Key=~p\n  Message=~p\n  Signature=~p\n",
+    %% [Public, Mb, Sb]),
     rsassa_pkcs1_v1_5_verify(Public,Mb,Sb).
 
 
@@ -90,8 +90,8 @@ rsaes_oaep_encrypt(Public=#ssh_key { public={N,E}}, M, L) ->
     SeedMask = ?MGF(MaskedDB, ?HLen),
     MaskedSeed = ssh_bits:xor_bits(Seed, SeedMask),
     EM = <<16#00, MaskedSeed/binary, MaskedDB/binary>>,
-    M = os2ip(EM),
-    C = rsaep(Public, M),
+    Mc = os2ip(EM),
+    C = rsaep(Public, Mc),
     i2osp(C, K).
 
 rsaes_oaep_decrypt(Key, C) ->
@@ -130,8 +130,8 @@ rsaes_pkcs1_v1_5_encrypt(Public=#ssh_key { public={N,E}}, M) ->
     ?ssh_assert(MLen =< K - 11, message_to_long),
     PS = ssh_bits:random(K - MLen - 3),
     EM = <<16#00,16#02,PS/binary,16#00,M/binary>>,
-    M = os2ip(EM),
-    C = rsaep(Public, M),
+    Mc = os2ip(EM),
+    C = rsaep(Public, Mc),
     i2osp(C, K).
 
 
@@ -199,7 +199,7 @@ emsa_pkcs1_v1_5_encode(M, EMLen) ->
 						   digest = H }),
     T = list_to_binary(TCode),
     TLen = size(T),
-    io:format("T[~w] = ~w\n", [TLen,T]),
+    %% io:format("T[~w] = ~w\n", [TLen,T]),
     ?ssh_assert(EMLen >= TLen + 11, message_to_short),
     PS = ssh_bits:fill_bits(EMLen - TLen - 3, 16#ff),
     <<16#00, 16#01, PS/binary, 16#00, T/binary>>.
@@ -220,12 +220,12 @@ emsa_pss_encode(M, EMBits, SLen) ->
     PS = ssh_bits:fill_bits(EMLen-SLen-?HLen-2, 0),
     DB = <<PS/binary, 16#01, Salt/binary>>,
     DbMask = ?MGF(H, EMLen - ?HLen -1),
-    io:format("DB=~p, DbMask=~p\n", [DB, DbMask]),
+    %% io:format("DB=~p, DbMask=~p\n", [DB, DbMask]),
     MaskedDB = ssh_bits:xor_bits(DB, DbMask),
-    io:format("MaskedDB=~p\n", [MaskedDB]),
+    %% io:format("MaskedDB=~p\n", [MaskedDB]),
     ZLen = 8*EMLen - EMBits,
     NZLen = (8 - (ZLen rem 8)) rem 8,
-    io:format("ZLen=~p, NZLen=~p\n", [ZLen, NZLen]),
+    %% io:format("ZLen=~p, NZLen=~p\n", [ZLen, NZLen]),
     <<_:ZLen, NZ:NZLen, MaskedDB1/binary>> = MaskedDB,
     MaskedDB2 = <<0:ZLen, NZ:NZLen, MaskedDB1/binary>>,
     <<MaskedDB2/binary, H/binary, 16#BC>>.

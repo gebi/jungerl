@@ -14,29 +14,33 @@
 -define(is_set(F, Bits),
 	((F) band (Bits)) == (F)).
 
+-define(XFER_PACKET_SIZE, 32768).
+-define(XFER_WINDOW_SIZE, 4*?XFER_PACKET_SIZE).
+
+
 attach(CM) ->
     case ssh_cm:attach(CM) of
 	{ok,CMPid} ->  open_xfer(CMPid);
 	Error ->  Error
     end.
 
-connect(Host, Port, Auth) ->
-    case ssh_cm:start_link(undefined, Host, Port, Auth) of
+connect(Host, Port, Opts) ->
+    case ssh_cm:start_link(undefined, Host, Port, Opts) of
 	{ok, CM} -> open_xfer(CM);
 	Error -> Error
     end.
 
 open_xfer(CM) ->
-    case ssh_cm:session_open(CM, 32768, 64536) of
+    case ssh_cm:session_open(CM, ?XFER_WINDOW_SIZE, ?XFER_PACKET_SIZE) of
 	{ok, Channel} ->
 	    case ssh_cm:subsystem(CM, Channel, "sftp") of
 		ok ->
 		    case init(CM, Channel) of
-			{ok, {Vsn,Ext}} ->
+			{ok, {Vsn,Ext}, Rest} ->
 			    {ok, #ssh_xfer { vsn = Vsn,
 					     ext = Ext,
 					     cm  = CM,
-					     channel = Channel }};
+					     channel = Channel },Rest};
 			Error ->
 			    Error
 		    end;
@@ -48,14 +52,47 @@ open_xfer(CM) ->
     end.
 
 
-
 init(CM, Channel) ->
-    case request(CM, Channel, ?SSH_FXP_INIT, <<?UINT32(5)>>) of
-	{ok, <<?SSH_FXP_VERSION, ?UINT32(Version), Ext/binary>>} ->
-	    {ok, {Version, decode_ext(Ext)}};
+    XF = #ssh_xfer { cm = CM, channel = Channel},
+    xf_request(XF, ?SSH_FXP_INIT, <<?UINT32(5)>>),
+    case reply(CM, Channel) of
+	{ok, <<?SSH_FXP_VERSION, ?UINT32(Version), Ext/binary>>, Rest} ->
+	    {ok, {Version, decode_ext(Ext)}, Rest};
 	Error ->
 	    Error
     end.
+
+reply(CM,Channel) ->
+    reply(CM,Channel,<<>>).
+
+reply(CM,Channel,RBuf) ->
+    receive
+	{ssh_cm, CM, {data, Channel, 0, Data}} ->
+	    case <<RBuf/binary, Data/binary>> of
+		<<?UINT32(Len),Reply:Len/binary,Rest/binary>> ->
+		    {ok, Reply, Rest};
+		RBuf2 ->
+		    reply(CM,Channel,RBuf2)
+	    end;
+	{ssh_cm, CM, {data, Channel, _, Data}} ->
+	    io:format("STDERR: ~s\n", [binary_to_list(Data)]),
+	    reply(CM,Channel,RBuf);
+	{ssh_cm, CM, {exit_signal,Channel,SIG,Err,Lang}} ->
+	    ssh_cm:close(CM, Channel),
+	    {error, Err};
+	{ssh_cm, CM, {exit_status,Channel,Status}} ->
+	    ssh_cm:close(CM, Channel),
+	    eof;
+	{ssh_cm, CM, {eof, Channel}} ->
+	    eof;
+	{ssh_cm, CM, {closed, Channel}} ->
+	    {error, closed};
+	{ssh_cm, CM, Msg} ->
+	    io:format("GOT: ssh_cm ~p\n", [Msg]);
+	Msg ->
+	    io:format("GOT: ~p\n", [Msg])
+    end.
+
 
 open(XF, ReqID, FileName, Access, Flags, Attrs) ->
     Vsn = XF#ssh_xfer.vsn,
@@ -67,53 +104,53 @@ open(XF, ReqID, FileName, Access, Flags, Attrs) ->
 		    (<<>>)
 	    end,
     F = encode_open_flags(Flags),
-    frequest(XF, ReqID, ?SSH_FXP_OPEN, 
-	     [?uint32(ReqID),
-	      ?string(FileName1),
-	      MBits,
-	      ?uint32(F),
-	      encode_ATTR(Vsn,Attrs)]).    
+    xf_request(XF,?SSH_FXP_OPEN, 
+	       [?uint32(ReqID),
+		?string(FileName1),
+		MBits,
+		?uint32(F),
+		encode_ATTR(Vsn,Attrs)]).    
     
 opendir(XF, ReqID, DirName) ->
     DirName1 = list_to_binary(DirName),
-    frequest(XF, ReqID, ?SSH_FXP_OPENDIR, 
-	     [?uint32(ReqID),
-	      ?string(DirName1)]).
+    xf_request(XF, ?SSH_FXP_OPENDIR, 
+	       [?uint32(ReqID),
+		?string(DirName1)]).
 
 
 close(XF, ReqID, Handle) ->
-    frequest(XF, ReqID, ?SSH_FXP_CLOSE,
-	     [?uint32(ReqID),
-	      ?binary(Handle)]).
+    xf_request(XF, ?SSH_FXP_CLOSE,
+	       [?uint32(ReqID),
+		?binary(Handle)]).
 
 read(XF, ReqID, Handle, Offset, Length) ->
-    frequest(XF, ReqID, ?SSH_FXP_READ,
-	     [?uint32(ReqID),
-	      ?binary(Handle),
-	      ?uint64(Offset),
-	      ?uint32(Length)]).
+    xf_request(XF, ?SSH_FXP_READ,
+	       [?uint32(ReqID),
+		?binary(Handle),
+		?uint64(Offset),
+		?uint32(Length)]).
 
 readdir(XF, ReqID, Handle) ->
-    frequest(XF, ReqID, ?SSH_FXP_READDIR,
-	     [?uint32(ReqID),
-	      ?binary(Handle)]).    
+    xf_request(XF, ?SSH_FXP_READDIR,
+	       [?uint32(ReqID),
+		?binary(Handle)]).    
 
-write(XF, ReqID, Handle, Offset, Data) ->
+write(XF,ReqID, Handle, Offset, Data) ->
     Data1 = if binary(Data) -> Data;
 	       list(Data) -> list_to_binary(Data)
 	    end,
-    frequest(XF, ReqID, ?SSH_FXP_WRITE,
-	     [?uint32(ReqID),
-	      ?binary(Handle),
-	      ?uint64(Offset),
-	      ?binary(Data1)]).
+    xf_request(XF,?SSH_FXP_WRITE,
+	       [?uint32(ReqID),
+		?binary(Handle),
+		?uint64(Offset),
+		?binary(Data1)]).
 
 %% Remove a file
 remove(XF, ReqID, File) ->
     File1 = list_to_binary(File),
-    frequest(XF, ReqID, ?SSH_FXP_REMOVE, 
-	     [?uint32(ReqID),
-	      ?string(File1)]).
+    xf_request(XF, ?SSH_FXP_REMOVE, 
+	       [?uint32(ReqID),
+		?string(File1)]).
 
 %% Rename a file/directory
 rename(XF, ReqID, Old, New, Flags) ->
@@ -127,28 +164,28 @@ rename(XF, ReqID, Old, New, Flags) ->
 	     true ->
 		  (<<>>)
 	  end,
-    frequest(XF, ReqID, ?SSH_FXP_RENAME, 
-	     [?uint32(ReqID),
-	      ?string(OldPath),
-	      ?string(NewPath),
-	      FlagBits]).
+    xf_request(XF, ?SSH_FXP_RENAME, 
+	       [?uint32(ReqID),
+		?string(OldPath),
+		?string(NewPath),
+		FlagBits]).
 
 
 
 %% Create directory
 mkdir(XF, ReqID, Path, Attrs) ->
     Path1 = list_to_binary(Path),
-    frequest(XF, ReqID, ?SSH_FXP_MKDIR, 
-	     [?uint32(ReqID),
-	      ?string(Path1),
-	      encode_ATTR(XF#ssh_xfer.vsn, Attrs)]).
+    xf_request(XF, ?SSH_FXP_MKDIR, 
+	       [?uint32(ReqID),
+		?string(Path1),
+		encode_ATTR(XF#ssh_xfer.vsn, Attrs)]).
 
 %% Remove a directory
 rmdir(XF, ReqID, Dir) ->
     Dir1 = list_to_binary(Dir),
-    frequest(XF, ReqID, ?SSH_FXP_REMOVE, 
-	     [?uint32(ReqID),
-	      ?string(Dir1)]).
+    xf_request(XF, ?SSH_FXP_REMOVE, 
+	       [?uint32(ReqID),
+		?string(Dir1)]).
 
 %% Stat file
 stat(XF, ReqID, Path, Flags) ->
@@ -160,10 +197,10 @@ stat(XF, ReqID, Path, Flags) ->
 		   true ->
 			[]
 		end,
-    frequest(XF, ReqID, ?SSH_FXP_STAT, 
-	     [?uint32(ReqID),
-	      ?string(Path1),
-	      AttrFlags]).
+    xf_request(XF, ?SSH_FXP_STAT, 
+	       [?uint32(ReqID),
+		?string(Path1),
+		AttrFlags]).
 
 
 %% Stat file - follow symbolic links
@@ -176,7 +213,7 @@ lstat(XF, ReqID, Path, Flags) ->
 		   true ->
 			[]
 		end,
-    frequest(XF, ReqID, ?SSH_FXP_LSTAT, 
+    xf_request(XF, ?SSH_FXP_LSTAT, 
 	     [?uint32(ReqID),
 	      ?string(Path1),
 	      AttrFlags]).
@@ -190,90 +227,94 @@ fstat(XF, ReqID, Handle, Flags) ->
 		   true ->
 			[]
 		end,
-    frequest(XF, ReqID, ?SSH_FXP_FSTAT, 
-	     [?uint32(ReqID),
-	      ?binary(Handle),
-	      AttrFlags]).
+    xf_request(XF, ?SSH_FXP_FSTAT, 
+	       [?uint32(ReqID),
+		?binary(Handle),
+		AttrFlags]).
 
 %% Modify file attributes
 setstat(XF, ReqID, Path, Attrs) ->
     Path1 = list_to_binary(Path),
-    frequest(XF, ReqID, ?SSH_FXP_SETSTAT, 
-	     [?uint32(ReqID),
-	      ?string(Path1),
-	      encode_ATTR(XF#ssh_xfer.vsn, Attrs)]).
+    xf_request(XF, ?SSH_FXP_SETSTAT, 
+	       [?uint32(ReqID),
+		?string(Path1),
+		encode_ATTR(XF#ssh_xfer.vsn, Attrs)]).
 
 
 %% Modify file attributes
 fsetstat(XF, ReqID, Handle, Attrs) ->
-    frequest(XF,  ReqID, ?SSH_FXP_FSETSTAT, 
-	     [?uint32(ReqID),
-	      ?binary(Handle),
-	      encode_ATTR(XF#ssh_xfer.vsn, Attrs)]).
+    xf_request(XF, ?SSH_FXP_FSETSTAT, 
+	       [?uint32(ReqID),
+		?binary(Handle),
+		encode_ATTR(XF#ssh_xfer.vsn, Attrs)]).
     
 %% Read a symbolic link
 readlink(XF, ReqID, Path) ->
     Path1 = list_to_binary(Path),
-    frequest(XF, ReqID, ?SSH_FXP_READLINK, 
-	     [?uint32(ReqID),
-	      ?binary(Path)]).
+    xf_request(XF, ?SSH_FXP_READLINK, 
+	       [?uint32(ReqID),
+		?binary(Path1)]).
 
 
 %% Create a symbolic link    
 symlink(XF, ReqID, LinkPath, TargetPath) ->
     LinkPath1 = list_to_binary(LinkPath),
     TargetPath1 = list_to_binary(TargetPath),
-    frequest(XF, ReqID, ?SSH_FXP_SYMLINK, 
-	     [?uint32(ReqID),
-	      ?binary(LinkPath1),
-	      ?binary(TargetPath1)]).
+    xf_request(XF, ?SSH_FXP_SYMLINK, 
+	       [?uint32(ReqID),
+		?binary(LinkPath1),
+		?binary(TargetPath1)]).
 
 %% Convert a path into a 'canonical' form
 realpath(XF, ReqID, Path) ->
     Path1 = list_to_binary(Path),
-    frequest(XF, ReqID, ?SSH_FXP_REALPATH,     
-	     [?uint32(ReqID),
-	      ?binary(Path1)]).
+    xf_request(XF, ?SSH_FXP_REALPATH,     
+	       [?uint32(ReqID),
+		?binary(Path1)]).
 
 extended(XF, ReqID, Request, Data) ->
-    frequest(XF, ReqID, ?SSH_FXP_EXTENDED,
-	     [?uint32(ReqID),
-	      ?string(Request),
-	      Data/binary]).
+    xf_request(XF, ?SSH_FXP_EXTENDED,
+	       [?uint32(ReqID),
+		?string(Request),
+		?binary(Data)]).
 
 
+%% Send xfer request to connection manager
+xf_request(XF, Op, Arg) ->
+    CM = XF#ssh_xfer.cm,
+    Channel = XF#ssh_xfer.channel,
+    Data = if binary(Arg) -> Arg;
+	      list(Arg) -> list_to_binary(Arg)
+	   end,
+    Size = 1+size(Data),
+    ssh_cm:send(CM, Channel, <<?UINT32(Size), Op, Data/binary>>).
+    
 
-frequest(XF, ReqID, Op, Arg) ->
-    case request(XF#ssh_xfer.cm, XF#ssh_xfer.channel, Op, Arg) of
-	{ok, Reply} ->
-	    freply(XF, Reply);
-	Error ->
-	    Error
-    end.
 
-freply(XF, << ?SSH_FXP_STATUS, ?UINT32(ReqID), ?UINT32(Status), 
-	    ?UINT32(ELen), Err:ELen/binary,
-	    ?UINT32(LLen), Lang:LLen/binary,
-	    Reply/binary >> ) ->
+xf_reply(XF, << ?SSH_FXP_STATUS, ?UINT32(ReqID), ?UINT32(Status), 
+	      ?UINT32(ELen), Err:ELen/binary,
+	      ?UINT32(LLen), Lang:LLen/binary,
+	      Reply/binary >> ) ->
     Stat = decode_status(Status),
     {status, ReqID, {Stat,binary_to_list(Err),binary_to_list(Lang),
 		     Reply}};
-freply(XF, <<?SSH_FXP_HANDLE, ?UINT32(ReqID),
-	    ?UINT32(HLen), Handle:HLen/binary>>) ->
+xf_reply(XF, <<?SSH_FXP_HANDLE, ?UINT32(ReqID),
+	      ?UINT32(HLen), Handle:HLen/binary>>) ->
     {handle, ReqID, Handle};
-freply(XF, <<?SSH_FXP_DATA, ?UINT32(ReqID),
-	    ?UINT32(DLen), Data:DLen/binary>>) ->
+xf_reply(XF, <<?SSH_FXP_DATA, ?UINT32(ReqID),
+	      ?UINT32(DLen), Data:DLen/binary>>) ->
     {data, ReqID, Data};
-freply(XF, <<?SSH_FXP_NAME, ?UINT32(ReqID),
-	    ?UINT32(Count), AData/binary>>) ->
+xf_reply(XF, <<?SSH_FXP_NAME, ?UINT32(ReqID),
+	      ?UINT32(Count), AData/binary>>) ->
     {name, ReqID, decode_names(XF#ssh_xfer.vsn, Count, AData)};
-freply(XF, <<?SSH_FXP_ATTRS, ?UINT32(ReqID),
-	    AData/binary>>) ->
+xf_reply(XF, <<?SSH_FXP_ATTRS, ?UINT32(ReqID),
+	      AData/binary>>) ->
     {A, _} = decode_ATTR(XF#ssh_xfer.vsn, AData),
     {attrs, ReqID, A};
-freply(XF, <<?SSH_FXP_EXTENDED_REPLY, ?UINT32(ReqID),
-	    RData>>) ->
+xf_reply(XF, <<?SSH_FXP_EXTENDED_REPLY, ?UINT32(ReqID),
+	      RData>>) ->
     {extended_reply, ReqID, RData}.
+
 
 
 decode_status(Status) ->
@@ -298,9 +339,6 @@ decode_status(Status) ->
 	?SSH_FX_LOCK_CONFlICT -> lock_conflict
     end.
 
-	
-
-
 decode_ext(<<?UINT32(NameLen), Name:NameLen/binary,
 	    ?UINT32(DataLen), Data:DataLen/binary,
 	    Tail/binary>>) ->
@@ -310,58 +348,6 @@ decode_ext(<<>>) ->
     [].
 
 
-request(CM, Channel, Op, Data) ->
-    Data1 = if binary(Data) -> Data;
-	       list(Data) -> list_to_binary(Data)
-	    end,
-    Size = 1+size(Data1),
-    ssh_cm:send(CM, Channel, <<?UINT32(Size), Op, Data1/binary>>),
-    reply0(CM, Channel).
-
-reply0(CM, Channel) ->
-    case get(rbuf) of
-	undefined ->
-	    reply(CM, Channel, <<>>);
-	Buf ->
-	    erase(rbuf),
-	    reply(CM, Channel, Buf)
-    end.
-    
-reply(CM, Channel, RData = <<?UINT32(Len),Reply/binary>>) ->
-    Sz = size(Reply),
-    if Len == Sz ->
-	    {ok, Reply};
-       Len < Sz ->
-	    <<Reply1:Len/binary, RBuf/binary>> = Reply,
-	    put(rbuf, RBuf);
-       Len > Sz ->
-	    reply_more(CM, Channel, RData)
-    end;
-reply(CM, Channel, RData) ->
-    reply_more(CM, Channel, RData).
-
-
-reply_more(CM, Channel, RData) ->
-    receive
-	{ssh_cm, CM, {data, Channel,Type,RData2}} ->
-	    ssh_cm:adjust_window(CM, Channel, size(RData2)),
-	    if Type == 0 ->
-		    reply(CM, Channel, <<RData/binary, RData2/binary>>);
-	       true ->
-		    io:format("STDERR: ~s\n", [binary_to_list(RData2)]),
-		    reply_more(CM, Channel, RData)
-	    end;
-	{ssh_cm, CM, {exit_signal,Channel,SIG,Err,Lang}} ->
-	    ssh_cm:close(CM, Channel),
-	    {error, Err};
-	{ssh_cm, CM, {exit_status,Channel,Status}} ->
-	    ssh_cm:close(CM, Channel),
-	    eof;
-	{ssh_cm, CM, {eof, Channel}} ->
-	    eof;
-	{ssh_cm, CM, {closed, Channel}} ->
-	    {error, closed}
-    end.
 
 %%
 %% Encode rename flags
@@ -822,14 +808,3 @@ decode_bits(F, [{Bit,BitName}|Bits]) ->
     end;
 decode_bits(F, []) ->
     [].
-
-
-
-
-
-
-    
-    
-
-    
-    

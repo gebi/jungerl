@@ -622,18 +622,19 @@ during the next `erl-schedule'."
       ((['put_chars s]
         (condition-case err
             (save-excursion
-              (save-selected-window
-                (if erl-popup-on-output
-                    (select-window (or (get-buffer-window (current-buffer))
-                                       (display-buffer (current-buffer)))))
-                (goto-char (point-max))
-                (insert s)))
+              (with-current-buffer (get-buffer-create "*erl-output*")
+                (save-selected-window
+                  (if erl-popup-on-output
+                      (select-window (or (get-buffer-window (current-buffer))
+                                         (display-buffer (current-buffer)))))
+                  (goto-char (point-max))
+                  (insert s))))
           (error (message "Error in group leader: %S" err)))))
     (&erl-group-leader-loop)))
 
 (when (null erl-group-leader)
   (setq erl-default-group-leader
         (erl-spawn
-          (rename-buffer "*erl-output*")
+          (erl-register 'group-leader)
           (&erl-group-leader-loop))))
 

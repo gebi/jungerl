@@ -158,6 +158,7 @@
 
 
 -define(MAX_BUFFER_SIZE, 8192).  % arbitrary default value...
+%-define(MAX_BUFFER_SIZE, 16644).  % arbitrary default value...
 
 %%% This record hold the negotiation result.
 %%% (Add entries when more complex dialects are being implemented !)
@@ -232,6 +233,7 @@
 	  }).
 
 -define(CSET_UCS2,         "UCS2").
+-define(CSET_UCS2LE,       "UCS-2LE").
 -define(CSET_UTF8,         "UTF-8").
 -define(CSET_ASCII,        "ASCII").
 -define(CSET_ISO_8859_1,   "ISO-8859-1").

@@ -15,6 +15,10 @@
 % </pre>
 % <P>.Here <b>File</b> will be used as a cache.
 
+% hacked 2003.0225 by Chris Pressey to work with inet & gen_tcp
+
+-include_lib("kernel/include/inet.hrl").
+
 -export([test/0,
 	 start_cache/1, 
 	 stop_cache/0, 
@@ -59,44 +63,49 @@ raw_get_url(URL, Timeout) ->
     case url_parse:parse(URL) of
 	{error, Why} ->
 	    {error, {badURL,URL}};
-	{http, IP, Port, File} ->
-	    get_http(IP, Port, File, [], Timeout)
+	{http, HostName, Port, File} ->
+            {ok, Host} = inet:gethostbyname(HostName),
+            IP = hd(Host#hostent.h_addr_list),
+	    get_http(IP, Port, File, ["Host: ", HostName], Timeout)
     end.
 
 raw_get_url(URL, Timeout, {IP, Port}) ->
     get_http(IP, Port, URL, [], Timeout).
 
 get_http(IP, Port, URL, Opts, Timeout) ->
-    socket:start(),
     %% io:format("ip = ~p, port = ~p, url = ~p~n", [ IP, Port, URL]),
-    Cmd = ["GET ", URL, " HTTP/1.0\r\n\r\n", Opts, "\r\n\r\n"],
+    Cmd = ["GET ", URL, " HTTP/1.1\r\n", Opts, "\r\n\r\n"],
     %% io:format("Cmd=~p\n", [Cmd]),
     %% io:format("url_server: fetching ~p ~p ~p~n", [IP, Port, URL]),
-    case catch socket:client('STREAM','AF_INET',{IP,Port},{binary_packet,0}) of
+    case catch
+      % socket:client('STREAM','AF_INET',{IP,Port},{binary_packet,0})
+      gen_tcp:connect(IP, Port,
+       [binary, {packet, raw}, {nodelay, true}, {active, true}]) of
 	{'EXIT', Why} -> 
 	    %% io:format("Socket exit:~p~n", [Why]),
 	    {error, {socket_exit, Why}};
 	{error, Why} -> 
 	    %% io:format("Socket error:~p~n", [Why]),
 	    {error, {socket_error, Why}};
-	Socket ->
+	{ok, Socket} ->
 	    %% io:format("Socket = ~p~n", [Socket]),
-	    Socket ! {self(), {deliver, Cmd}},
+	    gen_tcp:send(Socket, Cmd),
 	    receive_data(Socket, Timeout, list_to_binary([]))
     end.
 
 receive_data(Socket, Timeout, Bin) ->
     receive
-	{Socket, {fromsocket, B}} ->
+	{tcp, Socket, B} ->
 	    io:format(".", []),
 	    receive_data(Socket, Timeout, concat_binary([Bin,B]));
-	{Socket, {socket_closed, _}} ->
+	{tcp_closed, Socket} ->
 	    Data0 = binary_to_list(Bin),
-	    %% io:format("Here:~p~n", [Data0]),
+	    %% io:fwrite("Socket closed: ~p~n", [Data0]),
 	    {Data1, Info} = get_header(Data0, []),
 	    Bin1 = list_to_binary(Data1),
 	    {ok, Bin1};
 	Other ->
+            %% io:fwrite("Other: ~p~n", [Other]),
 	    {error, {socket, Other}}
 	after
 	    Timeout ->

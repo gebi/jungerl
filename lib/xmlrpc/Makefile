@@ -3,6 +3,8 @@ PUB_VSN="{1, 13}"
 
 all:
 	(cd src;$(MAKE))
+
+doc:
 	(cd doc;$(MAKE))
 
 clean:

@@ -45,7 +45,7 @@ out({FD, O} = FD_O, [{P, I, Ttot, In, Tgc, Gc}|R]) ->
 
 makem(no_file) -> [];
 makem(F) ->
-    ets_new(panCpu1_tmp),
+    panEts:new(panCpu1_tmp),
     panScan:file(F, '', {cb, cb_perf, go, [panCpu1_tmp]}),
     strip(summary(panCpu1_tmp)).
 
@@ -76,7 +76,7 @@ tail(Tab, Pid, [H|T]) ->
      end|tail(Tab, Pid, T)].
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 collapz(L) -> 
-    ets_new(panCpu1, [{keypos, 2}]), 
+    panEts:new(panCpu1, [{keypos, 2}]), 
     keysortr(3, collapse(L)).
 collapse([]) -> ets_t2l(panCpu1);
 collapse([Obj|R]) -> 
@@ -121,10 +121,6 @@ to_str(L) when list(L) -> L;
 to_str(T) -> io_lib:fwrite("~w", [T]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-ets_new(Tab) -> ets_new(Tab, [ordered_set]).
-ets_new(Tab, Opts) ->
-    catch ets:delete(Tab),
-    ets:new(Tab, [named_table,public]++Opts).
 ets_ins(Tab, Rec) ->
     catch ets:insert(Tab, Rec).
 ets_lup(Tab, Key) ->

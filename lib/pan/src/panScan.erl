@@ -38,8 +38,8 @@ action(FileName, OutFileName, Filter, Min, Max) ->
     maybe_close(Out).
 data_init() ->
     erase(first_ts),
-    ets_new(),
-    ets_new(panScanInfo, [duplicate_bag]).
+    panEts:new(?MODULE),
+    panEts:new(panScanInfo, [duplicate_bag]).
 
 -define(CHUNKSIZE, 1024).
 file_action(FileName, Fun, Filter) ->
@@ -360,11 +360,6 @@ trans_init(M,F,A) ->
     {M,F,length(A)}.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-ets_new() -> ets_new(?MODULE).
-ets_new(Tab) -> ets_new(Tab, [ordered_set]).
-ets_new(Tab, Attr) -> 
-    panEts:server(delete, Tab),
-    panEts:server(new, {Tab, [named_table,public]++Attr}).
 ets_ins(Rec) -> ets_ins(?MODULE, Rec).
 ets_ins(Tab, Rec) -> 
     catch ets:insert(Tab, Rec).

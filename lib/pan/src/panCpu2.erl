@@ -35,15 +35,15 @@ out(FD, [{I, P, F, B, D}|R]) ->
     out(FD, R).
 
 do(F2, F1) ->
-    ets_new(panCpu2_in),
-    ets_new(panCpu2_out),
+    panEts:new(panCpu2_in),
+    panEts:new(panCpu2_out),
     lists:foreach(fun(E) -> ets_ins(panCpu2_in, E) end, makem(F1)),
     match(makem(F2)),
     [{T, all(T)} || T <- [bef, aft, trig, same]].
 
 makem(no_file) -> [];
 makem(F) ->
-    ets_new(panCpu2_tmp),
+    panEts:new(panCpu2_tmp),
     panScan:file(F, '', {cb, cb_cpu, go, [panCpu2_tmp]}),
     strip(cb_cpu:summary(panCpu2_tmp)).
 
@@ -106,7 +106,7 @@ filt({shell,server,1}) -> false;
 filt(_) -> true.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 collapz(L) -> 
-    ets_new(panCpu_coll, [{keypos, 1}]), 
+    panEts:new(panCpu_coll), 
     collapse(L).
 collapse([]) -> ets_t2l(panCpu_coll);
 collapse([{{_, P}, I, F, B, D}|R]) -> 
@@ -130,10 +130,6 @@ to_str(T) -> io_lib:fwrite("~w", [T]).
 
     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-ets_new(Tab) -> ets_new(Tab, [ordered_set]).
-ets_new(Tab, Opts) ->
-    catch ets:delete(Tab),
-    ets:new(Tab, [named_table,public]++Opts).
 ets_ins(Tab, Rec) ->
     catch ets:insert(Tab, Rec).
 ets_del(Tab, Key) ->

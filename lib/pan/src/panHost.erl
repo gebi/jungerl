@@ -166,7 +166,7 @@ reset_timer(#timer{stop=Stop} = T) -> T#timer{timeout=ntdiff(Stop, now())}.
 maybe_start_client({ip, {CB, Port}}, Nodes) ->
     dbg:stop(),
     ?WAIT(3),
-    ets_new(panScan),
+    panEts:new(panScan),
     start_client(Port, CB, Nodes);
 maybe_start_client(_, _) -> ok.
 
@@ -267,7 +267,3 @@ ntform({Msec, Sec, Usec} = Now) ->
     T = tuple_to_list(element(2,calendar:now_to_datetime(Now)))++[Usec],
     lists:flatten(io_lib:fwrite("~2.2.0w:~2.2.0w:~2.2.0w.~6.6.0w", T)).
 
-ets_new(Tab) -> ets_new(Tab, [ordered_set]).
-ets_new(Tab, Attr) -> 
-    panEts:server(delete, Tab),
-    panEts:server(new, {Tab, [named_table,public]++Attr}).

@@ -9,7 +9,7 @@
 
 -export([go/0, go/1]).
 
--define(CB, cb_cpu).
+-define(CB, cb_perf).
 -define(PID(I), c:pid(0,127,I)).
 -define(FDMSG(Tag, US), 
 	[{Tag,{pid,foo},0,{0,0,US}},1,standard_io]++stat()).
@@ -42,13 +42,12 @@ stat() ->
 	S -> [S]
     end.
 	     
-post(Conds) ->
-    post(Conds, {ets:tab2list(?MODULE), 0}).
+post(Conds) -> post(Conds, {ets:tab2list(?MODULE), 0}).
 post([], {[], 0}) -> io:fwrite("ok~n");
 post([], {[{total, T}], T}) -> io:fwrite("ok~n");
 post([], X) -> io:fwrite("failed~n~p~n", [X]);
-post([{P, Con}|Conds], {D, T}) ->
-    post(Conds, do_post(P, Con, D, T)).
+post([{P, Con}|Conds], {D, T}) -> post(Conds, do_post(P, Con, D, T)).
+
 do_post(P, [], D, T) -> {D, T};
 do_post(P = file_driver, [{Tag, V}|Cons], D, T) ->
     do_post(P, Cons, D--[{{P,Tag},V}], T);
@@ -169,4 +168,11 @@ tc(14) ->
     ?EVENT(exit, 1, 6),
     ?END,
     post([{1, [{cpu,6},{in,1}]}]);
+tc(15) ->
+    ?EVENT(in, 1, 0),
+    ?EVENT(out, 1, 2),
+    ?EVENT(in, 2, 4),
+    ?EVENT(exit, 1, 6),
+    ?END,
+    post([{1, [{cpu,2},{in,1}]},{2,[{in,1}]}]);
 tc(_) -> not_yet_implemented.

@@ -13,7 +13,7 @@ tun_drv.o: tun_drv.c
 	$(CC) $(CFLAGS) -o $@ -c -fpic $(ERL_INCLUDE) $<
 
 clean:
-	-rm ../priv/tun_drv.so tun_drv.o
+	-rm ../priv/tun_drv.so
 
 config: # nothing
 

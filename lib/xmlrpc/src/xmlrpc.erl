@@ -85,7 +85,7 @@ send(Socket, URI, Header, Payload) ->
 	["POST ", URI, " HTTP/1.1\r\n",
 	 "Content-Length: ", integer_to_list(lists:flatlength(Payload)),
 	 "\r\n",
-	 "User-Agent: Erlang XML-RPC Client 1.12\r\n",
+	 "User-Agent: Erlang XML-RPC Client 1.13\r\n",
 	 "Content-Type: text/xml\r\n",
 	 Header, "\r\n",
 	 Payload],
@@ -183,4 +183,4 @@ ip(IP) when tuple(IP) -> {ip, IP}.
 
 %% Exported: stop/1
 
-stop(Pid) -> Pid ! stop.
+stop(Pid) -> tcp_serv:stop(Pid).

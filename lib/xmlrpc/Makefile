@@ -1,16 +1,16 @@
-VSN=1.12
-PUB_VSN="{1, 12}"
+VSN=1.13
+PUB_VSN="{1, 13}"
 
 all:
-	(cd src; $(MAKE))
-	(cd doc; $(MAKE))
+	(cd src;$(MAKE))
+	(cd doc;$(MAKE))
 
 clean:
-	(cd src; $(MAKE) clean)
-	(cd doc; $(MAKE) clean)
+	(cd src;$(MAKE) clean)
+	(cd doc;$(MAKE) clean)
 
 test: all
-	(cd test; $(MAKE))
+	(cd test;$(MAKE))
 
 release: all
 	rm -fr releases/xmlrpc-$(VSN)

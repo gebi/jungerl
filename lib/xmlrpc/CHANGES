@@ -23,3 +23,10 @@
 
 * Makefile structure updated to harmonize with the jungerl code
   respository (http://sourceforge.net/projects/jungerl/).
+
+== Tue Apr 15 20:48:11 CEST 2003
+== Version 1.13
+
+* xmlrpc:start_link{1,5,6} now behaves as a generic process,
+  e.g. gen_server and gen_fsm, and can be started as a child to a
+  supervisor.

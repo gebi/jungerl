@@ -192,7 +192,7 @@ send(Socket, StatusCode, ExtraHeader, Payload) ->
 	 reason_phrase(StatusCode), "\r\n",
 	 "Content-Length: ", integer_to_list(lists:flatlength(Payload)),
 	 "\r\n",
-	 "Server: Erlang/1.12\r\n",
+	 "Server: Erlang/1.13\r\n",
 	 ExtraHeader, "\r\n",
 	 Payload],
     gen_tcp:send(Socket, Response).

@@ -1,3 +1,13 @@
+2003-05-12  Mats Cronqvist  <etxmacr@cbe2077>
+
+	* src/panLib.erl (grep/2): made funs grepable 
+
+	* src/panScan.erl (do_do/5): moved grep function to panLib
+
+2003-05-09  Mats Cronqvist  <etxmacr@cbe2077>
+
+	* src/panEts.erl: added lup/2
+
 2003-05-08  Mats Cronqvist  <etxmacr@cbe2077>
 
 	* src/panTarg.erl: changed default/mandatory trace flags

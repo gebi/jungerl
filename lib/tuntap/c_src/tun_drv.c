@@ -188,17 +188,17 @@ static int tun_init(void)
     return 0;
 }
 
-ErlDrvEntry tun_driver_entry = {
-    init: tun_init,
-    start: tun_start,
-    stop: tun_stop,
-    ready_input: tun_input,
-    control: tun_ctl,
-    driver_name: "tun_drv"
-};
+ErlDrvEntry tun_driver_entry;
 
 ErlDrvEntry *driver_init(void)
 {
+    memset(&tun_driver_entry, 0, sizeof(tun_driver_entry));
+    tun_driver_entry.init = tun_init;
+    tun_driver_entry.start = tun_start;
+    tun_driver_entry.stop = tun_stop;
+    tun_driver_entry.ready_input = tun_input;
+    tun_driver_entry.control = tun_ctl;
+    tun_driver_entry.driver_name = "tun_drv";
     return &tun_driver_entry;
 }
 

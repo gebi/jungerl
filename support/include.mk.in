@@ -40,12 +40,25 @@ ifdef debug
 endif
 
 EBIN_DIR := ../ebin
+DOC_DIR  := ../doc
 EMULATOR := beam
 
 ERL_SOURCES := $(wildcard *.erl)
 ERL_HEADERS := $(wildcard *.hrl) $(wildcard ../include/*.hrl)
 ERL_OBJECTS := $(ERL_SOURCES:%.erl=$(EBIN_DIR)/%.$(EMULATOR))
+ERL_DOCUMENTS := $(ERL_SOURCES:%.erl=$(DOC_DIR)/%.html)
 
 $(EBIN_DIR)/%.$(EMULATOR): %.erl
 	$(ERLC) $(ERLC_FLAGS) -o $(EBIN_DIR) $<
 
+# generate documentation with edoc:
+# this is still not the proper way to do it, but it works
+# (see the wumpus application for an example)
+
+$(DOC_DIR)/%.html: %.erl
+	${ERL} -noshell \
+          -pa ../../syntax_tools/ebin \
+          -pa ../../edoc/ebin \
+          -pa ../../xmerl/ebin \
+          -run edoc file $< -run init stop
+	mv *.html $(DOC_DIR)

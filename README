@@ -32,7 +32,7 @@ subdirectories that are appropriate:
 
   src/   containing erlang sources
 
-  ebin/  containing beam files
+  ebin/  for putting compiled beam files
 
   c_src/ containing C sources
 

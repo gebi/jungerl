@@ -51,6 +51,7 @@ $(DOC_DIR)/%.html: %.erl
           -pa ../../syntax_tools/ebin \
           -pa ../../edoc/ebin \
           -pa ../../xmerl/ebin \
+	  -pa ../../ucs/ebin \
           -run edoc file $< -run init stop
 	mv *.html $(DOC_DIR)
 

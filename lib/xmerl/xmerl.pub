@@ -1,7 +1,7 @@
 {name, "xmerl"}.
-{vsn, {0,17}}.
+{vsn, {0,20}}.
 {summary, "XML processing tools"}.
-{author, "Ulf Wiger, Johan Blom, Richard Carlsson, Mickael Remond", "johan.blom@mobilearts.se", "20020307"}.
+{author, "Ulf Wiger, Johan Blom, Richard Carlsson, Mickael Remond", "johan.blom@mobilearts.se", "20040827"}.
 {keywords, ["xml", "html"]}.
 {needs, [{compiler, "3.0"}]}.
 {abstract, 

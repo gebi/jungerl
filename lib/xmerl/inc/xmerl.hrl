@@ -32,75 +32,83 @@
 %% --------------------------------
 
 %% XML declaration
--record(xmlDecl, {
-		  vsn,
-		  encoding,
-		  attributes
-		 }).
+-record(xmlDecl,{
+	  vsn,        % string() XML version
+	  encoding,   % string() Character encoding 
+	  standalone, % (yes | no)
+	  attributes  % [#xmlAttribute()] Other attributes than above
+	 }).
 
 %% Attribute
--record(xmlAttribute, {
-		       name,
-		       parents = [],
-		       pos,
-		       language = [],   % inherits the element's language
-		       expanded_name = [],
-		       nsinfo = [],	% {Prefix, Local} | []
-		       namespace = [],  % inherits the element's namespace
-		       value
-		      }).
+-record(xmlAttribute,{
+	  name,		   % atom()
+	  expanded_name=[],% atom() | {string(),atom()}
+	  nsinfo = [],	   % {Prefix, Local} | []
+	  namespace = [],  % inherits the element's namespace
+	  parents = [],	   % [{atom(),integer()}]
+	  pos,		   % integer()
+	  language = [],   % inherits the element's language
+	  value,	   % IOlist() | atom() | integer()
+	  normalized       % atom() one of (true | false)
+	 }).
 
 %% namespace record
--record(xmlNamespace, {
-		       default = [],
-		       nodes = []
-		      }).
+-record(xmlNamespace,{
+	  default = [],
+	  nodes = []
+	 }).
 
 %% namespace node - i.e. a {Prefix, URI} pair
--record(xmlNsNode, {
-		    prefix,
-		    uri = []
-		   }).
+%% TODO: these are not currently used?? /RC
+-record(xmlNsNode,{
+	  prefix,
+	  uri = []
+	 }).
 
 %% XML Element
--record(xmlElement, {
-		     name,
-		     parents = [],
-		     pos,
-		     attributes = [],
-		     content = [],
-		     language = [],
-		     expanded_name = [],
-		     nsinfo = [],	% {Prefix, Local} | []
-		     namespace = #xmlNamespace{}
-		    }).
+%% content = [#xmlElement()|#xmlText()|#xmlPI()|#xmlComment()|#xmlDecl()]
+-record(xmlElement,{
+	  name,			% atom()
+	  expanded_name = [],	% string() | {URI,Local} | {"xmlns",Local}
+	  nsinfo = [],	        % {Prefix, Local} | []
+	  namespace=#xmlNamespace{},
+	  parents = [],		% [{atom(),integer()}]
+	  pos,			% integer()
+	  attributes = [],	% [#xmlAttribute()]
+	  content = [],
+	  language = "",	% string()
+	  xmlbase="",           % string() XML Base path, for relative URI:s
+	  elementdef=undeclared % atom(), one of [undeclared | prolog | external | element]
+	 }).
 
 %% plain text
--record(xmlText, {
-		  parents = [],
-		  pos,
-		  language = [], % inherits the element's language
-		  value
-		 }).
+%% IOlist = [char() | binary () | IOlist]
+-record(xmlText,{
+	  parents = [],	% [{atom(),integer()}]
+	  pos,		% integer()
+	  language = [],% inherits the element's language
+	  value,	% IOlist()
+	  type = text   % atom() one of (text|cdata)
+	 }).
 
 %% plain text
--record(xmlComment, {
-		     parents = [],
-		     pos,
-		     language = [], % inherits the element's language
-		     value
-		 }).
+-record(xmlComment,{
+	  parents = [],  % [{atom(),integer()}]
+	  pos,	         % integer()
+	  language = [], % inherits the element's language
+	  value	         % IOlist()
+	 }).
 
 %% processing instruction
--record(xmlPI, {
-		name,
-		pos,
-		value
-		}).
+-record(xmlPI,{
+	  name,	% atom()
+	  pos,	% integer()
+	  value	% IOlist()
+	 }).
 
--record(xmlDocument, {
-		      content
-		     }).
+-record(xmlDocument,{
+	  content
+	 }).
 
 
 %% XPATH (xmerl_xpath, xmerl_pred_funcs) records
@@ -136,32 +144,40 @@
 
 
 %% scanner state record
--record(xmerl_scanner, {
-			encoding = "ISO-8859-1",
-			declarations = [],	% [{Name, Attrs}]
-			doctype_name,
-			doctype_DTD = internal, % internal | DTDId
-			rules,
-			keep_rules = false,	% delete (ets) tab if false
-			namespace_conformant = false, % true | false
-			event_fun,
-			hook_fun,
-			acc_fun,
-			fetch_fun,
-			close_fun,
-			continuation_fun,
-			rules_read_fun,
-			rules_write_fun,
-			directory,
-			fetch_path = [],
-			prolog = continue,
-			validation = false,
-			space = preserve,
-			user_state,
-			fun_states = #xmerl_fun_states{},
-			col = 1,
-			line = 1
-		       }).
+-record(xmerl_scanner,{
+	  encoding=undefined, % undefined | string() Character set used, default is UTF-8
+	  standalone = no,
+%	  prolog =continue,
+	  environment = prolog,    % atom(), (prolog | element)
+	  declarations = [],	   % [{Name, Attrs}]
+	  doctype_name,
+	  doctype_DTD = internal, % internal | DTDId
+	  rules,
+	  keep_rules = false,	% delete (ets) tab if false
+	  namespace_conformant = false, % true | false
+	  xmlbase,          % string() Current Base path, for relative URI:s
+	  xmlbase_cache,    % string() Cached Base path
+	  fetch_path=[], % [string()] List with additional, user
+                         % defined, paths
+	  validation = false,
+	  space = preserve,
+	  event_fun,
+	  hook_fun,
+	  acc_fun,
+	  fetch_fun,
+	  close_fun,
+	  continuation_fun,
+	  rules_read_fun,
+	  rules_write_fun,
+	  rules_delete_fun,
+	  user_state,
+	  fun_states = #xmerl_fun_states{},
+	  entity_references=[],
+	  text_decl=false,
+	  quiet=false,   % bool() Set to true will print no error messages
+	  col = 1,
+	  line = 1
+	 }).
 
 
 
@@ -181,6 +197,7 @@
 
 %% useful scanner macros
 %% ---------------------
+% -define(debug,1).
 
 -ifdef(debug).
 -define(dbg(Fmt, Args), ok=io:format("~p: " ++ Fmt, [?LINE|Args])).
@@ -190,13 +207,18 @@
 -define(DBG, no_debug).
 -endif.
 
--define(space, 16#20).
--define(cr, 16#9).
--define(lf, 16#D).
--define(tab, 16#A).
+-define(space, 32).
+-define(cr,    13).
+-define(lf,    10).
+-define(tab,   9).
 
 %% whitespace consists of 'space', 'carriage return', 'line feed' or 'tab'
 -define(whitespace(H), H==?space ; H==?cr ; H==?lf ; H==?tab).
+
+%% non-caharacters according to Unicode: 16#ffff and 16#fffe
+-define(non_character(H1,H2), H1==16#ff,H2==16#fe;H1==16#ff,H2==16#ff).
+
+-define(non_ascii(H), list(H),hd(H)>=128;integer(H),H>=128).
 
 -define(strip1,  {_, T1,  S1}  = strip(T,  S)).
 -define(strip2,  {_, T2,  S2}  = strip(T1, S1)).
@@ -208,6 +230,11 @@
 -define(strip8,  {_, T8,  S8}  = strip(T7, S7)).
 -define(strip9,  {_, T9,  S9}  = strip(T8, S8)).
 -define(strip10, {_, T10, S10} = strip(T9, S9)).
+
+-define(condstrip1,  {_, T1,  S1}  = condstrip(T, S, false)).
+-define(condstrip2,  {_, T2,  S2}  = condstrip(T1,S1,false)).
+-define(condstrip3,  {_, T3,  S3}  = condstrip(T2,S2,false)).
+-define(condstrip4,  {_, T4,  S4}  = condstrip(T3,S3,false)).
 
 -define(bump_col(N), 
 	?dbg("bump_col(~p), US = ~p~n", [N, S0#xmerl_scanner.user_state]),

@@ -19,6 +19,7 @@
 %%%----------------------------------------------------------------------
 %%% #0.    BASIC INFORMATION
 %%%----------------------------------------------------------------------
+%%% @private
 %%% File:       xmerl_xpath_pred.erl
 %%% Author       : Ulf Wiger <ulf.wiger@ericsson.com>
 %%% Description  : Helper module to xmerl_xpath: XPATH predicates.
@@ -31,7 +32,6 @@
 -vsn('0.6').
 -date('00-09-22').
 -author('ulf.wiger@ericsson.com').
-
 
 %% API
 -export([eval/2]).
@@ -67,8 +67,8 @@
 	 translate/2]).
 	 
 
-
 -include("xmerl.hrl").
+-include("xmerl_xpath.hrl").
 
 -record(obj, {type,
 	      value}).
@@ -85,6 +85,7 @@
 
 
 
+
 eval(Expr, C = #xmlContext{context_node = #xmlNode{pos = Pos}}) ->
     Obj = expr(Expr, C),
     Res = case Obj#xmlObj.type of
@@ -95,7 +96,7 @@ eval(Expr, C = #xmlContext{context_node = #xmlNode{pos = Pos}}) ->
 	      _ ->
 		  mk_boolean(C, Obj)
 	  end,
-    io:format("eval(~p, ~p) -> ~p~n", [Expr, Pos, Res]),
+%    io:format("eval(~p, ~p) -> ~p~n", [Expr, Pos, Res]),
     Res.
 
 
@@ -121,25 +122,26 @@ expr({bool, Op, E1, E2}, C) ->
 expr({'negative', E}, C) ->
     N = mk_number(C, E),
     - N;
-expr({number, N}, C) ->
+expr({number, N}, _C) ->
     ?number(N);
-expr({literal, S}, C) ->
+expr({literal, S}, _C) ->
     ?string(S);
 expr({function_call, F, Args}, C) ->
     case core_function(F) of
 	{true, F1} ->
-	    apply(?MODULE, F1, [C, Args]);
+	    ?MODULE:F1(C, Args);
 	true ->
-	    apply(?MODULE, F, [C, Args]);
+	    ?MODULE:F(C, Args);
 	false ->
 	    %% here, we should look up the function in the context provided 
 	    %% by the caller, but we haven't figured this out yet.
 	    exit({not_a_core_function, F})
     end;
 expr({path, Type, PathExpr}, C) ->
-    #xmlContext{nodeset = NS} = xmerl_xpath:eval_path(Type, PathExpr, C),
+    #state{context=#xmlContext{nodeset = NS}} =
+	xmerl_xpath:eval_path(Type, PathExpr, C),
     ?nodeset(NS);
-expr(Expr, C) ->
+expr(Expr, _C) ->
     exit({unknown_expr, Expr}).
 
 
@@ -249,7 +251,7 @@ id_tokens(Str) ->
     string:tokens(Str, " \t\n\r").
 			  
 
-attribute_test(N = #xmlNode{node = #xmlElement{attributes = Attrs}}, 
+attribute_test(#xmlNode{node = #xmlElement{attributes = Attrs}}, 
 	       Key, Vals) ->
     case lists:keymember(Key, #xmlAttribute.name, Attrs) of
 	{value, #xmlAttribute{value = V}} ->
@@ -257,7 +259,7 @@ attribute_test(N = #xmlNode{node = #xmlElement{attributes = Attrs}},
 	_ ->
 	    false
     end;
-attribute_test(_, Key, Vals) ->
+attribute_test(_Node, _Key, _Vals) ->
     false.
 
 %%% CONTINUE HERE!!!!
@@ -273,7 +275,7 @@ local_name1([]) ->
     ?string([]);
 local_name1([#xmlElement{name = Name, nsinfo = NSI}|_]) ->
     case NSI of
-	{Prefix, Local} ->
+	{_Prefix, Local} ->
 	    ?string(Local);
 	[] ->
 	    ?string(Name)
@@ -295,7 +297,7 @@ ns_uri([#xmlElement{nsinfo = NSI, namespace = NS}|_]) ->
 	    case lists:keysearch(Prefix, 1, NS#xmlNamespace.nodes) of
 		false ->
 		    ?string([]);
-		{value, {K, V}} ->
+		{value, {_K, V}} ->
 		    ?string(V)
 	    end;
 	[] ->
@@ -309,13 +311,12 @@ ns_uri([#xmlElement{nsinfo = NSI, namespace = NS}|_]) ->
 %% string: string(object?)
 string(C, []) ->
     ns_string(default_nodeset(C));
-
 string(C, [Arg]) ->
     string_value(mk_object(C, Arg)).
 
-ns_string(#xmlContext{nodeset = []}) ->
+ns_string([]) ->
     ?string([]);
-ns_string(#xmlContext{nodeset = [Obj|_]}) ->
+ns_string([Obj|_]) ->
     string_value(Obj).
 
 string_value(infinity) -> ?string("Infinity");
@@ -427,7 +428,7 @@ translations([H|T], [H1|T1]) ->
     [{H, replace, H1}|translations(T, T1)];
 translations(Rest, []) ->
     [{X, remove} || X <- Rest];
-translations([], Rest) ->
+translations([], _Rest) ->
     [].
 
 
@@ -441,11 +442,11 @@ fn_not(C, [Arg]) ->
     ?boolean(not(mk_boolean(C, Arg))).
 
 %% boolean: true() ->
-fn_true(C, []) ->
+fn_true(_C, []) ->
     ?boolean(true).
 
 %% boolean: false() ->
-fn_false(C, []) ->
+fn_false(_C, []) ->
     ?boolean(false).
 
 %% boolean: lang(string) ->
@@ -536,15 +537,15 @@ select_on_attribute([E = #xmlElement{attributes = Attrs}|T], K, V, Acc) ->
 	_ ->
 	    select_on_attribute(T, K, V, Acc)
     end;
-select_on_attribute([], K, V, Acc) ->
+select_on_attribute([], _K, _V, Acc) ->
     Acc.
 
 
 %%%%
 
-mk_nodeset(C0, #xmlContext{nodeset = NS}) ->
+mk_nodeset(_C0, #xmlContext{nodeset = NS}) ->
     NS;
-mk_nodeset(C0, #xmlObj{type = nodeset, value = NS}) ->
+mk_nodeset(_C0, #xmlObj{type = nodeset, value = NS}) ->
     NS;
 mk_nodeset(C0, Expr) ->
     case expr(Expr, C0) of
@@ -559,48 +560,48 @@ default_nodeset(#xmlContext{context_node = N}) ->
     [N].
 
 
-mk_object(C0, Obj = #xmlObj{}) ->
+mk_object(_C0, Obj = #xmlObj{}) ->
     Obj;
 mk_object(C0, Expr) ->
     expr(Expr, C0).
 
 
-mk_string(C0, #xmlObj{type = string, value = V}) ->
+mk_string(_C0, #xmlObj{type = string, value = V}) ->
     V;
 mk_string(C0, Expr) ->
     mk_string(C0, expr(Expr, C0)).
 
 
 
-mk_integer(C0, #xmlObj{type = number, value = V}) when float(V)  ->
+mk_integer(_C0, #xmlObj{type = number, value = V}) when float(V)  ->
     round(V);
-mk_integer(C0, #xmlObj{type = number, value = V}) when integer(V)  ->
+mk_integer(_C0, #xmlObj{type = number, value = V}) when integer(V)  ->
     V;
 mk_integer(C, Expr) ->
     mk_integer(C, expr(Expr, C)).
 
 
-mk_number(C, #xmlObj{type = string, value = V}) ->
+mk_number(_C, #xmlObj{type = string, value = V}) ->
     scan_number(V);
-mk_number(C, #xmlObj{type = number, value = V}) ->
+mk_number(_C, #xmlObj{type = number, value = V}) ->
     V;
 mk_number(C, Expr) ->
     mk_number(C, expr(Expr, C)).
 
 
-mk_boolean(C, #xmlObj{type = boolean, value = V}) -> 
+mk_boolean(_C, #xmlObj{type = boolean, value = V}) -> 
     V;
-mk_boolean(C, #xmlObj{type = number, value = 0}) ->
+mk_boolean(_C, #xmlObj{type = number, value = 0}) ->
     false;
-mk_boolean(C, #xmlObj{type = number, value = V}) when float(V) ; integer(V) ->
+mk_boolean(_C, #xmlObj{type = number, value = V}) when float(V) ; integer(V) ->
     true;
-mk_boolean(C, #xmlObj{type = nodeset, value = []}) ->
+mk_boolean(_C, #xmlObj{type = nodeset, value = []}) ->
     false;
-mk_boolean(C, #xmlObj{type = nodeset, value = V}) ->
+mk_boolean(_C, #xmlObj{type = nodeset, value = _V}) ->
     true;
-mk_boolean(C, #xmlObj{type = string, value = []}) ->
+mk_boolean(_C, #xmlObj{type = string, value = []}) ->
     false;
-mk_boolean(C, #xmlObj{type = string, value = V}) ->
+mk_boolean(_C, #xmlObj{type = string, value = _V}) ->
     true;
 mk_boolean(C, Expr) ->
     mk_boolean(C, expr(Expr, C)).
@@ -609,27 +610,29 @@ mk_boolean(C, Expr) ->
 normalize([H|T]) when ?whitespace(H) ->
     normalize(T);
 normalize(Str) ->
-    ContF = fun(_ContF, RetF, S) ->
+    ContF = fun(_ContF, RetF, _S) ->
 		    RetF()
 	    end,
-    normalize(Str, #xmerl_scanner{acc_fun = fun() -> exit(acc_fun) end,
-				  event_fun = fun() -> exit(event_fun) end,
-				  hook_fun = fun() -> exit(hook_fun) end,
-				  continuation_fun = ContF}, Acc = []).
+    normalize(Str,
+	      #xmerl_scanner{acc_fun = fun() -> exit(acc_fun) end,
+			     event_fun = fun() -> exit(event_fun) end,
+			     hook_fun = fun() -> exit(hook_fun) end,
+			     continuation_fun = ContF},
+	      []).
 
 
 normalize(Str = [H|_], S, Acc) when ?whitespace(H) ->
     case xmerl_scan:accumulate_whitespace(Str, S, default, Acc) of
-	{" " ++ Acc1, [], S1} ->
+	{" " ++ Acc1, [], _S1} ->
 	    lists:reverse(Acc1);
-	{Acc1, [], S1} ->
+	{Acc1, [], _S1} ->
 	    lists:reverse(Acc1);
 	{Acc1, T1, S1} ->
-	    normalize(T1, S, Acc1)
+	    normalize(T1, S1, Acc1)
     end;
 normalize([H|T], S, Acc) ->
     normalize(T, S, [H|Acc]);
-normalize([], S, Acc) ->
+normalize([], _S, Acc) ->
     lists:reverse(Acc).
 
 
@@ -644,7 +647,7 @@ scan_number("-" ++ T) ->
 		false ->
 		    'NaN'
 	    end;
-	Other ->
+	_Other ->
 	    'NaN'
     end;
 scan_number(T) ->
@@ -656,13 +659,13 @@ scan_number(T) ->
 		false ->
 		    'NaN'
 	    end;
-	Other ->
+	_Other ->
 	    'NaN'
     end.
 
 is_all_white([H|T]) when ?whitespace(H) ->
     is_all_white(T);
-is_all_white([H|_]) ->
+is_all_white([_H|_T]) ->
     false;
 is_all_white([]) ->
     true.

@@ -302,12 +302,12 @@ Unary 500 '-' .
 
 Erlang code.
 
-token({Token, Line}) ->
-	Token;
-token({Token, Line, Value}) ->
-	Token.
+% token({Token, _Line}) ->
+% 	Token;
+% token({Token, _Line, _Value}) ->
+% 	Token.
 
-value({Token, Line}) ->
+value({Token, _Line}) ->
 	Token;
-value({Token, Line, Value}) ->
+value({_Token, _Line, Value}) ->
 	Value.

@@ -8,7 +8,7 @@
 %%% the License for the specific language governing rights and limitations
 %%% under the License.
 %%%
-%%% The Original Code is xmerl-0.6
+%%% The Original Code is xmerl-0.7
 %%%
 %%% The Initial Developer of the Original Code is Ericsson Telecom
 %%% AB. Portions created by Ericsson are Copyright (C), 1998, Ericsson
@@ -20,18 +20,25 @@
 %%% #0.    BASIC INFORMATION
 %%%----------------------------------------------------------------------
 %%% @private
-%%% File:       xmerl_xml.erl
-%%% Author       : Richard Carlsson <richardc@csd.uu.se>
-%%% Description  : Callback module for exporting as raw text.
+%%% File:       xmerl_sgml.erl
+%%% Author       : Ulf Wiger <ulf.wiger@ericsson.com>
+%%%                Richard Carlsson <richardc@csd.uu.se>
+%%% Description  : Callback module for exporting XML to SGML.
+%%% 
+%%% Modules used : xmerl_lib
 %%%----------------------------------------------------------------------
 
--module(xmerl_text).
+-module(xmerl_sgml).
 
 -export(['#xml-inheritance#'/0]).
+
+%% Note: we assume XML data, so all tags are lowercase!
 
 -export(['#root#'/4,
 	 '#element#'/5,
 	 '#text#'/1]).
+
+-import(xmerl_lib, [markup/3, find_attribute/2, export_text/1]).
 
 -include("xmerl.hrl").
 
@@ -41,15 +48,27 @@
 
 %% The '#text#' function is called for every text segment.
 
-'#text#'(Text) -> Text.
+'#text#'(Text) ->
+    export_text(Text).
 
 
 %% The '#root#' tag is called when the entire structure has been
 %% exported. It does not appear in the structure itself.
 
-'#root#'(Data, _Attrs, [], _E) -> Data.
+'#root#'(Data, Attrs, [], _E) -> 
+    case find_attribute(header, Attrs) of
+	{value, Hdr} ->
+	    [Hdr, Data];
+	false ->
+	    Data
+    end.
 
 
-%% The '#element#' function is the default handler for XML elements.
+%% Note that SGML does not have the <Tag/> empty-element form.
+%% Furthermore, for some element types, the end tag may be forbidden -
+%% this can be handled by extending this module - see xmerl_otpsgml.erl
+%% for an example. (By default, we always generate the end tag, to make
+%% sure that the scope of a markup is not extended by mistake.)
 
-'#element#'(_Tag, Data, _Attrs, _Parents, _E) -> Data.
+'#element#'(Tag, Data, Attrs, _Parents, _E) ->
+    markup(Tag, Attrs, Data).

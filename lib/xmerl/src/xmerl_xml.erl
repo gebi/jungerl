@@ -19,6 +19,7 @@
 %%%----------------------------------------------------------------------
 %%% #0.    BASIC INFORMATION
 %%%----------------------------------------------------------------------
+%%% @private
 %%% File:       xmerl_xml.erl
 %%% Author       : Ulf Wiger <ulf.wiger@ericsson.com>
 %%%                Richard Carlsson <richardc@csd.uu.se>
@@ -47,19 +48,22 @@
 %% The '#text#' function is called for every text segment.
 
 '#text#'(Text) ->
+io:format("Text=~p~n",[Text]),
     export_text(Text).
 
 
 %% The '#root#' tag is called when the entire structure has been
 %% exported. It does not appear in the structure itself.
 
-'#root#'(Data, Attrs, [], E) ->
+'#root#'(Data, _Attrs, [], _E) ->
     ["<?xml version=\"1.0\"?>", Data].
 
 
 %% The '#element#' function is the default handler for XML elements.
 
-'#element#'(Tag, [], Attrs, Parents, E) ->
+'#element#'(Tag, [], Attrs, _Parents, _E) ->
+io:format("Empty Tag=~p~n",[Tag]),
     empty_tag(Tag, Attrs);
-'#element#'(Tag, Data, Attrs, Parents, E) ->
+'#element#'(Tag, Data, Attrs, _Parents, _E) ->
+io:format("Tag=~p~n",[Tag]),
     markup(Tag, Attrs, Data).

@@ -19,11 +19,12 @@
 %%%----------------------------------------------------------------------
 %%% #0.    BASIC INFORMATION
 %%%----------------------------------------------------------------------
+%%% @private
 %%% File:       xmerl_xpath_scan.erl
 %%% Author       : Ulf Wiger <ulf.wiger@ericsson.com>
 %%% Description  : Token scanner for XPATH grammar
 %%% 
-%%% Modules used : lists, xmerl_scan
+%%% Modules used : lists, xmerl_lib
 %%% 
 %%%----------------------------------------------------------------------
 %%%
@@ -80,35 +81,30 @@ tokens(Str, Acc) ->
     end.
 
 %% Expr Tokens
-scan_token("(" ++ T, A) ->		{{'(', ?L, '('}, T};
-scan_token(")" ++ T, A) ->		{{')', ?L, ')'}, T};
-scan_token("[" ++ T, A) ->		{{'[', ?L, '['}, T};
-scan_token("]" ++ T, A) ->		{{']', ?L, ']'}, T};
-scan_token(".." ++ T, A) ->
-%    {{'..', ?L, '..'}, T};
-    {rescan, "parent::node()" ++ T};
-scan_token("@" ++ T, A) ->
-%    {{'@', ?L, '@'}, T};
-    {rescan, "attribute::" ++ T};
-scan_token("," ++ T, A) ->		{{',', ?L, ','}, T};
-scan_token("::" ++ T, A) ->	{{'::', ?L, '::'}, T};
-
-
+scan_token("(" ++ T, _A) ->  {{'(', ?L, '('}, T};
+scan_token(")" ++ T, _A) ->  {{')', ?L, ')'}, T};
+scan_token("[" ++ T, _A) ->  {{'[', ?L, '['}, T};
+scan_token("]" ++ T, _A) ->  {{']', ?L, ']'}, T};
+scan_token(".." ++ T, _A) -> {rescan,"parent::node()" ++ T} ;
+						% {{'..',?L,'..'}, T};
+scan_token("@" ++ T, _A) ->  {rescan,"attribute::" ++ T};
+						% {{'@',?L,'@'},T};
+scan_token("," ++ T, _A) ->  {{',', ?L, ','}, T};
+scan_token("::" ++ T, _A) -> {{'::', ?L, '::'}, T};
 
 %% operators
-scan_token("//" ++ T, A) ->
-%    {{'//', ?L, '//'}, T};
-    {rescan, "/descendant-or-self::node()/" ++ T};
-scan_token("/" ++ T, A) ->	{{'/', ?L, '/'}, T};
-scan_token("|" ++ T, A) ->	{{'|', ?L, '|'}, T};
-scan_token("+" ++ T, A) ->	{{'+', ?L, '+'}, T};
-scan_token("-" ++ T, A) ->	{{'-', ?L, '-'}, T};
-scan_token("=" ++ T, A) ->	{{'=', ?L, '='}, T};
-scan_token("!=" ++ T, A) ->	{{'!=', ?L, '!='}, T};
-scan_token("<=" ++ T, A) ->	{{'<=', ?L, '<='}, T};
-scan_token("<" ++ T, A) ->	{{'<', ?L, '<'}, T};
-scan_token(">=" ++ T, A) ->	{{'>=', ?L, '>='}, T};
-scan_token(">" ++ T, A) ->	{{'>', ?L, '>'}, T};
+scan_token("//" ++ T, _A) -> {rescan,"/descendant-or-self::node()/" ++ T};
+						% {{'//',?L,'//'},T};
+scan_token("/" ++ T, _A) ->  {{'/', ?L, '/'}, T};
+scan_token("|" ++ T, _A) ->  {{'|', ?L, '|'}, T};
+scan_token("+" ++ T, _A) ->  {{'+', ?L, '+'}, T};
+scan_token("-" ++ T, _A) ->  {{'-', ?L, '-'}, T};
+scan_token("=" ++ T, _A) ->  {{'=', ?L, '='}, T};
+scan_token("!=" ++ T, _A) -> {{'!=', ?L, '!='}, T};
+scan_token("<=" ++ T, _A) -> {{'<=', ?L, '<='}, T};
+scan_token("<" ++ T, _A) ->  {{'<', ?L, '<'}, T};
+scan_token(">=" ++ T, _A) -> {{'>=', ?L, '>='}, T};
+scan_token(">" ++ T, _A) ->  {{'>', ?L, '>'}, T};
 
 scan_token("*" ++ T, A) ->
     Tok = 
@@ -126,25 +122,30 @@ scan_token("*" ++ T, A) ->
     {Tok, T};
 
 %% numbers
-scan_token(Str = [H|_], A) when H >= $0, H =< $9 ->
+scan_token(Str = [H|_], _A) when H >= $0, H =< $9 ->
     scan_number(Str);
 scan_token(Str = [$., H|_], A) when H >= $0, H =< $9 ->
     scan_number(Str, A);
-scan_token("." ++ T, A) ->
+scan_token("." ++ T, _A) ->
 %    {{'.', ?L, '.'}, T};
     {rescan, "self::node()" ++ T};
 
 %% Variable Reference
-scan_token([$$|T], A) ->
-    {Name, T1} = scan_name(T),
-    {{var_reference, ?L, list_to_atom(Name)}, T1};
+scan_token([$$|T], _A) ->
+    {{Prefix, Local}, T1} = scan_name(T),
+    case Prefix of
+	[] ->
+	    {{var_reference, ?L, list_to_atom(Local)}, T1};
+	_ ->
+	    {{var_reference, ?L, list_to_atom(Prefix++":"++Local)}, T1}
+    end;
 
-scan_token([H|T], A) when H == $" ; H == $' ->
+scan_token([H|T], _A) when H == $" ; H == $' ->
     {Literal, T1} = scan_literal(T, H, []),
     {{literal, ?L, Literal}, T1};
 
 scan_token(T, A) ->
-    {Name = {Prefix, Local}, T1} = scan_name(T),
+    {{Prefix, Local}, T1} = scan_name(T),
     case A of
 	[{X,_,_}|_] ->
 	    case special_token(X) of
@@ -171,11 +172,9 @@ other_name(Prefix, Local, T = "(" ++ _) ->
 other_name(Prefix, Local, T = "::" ++ _) ->
     axis(Prefix, Local, T);
 other_name([], Local, T) ->
-    {{name, ?L, {list_to_atom(Local), 
-		 [], Local}}, T};
+    {{name, ?L, {list_to_atom(Local),              [], Local}}, T};
 other_name(Prefix, Local, T) ->
-    {{name, ?L, {list_to_atom(Prefix ++ ":" ++ Local), 
-		 Prefix, Local}}, T}.
+    {{name, ?L, {list_to_atom(Prefix++":"++Local), Prefix, Local}}, T}.
 
 
 
@@ -223,7 +222,7 @@ scan_name([H1, H2 | T]) when H1 == $: ; H1 == $_ ->
 	    scan_prefix(T, [H2, H1])
     end;
 scan_name([H|T]) ->
-    case xmerl_scan:is_letter(H) of
+    case xmerl_lib:is_letter(H) of
 	true ->
 	    scan_prefix(T, [H]);
 	false ->
@@ -244,7 +243,7 @@ scan_prefix(":" ++ T, Acc) ->
     Prefix = lists:reverse(Acc),
     {{Prefix, LocalPart}, T1};
 scan_prefix(Str = [H|T], Acc) ->
-    case xmerl_scan:is_namechar(H) of
+    case xmerl_lib:is_namechar(H) of
 	true ->
 	    scan_prefix(T, [H|Acc]);
 	false ->
@@ -256,7 +255,7 @@ scan_local_part([], Acc) ->
 scan_local_part(Str = [H|_], Acc) when ?whitespace(H) ->
     {lists:reverse(Acc), Str};
 scan_local_part(Str = [H|T], Acc) ->
-    case xmerl_scan:is_namechar(H) of
+    case xmerl_lib:is_namechar(H) of
 	true ->
 	    scan_local_part(T, [H|Acc]);
 	false ->

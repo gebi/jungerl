@@ -15,3 +15,5 @@ conf: # nothing
 ../ebin/slang.app:	slang.app.src
 	cat slang.app.src | sed 's/%VSN%/${SLANG_VSN}/' > ../ebin/slang.app
 
+$(ERL_OBJECTS): $(ERL_HEADERS)
+

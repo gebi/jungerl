@@ -68,6 +68,7 @@ fi
 
 if test -z $HAVE_SLANG; then
    echo "No Slang header files" > ../lib/slang/SKIP
+   cp ../lib/{slang,ermacs}/SKIP  # ermacs needs slang
 fi
 
 dnl End.

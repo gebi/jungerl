@@ -12,7 +12,7 @@ AC_SUBST(ERLDIR)
 
 dnl C header files
 
-AC_CHECK_HEADERS(linux/if_tun.h)
+AC_CHECK_HEADERS(linux/if_tun.h, HAVE_TUNTAP="true")
 
 dnl For the Slang driver
 
@@ -48,6 +48,16 @@ case "$target_os" in
 esac
 
 AC_SUBST(LD_SHARED)
+
+dnl Skip applications that won't build.
+
+if test -z $HAVE_TUNTAP; then
+   echo "No tunnel linux/if_tun.h" > ../lib/tuntap/SKIP
+fi
+
+if test -z $SLANG_INCLUDE; then
+   echo "No Slang header files" > ../lib/slang/SKIP
+fi
 
 dnl End.
 

@@ -28,8 +28,10 @@ $(LIBS):
 	fi
 
 # Dependencies between programs.
+edoc: syntax_tools xmerl
 ermacs: slang msc
 enfs: rpc
+wumpus: edoc
 xmlrpc: xmerl
 
 

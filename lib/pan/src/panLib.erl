@@ -19,7 +19,7 @@
 -export([verify_dir/1]).
 -export([get_dir/1]).
 -export([delete_dir/1]).
--export([is_r7/0]).
+-export([emu_vers/0]).
 -export([timestamp/0,timestamp/1]).
 -export([host/0]).
 -export([get_ip/0]).
@@ -121,10 +121,20 @@ lsl(Dir) ->
 	{error, R} -> ?LOG(error, {R}), []
     end.
 
-is_r7() ->
-    case catch erlang:system_info(thread_pool_size) of
-	{'EXIT', _} -> no;
-	_ -> yes
+emu_vers() ->
+    case catch erlang:system_info(system_version) of
+	{'EXIT',R} -> {ok, 0};
+	VersStr -> 
+	    case regexp:first_match(VersStr,"[0-9]\.[0-9]") of 
+		nomatch -> {unknown, post_nine};
+		{match,F,L} -> 
+		    case string:substr(VersStr,F, L) of
+			"5.0" -> {ok, 7};
+			"5.1" -> {ok, 8};
+			"5.2" -> {ok, 9};
+			_ -> {unknown, post_nine}
+		    end
+	    end
     end.
 
 timestamp() -> timestamp(now()).

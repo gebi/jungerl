@@ -1,0 +1,1 @@
+This application implements a leader election behaviour modeled after gen_server. This behaviour intends to make it reasonably straightforward to implement a fully distributed server with master-slave semantics. 

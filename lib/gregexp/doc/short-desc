@@ -1,0 +1,1 @@
+This module extends the regexp module in OTP R7B-1 with support for submatches (the \(...\) syntax in SED regular expressions). This makes it possible to retrieve several components of a match with a single evaluation of a regexp. 

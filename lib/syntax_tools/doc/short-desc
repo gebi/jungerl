@@ -1,0 +1,1 @@
+This package contains modules for handling abstract Erlang syntax trees, in a way that is compatible with the "parse trees" of the standard library module `erl_parse', together with utilities for reading source files in unusual ways and pretty-printing syntax trees. Also included is an amazing automatic code-cleaner.

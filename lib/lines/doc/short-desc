@@ -1,0 +1,1 @@
+Efficient array-of-lines ADT. Allows for append, as well as insert, replace, delete in any position with reasonable access times. 

@@ -1,0 +1,1 @@
+This is a parse transform to give more informative exceptions. There is also support for invoking an "exit handler module" instead of just exiting. 

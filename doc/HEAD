@@ -1,0 +1,69 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+  <meta http-equiv="content-type"
+ content="text/html; charset=ISO-8859-1">
+  <title>Jungerl - a dense and chaotic Jungle of Erlang code</title>
+
+<style TYPE="text/css">
+body {
+  background: rgb(250,240,230);
+  font-family: Verdana, Arial, Helvetica, sans-serif;
+  font-size: 12pt;
+  color: black;
+  margin-right: 1em;
+  margin-left: 1em;
+  //background: #B6B6A5;
+  background-color: white;
+}
+
+H1, H2,  H4, H5 { font-weight: bold; }
+H1 { font-size: 200%; }
+H2 { font-size: 150%; }
+H3 { font-size: 130%; }
+H4 { font-size: 110%; }
+H5 { font-size: 100%; }
+
+A:visited { color: #600000;}
+A:link    { color: #0000f0; }          /* unvisited link */
+A:active  { color: lime; }             /* active links */
+A:hover   { background: rgb(189,183,107); }
+
+dl {
+  margin-left: 1em;
+  margin-right: 1em;
+  max-width: 40em;
+}
+
+dl dt {
+  font-weight: bold;
+  font-size: 120%;
+}
+dl dd {
+  margin-bottom: 1ex;
+}
+
+</style>
+</head>
+<body>
+<div id=logo style=" text-align: center;">
+<img src="jungerl-logo.png" title="" alt="The pseudo-temporary jungerl logo." 
+style="width: 800px; height: 60px;">
+</div>
+<div id=navbar style=" text-align: center;">
+ -- 
+<a href="http://sourceforge.net/projects/jungerl">project page</a>-- 
+<a href="http://cvs.sourceforge.net/cgi-bin/viewcvs.cgi/jungerl/">cvs browser</a>-- 
+<a href="http://www.bluetail.com/wiki/showPage?node=home">erlang wiki</a>--
+
+</div>
+<hr>
+<h1>Jungerl</h1>
+<p>
+The Jungle of Erlang code. This sourceforge project contains miscellanous
+utilities for erlang programmers.
+<h3>What is in the collection?</h3>
+<p>
+The following list has been assembled automatically by a short description
+file found in each jungerl subproject.
+</p>

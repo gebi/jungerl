@@ -1,0 +1,36 @@
+<h3>What is new in the collection?</h3>
+<ul>
+  <li><a
+ href="http://sourceforge.net/mailarchive/forum.php?forum_id=30262">Archive
+of the jungerl-commit mailinglist</a><br>
+  </li>
+</ul>
+<h3>Related links</h3>
+<ul>
+  <li>Open source erlang at <a href="http://erlang.org/">erlang.org</a></li>
+  <li>Commercial erlang at <a href="http://erlang.se/">erlang.se</a><br>
+  </li>
+  <li>Other <a
+ href="http://sourceforge.net/softwaremap/trove_list.php?form_cat=264">sourceforge
+projects in erlang</a>.<br>
+  </li>
+  <li><a href="http://www.erlang-projects.org/">Erlang-projects.org</a></li>
+  <li>The <a href="http://www.bluetail.com/wiki/">erlang wiki.</a></li>
+</ul>
+<h3>How do I update this page?</h3>
+<ol>
+  <li> cd to your local jungerl top-dir.
+  <li> run <code>doc/make_index.sh > ~/foo.html</code>
+  <li> check that the output seems correct using your browser
+  <li> scp ~/foo.html file to index.html in the project web arena
+       (i.e yourusername@jungerl.sf.net:/home/groups/j/ju/jungerl/htdocs)
+</ol>
+<p> <a href="http://validator.w3.org/check/referer"><img border="0"
+ src="http://www.w3.org/Icons/valid-html401" alt="Valid HTML 4.01!"
+ height="31" width="88"></a> </p>
+<hr>
+<div style="text-align: right;">written by <a
+ href="mailto:noss@users.sf.net">noss@users.sf.net</a><br>
+</div>
+</body>
+</html>

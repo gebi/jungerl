@@ -116,11 +116,12 @@ affect Distel's operation. More on this in the relevant sections.
 @node Conventions,  , Principles, Introduction
 @section Conventions of Use
 
-Most Distel commands need to know which Erlang node to talk to. The
-first command you use will prompt in the minibuffer for the name of
-the node to use. You can answer with either a @code{name@@host} node
-name, or with just the @code{name} part as an abbreviation for a node
-on the local machine.
+Most Distel commands need to know which Erlang node to talk to.
+(Distel doesn't start an Erlang node, you have to do that yourself.)
+The first command you use will prompt in the minibuffer for the name
+of the node to use. You can answer with either a @code{name@@host}
+node name, or with just the @code{name} part as an abbreviation for a
+node on the local machine.
 
 As a convenience, the node name you enter is cached and then reused in
 future commands. If you later want to talk to a different node you can

@@ -62,3 +62,7 @@ $(DOC_DIR)/%.html: %.erl
           -pa ../../xmerl/ebin \
           -run edoc file $< -run init stop
 	mv *.html $(DOC_DIR)
+
+# C linking items
+NSL_LIBS = @NSL_LIBS@
+SOCKET_LIBS = @SOCKET_LIBS@

@@ -1,10 +1,10 @@
-
+	
 This is an implementation of a subset of the SMB protocol.
 
 The file esmb.erl exports a number of functions that makes
 it possible to perform file operations towards a Windows
 (or Samba) server.
-
+	
 The file esmb_client.erl is an example of how to use these
 funtions to build an application. In this case it mimics
 the smbclient program that comes along with the Samba
@@ -19,5 +19,14 @@ implementation with smbclient as well as with Windows
 machines. Some obsolete SMB commands, not found in
 the CIFS document can be found at www.thursby.com.
 Finally, NetBIOS is described in RFC 1001,1002.
+
+To see what protocols messages that are sent when using
+the smbclient program. Try the following commands:
+
+  smbclient //korp/tobbe -U tobbe -m LANMAN1
+  smbclient korp -L -U tobbe -m LANMAN1
+
+By using the -m switch you force smbclient to negotiate
+the same dialect that esmb currently is using.
 
 Good luck, Tobbe

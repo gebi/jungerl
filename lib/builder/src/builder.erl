@@ -254,7 +254,13 @@ go(Options) ->
 		 end,
 		 ?herewith(D),
 		 fun(D) -> AppInfo = find_apps(D),
+			   ?report(debug, "find_apps(D) -> ~p~n", [AppInfo]),
 			   dict:store(app_info, AppInfo, D)
+		 end,
+		 ?herewith(D),
+		 fun(D) ->
+			 BootVars = boot_vars(D),
+			 dict:store(boot_vars, BootVars, D)
 		 end]),
     case lists:member({ok,true}, [dict:find(make_boot,Dict),
 				  dict:find(make_rel,Dict),
@@ -402,19 +408,25 @@ make_rel(Dict) ->
 	    Vsn = fetch_key(vsn, fetch(app, Dict)),
 	    Apps = fetch(app_info, Dict),
 	    AppInfo = [{A,V} || {A,V,F} <- Apps],
+	    ?report(debug,"AppInfo = ~p~n", [AppInfo]),
 	    {RelName, Rel} = 
 		case dict:find(rel_src, Dict) of
 		    %% mremond: Added this case clause:
-		    %%          Without it you get an error if you define the erts version
-		    %%          in your release file subset.
-		    %%          The ERTS version is anyway replace by the system ERTS
+		    %%          Without it you get an error if you define
+		    %%          the erts version in your release file subset.
+		    %%          The ERTS version is anyway replace by the
+		    %%          system ERTS
 		    {ok, {release,{Name,RelVsn}, {erts, ErtsVsn}, RelApps}} ->
+			?report(debug,"found rel_src: RelApps=~p~n",
+			    [RelApps]),
 			{Name,
 			 {release, {Name,RelVsn}, {erts, get_erts_vsn()},
 			  AppInfo}};
 		    {ok, {release,{Name,RelVsn},RelApps}} ->
 			%% here we should check that Apps is a subset of 
 			%% RelApps; if so, use RelApps; otherwise exit
+			?report(debug,"found rel_src: RelApps=~p~n",
+			    [RelApps]),
 			{Name,
 			 {release, {Name,RelVsn}, {erts, get_erts_vsn()},
 			  AppInfo}};
@@ -580,8 +592,9 @@ make_boot(Dict) ->
 	    App = fetch(app_name, Dict),
 	    CWD = cwd(),
 	    ok = file:set_cwd(fetch(out_dir,Dict)),
-	    SystoolsOpts = merge_opts([{path, systools_path(Dict)}],
-				      fetch(systools, Dict)),
+	    SystoolsOpts0 = merge_opts([{path, systools_path(Dict)}],
+				       fetch(systools, Dict)),
+	    SystoolsOpts = maybe_local(SystoolsOpts0, Dict),
 	    ?report(debug, "SystoolsOpts = ~p~n", [SystoolsOpts]),
 	    RelName = fetch(rel_name, Dict),
 	    Res = systools:make_script(RelName, SystoolsOpts),
@@ -597,6 +610,16 @@ make_boot(Dict) ->
 	_ ->
 	    ok
     end.
+
+
+maybe_local(Opts, Dict) ->
+    case lists:keymember(variables, 1, Opts) of
+	true ->
+	    Opts;
+	false ->
+	    [local|Opts -- [local]]
+    end.
+
 
 make_load_script(RelName) ->
     {ok, Bin} = file:read_file(RelName ++ ".boot"),
@@ -617,16 +640,65 @@ make_load_script(RelName) ->
 
 boot_vars(Dict) ->
     case dict:find(systools, Dict) of
-	{ok, Opts} ->
+	{ok, Opts} when Opts =/= [] ->
+	    ?report(debug, "systools opts = ~p~n", [Opts]),
 	    case lists:keysearch(variables, 1, Opts) of
 		{value, {_, Vars}} ->
 		    Vars;
 		false ->
 		    []
 	    end;
-	error ->
-	    []
+	_ ->
+	    ?report(debug,"will make boot_vars~n", []),
+	    {ok,[[Root]]} = init:get_argument(root),
+	    Apps = dict:fetch(app_info, Dict),
+	    prefixes(Apps, [{"ROOT",Root}])
     end.
+
+prefixes([{A,_,D}|Apps], Prefixes) ->
+    case [P || {_,P} <- Prefixes,
+	       lists:prefix(P, D)] of
+	[] ->
+	    prefixes(Apps, guess_root(D, Prefixes));
+	[_|_] ->
+	    prefixes(Apps, Prefixes)
+    end;
+prefixes([], Prefixes) ->
+    Prefixes.
+
+guess_root(D, Pfxs) ->
+    case lists:reverse(filename:split(D)) of
+	["ebin",App,"lib",Dir|T] ->
+	    guess(to_upper(Dir), 0, 
+		  filename:join(lists:reverse([Dir|T])), Pfxs);
+	["ebin",App,Dir|T] ->
+	    guess(to_upper(Dir), 0,
+		  filename:join(lists:reverse([Dir|T])), Pfxs)
+    end.
+
+guess(Guess,N,RootDir, Pfxs) ->
+    case lists:keymember(Guess,1,Pfxs) of
+	false ->
+	    ?report(debug, "manufactured boot_var {~p,~p}~n",
+		[Guess,RootDir]),
+	    [{Guess,RootDir}|Pfxs];
+	true ->
+	    ?report(debug, "duplicate Guess = ~p~n", [Guess]),
+	    guess(increment(Guess,N), N+1, RootDir, Pfxs)
+    end.
+
+increment(Guess,0) ->
+    Guess ++ "-1";
+increment(Guess,N) when N < 10 ->
+    [_,$-|T] = lists:reverse(Guess),
+    lists:reverse(T) ++ [$-|integer_to_list(N+1)].
+
+to_upper([H|T]) when H >= $a, H =< $z ->
+    [$A+(H-$a)|to_upper(T)];
+to_upper([H|T]) ->
+    [H|T];
+to_upper([]) ->
+    [].
 
 make_sh_script(Dict) ->
     case dict:find(sh_script, Dict) of
@@ -671,8 +743,8 @@ sh_script(Mode,Dict) ->
 	      _ ->
 		  []
 	  end,
-    BootVars = [[" -boot_var ", Var, " ", Dir] || {Var,Dir}
-						      <- boot_vars(Dict)],
+    BootVars = [[" -boot_var ", Var, " ", Dir] ||
+		   {Var,Dir} <- dict:fetch(boot_vars, Dict)],
 %     ["#/bin/sh\n"
 %      "erl ", Path, Boot, Sys, BootVars, XOpts, "\n"].
     ["#/bin/sh\n"
@@ -856,7 +928,6 @@ check_f(F, Ext) ->
 
 
 find_apps(Dict) ->
-    AppName = fetch(app_name, Dict),
     App = fetch(app, Dict),
     {value, {_, NeededApps}} = lists:keysearch(applications, 1, App),
     AppInfo = case dict:find(apps, Dict) of
@@ -871,7 +942,8 @@ find_apps(Dict) ->
 		  error ->
 		      []
 	      end,
-    Apps = merge_apps(RelApps, NeededApps, AppInfo),
+    AppName = dict:fetch(app_name, Dict),
+    Apps = merge_apps(RelApps, NeededApps, AppInfo) -- [AppName],
     ?report(debug, "Apps = ~p~n", [Apps]),
     KnownApps = [{A,V,D} || {A,V,D} <- AppInfo,
 			    V =/= unknown,
@@ -929,37 +1001,68 @@ app_info(Apps, Dict) ->
 	      
 
 search_apps(Apps, Dict, AppInfo, InitAcc) ->
+    ?report(debug,"search_apps(~p,Dict,~p,~p)~n", [Apps,AppInfo,InitAcc]),
     Path = fetch(path, Dict),
     Ebin = ebin_dir(Dict),
     Path1 = Path ++ [Ebin],
+    MyApp = {dict:fetch(app_name,Dict),
+	     dict:fetch(app_vsn,Dict), ebin_dir(Dict)},
     ?report(debug, "Search Path = ~p~n", [Path1]),
     case expand_path(Path ++ [Ebin], Apps, AppInfo, InitAcc) of
 	{FoundInfo, []} ->
-	    check_found(FoundInfo);
+	    ?report(debug, "LeftApps = [], FoundInfo = ~p~n", [FoundInfo]),
+	    [MyApp|check_found(FoundInfo, Dict)];
 	{FoundInfo, LeftApps} ->
 	    %% LeftApps may still include applications for which we've
 	    %% found versions (but didn't know if they were the right ones)
+	    ?report(debug, "LeftApps = ~p,~nFoundInfo = ~p~n", 
+		[LeftApps, FoundInfo]),
 	    case [A || A <- LeftApps,
 		       not(lists:keymember(A, 1, FoundInfo))] of
 		[] ->
-		    check_found(FoundInfo);
+		    [MyApp|check_found(FoundInfo, Dict)];
 		NotFound ->
 		    exit({not_found, NotFound})
 	    end
     end.
 	    
-check_found(FoundInfo) ->
-    case [{A,D} || {A,V,D} <- FoundInfo,
-		   V == unknown] of
-	[] ->
-	    FoundInfo;
-	UnknownVsns ->
+check_found(FoundInfo, Dict) ->
+    case lists:foldr(
+	   fun({A,unknown,D}, {Found,Left}) ->
+		   AppF = filename:join(D,atom_to_list(A) ++ ".app"),
+		   case vsn_from_app_file(AppF) of
+		       unknown ->
+			   {Found,[{A,unknown,D}|Left]};
+		       FoundVsn ->
+			   {[{A,FoundVsn,D}|Found], Left}
+		   end;
+	      (GoodApp, {Found,Left}) ->
+		   {[GoodApp|Found], Left}
+	   end, {[],[]}, FoundInfo) of
+	{Found, []} ->
+	    ?report(debug, "Found apps:~n   ~p~n", [FoundInfo]),
+	    Found;
+	{Found, UnknownVsns} ->
 	    %% These app directories didn't have a version
 	    %% suffix. This is allowed, but we must then 
 	    %% extract the version some other way.... FFS
 	    ?report(debug, "Should find the versions of"
 		" these apps:~n   ~p~n", [UnknownVsns]),
-	    FoundInfo
+	    Found
+    end.
+
+vsn_from_app_file(AppF) ->
+    case file:consult(AppF) of
+	{ok, [{application,_,Opts}]} ->
+	    case lists:keysearch(vsn,1,Opts) of
+		{value,{_,Vsn}} ->
+		    Vsn;
+		false ->
+		    unknown
+	    end;
+	Other ->
+	    ?report(debug, "file:consult(~p) -> ~p~n", [AppF,Other]),
+	    unknown
     end.
 
 
@@ -991,8 +1094,10 @@ expand_path([Dir|Ds], Apps, AppInfo, Acc) ->
 			    AppA = list_to_atom(App),
 			    case lists:member(AppA, Apps) of
 				true ->
-				    expand_path(Ds, Apps, AppInfo, 
-						[{AppA,unkown,Dir}|Acc]);
+				    {Acc1,Apps1} = 
+					maybe_save_app(AppA, unknown, Dir,
+						       Apps, AppInfo, Acc),
+				    expand_path(Ds, Apps1, AppInfo, Acc1);
 				false ->
 				    expand_path(Ds, Apps, AppInfo, Acc)
 			    end;
@@ -1023,6 +1128,10 @@ maybe_save_app(AppA, Vsn, Dir, Apps, AppInfo, Acc) ->
 	"               ~p)~n"), 
 	[AppA,Vsn,Dir,AppInfo, Acc]),
     case lists:keysearch(AppA, 1, Acc) of
+	{value, {_,unknown,unknown}} ->
+	    {lists:keyreplace(
+	       AppA,1,Acc,{AppA,Vsn,Dir}),
+	     Apps};
 	{value, {_,Vsn,_}} ->
 	    %% We already have this version
 	    {Acc, Apps};
@@ -1069,7 +1178,10 @@ maybe_save_app(AppA, Vsn, Dir, Apps, AppInfo, Acc) ->
 
 %%% later_vsn(VsnA, VsnB) -> true | false.
 %%%  true if VsnA > VsnB, false otherwise
-
+later_vsn(unknown,_) ->
+    false;
+later_vsn(_,unknown) ->
+    true;
 later_vsn(Vsn, Vsn) ->
     false;
 later_vsn(VsnA, VsnB) ->
@@ -1267,7 +1379,7 @@ read_app_file(Dict) ->
 
 app_options(Opts) ->
     [opt(description,Opts,""), opt(id,Opts,""),
-     opt(registered,Opts,[]), opt(applications,Opts,[]),
+     opt(registered,Opts,[]), opt(applications,Opts,[kernel,stdlib]),
      opt(env,Opts,[]), opt(mod,Opts,[]),
      opt(start_phases,Opts,undefined)].
     

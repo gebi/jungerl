@@ -1,0 +1,54 @@
+
+SIMPLE HOWTO for SSH
+
+1. SIMPLE SHELL
+
+ssh:connect(Host, [Port,] Opts).
+
+2. SETUP SFTP CONNECTION
+
+{ok,S} = sftp:start(Host,[Port,]Opts)
+  
+   then you can open/close/read/write/read_file/write_file as normal.
+
+
+3. START DISTRIBUTION OVER SSH
+
+  erl [-pa <ssh-ebin-path> -name <name>@ssh:<host> -proto_dist ssh [-ssh_user user] [-ssh_password pass]
+
+  > net:ping('<rname>@ssh:<rhost>').
+
+  (Hint: fix the cookies)
+
+
+4. TCP FORWARD (connecting to ports on remote system)
+
+  {ok,T} = ssh_tcp:start(Host,[Port,] Opts)
+
+  {ok,P} = ssh_tcp:forward(T,<local-ip>,<local-port>,<remote-ip>,<remote-port>)
+
+  {ok,S} = gen_tcp:connect({127,0,0,1}, P, Opts)
+
+
+4. TCP BACKWARD (connections from remote system)
+
+  {ok,T} = ssh_tcp:start(Host,[Port,] Opts)
+
+  {ok,L} = gen_tcp:listen(<local-port>, [{ifaddr,<local-ip>} ...])
+
+  ssh_tcp:backward(T,<local-ip>,<local-port>,<remote-ip>,<remote-port>)
+
+  {ok,S} = gen_tcp:accept(L).
+
+
+
+
+
+
+
+
+
+
+
+	
+   

@@ -4,6 +4,9 @@ dnl work out who the cpu, vendor and OS are
 AC_CANONICAL_SYSTEM
 AC_DEFINE_UNQUOTED(CPU_VENDOR_OS, "$target")
 
+JUNGERL_DIR=$(dirname `pwd`)
+AC_SUBST(JUNGERL_DIR)
+
 dnl Programs
 
 AC_PROG_CC
@@ -73,5 +76,5 @@ fi
 
 dnl End.
 
-AC_OUTPUT(../support/include.mk)
+AC_OUTPUT(../support/include.mk ../bin/jerl)
 

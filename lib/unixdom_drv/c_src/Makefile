@@ -9,7 +9,7 @@ SHLIB_OBJS = unixdom_drv.o my-unixdom.o erl_driver_tk.o
 all: $(UNIXDOM_DRV_SO)
 
 $(UNIXDOM_DRV_SO): $(SHLIB_OBJS)
-	ld -G -o $@ $^
+	$(LD_SHARED) -o $@ $^
 	# Symlink is only to help when using "jerl" script.
 	-ln -s $(UNIXDOM_DRV_SO) ../ebin
 

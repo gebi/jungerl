@@ -15,6 +15,7 @@ LIBS := \
         pico \
 	posix_drv \
 	rpc \
+	smart_exceptions \
 	spread_drv \
         syntax_tools \
 	tuntap \

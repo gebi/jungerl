@@ -51,6 +51,7 @@
 -export([big_endian_to_integer/1, little_endian_to_integer/1]).
 -export([big_endian_to_integer/3, little_endian_to_integer/3]).
 -export([factor/1, diff/2]).
+-export([is_homogenous/1]).
 
 %%% BEGIN ce_lists.erl %%%
 
@@ -286,5 +287,21 @@ diff([Head1 | Tail1], [Head1 | Tail2], Pos, Acc) ->
 diff([Head1 | Tail1], List2=[Head2 | Tail2], Pos, Acc) ->
   diff(Tail1, List2, Pos + 1, [{insert, Pos, [Head1]} | Acc]).
 
-%%% END of ce_lists.erl %%%
+%% @spec is_homogenous([term()]) -> true | false
+%% @doc Determines whether the given list is homogenous or not.
+%% If all of the terms of the list are equal, the list is
+%% considered homogenous.
 
+is_homogenous([]) ->
+  true;
+is_homogenous([Head | Tail]) ->
+  is_homogenous(Head, Tail).
+
+is_homogenous(Head, []) ->
+  true;
+is_homogenous(Head, [Head | Tail]) ->
+  is_homogenous(Head, Tail);
+is_homogenous(Head, _) ->
+  false.
+
+%%% END of ce_lists.erl %%%

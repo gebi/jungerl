@@ -6,12 +6,7 @@
 </head>
 <body bgcolor="white">
 <h1>Module epp_dodger</h1>
-<ul><li>
-<a href="#index">Function index</a></li><li>
-<a href="#exported">Exported functions</a></li></ul>
-
-<h2>Description</h2>
-<code>epp_dodger</code> - bypasses the Erlang preprocessor.
+<code>epp_dodger</code> - bypasses the Erlang preprocessor.<ul><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul><h2><a name="description">Description</a></h2><code>epp_dodger</code> - bypasses the Erlang preprocessor.
  
   <p>This module tokenises and parses most Erlang source code without
   expanding preprocessor directives and macro applications, as long as
@@ -21,43 +16,44 @@
   "<code>epp</code>" before the parser sees them), an extended syntax
   tree is created, using the <code>erl_syntax</code> module.</p>
  
-
 <h2><a name="index">Function Index</a></h2>
-
-<table width="100%" border="1"><tr><th colspan="2" align="left">Exported Functions</th></tr>
-<tr><td><a href="#format_error-1">format_error/1</a></td><td>Callback function for formatting error descriptors.</td></tr>
-<tr><td><a href="#parse-1">parse/1</a></td><td><a href="#parse-2">See <code>parse/2</code>.</a></td></tr>
-<tr><td><a href="#parse-2">parse/2</a></td><td>Reads and parses program text from an I/O stream.</td></tr>
-<tr><td><a href="#parse_file-1">parse_file/1</a></td><td>Reads and parses a file.</td></tr>
-<tr><td><a href="#parse_form-2">parse_form/2</a></td><td>Reads and parses a single program form from an I/O stream.</td></tr>
+<table width="100%" border="1"><tr><td valign="top"><a href="#format_error-1">format_error/1</a></td><td>Callback function for formatting error descriptors.</td></tr>
+<tr><td valign="top"><a href="#parse-1">parse/1</a></td><td><p>Equivalent to <a href="#parse-2"><tt>parse(IODevice, 1)</tt></a>.</p>
+</td></tr>
+<tr><td valign="top"><a href="#parse-2">parse/2</a></td><td>Reads and parses program text from an I/O stream.</td></tr>
+<tr><td valign="top"><a href="#parse_file-1">parse_file/1</a></td><td>Reads and parses a file.</td></tr>
+<tr><td valign="top"><a href="#parse_form-2">parse_form/2</a></td><td>Reads and parses a single program form from an I/O stream.</td></tr>
+<tr><td valign="top"><a href="#quick_parse-1">quick_parse/1</a></td><td/></tr>
+<tr><td valign="top"><a href="#quick_parse-2">quick_parse/2</a></td><td/></tr>
+<tr><td valign="top"><a href="#quick_parse_file-1">quick_parse_file/1</a></td><td/></tr>
+<tr><td valign="top"><a href="#quick_parse_form-2">quick_parse_form/2</a></td><td/></tr>
 </table>
 
-<h2><a name="exported">Exported Functions</a></h2>
+<h2><a name="functions">Function Details</a></h2>
 
 <h3><a name="format_error-1">format_error/1</a></h3>
-
-<p><code>format_error(term()) -> string()</code></p>
+<p><tt>format_error(X1::term()) -&gt; string()</tt></p>
 <p>Callback function for formatting error descriptors.</p>
 
 <h3><a name="parse-1">parse/1</a></h3>
+<p><tt>parse(Dev::IODevice) -&gt; {ok, Forms} | {error, ErrorInfo}</tt></p>
+<p>Equivalent to <a href="#parse-2"><tt>parse(IODevice, 1)</tt></a>.</p>
 
-<p><code>parse(IODevice) -> {ok, Forms} | {error, ErrorInfo}</code></p>
-<p>Equivalent to <a href="#parse-2"><code>parse(IODevice, 1)</code></a>.</p>
 
 <h3><a name="parse-2">parse/2</a></h3>
-
-<p><code>parse(IODevice, StartLine) -> {ok, Forms} | {error, ErrorInfo}<ul><li>IODevice = pid()</li><li>StartLine = integer()</li><li>Forms = [<a href="erl_syntax.html#type-syntaxTree">erl_syntax:syntaxTree()</a>]</li><li>ErrorInfo = term()</li></ul></code></p>
+<p><tt>parse(Dev::IODevice, L0::StartLine) -&gt; {ok, Forms} | {error, ErrorInfo}</tt>
+<ul><li><tt>IODevice = pid()</tt></li><li><tt>StartLine = integer()</tt></li><li><tt>Forms = [<a href="erl_syntax.html#type-syntaxTree">erl_syntax:syntaxTree()</a>]</tt></li><li><tt>ErrorInfo = term()</tt></li></ul></p>
 <p>Reads and parses program text from an I/O stream. Characters are
   read from <code>IODevice</code> until end-of-file; apart from this,
   the behaviour is the same as for <code>parse_file/1</code>.
   <code>StartLine</code> is the initial line number, which should be a
   positive integer.
  </p>
-<p>See also: <a href="#parse_file-1"><code>parse_file/1</code></a>.</p>
+<p><b>See also:</b> <a href="#parse_file-1">parse_file/1</a>.</p>
 
 <h3><a name="parse_file-1">parse_file/1</a></h3>
-
-<p><code>parse_file(File) -> {ok, Forms} | {error, ErrorInfo}<ul><li>File = <a href="file.html#type-filename">file:filename()</a></li><li>Forms = [<a href="erl_syntax.html#type-syntaxTree">erl_syntax:syntaxTree()</a>]</li><li>ErrorInfo = term()</li></ul></code></p>
+<p><tt>parse_file(File) -&gt; {ok, Forms} | {error, ErrorInfo}</tt>
+<ul><li><tt>File = <a href="/usr/local/home/richardc/hipe/otp/lib/kernel/doc/file.html#type-filename">file:filename()</a></tt></li><li><tt>Forms = [<a href="erl_syntax.html#type-syntaxTree">erl_syntax:syntaxTree()</a>]</tt></li><li><tt>ErrorInfo = term()</tt></li></ul></p>
 <p>Reads and parses a file. If successful, <code>{ok, Forms}</code>
   is returned, where <code>Forms</code> is a list of abstract syntax
   trees representing the "program forms" of the file (cf.
@@ -65,18 +61,37 @@
   ErrorInfo}</code> is returned, where <code>ErrorInfo</code> is an
   Erlang I/O ErrorInfo structure (see module <code>io</code>.)
  </p>
-<p>See also: <a href="io.html"><code>io</code></a>, <a href="erl_syntax.html#is_form-1"><code>erl_syntax:is_form/1</code></a>.</p>
+<p><b>See also:</b> <a href="/usr/local/home/richardc/hipe/otp/lib/stdlib/doc/io.html">io</a>, <a href="erl_syntax.html#is_form-1">erl_syntax:is_form/1</a>.</p>
 
 <h3><a name="parse_form-2">parse_form/2</a></h3>
-
-<p><code>parse_form(IODevice, StartLine) -> {ok, Forms, LineNo} | {eof, LineNo} | {error, ErrorInfo, LineNo}<ul><li>IODevice = pid()</li><li>StartLine = integer()</li><li>Forms = [<a href="erl_syntax.html#type-syntaxTree">erl_syntax:syntaxTree()</a>]</li><li>ErrorInfo = term()</li><li>LineNo = integer()</li></ul></code></p>
+<p><tt>parse_form(Dev::IODevice, L0::StartLine) -&gt; {ok, Form, LineNo} | {eof, LineNo} | {error, ErrorInfo, LineNo}</tt>
+<ul><li><tt>IODevice = pid()</tt></li><li><tt>StartLine = integer()</tt></li><li><tt>Form = <a href="erl_syntax.html#type-syntaxTree">erl_syntax:syntaxTree()</a> | none</tt></li><li><tt>ErrorInfo = term()</tt></li><li><tt>LineNo = integer()</tt></li></ul></p>
 <p>Reads and parses a single program form from an I/O stream.
   Characters are read from <code>IODevice</code> until an end-of-form
   marker is found (a period character followed by whitespace), or until
   end-of-file; apart from this, the behaviour is similar to that of
   <code>parse/2</code>, except that the return values also contain the
   final line number, given that <code>StartLine</code> is the initial
-  line number, and that <code>{eof, LineNo}</code> may be returned.
+  line number, and that <code>{eof, LineNo}</code> may be returned. If
+  the scanning/parsing determines that the form should be discarded,
+  <code>{ok, none, LineNo}</code> will be returned.
  </p>
-<p>See also: <a href="#parse-2"><code>parse/2</code></a>.</p></body>
+<p><b>See also:</b> <a href="#parse-2">parse/2</a>.</p>
+
+<h3><a name="quick_parse-1">quick_parse/1</a></h3>
+<tt>quick_parse(Dev) -&gt; term()
+</tt>
+
+<h3><a name="quick_parse-2">quick_parse/2</a></h3>
+<tt>quick_parse(Dev, L0) -&gt; term()
+</tt>
+
+<h3><a name="quick_parse_file-1">quick_parse_file/1</a></h3>
+<tt>quick_parse_file(File) -&gt; term()
+</tt>
+
+<h3><a name="quick_parse_form-2">quick_parse_form/2</a></h3>
+<tt>quick_parse_form(Dev, L0) -&gt; term()
+</tt>
+</body>
 </html>

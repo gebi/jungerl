@@ -1,0 +1,84 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Erlang Syntax Tools
+</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body bgcolor="white">
+<h1>Erlang Syntax Tools
+</h1>
+<p>Copyright © 1997-2004 Richard Carlsson</p>
+<p><b>Version:</b> 1.4a (Jungerl)</p>
+<p><b>Authors:</b> Richard Carlsson (<a href="mailto:richardc@csd.uu.se"><tt>richardc@csd.uu.se</tt></a>).</p>
+This package contains modules for handling abstract Erlang syntax
+trees, in a way that is compatible with the "parse trees" of the
+standard library module <code>erl_parse</code>, together with utilities for reading
+source files in unusual ways and pretty-printing syntax trees. Also
+included is an amazing module merger and renamer called Igor, as well as
+an automatic code-cleaner.
+
+<p>The abstract layer (defined in <a href="erl_syntax.html"><code>erl_syntax</code></a>) is nicely
+structured and the node types are context-independent. The layer makes
+it possible to transparently attach source-code comments and user
+annotations to nodes of the tree. Using the abstract layer makes
+applications less sensitive to changes in the <a href="/usr/local/home/richardc/hipe/otp/lib/stdlib/doc/erl_parse.html"><code>//stdlib/erl_parse</code></a>
+data structures, only requiring the <a href="erl_syntax.html"><code>erl_syntax</code></a> module to be
+up-to-date.</p>
+
+<p>The pretty printer <a href="erl_prettypr.html"><code>erl_prettypr</code></a> is implemented on top of the
+library module <a href="prettypr.html"><code>prettypr</code></a>: this is a powerful and flexible generic
+pretty printing library, which is also distributed separately.</p>
+
+<p>For a short demonstration of parsing and pretty-printing, simply
+compile the included module <a href="../examples/demo.erl"><code>demo.erl</code></a>, and execute
+<code>demo:run()</code> from the Erlang shell. It will compile the
+remaining modules and give you further instructions.</p>
+
+<p>Also try the <a href="erl_tidy.html"><code>erl_tidy</code></a> module, as follows:
+<pre>
+    erl_tidy:dir("any-erlang-source-dir", [test, old_guard_tests]).</pre>
+("<code>test</code>" assures that no files are modified).</p>
+
+<p>News in 1.4:
+<ul>
+  <li>Added support for <a href="erl_syntax.html#cond_expr-1">cond-expressions</a>,
+      <a href="erl_syntax.html#try_expr-4">try-expressions</a> and
+      <a href="erl_syntax.html#class_qualifier-2">class-qualifier patterns</a>.</li>
+  <li>Added support for parameterized modules.</li>
+  <li><a href="igor.html">Igor</a> is officially included.</li>
+  <li>Quick-parse functionality added to <a href="epp_dodger.html"><code>epp_dodger</code></a>.</li>
+</ul>
+</p>
+
+<p>News in 1.3:
+<ul>
+  <li>Added support for qualified names (as used by "packages").</li>
+  <li>Various internal changes.</li>
+</ul>
+</p>
+
+<p>News in 1.2:
+<ul>
+  <li>HTML Documentation (generated with EDoc).</li>
+  <li>A few bug fixes and some minor interface changes (sorry for any
+    inconvenience).</li>
+</ul>
+</p>
+
+<p>News in 1.1:
+<ul>
+  <li>Module <a href="erl_tidy.html"><code>erl_tidy</code></a>: check or tidy either a single module, or a
+    whole directory tree recursively. Rewrites and reformats the code
+    without losing comments or expanding macros. Safe mode allows
+    generating reports without modifying files.</li>
+  <li>Module <a href="erl_syntax_lib.html"><code>erl_syntax_lib</code></a>: contains support functions for easier
+    analysis of the source code structure.</li>
+  <li>Module <a href="epp_dodger.html"><code>epp_dodger</code></a>: Bypasses the Erlang preprocessor - avoids
+    macro expansion, file inclusion, conditional compilation, etc.
+    Allows you to find/modify particular definitions/applications of
+    macros, and other things previously not possible.</li>
+</ul>
+</p>
+</body>
+</html>

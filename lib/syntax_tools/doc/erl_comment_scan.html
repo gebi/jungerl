@@ -6,27 +6,19 @@
 </head>
 <body bgcolor="white">
 <h1>Module erl_comment_scan</h1>
-<ul><li>
-<a href="#index">Function index</a></li><li>
-<a href="#exported">Exported functions</a></li></ul>
-
-<h2>Description</h2>
-Functions for reading comment lines from Erlang source code.
-
+Functions for reading comment lines from Erlang source code.<ul><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul><h2><a name="description">Description</a></h2>Functions for reading comment lines from Erlang source code.
 <h2><a name="index">Function Index</a></h2>
-
-<table width="100%" border="1"><tr><th colspan="2" align="left">Exported Functions</th></tr>
-<tr><td><a href="#file-1">file/1</a></td><td>Extracts comments from an Erlang source code file.</td></tr>
-<tr><td><a href="#join_lines-1">join_lines/1</a></td><td>Joins individual comment lines into multi-line comments.</td></tr>
-<tr><td><a href="#scan_lines-1">scan_lines/1</a></td><td>Extracts individual comment lines from a source code string.</td></tr>
-<tr><td><a href="#string-1">string/1</a></td><td>Extracts comments from a string containing Erlang source code.</td></tr>
+<table width="100%" border="1"><tr><td valign="top"><a href="#file-1">file/1</a></td><td>Extracts comments from an Erlang source code file.</td></tr>
+<tr><td valign="top"><a href="#join_lines-1">join_lines/1</a></td><td>Joins individual comment lines into multi-line comments.</td></tr>
+<tr><td valign="top"><a href="#scan_lines-1">scan_lines/1</a></td><td>Extracts individual comment lines from a source code string.</td></tr>
+<tr><td valign="top"><a href="#string-1">string/1</a></td><td>Extracts comments from a string containing Erlang source code.</td></tr>
 </table>
 
-<h2><a name="exported">Exported Functions</a></h2>
+<h2><a name="functions">Function Details</a></h2>
 
 <h3><a name="file-1">file/1</a></h3>
-
-<p><code>file(FileName::<a href="file.html#type-filename">file:filename()</a>) -> [Comment]<ul><li>Comment = {Line, Column, Indentation, Text}</li><li>Line = integer()</li><li>Column = integer()</li><li>Indentation = integer()</li><li>Text = [string()]</li></ul></code></p>
+<p><tt>file(FileName::<a href="/usr/local/home/richardc/hipe/otp/lib/kernel/doc/file.html#type-filename">file:filename()</a>) -&gt; [Comment]</tt>
+<ul><li><tt>Comment = {Line, Column, Indentation, Text}</tt></li><li><tt>Line = integer()</tt></li><li><tt>Column = integer()</tt></li><li><tt>Indentation = integer()</tt></li><li><tt>Text = [string()]</tt></li></ul></p>
 <p>Extracts comments from an Erlang source code file. Returns a
   list of entries representing <em>multi-line</em> comments, listed in
   order of increasing line-numbers. For each entry, <code>Text</code>
@@ -49,11 +41,11 @@ Functions for reading comment lines from Erlang source code.
   error occurred, where <code>Reason</code> is an atom corresponding to
   a Posix error code; see the module <code>file</code> for details.</p>
  </p>
-<p>See also: <a href="file.html"><code>file</code></a>.</p>
+<p><b>See also:</b> <a href="/usr/local/home/richardc/hipe/otp/lib/kernel/doc/file.html">file</a>.</p>
 
 <h3><a name="join_lines-1">join_lines/1</a></h3>
-
-<p><code>join_lines([CommentLine]) -> [Comment]<ul><li>CommentLine = {Line, Column, Indent, string()}</li><li>Line = integer()</li><li>Column = integer()</li><li>Indent = integer()</li><li>Comment = {Line, Column, Indent, Text}</li><li>Text = [string()]</li></ul></code></p>
+<p><tt>join_lines(Lines::[CommentLine]) -&gt; [Comment]</tt>
+<ul><li><tt>CommentLine = {Line, Column, Indent, string()}</tt></li><li><tt>Line = integer()</tt></li><li><tt>Column = integer()</tt></li><li><tt>Indent = integer()</tt></li><li><tt>Comment = {Line, Column, Indent, Text}</tt></li><li><tt>Text = [string()]</tt></li></ul></p>
 <p>Joins individual comment lines into multi-line comments. The
   input is a list of entries representing individual comment lines,
   <em>in order of decreasing line-numbers</em>; see
@@ -63,11 +55,11 @@ Functions for reading comment lines from Erlang source code.
   <code>Text</code> is a list of consecutive comment lines in order of
   <em>increasing</em> line-numbers (i.e., top-down).
  </p>
-<p>See also: <a href="#scan_lines-1"><code>scan_lines/1</code></a>.</p>
+<p><b>See also:</b> <a href="#scan_lines-1">scan_lines/1</a>.</p>
 
 <h3><a name="scan_lines-1">scan_lines/1</a></h3>
-
-<p><code>scan_lines(string()) -> [CommentLine]<ul><li>CommentLine = {Line, Column, Indent, Text}</li><li>Line = integer()</li><li>Column = integer()</li><li>Indent = integer()</li><li>Text = string()</li></ul></code></p>
+<p><tt>scan_lines(Text::string()) -&gt; [CommentLine]</tt>
+<ul><li><tt>CommentLine = {Line, Column, Indent, Text}</tt></li><li><tt>Line = integer()</tt></li><li><tt>Column = integer()</tt></li><li><tt>Indent = integer()</tt></li><li><tt>Text = string()</tt></li></ul></p>
 <p>Extracts individual comment lines from a source code string.
   Returns a list of comment lines found in the text, listed in order of
   <em>decreasing</em> line-numbers, i.e., the last comment line in the
@@ -78,14 +70,14 @@ Functions for reading comment lines from Erlang source code.
   <code>Line</code>, <code>Column</code> and <code>Indent</code>, see
   <code>file/1</code>.
  </p>
-<p>See also: <a href="#file-1"><code>file/1</code></a>.</p>
+<p><b>See also:</b> <a href="#file-1">file/1</a>.</p>
 
 <h3><a name="string-1">string/1</a></h3>
-
-<p><code>string(Arg1) -> term()</code></p>
-<p>Extracts comments from a string containing Erlang source code.
+<tt>string(Text) -&gt; term()
+</tt><p>Extracts comments from a string containing Erlang source code.
   Except for reading directly from a string, the behaviour is the same
   as for <code>file/1</code>.
  </p>
-<p>See also: <a href="#file-1"><code>file/1</code></a>.</p></body>
+<p><b>See also:</b> <a href="#file-1">file/1</a>.</p>
+</body>
 </html>

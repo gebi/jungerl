@@ -6,30 +6,35 @@
 </head>
 <body bgcolor="white">
 <h1>Module erl_recomment</h1>
-<ul><li>
-<a href="#index">Function index</a></li><li>
-<a href="#exported">Exported functions</a></li></ul>
-
-<h2>Description</h2>
 Inserting comments into abstract Erlang syntax trees
  
   <p>This module contains functions for inserting comments, described
   by position, indentation and text, as attachments on an abstract
+  syntax tree, at the correct places.</p><ul><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul><h2><a name="description">Description</a></h2>Inserting comments into abstract Erlang syntax trees
+ 
+  <p>This module contains functions for inserting comments, described
+  by position, indentation and text, as attachments on an abstract
   syntax tree, at the correct places.</p>
-
 <h2><a name="index">Function Index</a></h2>
-
-<table width="100%" border="1"><tr><th colspan="2" align="left">Exported Functions</th></tr>
-<tr><td><a href="#recomment_forms-2">recomment_forms/2</a></td><td>Attaches comments to the syntax tree/trees representing a
+<table width="100%" border="1"><tr><td valign="top"><a href="#quick_recomment_forms-2">quick_recomment_forms/2</a></td><td>Like <a href="#recomment_forms-2"><code>recomment_forms/2</code></a>, but only inserts top-level
+  comments.</td></tr>
+<tr><td valign="top"><a href="#recomment_forms-2">recomment_forms/2</a></td><td>Attaches comments to the syntax tree/trees representing a
   program.</td></tr>
-<tr><td><a href="#recomment_tree-2">recomment_tree/2</a></td><td>Attaches comments to a syntax tree.</td></tr>
+<tr><td valign="top"><a href="#recomment_tree-2">recomment_tree/2</a></td><td>Attaches comments to a syntax tree.</td></tr>
 </table>
 
-<h2><a name="exported">Exported Functions</a></h2>
+<h2><a name="functions">Function Details</a></h2>
+
+<h3><a name="quick_recomment_forms-2">quick_recomment_forms/2</a></h3>
+<p><tt>quick_recomment_forms(Tree::Forms, Comments::[Comment]) -&gt; <a href="#type-syntaxTree">syntaxTree()</a></tt>
+<ul><li><tt>Forms = <a href="#type-syntaxTree">syntaxTree()</a> | [<a href="#type-syntaxTree">syntaxTree()</a>]</tt></li><li><tt>Comment = {Line, Column, Indentation, Text}</tt></li><li><tt>Line = integer()</tt></li><li><tt>Column = integer()</tt></li><li><tt>Indentation = integer()</tt></li><li><tt>Text = [string()]</tt></li></ul></p>
+<p>Like <a href="#recomment_forms-2"><code>recomment_forms/2</code></a>, but only inserts top-level
+  comments. Comments within function definitions or declarations
+  ("forms") are simply ignored.</p>
 
 <h3><a name="recomment_forms-2">recomment_forms/2</a></h3>
-
-<p><code>recomment_forms(Forms, Comments::[Comment]) -> <a href="#type-syntaxTree">syntaxTree()</a><ul><li><a name="type-syntaxTree">syntaxTree()</a> = <a href="erl_syntax.html#type-syntaxTree">erl_syntax:syntaxTree()</a></li><li>Forms = <a href="#type-syntaxTree">syntaxTree()</a> | [<a href="#type-syntaxTree">syntaxTree()</a>]</li><li>Comment = {Line, Column, Indentation, Text}</li><li>Line = integer()</li><li>Column = integer()</li><li>Indentation = integer()</li><li>Text = [string()]</li></ul></code></p>
+<p><tt>recomment_forms(Tree::Forms, Comments::[Comment]) -&gt; <a href="#type-syntaxTree">syntaxTree()</a></tt>
+<ul><li><tt><a name="type-syntaxTree">syntaxTree()</a> = <a href="erl_syntax.html#type-syntaxTree">erl_syntax:syntaxTree()</a></tt></li><li><tt>Forms = <a href="#type-syntaxTree">syntaxTree()</a> | [<a href="#type-syntaxTree">syntaxTree()</a>]</tt></li><li><tt>Comment = {Line, Column, Indentation, Text}</tt></li><li><tt>Line = integer()</tt></li><li><tt>Column = integer()</tt></li><li><tt>Indentation = integer()</tt></li><li><tt>Text = [string()]</tt></li></ul></p>
 <p>Attaches comments to the syntax tree/trees representing a
   program. The given <code>Forms</code> should be a single syntax tree
   of type <code>form_list</code>, or a list of syntax trees
@@ -73,11 +78,11 @@ Inserting comments into abstract Erlang syntax trees
   <code>L</code>, column <code>C</code>, fails because the tree
   structure is ill-formed.</p>
  </p>
-<p>See also: <a href="erl_comment_scan.html"><code>erl_comment_scan</code></a>, <a href="#recomment_tree-2"><code>recomment_tree/2</code></a>.</p>
+<p><b>See also:</b> <a href="erl_comment_scan.html">erl_comment_scan</a>, <a href="#quick_recomment_forms-2">quick_recomment_forms/2</a>, <a href="#recomment_tree-2">recomment_tree/2</a>.</p>
 
 <h3><a name="recomment_tree-2">recomment_tree/2</a></h3>
-
-<p><code>recomment_tree(Tree::<a href="#type-syntaxTree">syntaxTree()</a>, Comments::[Comment]) -> {<a href="#type-syntaxTree">syntaxTree()</a>, [Comment]}<ul><li>Comment = {Line, Column, Indentation, Text}</li><li>Line = integer()</li><li>Column = integer()</li><li>Indentation = integer()</li><li>Text = [string()]</li></ul></code></p>
+<p><tt>recomment_tree(Tree::<a href="#type-syntaxTree">syntaxTree()</a>, Comments::[Comment]) -&gt; {<a href="#type-syntaxTree">syntaxTree()</a>, [Comment]}</tt>
+<ul><li><tt>Comment = {Line, Column, Indentation, Text}</tt></li><li><tt>Line = integer()</tt></li><li><tt>Column = integer()</tt></li><li><tt>Indentation = integer()</tt></li><li><tt>Text = [string()]</tt></li></ul></p>
 <p>Attaches comments to a syntax tree. The result is a pair
   <code>{NewTree, Remainder}</code> where <code>NewTree</code> is the
   given <code>Tree</code> where comments from the list
@@ -101,5 +106,6 @@ Inserting comments into abstract Erlang syntax trees
   <code>Indentation</code> fields, and the behaviour in case of errors,
   see <code>recomment_forms/2</code>.</p>
  </p>
-<p>See also: <a href="#recomment_forms-2"><code>recomment_forms/2</code></a>.</p></body>
+<p><b>See also:</b> <a href="#recomment_forms-2">recomment_forms/2</a>.</p>
+</body>
 </html>

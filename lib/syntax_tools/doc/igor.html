@@ -1,0 +1,581 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Module igor</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body bgcolor="white">
+<h1>Module igor</h1>
+Igor: the Module Merger and Renamer.<ul><li><a href="#description">Description</a></li><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul><h2><a name="description">Description</a></h2>Igor: the Module Merger and Renamer.
+ 
+  <p>The program Igor merges the source code of one or more Erlang
+  modules into a single module, which can then replace the original set
+  of modules. Igor is also able to rename a set of (possibly
+  interdependent) modules, without joining them into a single
+  module.</p>
+ 
+  <p>The main user interface consists of the functions <a href="#merge-3"><code>merge</code></a> and <a href="#rename-3"><code>rename</code></a>. See also the <a href="#parse_transform-2"><code>parse_transform</code></a>
+  function</p>
+ 
+  <p>A note of warning: Igor cannot do anything about the case when the
+  name of a remote function is passed to the built-in functions
+  <code>apply</code> and <code>spawn</code> <em>unless</em> the module
+  and function names are explicitly stated in the call, as in e.g.
+  <code>apply(lists, reverse, [Xs])</code>. In all other cases, Igor
+  leaves such calls unchanged, and warns the user that manual editing
+  might be necessary.</p>
+ 
+  <p>Also note that Erlang records will be renamed as necessary to
+  avoid non-equivalent definitions using the same record name. This
+  does not work if the source code accesses the name field of such
+  record tuples by <code>element/2</code> or similar methods. Always
+  use the record syntax to handle record tuples, if possible.</p>
+ 
+  <p>Disclaimer: the author of this program takes no responsibility for
+  the correctness of the produced output, or for any effects of its
+  execution. In particular, the author may not be held responsible
+  should Igor include the code of a deceased madman in the result.</p>
+ 
+  <p>For further information on Igors in general, see e.g. "Young
+  Frankenstein", Mel Brooks, 1974, and "The Fifth Elephant", Terry
+  Pratchett, 1999.</p>
+<h2><a name="types">Data Types</a></h2>
+
+<h3><a name="type-stubDescriptor">stubDescriptor()</a></h3>
+<p><tt>stubDescriptor() = [{ModuleName, Functions, [Attribute]}]</tt>
+<ul><li><tt>ModuleName = atom()</tt></li><li><tt>Functions = [{FunctionName, {ModuleName, FunctionName}}]</tt></li><li><tt>FunctionName = {atom(), integer()}</tt></li><li><tt>Attribute = {atom(), term()}</tt></li></ul></p>
+<p>A stub module descriptor contains the module name, a list of
+       exported functions, and a list of module attributes. Each
+       function is described by its name (which includes its arity),
+       and the corresponding module and function that it calls. (The
+       arities should always match.) The attributes are simply
+       described by key-value pairs.
+ </p>
+
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1"><tr><td valign="top"><a href="#create_stubs-2">create_stubs/2</a></td><td>Creates stub module source files corresponding to the given stub
+  descriptors.</td></tr>
+<tr><td valign="top"><a href="#merge-2">merge/2</a></td><td><p>Equivalent to <a href="#merge-3"><tt>merge(Name, Files, [])</tt></a>.</p>
+</td></tr>
+<tr><td valign="top"><a href="#merge-3">merge/3</a></td><td>Merges source code files to a single file.</td></tr>
+<tr><td valign="top"><a href="#merge_files-3">merge_files/3</a></td><td><p>Equivalent to <a href="#merge_files-4"><tt>merge_files(Name, [], Files, Options)</tt></a>.</p>
+</td></tr>
+<tr><td valign="top"><a href="#merge_files-4">merge_files/4</a></td><td>Merges source code files and syntax trees to a single syntax
+  tree.</td></tr>
+<tr><td valign="top"><a href="#merge_sources-3">merge_sources/3</a></td><td>Merges syntax trees to a single syntax tree.</td></tr>
+<tr><td valign="top"><a href="#parse_transform-2">parse_transform/2</a></td><td>Allows Igor to work as a component of the Erlang compiler.</td></tr>
+<tr><td valign="top"><a href="#rename-2">rename/2</a></td><td><p>Equivalent to <a href="#rename-3"><tt>rename(Files, Renamings, [])</tt></a>.</p>
+</td></tr>
+<tr><td valign="top"><a href="#rename-3">rename/3</a></td><td>Renames a set of possibly interdependent source code modules.</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3><a name="create_stubs-2">create_stubs/2</a></h3>
+<p><tt>create_stubs(Stubs::[<a href="#type-stubDescriptor">stubDescriptor()</a>], Options::[term()]) -&gt; [string()]</tt></p>
+<p>Creates stub module source files corresponding to the given stub
+  descriptors. The returned value is the list of names of the created
+  files. See <code>merge_sources/3</code> for more information about
+  stub descriptors.
+ 
+  <p>Options:
+  <dl>
+    <dt><code>{backup_suffix, string()}</code></dt>
+    <dt><code>{backups, bool()}</code></dt>
+    <dt><code>{printer, Function}</code></dt>
+    <dt><code>{stub_dir, filename()}</code></dt>
+    <dt><code>{suffix, string()}</code></dt>
+    <dt><code>{verbose, bool()}</code></dt>
+  </dl>
+  See <code>merge/3</code> for details on these options.</p>
+ </p>
+<p><b>See also:</b> <a href="#merge-3">merge/3</a>, <a href="#merge_sources-3">merge_sources/3</a>.</p>
+
+<h3><a name="merge-2">merge/2</a></h3>
+<p><tt>merge(Name::atom(), Files::[<a href="#type-filename">filename()</a>]) -&gt; [<a href="#type-filename">filename()</a>]</tt></p>
+<p>Equivalent to <a href="#merge-3"><tt>merge(Name, Files, [])</tt></a>.</p>
+
+
+<h3><a name="merge-3">merge/3</a></h3>
+<p><tt>merge(Name::atom(), Files::[<a href="#type-filename">filename()</a>], Options::[term()]) -&gt; [<a href="#type-filename">filename()</a>]</tt>
+<ul><li><tt><a name="type-filename">filename()</a> = <a href="/usr/local/home/richardc/hipe/otp/lib/kernel/doc/file.html#type-filename">file:filename()</a></tt></li></ul></p>
+<p>Merges source code files to a single file. <code>Name</code>
+  specifies the name of the resulting module - not the name of the
+  output file. <code>Files</code> is a list of file names and/or module
+  names of source modules to be read and merged (see
+  <code>merge_files/4</code> for details). All the input modules must
+  be distinctly named.
+ 
+  <p>The resulting source code is written to a file named
+  "<code><em>Name</em>.erl</code>" in the current directory, unless
+  otherwise specified by the options <code>dir</code> and
+  <code>outfile</code> described below.</p>
+ 
+  <p>Examples:
+  <ul>
+    <li>given a module <code>m</code> in file "<code>m.erl</code>"
+    which uses the standard library module <code>lists</code>, calling
+    <code>igor:merge(m, [m, lists])</code> will create a new file
+    "<code>m.erl</code> which contains the code from <code>m</code> and
+    exports the same functions, and which includes the referenced code
+    from the <code>lists</code> module. The original file will be
+    renamed to "<code>m.erl.bak</code>".</li>
+ 
+    <li>given modules <code>m1</code> and <code>m2</code>, in
+    corresponding files, calling <code>igor:merge(m, [m1, m2])</code>
+    will create a file "<code>m.erl</code>" which contains the code
+    from <code>m1</code> and <code>m2</code> and exports the functions
+    of <code>m1</code>.</li>
+  </ul></p>
+ 
+  <p>Stub module files are created for those modules that are to be
+  exported by the target module (see options <code>export</code>,
+  <code>stubs</code> and <code>stub_dir</code>).</p>
+ 
+  <p>The function returns the list of file names of all created
+  modules, including any automatically created stub modules. The file
+  name of the target module is always first in the list.</p>
+ 
+  <p>Note: If you get a "syntax error" message when trying to merge
+  files (and you know those files to be correct), then try the
+  <code>preprocess</code> option. It typically means that your code
+  contains too strange macros to be handled without actually performing
+  the preprocessor expansions.</p>
+ 
+  <p>Options:
+  <dl>
+    <dt><code>{backup_suffix, string()}</code></dt>
+ 
+      <dd>Specifies the file name suffix to be used when a backup file
+      is created; the default value is <code>".bak"</code>.</dd>
+ 
+    <dt><code>{backups, bool()}</code></dt>
+ 
+      <dd>If the value is <code>true</code>, existing files will be
+      renamed before new files are opened for writing. The new names
+      are formed by appending the string given by the
+      <code>backup_suffix</code> option to the original name. The
+      default value is <code>true</code>.</dd>
+ 
+    <dt><code>{dir, filename()}</code></dt>
+ 
+      <dd>Specifies the name of the directory in which the output file
+      is to be written. An empty string is interpreted as the current
+      directory. By default, the current directory is used.</dd>
+ 
+    <dt><code>{outfile, filename()}</code></dt>
+ 
+      <dd>Specifies the name of the file (without suffix) to which the
+      resulting source code is to be written. By default, this is the
+      same as the <code>Name</code> argument.</dd>
+ 
+    <dt><code>{preprocess, bool()}</code></dt>
+ 
+      <dd>If the value is <code>true</code>, preprocessing will be done
+      when reading the source code. See <code>merge_files/4</code> for
+      details.</dd>
+ 
+    <dt><code>{printer, Function}</code></dt>
+      <dd><ul>
+        <li><code>Function = (syntaxTree()) -&gt; string()</code></li>
+      </ul>
+      Specifies a function for prettyprinting Erlang syntax trees.
+      This is used for outputting the resulting module definition, as
+      well as for creating stub files. The function is assumed to
+      return formatted text for the given syntax tree, and should raise
+      an exception if an error occurs. The default formatting function
+      calls <code>erl_prettypr:format/2</code>.</dd>
+ 
+    <dt><code>{stub_dir, filename()}</code></dt>
+ 
+      <dd>Specifies the name of the directory to which any generated
+      stub module files are written. The default value is
+      <code>"stubs"</code>.</dd>
+ 
+    <dt><code>{stubs, bool()}</code></dt>
+ 
+      <dd>If the value is <code>true</code>, stub module files will be
+      automatically generated for all exported modules that do not have
+      the same name as the target module. The default value is
+      <code>true</code>.</dd>
+ 
+    <dt><code>{suffix, string()}</code></dt>
+ 
+      <dd>Specifies the suffix to be used for the output file names;
+      the default value is <code>".erl"</code>.</dd>
+  </dl>
+ 
+  See <code>merge_files/4</code> for further options.</p>
+ </p>
+<p><b>See also:</b> <a href="#merge-2">merge/2</a>, <a href="#merge_files-4">merge_files/4</a>.</p>
+
+<h3><a name="merge_files-3">merge_files/3</a></h3>
+<p><tt>merge_files(Name::atom(), Files::[<a href="#type-filename">filename()</a>], Options::[term()]) -&gt; {<a href="#type-syntaxTree">syntaxTree()</a>, [<a href="#type-stubDescriptor">stubDescriptor()</a>]}</tt></p>
+<p>Equivalent to <a href="#merge_files-4"><tt>merge_files(Name, [], Files, Options)</tt></a>.</p>
+
+
+<h3><a name="merge_files-4">merge_files/4</a></h3>
+<p><tt>merge_files(Name::atom(), Sources::[Forms], Files::[<a href="#type-filename">filename()</a>], Options::[term()]) -&gt; {<a href="#type-syntaxTree">syntaxTree()</a>, [<a href="#type-stubDescriptor">stubDescriptor()</a>]}</tt>
+<ul><li><tt>Forms = <a href="#type-syntaxTree">syntaxTree()</a> | [<a href="#type-syntaxTree">syntaxTree()</a>]</tt></li></ul></p>
+<p>Merges source code files and syntax trees to a single syntax
+  tree. This is a file-reading front end to
+  <code>merge_sources/3</code>. <code>Name</code> specifies the name of
+  the resulting module - not the name of the output file.
+  <code>Sources</code> is a list of syntax trees and/or lists of
+  "source code form" syntax trees, each entry representing a module
+  definition. <code>Files</code> is a list of file names and/or module
+  names of source modules to be read and included. All the input
+  modules must be distinctly named.
+ 
+  <p>If a name in <code>Files</code> is not the name of an existing
+  file, Igor assumes it represents a module name, and tries to locate
+  and read the corresponding source file. The parsed files are appended
+  to <code>Sources</code> and passed on to
+  <code>merge_sources/3</code>, i.e., entries in <code>Sources</code>
+  are listed before entries read from files.</p>
+ 
+  <p>If no exports are listed by an <code>export</code> option (see
+  <code>merge_sources/3</code> for details), then if <code>Name</code>
+  is also the name of one of the input modules, that module will be
+  exported; otherwise, the first listed module will be exported. Cf.
+  the examples under <code>merge/3</code>.</p>
+ 
+  <p>The result is a pair <code>{Tree, Stubs}</code>, where
+  <code>Tree</code> represents the source code that is the result of
+  merging all the code in <code>Sources</code> and <code>Files</code>,
+  and <code>Stubs</code> is a list of stub module descriptors (see
+  <code>merge_sources/3</code> for details).</p>
+ 
+  <p>Options:
+  <dl>
+    <dt><code>{comments, bool()}</code></dt>
+ 
+      <dd>If the value is <code>true</code>, source code comments in
+      the original files will be preserved in the output. The default
+      value is <code>true</code>.</dd>
+ 
+    <dt><code>{find_src_rules, [{string(), string()}]}</code></dt>
+ 
+      <dd>Specifies a list of rules for associating object files with
+      source files, to be passed to the function
+      <code>filename:find_src/2</code>. This can be used to change the
+      way Igor looks for source files. If this option is not specified,
+      the default system rules are used. The first occurrence of this
+      option completely overrides any later in the option list.</dd>
+ 
+    <dt><code>{includes, [filename()]}</code></dt>
+ 
+      <dd>Specifies a list of directory names for the Erlang
+      preprocessor, if used, to search for include files (cf. the
+      <code>preprocess</code> option). The default value is the empty
+      list. The directory of the source file and the current directory
+      are automatically appended to the list.</dd>
+ 
+    <dt><code>{macros, [{atom(), term()}]}</code></dt>
+ 
+      <dd>Specifies a list of "pre-defined" macro definitions for the
+      Erlang preprocessor, if used (cf. the <code>preprocess</code>
+      option). The default value is the empty list.</dd>
+ 
+    <dt><code>{preprocess, bool()}</code></dt>
+ 
+      <dd>If the value is <code>false</code>, Igor will read source
+      files without passing them through the Erlang preprocessor
+      (<code>epp</code>), in order to avoid expansion of preprocessor
+      directives such as <code>-include(...).</code>,
+      <code>-define(...).</code> and <code>-ifdef(...)</code>, and
+      macro calls such as <code>?LINE</code> and <code>?MY_MACRO(x,
+      y)</code>. The default value is <code>false</code>, i.e.,
+      preprocessing is not done. (See the module
+      <code>epp_dodger</code> for details.)
+ 
+      <p>Notes: If a file contains too exotic definitions or uses of
+      macros, it will not be possible to read it without preprocessing.
+      Furthermore, Igor does not currently try to sort out multiple
+      inclusions of the same file, or redefinitions of the same macro
+      name. Therefore, when preprocessing is turned off, it may become
+      necessary to edit the resulting source code, removing such
+      re-inclusions and redefinitions.</p></dd>
+  </dl>
+ 
+  See <code>merge_sources/3</code> for further options.</p>
+ </p>
+<p><b>See also:</b> <a href="epp_dodger.html">epp_dodger</a>, <a href="#merge-3">merge/3</a>, <a href="#merge_files-3">merge_files/3</a>, <a href="#merge_sources-3">merge_sources/3</a>, <a href="/usr/local/home/richardc/hipe/otp/lib/stdlib/doc/filename.html#find_src-2">filename:find_src/2</a>.</p>
+
+<h3><a name="merge_sources-3">merge_sources/3</a></h3>
+<p><tt>merge_sources(Name::atom(), Sources::[Forms], Options::[term()]) -&gt; {<a href="#type-syntaxTree">syntaxTree()</a>, [<a href="#type-stubDescriptor">stubDescriptor()</a>]}</tt>
+<ul><li><tt>Forms = <a href="#type-syntaxTree">syntaxTree()</a> | [<a href="#type-syntaxTree">syntaxTree()</a>]</tt></li></ul></p>
+<p>Merges syntax trees to a single syntax tree. This is the main
+  code merging "engine". <code>Name</code> specifies the name of the
+  resulting module. <code>Sources</code> is a list of syntax trees of
+  type <code>form_list</code> and/or lists of "source code form" syntax
+  trees, each entry representing a module definition. All the input
+  modules must be distinctly named.
+ 
+  <p>Unless otherwise specified by the options, all modules are assumed
+  to be at least "static", and all except the target module are assumed
+  to be "safe". See the <code>static</code> and <code>safe</code>
+  options for details.</p>
+ 
+  <p>If <code>Name</code> is also the name of one of the input modules,
+  the code from that module will occur at the top of the resulting
+  code, and no extra "header" comments will be added. In other words,
+  the look of that module will be preserved.</p>
+ 
+  <p>The result is a pair <code>{Tree, Stubs}</code>, where
+  <code>Tree</code> represents the source code that is the result of
+  merging all the code in <code>Sources</code>, and <code>Stubs</code>
+  is a list of stub module descriptors (see below).</p>
+ 
+  <p><code>Stubs</code> contains one entry for each exported input
+  module (cf. the <code>export</code> option), each entry describing a
+  stub module that redirects calls of functions in the original module
+  to the corresponding (possibly renamed) functions in the new module.
+  The stub descriptors can be used to automatically generate stub
+  modules; see <code>create_stubs/2</code>.</p>
+ 
+  <p>Options:
+  <dl>
+    <dt><code>{export, [atom()]}</code></dt>
+ 
+      <dd>Specifies a list of names of input modules whose interfaces
+      should be exported by the output module. A stub descriptor is
+      generated for each specified module, unless its name is
+      <code>Name</code>. If no modules are specified, then if
+      <code>Name</code> is also the name of an input module, that
+      module will be exported; otherwise the first listed module in
+      <code>Sources</code> will be exported. The default value is the
+      empty list.</dd>
+ 
+    <dt><code>{export_all, bool()}</code></dt>
+ 
+      <dd>If the value is <code>true</code>, this is equivalent to
+      listing all of the input modules in the <code>export</code>
+      option. The default value is <code>false</code>.</dd>
+ 
+  <dt><code>{file_attributes, Preserve}</code></dt>
+      <dd><ul>
+        <li><code>Preserve = yes | comment | no</code></li>
+      </ul>
+      If the value is <code>yes</code>, all file attributes
+      <code>-file(...)</code> in the input sources will be preserved in
+      the resulting code. If the value is <code>comment</code>, they
+      will be turned into comments, but remain in their original
+      positions in the code relative to the other source code forms. If
+      the value is <code>no</code>, all file attributes will be removed
+      from the code, unless they have attached comments, in which case
+      they will be handled as in the <code>comment</code> case. The
+      default value is <code>no</code>.</dd>
+ 
+  <dt><code>{no_banner, bool()}</code></dt>
+ 
+      <dd>If the value is <code>true</code>, no banner comment will be
+      added at the top of the resulting module, even if the target
+      module does not have the same name as any of the input modules.
+      Instead, Igor will try to preserve the look of the module whose
+      code is at the top of the output. The default value is
+      <code>false</code>.</dd>
+ 
+  <dt><code>{no_headers, bool()}</code></dt>
+ 
+      <dd>If the value is <code>true</code>, no header comments will be
+      added to the resulting module at the beginning of each section of
+      code that originates from a particular input module. The default
+      value is <code>false</code>, which means that section headers are
+      normally added whenever more than two or more modules are
+      merged.</dd>
+ 
+  <dt><code>{no_imports, bool()}</code></dt>
+ 
+      <dd>If the value is <code>true</code>, all
+      <code>-import(...)</code> declarations in the original code will
+      be expanded in the result; otherwise, as much as possible of the
+      original import declarations will be preserved. The default value
+      is <code>false</code>.</dd>
+ 
+  <dt><code>{notes, Notes}</code></dt>
+      <dd><ul>
+        <li><code>Notes = always | yes | no</code></li>
+      </ul>
+      If the value is <code>yes</code>, comments will be inserted where
+      important changes have been made in the code. If the value is
+      <code>always</code>, <em>all</em> changes to the code will be
+      commented. If the value is <code>no</code>, changes will be made
+      without comments. The default value is <code>yes</code>.</dd>
+ 
+  <dt><code>{redirect, [{atom(), atom()}]}</code></dt>
+ 
+      <dd>Specifies a list of pairs of module names, representing a
+      mapping from old names to new. <em>The set of old names may not
+      include any of the names of the input modules.</em> All calls to
+      the listed old modules will be rewritten to refer to the
+      corresponding new modules. <em>The redirected calls will not be
+      further processed, even if the new destination is in one of the
+      input modules.</em> This option mainly exists to support module
+      renaming; cf. <code>rename/3</code>. The default value is the
+      empty list.</dd>
+ 
+  <dt><code>{safe, [atom()]}</code></dt>
+ 
+      <dd>Specifies a list of names of input modules such that calls to
+      these "safe" modules may be turned into direct local calls, that
+      do not test for code replacement. Typically, this can be done for
+      e.g. standard library modules. If a module is "safe", it is per
+      definition also "static" (cf. below). The list may be empty. By
+      default, all involved modules <em>except the target module</em>
+      are considered "safe".</dd>
+ 
+  <dt><code>{static, [atom()]}</code></dt>
+ 
+      <dd>Specifies a list of names of input modules which will be
+      assumed never to be replaced (reloaded) unless the target module
+      is also first replaced. The list may be empty. The target module
+      itself (which may also be one of the input modules) is always
+      regarded as "static", regardless of the value of this option. By
+      default, all involved modules are assumed to be static.</dd>
+ 
+  <dt><code>{tidy, bool()}</code></dt>
+ 
+      <dd>If the value is <code>true</code>, the resulting code will be
+      processed using the <code>erl_tidy</code> module, which removes
+      unused functions and does general code cleanup. (See
+      <code>erl_tidy:module/2</code> for additional options.) The
+      default value is <code>true</code>.</dd>
+ 
+  <dt><code>{verbose, bool()}</code></dt>
+ 
+      <dd>If the value is <code>true</code>, progress messages will be
+      output while the program is running; the default value is
+      <code>false</code>.</dd>
+  </dl></p>
+ 
+  <p>Note: The distinction between "static" and "safe" modules is
+  necessary in order not to break the semantics of dynamic code
+  replacement. A "static" source module will not be replaced unless the
+  target module also is. Now imagine a state machine implemented by
+  placing the code for each state in a separate module, and suppose
+  that we want to merge this into a single target module, marking all
+  source modules as static. At each point in the original code where a
+  call is made from one of the modules to another (i.e., the state
+  transitions), code replacement is expected to be detected. Then, if
+  we in the merged code do not check at these points if the
+  <em>target</em> module (the result of the merge) has been replaced,
+  we can not be sure in general that we will be able to do code
+  replacement of the merged state machine - it could run forever
+  without detecting the code change. Therefore, all such calls must
+  remain remote-calls (detecting code changes), but may call the target
+  module directly.</p>
+ 
+  <p>If we are sure that this kind of situation cannot ensue, we may
+  specify the involved modules as "safe", and all calls between them
+  will become local. Note that if the target module itself is specified
+  as safe, "remote" calls to itself will be turned into local calls.
+  This would destroy the code replacement properties of e.g. a typical
+  server loop.</p>
+ </p>
+<p><b>See also:</b> <a href="#create_stubs-2">create_stubs/2</a>, <a href="#rename-3">rename/3</a>, <a href="erl_tidy.html#module-2">erl_tidy:module/2</a>.</p>
+
+<h3><a name="parse_transform-2">parse_transform/2</a></h3>
+<p><tt>parse_transform(Forms::[<a href="#type-syntaxTree">syntaxTree()</a>], Options::[term()]) -&gt; [<a href="#type-syntaxTree">syntaxTree()</a>]</tt>
+<ul><li><tt><a name="type-syntaxTree">syntaxTree()</a> = <a href="erl_syntax.html#type-syntaxTree">erl_syntax:syntaxTree()</a></tt></li></ul></p>
+<p>Allows Igor to work as a component of the Erlang compiler.
+  Including the term <code>{parse_transform, igor}</code> in the
+  compile options when compiling an Erlang module (cf.
+  <code>compile:file/2</code>), will call upon Igor to process the
+  source code, allowing automatic inclusion of other source files. No
+  files are created or overwritten when this function is used.
+ 
+  <p>Igor will look for terms <code>{igor, List}</code> in the compile
+  options, where <code>List</code> is a list of Igor-specific options,
+  as follows:
+  <dl>
+   <dt><code>{files, [filename()]}</code></dt>
+     <dd>The value specifies a list of source files to be merged with
+     the file being compiled; cf. <code>merge_files/4</code>.</dd>
+  </dl>
+ 
+  See <code>merge_files/4</code> for further options. Note, however,
+  that some options are preset by this function and cannot be
+  overridden by the user; in particular, all cosmetic features are
+  turned off, for efficiency. Preprocessing is turned on.</p>
+ </p>
+<p><b>See also:</b> <a href="#merge_files-4">merge_files/4</a>, <a href="/usr/local/home/richardc/hipe/otp/lib/compiler/doc/compile.html#file-2">compile:file/2</a>.</p>
+
+<h3><a name="rename-2">rename/2</a></h3>
+<p><tt>rename(Files::[<a href="#type-filename">filename()</a>], Renamings) -&gt; [string()]</tt></p>
+<p>Equivalent to <a href="#rename-3"><tt>rename(Files, Renamings, [])</tt></a>.</p>
+
+
+<h3><a name="rename-3">rename/3</a></h3>
+<p><tt>rename(Files::[<a href="#type-filename">filename()</a>], Renamings, Options::[term()]) -&gt; [string()]</tt>
+<ul><li><tt>Renamings = [{atom(), atom()}]</tt></li></ul></p>
+<p>Renames a set of possibly interdependent source code modules.
+  <code>Files</code> is a list of file names of source modules to be
+  processed. <code>Renamings</code> is a list of pairs of <em>module
+  names</em>, representing a mapping from old names to new. The
+  returned value is the list of output file names.
+ 
+  <p>Each file in the list will be read and processed separately. For
+  every file, each reference to some module M, such that there is an
+  entry <code>{<em>M</em>, <em>M1</em>}</code> in
+  <code>Renamings</code>, will be changed to the corresponding M1.
+  Furthermore, if a file F defines module M, and there is an entry
+  <code>{<em>M</em>, <em>M1</em>}</code> in <code>Renamings</code>, a
+  new file named <code><em>M1</em>.erl</code> will be created in the
+  same directory as F, containing the source code for module M, renamed
+  to M1. If M does not have an entry in <code>Renamings</code>, the
+  module is not renamed, only updated, and the resulting source code is
+  written to <code><em>M</em>.erl</code> (typically, this overwrites
+  the original file). The <code>suffix</code> option (see below) can be
+  used to change the default "<code>.erl</code>" suffix for the
+  generated files.</p>
+ 
+  <p>Stub modules will automatically be created (see the
+  <code>stubs</code> and <code>stub_dir</code> options below) for each
+  module that is renamed. These can be used to redirect any calls still
+  using the old module names. The stub files are created in the same
+  directory as the source file (typically overwriting the original
+  file).</p>
+ 
+  <p>Options:
+  <dl>
+    <dt><code>{backup_suffix, string()}</code></dt>
+    <dt><code>{backups, bool()}</code></dt>
+    <dt><code>{printer, Function}</code></dt>
+    <dt><code>{stubs, bool()}</code></dt>
+    <dt><code>{suffix, string()}</code></dt>
+  </dl>
+  See <code>merge/3</code> for details on these options.</p>
+ 
+  <p><dl>
+    <dt><code>{comments, bool()}</code></dt>
+    <dt><code>{preprocess, bool()}</code></dt>
+  </dl>
+  See <code>merge_files/4</code> for details on these options.</p>
+ 
+  <p><dl>
+    <dt><code>{no_banner, bool()}</code></dt>
+  </dl>
+  For the <code>rename</code> function, this option is
+  <code>true</code> by default. See <code>merge_sources/3</code> for
+  details.</p>
+ 
+  <p><dl>
+    <dt><code>{tidy, bool()}</code></dt>
+  </dl>
+  For the <code>rename</code> function, this option is
+  <code>false</code> by default. See <code>merge_sources/3</code> for
+  details.</p>
+ 
+  <p><dl>
+    <dt><code>{no_headers, bool()}</code></dt>
+    <dt><code>{stub_dir, filename()}</code></dt>
+  </dl>
+  These options are preset by the <code>rename</code> function and
+  cannot be overridden by the user.</p>
+ 
+  <p>See <code>merge_sources/3</code> for further options.</p>
+ </p>
+<p><b>See also:</b> <a href="#merge-3">merge/3</a>, <a href="#merge_files-4">merge_files/4</a>, <a href="#merge_sources-3">merge_sources/3</a>.</p>
+</body>
+</html>

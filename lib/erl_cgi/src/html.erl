@@ -39,6 +39,9 @@ block()  -> fun(T) -> is_block(T) end.
 is_fontstyle(tt)     -> true;
 is_fontstyle(i)      -> true;
 is_fontstyle(b)      -> true;
+is_fontstyle(u)      -> true;
+is_fontstyle(s)      -> true;
+is_fontstyle(strike) -> true;
 is_fontstyle(big)    -> true;
 is_fontstyle(small)  -> true;
 is_fontstyle(erl)    -> true; %% EXTENSION
@@ -363,7 +366,7 @@ value(Name) ->
         "lt" -> 60;
 	"gt" -> 62;
         "amp" -> 38;
-        "quot" -> $\";
+        "quot" -> $";
         "nbsp" -> 160;
         "iexcl" -> 161;
         "cent" -> 162;

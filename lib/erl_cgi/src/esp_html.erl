@@ -7,7 +7,7 @@
 
 -export([format/1, format/2]).
 -export([to_value/1]).
--export([pcdata/2]).
+-export([pcdata/2, pcdata/1]).
 -import(lists, [map/2, reverse/1,member/2]).
 
 %% -define(debug,true).
@@ -34,7 +34,9 @@
 	"<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0 Frameset//EN\">").
 
 format({document,Cs}) ->
-    format({document, Cs}, #state { fmt = fun format_fun/4 }).
+    format({document, Cs}, #state { fmt = fun format_fun/4 });
+format({flow,Cs}) ->
+    format({flow, Cs}, #state { fmt = fun format_fun/4 }).
 
 format({document, Cs}, St) ->
     case Cs of
@@ -45,7 +47,11 @@ format({document, Cs}, St) ->
 	Cs ->
 	    [?HTML_4_0 ++ "$\n",
 	     repeat(fun(T) -> html:is_flow(T) end, Cs, [body,html],St)]
-    end.
+    end;
+format({flow, Cs}, St) ->
+    repeat(fun(T) -> html:is_flow(T) end, Cs, [body,html],St).
+    
+
 
 
 fmt(St,Tag,As,Body,Ps) ->
@@ -574,24 +580,55 @@ require(Tag,Ts,Ps,St) ->
 %%
 %% Emit HTML from 8-bit  iso-8859-1
 %%
-pcdata(Cs, Pre) ->
-    pcdata(Cs, html:chars(),Pre).
+pcdata(Cs, _) ->
+    pcdata(Cs).
 
-pcdata([C|Cs], TV, Pre) when integer(C) ->
-    if 
-%%Pre == false -> [element(C+1, TV) | pcdata(Cs,TV,Pre)];
-       C == $\n -> [C | pcdata(Cs,TV,Pre)];
-       C == $\r -> [C | pcdata(Cs,TV,Pre)];
-       C == $\t -> [C | pcdata(Cs,TV,Pre)];
-       C == $\s -> [C | pcdata(Cs,TV,Pre)];
-       true -> [element(C+1, TV) | pcdata(Cs,TV,Pre)]
+pcdata(Cs) ->
+    pcdata1(Cs, html:chars()).    
+
+pcdata1([C|Cs], TV) when integer(C) ->
+    if
+	C == $\n -> [C | pcdata1(Cs,TV)];
+	C == $\r -> [C | pcdata1(Cs,TV)];
+	C == $\t -> [C | pcdata1(Cs,TV)];
+	C == $\s -> [C | pcdata1(Cs,TV)];
+	C > 255  -> [amp(C) | pcdata1(Cs,TV)];
+	C < 0 -> pcdata1(Cs,TV);
+	true -> [element(C+1, TV) | pcdata1(Cs,TV)]
     end;
-pcdata([C|Cs], TV, Pre) when binary(C) ->
-    [ pcdata(binary_to_list(C),TV,Pre) | pcdata(Cs,TV,Pre)];
-pcdata([Cs1|Cs2], TV,Pre) when list(Cs1) ->
-    [pcdata(Cs1,TV,Pre) | pcdata(Cs2,TV,Pre)];
-pcdata([], _, _) ->
+pcdata1([C|Cs], TV) when binary(C) ->
+    [ pcdata1(binary_to_list(C),TV) | pcdata1(Cs,TV)];
+pcdata1([Cs1|Cs2], TV) when list(Cs1) ->
+    [pcdata1(Cs1,TV) | pcdata1(Cs2,TV)];
+pcdata1([], _) ->
     [].
+
+amp(N) when N =< 16#ff     ->  "&#"++hex8(N)++";";
+amp(N) when N =< 16#ffff   ->  "&#"++hex16(N)++";";
+amp(N) when N =< 16#ffffff ->  "&#"++hex24(N)++";";
+amp(N) -> "&#"++hex32(N)++";".
+
+hex16(N) ->
+    hex8((N bsr 8) band 16#ff) ++ hex8(N band 16#ff).
+
+hex24(N) ->
+    hex8((N bsr 16) band 16#ff) ++ 
+	hex8((N bsr 8) band 16#ff) ++ 
+	hex8(N band 16#ff).
+
+hex32(N) ->
+    hex8((N bsr 24) band 16#ff) ++ 
+    hex8((N bsr 16) band 16#ff) ++ 
+    hex8((N bsr 8) band 16#ff) ++ 
+    hex8(N band 16#ff).
+
+
+hex8(N) ->
+    hex4((N bsr 4) band 16#f)++hex4(N band 16#f).
+
+hex4(N) when N < 10 -> [N+$0];
+hex4(N) -> [(N-10)+$A].
+    
 
 
 extract_attr(K, Default, As) ->

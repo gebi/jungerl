@@ -48,6 +48,7 @@
 
 -export([start/0, loop/2]).
 -export([subscribe/1, unsubscribe/1]).
+-export([subscribe/2, unsubscribe/2]).
 
 %% @spec start() -> {ok, pid()} | {error, Reason}
 %% @doc Starts a broadcasting service.
@@ -88,10 +89,13 @@ loop(Parent, Subscribers) ->
   end.
 
 %% @spec subscribe(Broadcaster::pid()) -> ok | {error, Reason}
-%% @doc Subscribes to a broadcasting service.
+%% @equiv subscribe(Broadcaster, self())
 
 subscribe(Broadcaster) ->
   subscribe(Broadcaster, self()).
+
+%% @spec subscribe(Broadcaster::pid(), Subscriber::pid()) -> ok | {error, Reason}
+%% @doc Subscribes to a broadcasting service.
   
 subscribe(Broadcaster, Pid) ->
   Broadcaster ! {?MODULE, {subscribe, Pid}},
@@ -101,10 +105,13 @@ subscribe(Broadcaster, Pid) ->
   end.
 
 %% @spec unsubscribe(Broadcaster::pid()) -> ok | {error, Reason}
-%% @doc Cancels subscription to a broadcasting service.
+%% @equiv unsubscribe(Broadcaster, self())
 
 unsubscribe(Broadcaster) ->
   unsubscribe(Broadcaster, self()).
+
+%% @spec unsubscribe(Broadcaster::pid(), Unsubscriber::pid()) -> ok | {error, Reason}
+%% @doc Cancels subscription to a broadcasting service.
   
 unsubscribe(Broadcaster, Pid) ->
   Broadcaster ! {?MODULE, {unsubscribe, Pid}},

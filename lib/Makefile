@@ -17,6 +17,7 @@ LIBS := \
         pan \
         pico \
 	posix_drv \
+	proc_reg \
 	quickcheck \
 	rdbms \
 	rpc \

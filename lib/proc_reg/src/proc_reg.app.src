@@ -1,0 +1,5 @@
+[
+ {description, "Local process registration facility"},
+ {mod, {proc_reg_sup, []}}
+].
+

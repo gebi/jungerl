@@ -1,0 +1,91 @@
+proc_reg - a generic process registration facility
+--------------------------------------------------
+
+Author: Ulf Wiger <ulf.wiger@ericsson.com>
+Date  : 2004-07-08
+Requires : OTP R9C-2 or later (requires the ets:insert_new/2 function)
+
+
+This application supports local registration of processes using any erlang
+term. Furthermore, each process can register by several different
+names at the same time.
+
+The application must be started for the registration functions to
+work. Two permanent processes are created: a registry administration
+process (proc_reg), and a table owner process. The proc_reg process is
+designed to be fault-tolerant, and is able to restart without losing
+track of registered processes. If the table owner process dies, the
+application is terminated and, if the application were started as
+'permanent', so is the node. This is the recommended setup.
+The registration functions will stop working if the tables are not
+present.
+
+
+Functions:
+----------
+reg(Name, Pid) -> true | exit(badarg)
+unreg(Name) -> true | exit(badarg)
+where(Name) -> pid() | undefined
+send(Name, Msg) -> Msg | exit(badarg)
+
+Semantics:
+----------
+The functions have been designed to have the same semantics as the
+built-in registration functions as far as possible (except for
+allowing arbitrary terms and multiple registrations per process.)
+For example, the following function is guaranteed to return
+'undefined':
+
+serialized(Name, Pid) ->
+   true = proc_reg:reg(Name, Pid),
+   exit(Pid, foo),
+   proc_reg:where(Name).
+
+That is, the application is written to honour the 'Principle of Least
+Astonishment', without sacrificing performance. The overhead should be
+very small, and reg/unreg/where/send do not cause and synchronous
+calls to the proc_reg process, EXCEPT IN ONE CASE:
+
+If a name has been registered, the process dies, and another process
+immediately thereafter tries to register the same name, it could
+happen that the proc_reg process has not yet been informed that the
+first process died. In this case, the re-registration will first fail,
+then the reg/2 function will notice that the name is registered to a
+non-existing process, and make a synchronous call to the proc_reg
+process (which runs on high priority), telling it to immediately audit
+the dead process; then, the reg/2 function will try the registration
+once more. It is not impossible, but highly unlikely, that the
+registration attempt will fail even the second time, but this is then
+due to a race condition with another process, and not the fault of
+proc_reg.
+
+BTW, Pid must be local, just like with the built-in functions.
+
+Test suite:
+-----------
+In proc_reg/test/ there is a test suite, designed to work with the OTP
+test server. Please note that there is a hard-coded path in the
+*_SUITE.erl modules (in init_per_testcase/2.) This must be changed
+before the test suites can be run. Wiewing the source code in the test
+suite should give some detailed insight into the exact semantics of
+proc_reg.
+
+Builder:
+--------
+The proc_reg application was designed to work with 'builder'.
+Cd to the proc_reg/ directory, start an erlang node with 'builder' in
+the path, and type builder:go(), and you should get a working start
+script in priv/ (works well in UNIX, YMMV on Win32). This start script
+will start an erlang node with kernel, stdlib, sasl, and proc_reg all
+running - quite handy for performing simple tests.
+
+Future work:
+------------
+- Write edoc-based documentation
+- Add utility functions, like registered_names()
+- Measure performance (should be excellent)
+- Make the test suites relocatable.
+
+Please send comments and improvement suggestions.
+
+Ulf Wiger

@@ -27,13 +27,13 @@ alas, it is not a product, so your mileage will vary.
 
 <hr>
 <h2>basic</h2>
-pan should be run from an erlang node (the host). the host must be able to
-attach itself to the distributed erlang network that is the
-AXD301. when started, it will load itself on a number of the AXD301
-nodes (the target(s)), and start a tracing process. the target process
-will generate a number of data files containing information about the
+pan should be run from an erlang node (the host). the host must be
+able to attach itself to the target, but should be hidden (<code>erl
+-hidden</code>).  when pan is started, it will load itself on the
+target(s), and start a tracing process.  the target process will
+generate a data file containing information about the
 operating system and the erlang emulator, as well as about the erlang
-processes and the erlang data tables. when the target process(es) are
+processes and the erlang tables. when the target process(es) are
 terminated the data files will be moved to the host.
 <p>
   the data files are stored in a file tree that uses the name of the
@@ -43,17 +43,18 @@ names. they can be analyzed in different fashions.
 <hr>
 <h2>data taking</h2>
 <h3>pan:start/stop</h3>
-<code>pan:start(Tc,CPs,Procs,Flags,Matches).</code>
+<code>pan:start(Tc,Nodes,Procs,Flags,MatchSpecs).</code>
 <p>
 <code>pan:stop()</code>
 <p>
-  see the <a href="pan.html">reference</a> for a detailed description of the
-parameters. briefly; <code>Tc</code> (test case) is a tag used to label the
-data files, <code>CPs</code> is a list of CPs to run on, <code>Procs</code> is
-a list of processes to trace on, <code>Flags</code> is a list of tracing flags
-and Matches is a list of match specifications (see erlang tracing 
-<a href="erlang_trace.html">doc</a>). (if the parameters are not given as lists
-they will be treated as lists of length 1).
+  see the <a href="pan.html">reference</a> for a detailed description
+of the parameters. briefly; <code>Tc</code> (test case) is a tag used
+to label the data files, <code>Nodes</code> is a list of target nodes
+to run on, <code>Procs</code> is a list of processes to trace on,
+<code>Flags</code> is a list of tracing flags and Matches is a list of
+match specifications (see erlang tracing <a href="erlang_trace.html">doc</a>).
+(if the parameters are not given as lists they will be treated as
+lists of length 1).
 <p>
 <code>Tc</code> can be the special atom <code>ip</code>, which means that the
 tracing info will display on the host terminal instead of being sent to file.
@@ -144,7 +145,8 @@ all; N = 29, 1127459 us 1127459 us/proc (100.0000)
   sbm.........................................................     1.0     6.1
 </pre>
 
-<code>pan:prof/2</code> shows the cpu usage per function for a process (in this case plcMemory).
+<code>pan:prof/2</code> shows the cpu usage per function for a process
+(in this case plcMemory).
 <pre>
 > pan:prof("/tmp/pan/tst",plcMemory).
 plcMemory; N = 1, 192779 us 192779 us/proc (100.000)
@@ -216,17 +218,13 @@ application <code>dbg</code>.
 the <a href="pan.html">reference</a>
 <hr>
 <h3>installation</h3>
-a recent version of the tool should be here;<br>
-<code>http://avweb.etxb.ericsson.se/~etxmacr/export/pan/pan-*.tgz</code><br>
-unpack like this (gtar is the GNU tar):<br>
-<code>cd &lt;some-dir&gt; ; gtar -xzvf &lt;tgz-file&gt;</code><br>
-this will create the dir <code>&lt;some-dir&gt;/&lt;version&gt;</code><br>
-run this;<br>
-<code>&lt;some-dir&gt;/&lt;version&gt;/pan</code><br>
-this will start up a correctly configured erlang shell
+available via anonymous cvs from www.sourceforge.net/projects/jungerl
+(cvsroot pserver:anonymous@cvs.sourceforge.net:/cvsroot/jungerl)
+or the sourceforge tarballs
+http://cvs.sourceforge.net/cvstarballs/jungerl-cvsroot.tar.gz
 <hr>
 <address>mats.cronqvist@ericsson.com</address>
 <!-- hhmts start -->
-Last modified: Wed Aug 14 11:31:20 MET DST 2002
+Last modified: Fri Mar  7 15:02:15 MET 2003
 <!-- hhmts end -->
 </body> </html>

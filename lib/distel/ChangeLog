@@ -1,3 +1,11 @@
+2005-03-25  Mats Cronqvist  <mats.cronqvist@ericsson.com>
+
+	* elisp/derl.el (derl-int32-to-decimal): Rewrote the test for
+	enough precision in floating-point. the test is pretty lame, even
+	if it succeeds we cannot be sure it'll work for all int32's.
+	alas, i'm too ignorant to write a good test. the previous version
+	of the test was nicer, but FSFmacs-specific :<
+
 2005-02-20  Luke Gorrie  <luke@synap.se>
 
 	* doc/distel.texi (Conventions): Added a note that you need to

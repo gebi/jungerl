@@ -15,6 +15,7 @@ LIBS := \
         pico \
 	posix_drv \
 	rpc \
+	spread_drv \
         syntax_tools \
 	tuntap \
         wiki \

@@ -104,7 +104,9 @@ AC_SUBST(SOCKET_LIBS)
 dnl
 dnl The "gd1_drv" driver for libgd 1.8.4 requires the following:
 dnl	libgd version 1 (as a shared library!), libpng, libjpeg, libXpm
-dnl If you have all of those things, then 
+dnl If you have all of those things, then create the file
+dnl ../support/GDConfig.mk (according to the instructions in
+dnl ../jungerl/lib/gd1_drv/README) and re-run "make" at the top level.
 dnl
 
 AC_MSG_CHECKING([whether to build gd1_drv driver])
@@ -116,6 +118,21 @@ else
   AC_MSG_RESULT([no, see CVSROOT/jungerl/lib/gd1_drv/README for instructions])
 fi
 
+dnl
+dnl The "spread_drv" driver for the Spread reliable multicast toolkit
+dnl is known to work with version 3.17.0 of Spread.
+dnl 
+
+AC_MSG_CHECKING([whether to build spread_drv driver])
+if test -f ../support/SpreadConfig.mk ; then
+  rm -f ../lib/spread_drv/SKIP
+  AC_MSG_RESULT([yes])
+else
+  echo "Missing CVSROOT/jungerl/support/SpreadConfig.mk file" > ../lib/spread_drv/SKIP
+  AC_MSG_RESULT([no, see CVSROOT/jungerl/lib/spread_drv/README for instructions])
+fi
+
+dnl
 dnl End.
 
 AC_OUTPUT(../support/include.mk ../bin/jerl)

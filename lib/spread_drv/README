@@ -1,0 +1,34 @@
+
+spread_drv
+==========
+
+This driver is for Spread, a reliable multicast library.  According to the
+Spread documentation:
+
+    "Spread is a toolkit that provides a high performance messaging service
+    that is resilient to faults across external or internal networks. Spread
+    functions as a unified message bus for distributed applications, and
+    provides highly tuned application-level multicast and group communication
+    support. Spread services range from reliable message passing to fully
+    ordered messages with delivery guarantees, even in case of computer
+    failures and network partitions."
+
+See http://www.spread.org/ for source distribution for Spread, which
+is a prerequisite for attempting to build this driver.
+
+Once you've compiled and installed libtspread.so and the Spread
+header files (sp.h, ...), you'll *must* follow the instructions
+found in the file SpreadConfig.mk.sample.
+
+Once everything is compiled cleanly, and you've taken care of the
+prerequisites mentioned in the "UserGuide.txt" file (in this directory),
+run the regression test:
+
+     % cd CVSROOT/jungerl/lib/spread_drv/test
+     % make test
+
+You should see the message "All regression tests PASSED."
+
+If you have problems compiling or using this driver, please email me
+at slfritchie at snookles dot com.
+

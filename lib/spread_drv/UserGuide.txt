@@ -1,0 +1,186 @@
+
+Sorry, this isn't much of a user guide, but hopefully it's better than
+nothing.
+
+
+Prerequisites
+=============
+
+* I strongly recommend that your Erlang virtual machine executable,
+  "beam", has been compiled with threads support.  The Spread driver
+  attempts to utilize a pool of worker threads, if they are available,
+  to avoid blocking the entire virtual machine.  Without additional
+  worker threads, all other Erlang processes may be frozen when
+  calling certain Spread driver functions.
+
+  If you see the string "threads" when you run "erl":
+
+    % erl
+    Erlang (BEAM) emulator version 5.2.3.3 [source] [threads:0]
+    
+    Eshell V5.2.3.3  (abort with ^G)
+    1> 
+
+  ... then your "beam" executable supports threads.  If you don't see
+  "threads" in the banner line, then you should re-run "configure" and
+  then re-compile and re-install.
+
+  At the top level directory of the Erlang OTP source distribution,
+  include the flag "--enable-threads" on the "configure" command
+  line.  For example:
+
+    % ./configure --prefix=/usr/local --enable-threads
+
+* In order to take advantage of the threads, you'll need to include
+  the flag "+Ax" on the "erl" command line.  Replace "x" with a number
+  greater than zero.  For example, to create a pool of 8 worker
+  threads:
+
+    % erl +A8
+    Erlang (BEAM) emulator version 5.2.3.3 [source] [threads:8]
+    
+    Eshell V5.2.3.3  (abort with ^G)
+    1> 
+
+* You must have the Spread library compiled and installed on your
+  system.  This driver is known to work with version 3.17.0 of Spread.
+
+  If you are building this driver as part of the EDTK source
+  distribtion, edit the Makefile for the paths to the "sp.h" C header
+  file and the libtspread.so shared library file.  If you're building
+  it as part of the Jungerl source collection, see the "README" file
+  in this directory for compilation instructions.
+
+* You must have at least one machine running a properly-configured
+  Spread daemon.  See the Spread documentation for creating a suitable
+  "spread.conf" configuration file for your environment and for
+  starting the daemon.
+
+  The "spuser" tool, included with the Spread source distribution, can
+  be very helpful in debugging Spread daemon configuration problems.
+  If you can run "spuser" on two different machines (with two properly
+  configured Spread daemons), or on a single machine (with a single
+  properly configured Spread daemon), then "j foo" to join the group
+  "foo", and you see the results, you've got the daemons properly
+  configured.
+
+* You ought know how the Spread API works.  It will be very useful to
+  know the basics of the C version or the Java version.  The Spread
+  User Guide is probably the best place to look; it can be found at
+  http://www.spread.org/docs/docspread.html
+
+
+What source files do what?
+==========================
+
+spread.erl
+
+	This is a high-level interface to the Spread driver.  The
+	operations is provides are:
+
+	- start_link: Start a spread intermediary process.  It's
+	  possible to have several running inside the same virtual
+	  machine, but it's probably better to share a single one.
+	  Unless you have a specific reason for wanting multiple ones:
+	  each intermediary process will open a spread_drv driver
+	  port, which in turn issue a single connection to a Spread
+	  daemon.
+
+	- stop: Stop the spread intermediary process.
+
+	- subscribe: Subscribe to messages sent to a particular Spread
+	  group.  You have the option of asking for messages that
+	  reflect changes in membership of the group.
+
+	  NOTE: Not all data that is present in the raw Spread
+	  membership event message (e.g., the Spread group ID number,
+	  the reason for the membership change, who was added/removed)
+	  is available in the current Erlang implementation.  Adding
+	  those things would be straightforward, but it isn't clear if
+	  anyone/anything needs them right now.
+
+	- unsubscribe: Cancel a previous subscription.
+
+	- multicast: Send a message to a Spread group.  You are not
+          required to subscribe to the group first.  However, if you
+          are subscribed to the group, then you will receive a copy of
+          the message.
+
+	- mg_multicast: Send a message to several Spread groups
+          simultaneously.
+
+	Once subscribed to a Spread group, your mailbox will receive
+	one or two types messages from the Spread intermediary:
+
+	- {spread, Pid, membership, Group, Members}
+
+	  This message notifies you that the membership of group Group
+	  has changed to the list of Members.
+
+	- {spread, Pid, msg, Group, Type, Sender, MessType, Mess}
+
+	  This message contains a message Mess from group Group.
+	  Type, Sender, MessType, and Mess all correspond closely to
+	  the Spread C API.  The only difference is that Type is not
+	  the C API's "service_type" bitmask but rather one of the
+	  following atoms:
+
+	    unreliable_mess, reliable_mess, fifo_mess, causal_mess,
+	    agreed_mess, safe_mess
+
+spread_drv.erl
+
+	This file is automatically generated by the Erlang Driver
+	Toolkit (EDTK).  See http://www.snookles.com/erlang/edtk/ for
+	the EDTK source code distribution, if you're curious.
+
+	There is a (almost) one-to-one correspondance between
+	functions found in this file and the functions of the Spread C
+	API as well as a nearly one-to-one mapping of the arguments
+	between the Erlang functions and the C API's function
+	arguments.  See the file "spread_drv.hrl" for constants and
+	other magic numbers that are used by the driver.
+
+spread_floodrec.erl
+
+	A simple application using the interface found in spread.erl.
+	It acts as a passive collector of Spread messages, printing a
+	short message each time that 1,000 messages have been
+	received.
+
+	Run the following on machine A:
+
+	% erl +A5
+	Erlang (BEAM) emulator version 5.2.3.3 [source] [threads:5]
+	
+	Eshell V5.2.3.3  (abort with ^G)
+	1> {ok, Pid} = spread_floodrec:start_link("flooder").
+	{ok,<0.32.0>}
+	Msg count = 1000
+	Msg count = 2000
+	Msg count = 3000
+	Msg count = 4000
+	Msg count = 5000
+	2> 
+
+	Run the following on machine B.  If you only have Spread set
+	up on a single machine, run this on machine B ... it's just a
+	bit less impressive that way.
+
+	% spflooder -m 5000 -b 4
+	flooder: connecting to 4803@localhost
+	flooder: starting  multicast of 5000 messages, 4 bytes each.
+	flooder: completed   1000 messages of 4 bytes
+	flooder: completed   2000 messages of 4 bytes
+	flooder: completed   3000 messages of 4 bytes
+	flooder: completed   4000 messages of 4 bytes
+	flooder: completed   5000 messages of 4 bytes
+	flooder: completed multicast of 5000 messages, 4 bytes each.
+
+spread_test.erl
+
+	This is a set of extremely thin regression tests for the
+	spread_drv driver.  I think of them as "smoke tests": give it
+	a try, and see if smoke comes out.  The best way to run these
+	tests is to use the command "make test" or "make regression".
+

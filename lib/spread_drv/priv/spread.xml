@@ -1,0 +1,364 @@
+<erldriver name="spread_drv" abbrev="" default_async_calls="1"
+           default_debug_verbose="0">
+
+<summary>Spread toolkit version 3.17.0 driver</summary>
+
+<cpy>Copyright (c) 2002, Scott Lystig Fritchie.  All rights reserved.</cpy>
+<cpy>See the file "LICENSE" at the top of the source distribution for</cpy>
+<cpy>full license terms.</cpy>
+
+<erl_drv_entry name="ready_input" cname="my_ready_input"/>
+
+<stash size="4"/>
+
+<const name="MAX_MULTIGROUPS" value="64"
+       comment="Max number of groups in a multi-group multicast message"/>
+<const name="MAX_MSGLEN" value="(99*1024)"
+       comment="Max length of a multicast message"/>
+
+<verbatim place="top_cpp_stuff">
+#include &lt;stdio.h>
+#include &lt;string.h>
+
+#include &lt;sp.h>
+#include &lt;spread_drv.h>
+#include &lt;my-spread.h>
+</verbatim>
+
+<verbatim place="descriptor_members">
+	int	mbox_init_p;	/* Flag: mailbox is initialized */
+	mailbox	mbox;
+	char	private_group[MAX_GROUP_NAME];
+	char	sender[MAX_GROUP_NAME];
+	int	active_p;	/* Flag: "active" behavior enabled */
+</verbatim>
+
+<verbatim place="end-driver-stop">
+	if (desc->active_p) {
+		driver_select(desc->port, (ErlDrvEvent) desc->mbox, DO_READ, 0);
+	}
+	if (desc->mbox_init_p) {
+		edtk_debug("%s: port stop: calling SP_disconnect", __FUNCTION__);
+		SP_disconnect(desc->mbox);
+		edtk_debug("%s: port stop: SP_disconnect done", __FUNCTION__);
+		desc->mbox_init_p = 0;
+	}
+</verbatim>
+
+<func name="sp_connect" cname="SP_connect">
+ <arg name="spread_name" ctype="char *" ser_type="binary" nulterm="1"/>
+ <arg name="private_name" ctype="char *" ser_type="binary" nulterm="1"/>
+ <arg name="priority" ctype="int"/>
+ <arg name="group_membership" ctype="int"/>
+ <arg name="mbox_ptr" ctype="mailbox *" noerlcall="1"/>
+ <arg name="private_group" ctype="char *" noerlcall="1"/>
+ <return ctype="int" name="ret_int" expect="== ACCEPT_SESSION"
+         xreturn="xret_connect"/>
+ <hack type="verbatim" place="post-deserialize">
+	if (desc->mbox_init_p) {
+		edtk_debug("%s: sp_connect: already connected", __FUNCTION__);
+		reply_error(desc, ILLEGAL_SESSION);
+		return;
+	}
+	if (strlen(c->i.private_name) == 0) {
+		c->i.private_name = NULL;
+	}
+	c->i.mbox_ptr = &desc->mbox;
+	c->i.private_group = &desc->private_group[0];
+ </hack>
+ <hack type="verbatim" place="ready_async-pre-reply">
+	if (c->o.ret_int == ACCEPT_SESSION) {
+		desc->mbox_init_p = 1;
+	}
+ </hack>
+</func>
+
+<func name="sp_disconnect" cname="SP_disconnect">
+ <arg name="mbox" ctype="mailbox" noerlcall="1"/>
+ <return ctype="int" name="ret_int" expect="== 0" expect_errval="c->o.ret_int"/>
+ <hack type="verbatim" place="post-deserialize">
+	c->i.mbox = desc->mbox;
+ </hack>
+ <hack type="verbatim" place="ready_async-pre-reply">
+	if (c->o.ret_int == 0) {
+		desc->mbox_init_p = 0;
+	}
+ </hack>
+</func>
+
+<func name="sp_join" cname="SP_join">
+ <arg name="mbox" ctype="mailbox" noerlcall="1"/>
+ <arg name="group" ctype="char *" ser_type="binary" nulterm="1"/>
+ <return ctype="int" name="ret_int" expect="== 0"/>
+ <hack type="verbatim" place="post-deserialize">
+	if (! desc->mbox_init_p) {
+		edtk_debug("%s: sp_connect: not connected", __FUNCTION__);
+		reply_error(desc, ILLEGAL_SESSION);
+		return;
+	}
+	c->i.mbox = desc->mbox;
+ </hack>
+</func>
+
+<func name="sp_leave" cname="SP_leave">
+ <arg name="mbox" ctype="mailbox" noerlcall="1"/>
+ <arg name="group" ctype="char *" ser_type="binary" nulterm="1"/>
+ <return ctype="int" name="ret_int" expect="== 0"/>
+ <hack type="verbatim" place="post-deserialize">
+	if (! desc->mbox_init_p) {
+		edtk_debug("%s: sp_connect: not connected", __FUNCTION__);
+		reply_error(desc, ILLEGAL_SESSION);
+		return;
+	}
+	c->i.mbox = desc->mbox;
+ </hack>
+</func>
+
+<!-- SP_equal_group_ids not implemented right now:- what's a group_id? -->
+<!-- SP_error not implemented: why bother? -->
+
+<func name="sp_multicast" cname="SP_multicast">
+ <arg name="mbox" ctype="mailbox" noerlcall="1"/>
+ <arg name="service_type" ctype="service"
+      ser_type="unsigned-integer" ser_size="32"/>
+ <arg name="group" ctype="char *" ser_type="binary" nulterm="1"/>
+ <arg name="mess_type" ctype="int16"
+      ser_type="unsigned-integer" ser_size="16"/>
+ <arg name="mess_len" ctype="int" noerlcall="1" usestash="0"/>
+ <arg name="mess" ctype="char *" ser_type="binary" binlen2stash="0"/>
+ <return ctype="int" name="ret_int" expect=">= 0"/>
+ <hack type="verbatim" place="post-deserialize">
+	if (! desc->mbox_init_p) {
+		edtk_debug("%s: sp_connect: not connected", __FUNCTION__);
+		reply_error(desc, ILLEGAL_SESSION);
+		return;
+	}
+	c->i.mbox = desc->mbox;
+ </hack>
+</func>
+
+<!-- NOTE: The implementation of my_multigroup_multicast is limited to -->
+<!--       64 group names (MAX_MULTIGROUPS in my-spread.c)             -->
+
+<func name="sp_multigroup_multicast" cname="my_multigroup_multicast">
+ <arg name="mbox" ctype="mailbox" noerlcall="1"/>
+ <arg name="service_type" ctype="service"
+      ser_type="unsigned-integer" ser_size="32"/>
+ <arg name="groups" ctype="char *" ser_type="binary" binlen2stash="0"/>
+ <arg name="mess_type" ctype="int16"
+      ser_type="unsigned-integer" ser_size="16"/>
+ <arg name="mess_len" ctype="int" noerlcall="1" usestash="0"/>
+ <arg name="mess" ctype="char *" ser_type="binary" binlen2stash="0"/>
+ <return ctype="int" name="ret_int" expect=">= 0"/>
+ <hack type="verbatim" place="post-deserialize">
+	if (! desc->mbox_init_p) {
+		edtk_debug("%s: sp_connect: not connected", __FUNCTION__);
+		reply_error(desc, ILLEGAL_SESSION);
+		return;
+	}
+	c->i.mbox = desc->mbox;
+ </hack>
+</func>
+
+<!-- SP_multigroup_scat_multicast not implemented: why bother? -->
+
+<func name="sp_poll" cname="SP_poll" async_op="0">
+ <arg name="mbox" ctype="mailbox" noerlcall="1"/>
+ <return ctype="int" name="ret_int"/>
+ <hack type="verbatim" place="post-deserialize">
+	if (! desc->mbox_init_p) {
+		edtk_debug("%s: sp_connect: not connected", __FUNCTION__);
+		reply_error(desc, ILLEGAL_SESSION);
+		return;
+	}
+	c->i.mbox = desc->mbox;
+ </hack>
+</func>
+
+<!-- SP_scat_multicast not implemented: why bother? -->
+
+<func name="sp_receive" cname="SP_receive">
+ <arg name="mbox" ctype="mailbox" noerlcall="1"/>
+ <arg name="service_type" ctype="service" noerlcall="1" argtype="out"/>
+ <arg name="sender" ctype="char *" noerlcall="1"/>
+ <arg name="max_groups" ctype="int"/>
+ <arg name="num_groups" ctype="int" argtype="out" noerlcall="1"/>
+ <!-- Use "callcast" here to get the compiler to shut up -->
+ <arg name="groups" ctype="char *" noerlcall="1"
+           callcast="(char (*)[MAX_GROUP_NAME]) "/>
+ <arg name="mess_type" ctype="int16" argtype="out" noerlcall="1"/>
+ <arg name="endian_mismatch" ctype="int" argtype="out" noerlcall="1"/>
+ <arg name="max_mess_len" ctype="int"/>
+ <arg name="mess" ctype="char *" noerlcall="1"/>
+ <return ctype="int" name="ret_int" expect=">= 0"
+         xreturn="xret_receive"/>
+ <hack type="verbatim" place="post-deserialize">
+	if (! desc->mbox_init_p) {
+		edtk_debug("%s: sp_connect: not connected", __FUNCTION__);
+		reply_error(desc, ILLEGAL_SESSION);
+		return;
+	}
+	c->o.service_type = 0; /* Avoid DROP_RECV semantics with zero! */
+	c->i.mbox = desc->mbox;
+	c->i.sender = &desc->sender[0];	 /* static allocation hack */
+	if ((c->i.groups = (char *) sys_alloc(c->i.max_groups * MAX_GROUP_NAME)) == NULL) {
+		edtk_debug("%s: sp_receive: sys_alloc failed", __FUNCTION__);
+		reply_error(desc, ENOMEM);
+		return;
+	}
+	if ((c->i.mess = (char *) edtk_driver_alloc_wrapper(c->i.max_mess_len)) == NULL) {
+		edtk_debug("%s: sp_receive: edtk_driver_alloc_wrapper failed", __FUNCTION__);
+		free(c->i.groups);
+		reply_error(desc, ENOMEM);
+		return;
+	}
+ </hack>
+ <hack type="verbatim" place="ready_async-post-reply">
+	if (c->i.groups != NULL) {
+		sys_free(c->i.groups);
+	}
+ </hack>
+</func>
+
+<func name="sp_get_gid_offset_memb_mess" cname="SP_get_gid_offset_memb_mess">
+ <return ctype="int" name="ret_int"/>
+</func>
+
+<func name="sp_get_num_vs_offset_memb_mess" cname="SP_get_num_vs_offset_memb_mess">
+ <return ctype="int" name="ret_int"/>
+</func>
+
+<func name="sp_get_vs_set_offset_memb_mess" cname="SP_get_vs_set_offset_memb_mess">
+ <return ctype="int" name="ret_int"/>
+</func>
+
+<func name="set_active" cname="my_set_active">
+ <arg name="drv_data" ctype="ErlDrvData" noerlcall="1"/>
+ <arg name="value" ctype="int"/>
+ <return ctype="int" name="ret_int"/>
+ <hack type="verbatim" place="post-deserialize">
+	c->i.drv_data = drv_data;
+ </hack>
+</func>
+
+<xtra_return name="xret_connect">
+  <xtra_ok>
+    <xtra_val etype="binary" valtype="static_buf" val="c->i.private_group"
+            offset="0" length="strlen(c->i.private_group)"/>
+  </xtra_ok>
+  <xtra_error>
+    <xtra_val etype="integer" val="c->o.ret_int"/>
+  </xtra_error>
+</xtra_return>
+
+<xtra_return name="xret_receive">
+  <xtra_ok>
+    <xtra_val etype="integer" val="c->o.service_type"/>
+    <xtra_val etype="binary" valtype="static_buf" val="c->i.sender"
+            offset="0" length="strlen(c->i.sender)"/>
+    <xtra_val etype="list" procname="make_xret_group_list"/>
+    <xtra_val etype="integer" val="c->o.mess_type"/>
+    <xtra_val etype="integer" val="c->o.endian_mismatch"/>
+    <xtra_val etype="binary" valtype="erl_drv_bin" val="c->i.mess"
+            offset="0" length="c->o.ret_int"/>
+  </xtra_ok>
+  <xtra_error>
+    <xtra_val etype="integer" val="c->o.ret_int"/>
+    <!-- If ?GROUPS_TOO_SHORT, this is -1*groups, else undefined -->
+    <xtra_val etype="integer" val="c->o.num_groups"/>
+    <!-- If ?BUFFER_TOO_SHORT, this is -1*message size, else undefined -->
+    <xtra_val etype="integer" val="c->o.endian_mismatch"/>
+  </xtra_error>
+</xtra_return>
+
+<custom_erl name="shutdown">
+ <export>
+-export([shutdown/1]).
+-export([make_grouplist/1]).
+ </export>
+ <code>
+shutdown(Port) ->
+    case catch port_close(Port) of
+         true -> ok;
+	 _ -> error
+    end,
+    ok.
+
+%%
+%% make_grouplist() -- Use to format the group list for
+%% sp_multigroup_multicast().  The members of the list NUL-terminated
+%% and concatenated.  If the first byte of a member name is NUL, then
+%% you've reached the end of the list.
+%%
+%% QQQ We are very trusting about our input: no empty lists or
+%% binaries as list members, no list members with NULs in them, etc.
+%%
+make_grouplist(L) ->
+    list_to_binary(make_grouplist2(L)).
+
+make_grouplist2([]) ->
+    [0];
+make_grouplist2([H|T]) ->
+    [H | [0 | make_grouplist2(T)]].
+
+ </code>
+</custom_erl>
+
+<verbatim place="end-hrl">
+
+-define(LOW_PRIORITY,    0).
+-define(MEDIUM_PRIORITY, 1).
+-define(HIGH_PRIORITY,   2).
+
+-define(DEFAULT_SPREAD_PORT,     4803).
+
+-define(UNRELIABLE_MESS,         16#00000001).
+-define(RELIABLE_MESS,           16#00000002).
+-define(FIFO_MESS,               16#00000004).
+-define(CAUSAL_MESS,             16#00000008).
+-define(AGREED_MESS,             16#00000010).
+-define(SAFE_MESS,               16#00000020).
+-define(REGULAR_MESS,            16#0000003f).
+
+-define(SELF_DISCARD,            16#00000040).
+-define(DROP_RECV,               16#01000000).
+
+-define(REG_MEMB_MESS,           16#00001000).
+-define(TRANSITION_MESS,         16#00002000).
+-define(CAUSED_BY_JOIN,          16#00000100).
+-define(CAUSED_BY_LEAVE,         16#00000200).
+-define(CAUSED_BY_DISCONNECT,    16#00000400).
+-define(CAUSED_BY_NETWORK,       16#00000800).
+-define(MEMBERSHIP_MESS,         16#00003f00).
+
+-define(ENDIAN_RESERVED,         16#80000080).
+-define(RESERVED,                16#003fc000).
+-define(REJECT_MESS,             16#00400000).
+
+-define(ACCEPT_SESSION,           1).
+-define(ILLEGAL_SPREAD,          -1).
+-define(COULD_NOT_CONNECT,       -2).
+-define(REJECT_QUOTA,            -3).
+-define(REJECT_NO_NAME,          -4).
+-define(REJECT_ILLEGAL_NAME,     -5).
+-define(REJECT_NOT_UNIQUE,       -6).
+-define(REJECT_VERSION,          -7).
+-define(CONNECTION_CLOSED,       -8).
+-define(REJECT_AUTH,             -9).
+
+-define(ILLEGAL_SESSION,         -11).
+-define(ILLEGAL_SERVICE,         -12).
+-define(ILLEGAL_MESSAGE,         -13).
+-define(ILLEGAL_GROUP,           -14).
+-define(BUFFER_TOO_SHORT,        -15).
+-define(GROUPS_TOO_SHORT,        -16).
+-define(MESSAGE_TOO_LONG,        -17).
+
+-define(MAX_GROUP_NAME,          32).
+-define(MAX_PRIVATE_NAME,        10).%largest possible size of private_name field of SP_connect()
+-define(MAX_PROC_NAME,           20).%largest possible size of process name of daemon
+
+</verbatim>
+
+</erldriver>
+

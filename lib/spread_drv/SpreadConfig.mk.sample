@@ -1,0 +1,34 @@
+#
+# The autoconf magic required to automatically find your system's
+# header files and shared libraries for libgd, libpng, libjpeg, and
+# libXpm are too complex to bother with.  Instead, you must configure
+# them manually.  The process goes like this:
+#
+# 1. Create a file named CVSROOT/jungerl/config/SpreadConfig.mk
+#    Feel free to copy this file file as a template to make your
+#    life easier: copy it to ../../config/SpreadConfig.mk.
+#
+# 2. Edit the SpreadConfig.mk file to define the "make" variables that
+#    the spread_drv Makefiles are expecting:
+#      LIBSPREAD_CPPFLAGS, LIBSPREAD_LDFLAGS
+#
+# 3. Re-run "configure" using the following commands:
+#      % cd CVSROOT/jungerl/config
+#      % ./configure
+#
+# 4. Run "make" (or whatever your GNU Make binary is called) at the
+#    top level:
+#      % cd CVSROOT/jungerl
+#      % make 
+
+# NOTE: For the {LibName}_LDFLAGS variable, you can use
+# "-L/path/to/dir -lname".  Use "/path/to/libname.so" if the linker
+# is stubborn.  Solaris may require you to use "-R/path/to/dir" if
+# the shared library is installed in a non-standard directory.
+#
+# MAKE CERTAIN YOU LINK WITH "-ltspread", NOT "-lspread"!
+
+# Flags for libspread headers & shared library
+LIBSPREAD_CPPFLAGS = -I/usr/local/include
+LIBSPREAD_LDFLAGS = -L/usr/local/lib -ltspread
+

@@ -1,0 +1,56 @@
+#!/bin/sh
+#
+#
+JERLHOME=/usr/local/jungerl/jungerl
+EGETTEXT="-pa $JERLHOME/lib/intl/ebin"
+SYNTAX_TOOLS="-pa $JERLHOME/lib/syntax_tools/ebin"
+
+opts=""
+args=`getopt -n egettext -a -o "f:D:d:o:p:m:M:nsF" -l "files-from:,directory:,default-domain:,output:,output-dir:,add-location,no-location,omit-header,sort-output,sort-by-file,msgstr-prefix:,msgstr-suffix:" -- "$@"`
+eval set -- "$args"
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+      -V)   opts="$opts $1"; shift ;;
+
+      -f)               opts="$opts $1 $2"; shift 2;;
+      --files-from)     opts="$opts -f $2"; shift 2;;
+
+      -D)               opts="$opts $1 $2"; shift 2;;
+      --directory)      opts="$opts -D $2"; shift 2;;
+
+      -d)               opts="$opts $1 $2"; shift 2;;
+      --default-domain) opts="$opts -d $2"; shift 2;;
+
+      -o)               opts="$opts $1 $2"; shift 2;;
+      --output)         opts="$opts -o $2"; shift 2;;
+
+      -p)               opts="$opts $1 $2"; shift 2;;
+      --output-dir)     opts="$opts -p $2"; shift 2;;
+
+      --no-location)    opts="$opts -N"; shift;;
+      --add-location)   opts="$opts -n"; shift;;
+      -n)               opts="$opts -n"; shift;;
+
+      --omit-header)    opts="$opts -O"; shift;;
+
+      --sort-output)    opts="$opts -s"; shift;;
+      -s)               opts="$opts -s"; shift;;
+
+      --sort-by-file)   opts="$opts -F"; shift;;
+      -F)               opts="$opts -F"; shift;;
+
+      --msgstr-prefix)  opts="$opts -m $2"; shift 2;;
+      -m)               opts="$opts -m $2"; shift 2;;
+
+      --msgstr-suffix)  opts="$opts -M $2"; shift 2;;
+      -M)               opts="$opts -M $2"; shift 2;;
+
+      +*)   opts="$opts $1"; shift ;; 
+      --)   shift; break;;
+      *)    break;;
+  esac
+done
+
+erl -noinput $EGETTEXT $SYNTAX_TOOLS  $opts -s egettext start $*

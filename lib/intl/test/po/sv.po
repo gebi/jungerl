@@ -1,0 +1,60 @@
+# Swedish translations for PACKAGE package.
+# Copyright (C) 2003 <company>
+# <first-author> <EMAIL@ADDRESS>, 2003.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"PO-Revision-Date: 2003-12-30 02:21+0100\n"
+"Last-Translator: Tony Rogvall <tony@bix.hemma.se>\n"
+"Language-Team: Swedish <sv@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=ISO-8859-1\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: test.erl:25
+#, no-c-format
+msgid "Hello world\n"
+msgstr "Hejsan världen\n"
+
+#: test.erl:26
+#, no-c-format
+msgid "Bend over\n"
+msgstr "Böj dig framåt\n"
+
+#: test.erl:27
+#, no-c-format
+msgid "This is translated later\n"
+msgstr "Översätt detta senare\n"
+
+#: test.erl:31 test.erl:45
+#, no-c-format
+msgid "You got mail\n"
+msgstr "Du har post\n"
+
+#: test.erl:32
+#, no-c-format
+msgid "You got one mail\n"
+msgid_plural "You got mail\n"
+msgstr[0] "Du har fått ett brev\n"
+msgstr[1] "Du har fått brev\n"
+
+#: test.erl:34
+#, no-c-format
+msgid "You got virus\n"
+msgstr "Du har fått virus\n"
+
+#: test.erl:35
+#, no-c-format
+msgid "You got one virus\n"
+msgid_plural "You got plenty of viruses\n"
+msgstr[0] "Du har fått ett virus\n"
+msgstr[1] "Du har en massa virus\n"
+
+#: test.erl:38 test.erl:40 test.erl:46
+#, no-c-format
+msgid "You got a ~w coin\n"
+msgid_plural "You got tons of ~w\n"
+msgstr[0] "Du har en ~w slant\n"
+msgstr[1] "Du har massvis med ~w\n"

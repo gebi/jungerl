@@ -1,0 +1,60 @@
+# French translations for PACKAGE package.
+# Copyright (C) 2003 <company>
+# <first-author> <EMAIL@ADDRESS>, 2003.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"PO-Revision-Date: 2003-12-30 01:17Z\n"
+"Last-Translator: Automatically generated\n"
+"Language-Team: none\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#: test.erl:25
+#, no-c-format
+msgid "Hello world\n"
+msgstr "Bonjour monde\n"
+
+#: test.erl:26
+#, no-c-format
+msgid "Bend over\n"
+msgstr "Courbure plus de\n"
+
+#: test.erl:27
+#, no-c-format
+msgid "This is translated later\n"
+msgstr "Ceci est traduit plus tard\n"
+
+#: test.erl:31 test.erl:45
+#, no-c-format
+msgid "You got mail\n"
+msgstr "Vous avez obtenu le courrier\n"
+
+#: test.erl:32
+#, no-c-format
+msgid "You got one mail\n"
+msgid_plural "You got mail\n"
+msgstr[0] "Vous avez obtenu un courrier\n"
+msgstr[1] "Vous avez obtenu le courrier\n"
+
+#: test.erl:34
+#, no-c-format
+msgid "You got virus\n"
+msgstr "Vous avez obtenu le virus\n"
+
+#: test.erl:35
+#, no-c-format
+msgid "You got one virus\n"
+msgid_plural "You got plenty of viruses\n"
+msgstr[0] "Vous avez obtenu un virus\n"
+msgstr[1] "Vous avez obtenu l'abondance des virus\n"
+
+#: test.erl:38 test.erl:40 test.erl:46
+#, no-c-format
+msgid "You got a ~w coin\n"
+msgid_plural "You got tons of ~w\n"
+msgstr[0] "Vous avez obtenu une pice de ~w monnaie\n"
+msgstr[1] "Vous avez obtenu des tonnes de ~w\n"

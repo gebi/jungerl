@@ -9,6 +9,7 @@
 	 start/0,stop/0,
 	 init/1,
 	 gettext/1,
+	 gettext_noop/1,
 	 ngettext/3,
 	 dgettext/2,
 	 dngettext/4,
@@ -89,6 +90,11 @@ init(Starter) ->
 		    ok
 	    end
     end.
+
+
+gettext_noop(MsgId) -> 
+    MsgId.
+
 
 gettext(MsgId) ->
     reply(port_control(intl, ?INTL_GETTEXT, 

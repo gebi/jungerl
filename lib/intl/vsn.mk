@@ -1,1 +1,1 @@
-INTL_VSN = 1.0
+INTL_VSN = 1.1

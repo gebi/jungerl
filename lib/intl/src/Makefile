@@ -1,6 +1,9 @@
 
 MODULES = \
-	intl 
+	intl \
+	mo \
+	egettext
+
 
 ERLC_FLAGS = -Ddebug
 

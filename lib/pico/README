@@ -1,0 +1,28 @@
+To test the system:
+
+    1) make
+    2) ./start_4999
+    3) point your browser at ./index.html
+
+Interface
+
+	pico:start(Port, Max Mod, [Arg1, Arg2]).
+
+        Creates a process called pico_port_<Port>
+        
+        pico:stop(Port, Reason) 
+
+
+Callbacks
+	
+	Mod:start(Arg1, Arg2) -> State
+        Mod:handle(get|Post, State) -> {reply, Str, State'}
+                                       {redirect, Url, State'}
+        Mod:stop(Reason, State) -> State'
+
+Test
+        Point browser to index.html
+
+
+
+

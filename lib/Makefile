@@ -8,9 +8,11 @@ LIBS := \
 	lersp \
 	msc \
         pan \
+        pico \
 	rpc \
         syntax_tools \
 	tuntap \
+        wiki \
         wumpus \
         www_tools \
 	xmerl \
@@ -35,6 +37,7 @@ ce: edoc
 edoc: syntax_tools xmerl
 ermacs: slang msc
 enfs: rpc
+wiki: pico
 wumpus: edoc
 xmlrpc: xmerl
 

@@ -11,3 +11,5 @@ be useful for prototyping, as example code, etc.  ce is included in the
 Jungerl mainly to support my own submissions which already use it, but if
 you find it useful, you're welcome to use the functions in it, and to add
 functions and modules to it.
+
+The ce library was added to Jungerl at ce version 2003.0228.

@@ -1,0 +1,9 @@
+To make wiki fly do the following
+
+1) Type "make"
+
+2) Edit wiki.sh with the appropriate paths
+
+3) Give the command
+
+   ./wiki.sh start

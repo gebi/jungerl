@@ -39,4 +39,3 @@ get_display(X)       -> ex11_client:get_display(X).
 set_display(X,Dpy)   -> ex11_client:set_display(X,Dpy).
 
 
-

@@ -1,6 +1,4 @@
 
-*** Fri Feb 19 15:21:11 EST 1999 ***
-
 If you are interested in helping out implementing the full 
 X11 protocols + a toolkit on top of it, then let me know. 
 Basically to add a new request, add a record for the 
@@ -15,25 +13,23 @@ EXAMPLE: We add the MapNotify event
 
  1. Edit ex11.hrl and locate the 'EVENT MESSAGES' part.
  2. Under the 'Event Codes' heading, add:  
-
       -define(EVENT_MAP_NOTIFY,        19).
 
  3. Under the 'Event Records' heading, add:
-
       -record(map_notify, {seqno, event, window, override_redirect}).
 
  4. Under the 'Event guards' heading, add:
-
       -define(IS_MAP_NOTIFY_EVENT(E), record(E,map_notify)).
 
  5. Under the 'Decoding event messages', add a new function clause:
 
-      decode_event([?EVENT_MAP_NOTIFY,_,S1,S0,E3,E2,E1,E0,W3,W2,W1,W0,V|D]) ->
-          {_,Rest} = split_list(19,D), % 19 unused bytes
-          E = #expose{seqno=i16(S1,S0),
-                      event=i32(W3,W2,W1,W0),
-                      window=i32(W3,W2,W1,W0),
-                      override_redirect=i16(V)},
+      decode_event(<<?EVENT_MAP_NOTIFY,_,SeqNo:16,
+                     Event:32,Win:32,V,
+	             _:152, Rest/binary]) ->
+          E = #expose{seqno=SeqNo,
+                      event=Event,
+                      window=Win,
+                      override_redirect=V},
           {E,Rest};
 
  6. Write a test program which can receive the event.
@@ -80,7 +76,7 @@ Example: We add the PolyLine request
 
  4. Add a suitable clause to enc/2:
 
-      enc(X,Req) when ?IS_POLY_LINE(Req)           -> poly_line(X,Req);
+      enc(X,Req) when ?IS_POLY_LINE(Req)-> poly_line(X,Req);
 
  5. Implement the actual encode function (located in alphabetical 
     order in the file):
@@ -93,16 +89,17 @@ Example: We add the PolyLine request
 		          list(R#poly_line.points) ->
           PointsList = encode_points(R#poly_line.points),
           {ok,
-           [R#poly_line.opcode,
-            R#poly_line.coord_mode, 
-            i16(3 + length(PointsList)),
-            i32(R#poly_line.drawable),
-            i32(R#poly_line.gc),
-            PointsList]}.
+           <<(R#poly_line.opcode),
+            (R#poly_line.coord_mode), 
+            (3 + size(PointsList) div 4):16,
+            (R#poly_line.drawable):32,
+            (R#poly_line.gc):32,
+            PointsList/binary]}.
 
       encode_points([H|T]) when ?IS_POINT(H) ->
-          [i16(H#point.x) ++ i16(H#point.y)|encode_points(T)];
-      encode_points([]) -> [].
+          <<(H#point.x):16, (H#point.y):16, 
+            (encode_points(T))/binary>>;
+      encode_points([]) -> <<>>.
     
     Add as many guards as possible. Don't perform any error
     checking int the encode function. An eventual crash will
@@ -112,10 +109,10 @@ Example: We add the PolyLine request
 
 ------------------------------------------------------------------------
 
-Good luck, and send me your additions so that I can
+Good luck, and send me your additions so that we can
 add them to the standard distribution of the Erlang-
-X11 binding. 
+X11 binding. Or better, check in them at JungErl.
 
-/Tobbe , tnt@home.se
-
+/Tobbe, tnt@home.se
+/Vlad, vlad_dumitrescu@hotmail.com
 

@@ -1,6 +1,16 @@
 
-*** Thu Mar 11 14:50:29 EST 1999 ***
+*** Sat Mar 01 2003 ***
+ex11-0.11B
+==========
 
+The 0.11 version was converted to use the binary
+features of Erlang and work is under way to 
+implement more of the protocol. The project was
+also included in JungErl at SourceForge.
+
+/Vlad, vlad_dumitrescu@hotmail.com
+
+*** Thu Mar 11 1999 ***
 ex11-0-11.tgz
 ===========
 
@@ -11,8 +21,7 @@ to run on Windows (assuming you have an X server).
 
 /Tobbe, tobbe@serc.rmit.edu.au
 
-*** Tue Feb 23 11:10:00 EST 1999 ***
-
+*** Tue Feb 23 1999 ***
 x11-0-1.tgz
 ===========
 
@@ -26,20 +35,16 @@ out with this should read README.developers. But before
 anything more are implemented I suggest that we wait
 for the new Erlang bit-syntax to be released.
 
-To compile both for JAM and BEAM, run: 
+-------------------------------------
+
+To compile, run: 
 
   make
-
-or just:  
-
-  make jam
-  make beam
-
-if you only are running one of the machines.
 
 Check out the code in rcube.erl for an example on how 
 to use ex11. Run: 
 
+  rcube:start(), %% default host is "localhost"
   rcube:start(HostName),
 
 where HostName is the name of the machine where your

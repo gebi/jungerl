@@ -1,5 +1,6 @@
 -ifndef(_EX11_H).
 -define(_EX11_H, 1).
+
 %%% ---------------------------------------------------------------------
 %%% Created:  15 Feb 1999 by Tobbe, tobbe@cslab.ericsson.se
 %%% Function: Include file, with basic X data.
@@ -33,10 +34,6 @@
 
 -define(MSB_BYTEORDER, $B).
 -define(LSB_BYTEORDER, $l).
-
-%% ---------------
-%% Set of events
-
 
 %% ------------
 %% Misc Values
@@ -76,6 +73,53 @@
 -define(EVENT_COLORMAP_CHANGE,       16#00800000).
 -define(EVENT_OWNER_GRAB_BUTTON,     16#01000000).
 
+%% ---------------
+-define(BIT_GRAVITY_FORGET, 0).
+-define(BIT_GRAVITY_NORTHWEST, 1).
+-define(BIT_GRAVITY_NORTH, 2).
+-define(BIT_GRAVITY_NORTHEAST, 3).
+-define(BIT_GRAVITY_WEST, 4).
+-define(BIT_GRAVITY_CENTER, 5).
+-define(BIT_GRAVITY_EAST, 6).
+-define(BIT_GRAVITY_SOUTHWEST, 7).
+-define(BIT_GRAVITY_SOUTH, 8).
+-define(BIT_GRAVITY_SOUTHEAST, 9).
+-define(BIT_GRAVITY_STATIC, 10).
+
+-define(WIN_GRAVITY_UNMAP, 0).
+-define(WIN_GRAVITY_NORTHWEST, 1).
+-define(WIN_GRAVITY_NORTH, 2).
+-define(WIN_GRAVITY_NORTHEAST, 3).
+-define(WIN_GRAVITY_WEST, 4).
+-define(WIN_GRAVITY_CENTER, 5).
+-define(WIN_GRAVITY_EAST, 6).
+-define(WIN_GRAVITY_SOUTHWEST, 7).
+-define(WIN_GRAVITY_SOUTH, 8).
+-define(WIN_GRAVITY_SOUTHEAST, 9).
+-define(WIN_GRAVITY_STATIC, 10).
+
+-define(KEYBUT_MASK_SHIFT, 16#0001).
+-define(KEYBUT_MASK_LOCK, 16#0002).
+-define(KEYBUT_MASK_CONTROL, 16#0004).
+-define(KEYBUT_MASK_MOD1, 16#0008).
+-define(KEYBUT_MASK_MOD2, 16#0010).
+-define(KEYBUT_MASK_MOD3, 16#0020).
+-define(KEYBUT_MASK_MOD4, 16#0040).
+-define(KEYBUT_MASK_MOD5, 16#0080).
+-define(KEYBUT_MASK_BUTTON1, 16#0100).
+-define(KEYBUT_MASK_BUTTON2, 16#0200).
+-define(KEYBUT_MASK_BUTTON3, 16#0400).
+-define(KEYBUT_MASK_BUTTON4, 16#0800).
+-define(KEYBUT_MASK_BUTTON5, 16#1000).
+
+
+-define(ATOM_PRIMARY, 1).
+-define(ATOM_SECONDARY, 2).
+-define(ATOM_ARC, 3).
+-define(ATOM_ATOM, 4).
+-define(ATOM_BITMAP, 5).
+-define(ATOM_CARDINAL, 6).
+-define(ATOM_COLORMAP, 7).
 
 %% ----------------------
 %% MAJOR DATA STRUCTURES
@@ -676,7 +720,6 @@
 
 %% Guards test
 -define(IS_WIN_VALUES(R), record(R,win_values)).
-
 
 -record(create_window,
 	{opcode               = 1,

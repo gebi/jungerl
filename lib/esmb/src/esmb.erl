@@ -13,7 +13,7 @@
 	 close_file/2, write_file/4, delete_file/3]).
 -export([dec_smb/1, tt_name/1]).
 -export([zeros/1,p14/1,s16x/1,s21_lm_session_key/1,ex/2,swab/1,
-	 challenge_response/2,bit_reverse/1, crtest/0, e/2]).
+	 challenge_response/2, crtest/0, e/2]).
 -include("esmb_lib.hrl").
 
 -define(PORT, 139).
@@ -188,7 +188,9 @@ decode_smb_response(Req, {ok, _, ResPdu}) when  ?IS(Req, ?SMB_NEGOTIATE) ->
 	?PCNET_1_0 ->
 	    #smb_negotiate_res{dialect_index = Di};
 	?LANMAN_1_0 ->
-	    lanman_neg_resp(B, #smb_negotiate_res{dialect_index = Di});
+	    crypto:start(),
+	    lanman_neg_resp(B, Res#smbpdu.bf, 
+			    #smb_negotiate_res{dialect_index = Di});
 	_ ->
 	    exit(nyi)
     end;
@@ -230,14 +232,14 @@ lanman_neg_resp(<<SecurityMode:16/little,
 		  _:2/binary,            % Current date at server
 		  _:2/binary,            % Current time zone at server
 		  EncKeyLen:16/little,   % Encryption key length
-		  _:2/binary,            % reserved
-		  ByteCount:16/little,   % Count of data bytes
-		  B/binary>>,
+		  _:2/binary>>,          % reserved
+		  B,
 		Neg) ->
     <<EncKey:EncKeyLen/binary, _/binary>> = B,
     Neg#smb_negotiate_res{security_mode   = SecurityMode,
 			  max_buffer_size = MaxBufferSize,
 			  encryption_key  = EncKey}.
+    
 
 
 %%% ---
@@ -472,8 +474,8 @@ dec_smb(Req,
 %%% --------------------------------------------------------------------
 
 %%% FIXME : better test when new dialects are added
--define(PRE_NT_LM_0_12(Neg), (Neg#smb_negotiate_res.dialect_index == 0)).
--define(PRE_DOS_LANMAN_2_1(Neg), (Neg#smb_negotiate_res.dialect_index == 0)).
+-define(CORE_PROTOCOL(Neg), (Neg#smb_negotiate_res.dialect_index == 0)).
+-define(PRE_DOS_LANMAN_2_1(Neg), (Neg#smb_negotiate_res.dialect_index =< 1)).
 
 
 smb_close_file_pdu(InReq) ->
@@ -838,8 +840,9 @@ bf_tree_connect_andx(Neg, Path) when ?PRE_DOS_LANMAN_2_1(Neg) ->
 %%% ---
 
 smb_session_setup_andx_pdu(Neg, U) ->
-    {Wc,Wp} = wp_session_setup_andx(Neg, U),
-    Bf = bf_session_setup_andx(Neg, U),
+    {Passwd, PwLen} = enc_passwd(Neg, U#user.pw),
+    {Wc,Wp} = wp_session_setup_andx(Neg, U, PwLen),
+    Bf = bf_session_setup_andx(Neg, U, Passwd),
     Rec = #smbpdu{cmd = ?SMB_SESSION_SETUP_ANDX,
 		  pid = mypid(),
 		  mid = 1,
@@ -851,8 +854,7 @@ smb_session_setup_andx_pdu(Neg, U) ->
     %%io:format("ByteCount = ~p~n",[Rec#smbpdu.bc]),
     {Rec, enc_smb(Rec)}.
 
-wp_session_setup_andx(Neg,U) when ?PRE_NT_LM_0_12(Neg) ->
-    PwLen = length(U#user.pw),
+wp_session_setup_andx(Neg, U, PwLen) ->
     {10,
      <<?NoAndxCmd,              
       0,                         % reserved
@@ -862,14 +864,21 @@ wp_session_setup_andx(Neg,U) when ?PRE_NT_LM_0_12(Neg) ->
       ?VcNumber:16/little,
       0:32/little,               % session key
       PwLen:16/little,
-      0:32/little>>}.             % reserved
+      0:32/little>>}.            % reserved
     
-bf_session_setup_andx(Neg,U) when ?PRE_NT_LM_0_12(Neg) ->
-    list_to_binary([U#user.pw,
+bf_session_setup_andx(Neg,U, Passwd) ->
+    list_to_binary([Passwd,
 		    U#user.name,[0],
 		    U#user.primary_domain,[0],
 		    U#user.native_os,[0],
 		    U#user.native_lanman,[0]]).
+
+enc_passwd(Neg, Passwd) when ?CORE_PROTOCOL(Neg) ->
+    {Passwd, length(Passwd)};
+enc_passwd(Neg, Passwd) when ?PRE_DOS_LANMAN_2_1(Neg) ->
+    EncKey = Neg#smb_negotiate_res.encryption_key,
+    EncPasswd = challenge_response(Passwd, EncKey),
+    {EncPasswd, size(EncPasswd)}.
 
 %%%
 %%% TEST: smbclient //korp/tobbe -U tobbe -m LANMAN1
@@ -894,9 +903,13 @@ test_response() ->
        16#a4,16#81,16#a3,16#f8,16#84,16#67>>.
     
 
-challenge_response(Passwd, Challenge) -> 
-    %%ex(s21_lm_session_key(Passwd), Challenge).
-    ex(s21_nt_session_key(Passwd), Challenge).
+challenge_response(Passwd, Challenge) when binary(Passwd) -> 
+    %%io:format("s21_lm_session_key(Passwd)=~p~n",[s21_lm_session_key(Passwd)]),
+    ex(s21_lm_session_key(Passwd), Challenge);
+challenge_response(Passwd, Challenge) when list(Passwd) -> 
+    challenge_response(list_to_binary(Passwd), Challenge).
+
+%%    ex(s21_nt_session_key(Passwd), Challenge).
 
 ex(<<K0:7/binary,K1:7/binary>>, Data) when size(Data) == 8 ->
     concat_binary([e(K0, Data),
@@ -906,12 +919,12 @@ ex(<<K0:7/binary,K1:7/binary,K2:7/binary>>, Data) when size(Data) == 8 ->
 		   e(K1, Data),
 		   e(K2, Data)]);
 ex(K, D)  ->
-    io:format("K=~p~nD=~p~n",[K,D]).
+    io:format("<FATAL ERROR>: K=~p~nD=~p~n",[K,D]),
+    exit("fatal_error").
 
 e(K,D) -> 
-    io:format("crypto:des_cbc_encrypt(~p, 0, ~p) ~n", [K,D]),
+    %%io:format("crypto:des_cbc_encrypt(~p, 0, ~p) ~n", [K,D]),
     B = crypto:des_cbc_encrypt(s2k(K), null_vector(), D).
-%    <<B/binary, 0>>.
 
 null_vector() -> <<0,0,0,0,0,0,0,0>>.
 
@@ -927,6 +940,11 @@ s21_nt_session_key(Passwd) ->
     <<S16/binary, Zero5/binary>>.
 
 %%%
+%%% What does this function do ??
+%%% According to the CIFS spec we should do
+%%% bit reverse on each byte. But instead we
+%%% do this...
+%%%
 %%% See libsmb/smbdes.c str_to_key(Str,Key)
 %%%
 s2k(<<S0,S1,S2,S3,S4,S5,S6>>) ->
@@ -938,11 +956,15 @@ s2k(<<S0,S1,S2,S3,S4,S5,S6>>) ->
     K5 = ((S4 band 16#1F) bsl 2) bor (S5 bsr 6),
     K6 = ((S5 band 16#3F) bsl 1) bor (S6 bsr 7),
     K7 = S6 band 16#7F,
-    list_to_binary([X bsl 1 || X <- [K0,K1,K2,K3,K4,K5,K6,K7]]).
+    list_to_binary([X bsl 1 || X <- [K0,K1,K2,K3,K4,K5,K6,K7]]);
+s2k(<<B0:7/binary,B1:7/binary>>) ->
+    concat_binary([s2k(B0),s2k(B1)]).
     
 
 s16x(Passwd) -> 
-    ex(swab(p14(Passwd)), n8()).
+    %%io:format("====== ~p b(~p)~n", [p14(Passwd), swab(p14(Passwd))]),
+    %%io:format("------ ~p b(~p)~n", [p14(Passwd), s2k(p14(Passwd))]),
+    ex(p14(Passwd), n8()).
 
 p14(Passwd) when size(Passwd) =< 14 ->
     Upasswd = list_to_binary(ucase(binary_to_list(Passwd))),
@@ -955,7 +977,7 @@ zeros(N) ->
     list_to_binary(zerosN(N)).
 
 zerosN(0)          -> [];
-zerosN(N) when N>0 -> [$0 | zerosN(N-1)].
+zerosN(N) when N>0 -> [0 | zerosN(N-1)].
 
 %%%
 %%% Return a sequence of bytes where each byte
@@ -966,16 +988,6 @@ swab(B) when binary(B) ->
 swab(L) when list(L)   -> 
     F = fun(X) -> bit_rev(X) end,
     lists:map(F, L).
-
-bit_reverse(X) when X < 255 ->
-    ((X bsr 7) band 16#01) bor
-    ((X bsr 5) band 16#02) bor
-    ((X bsr 3) band 16#04) bor
-    ((X bsr 1) band 16#08) bor
-    ((X bsl 1) band 16#10) bor
-    ((X bsl 3) band 16#20) bor
-    ((X bsl 5) band 16#40) bor
-    ((X bsl 7) band 16#80).
 
 bit_rev(N) when N < 256, N >= 0 ->
     <<B0:1,B1:1,B2:1,B3:1,B4:1,B5:1,B6:1,B7:1>> = <<N>> ,

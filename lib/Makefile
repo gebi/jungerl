@@ -1,6 +1,7 @@
 LIBS := \
 	builder \
 	ce \
+	distel \
 	edoc \
 	enfs \
 	erl_cgi \
@@ -9,6 +10,7 @@ LIBS := \
 	gd1_drv \
         gen_leader \
 	slang \
+	ssh \
 	lersp \
         lines \
 	measurement \
@@ -25,6 +27,7 @@ LIBS := \
 	spread_drv \
         syntax_tools \
 	tuntap \
+	ucs \
         wiki \
         wumpus \
         www_tools \
@@ -57,6 +60,7 @@ plain_fsm: edoc
 wiki: pico
 wumpus: edoc
 xmlrpc: xmerl
+xmerl: ucs
 
 
 .PHONY: $(LIBS)

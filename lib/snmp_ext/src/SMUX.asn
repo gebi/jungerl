@@ -1,0 +1,229 @@
+  SMUX DEFINITIONS ::= BEGIN
+
+-- Modified from RFC1227 for the Erlang ASN.1 compiler
+
+
+  IMPORTS
+          DisplayString, ObjectName,
+          ObjectSyntax, NetworkAddress, TimeTicks
+                  FROM RFC1155-SMI;
+
+--           PDUs
+--                   FROM RFC1157-SNMP;
+
+
+   -- tags for SMUX-specific PDUs are application-wide to
+   -- avoid conflict with tags for current (and future)
+   -- SNMP-generic PDUs
+
+   SMUX-PDUs ::=
+       CHOICE {
+           open            -- SMUX peer uses
+               OpenPDU,    -- immediately after TCP open
+
+           close           -- either uses immediately before TCP close
+               ClosePDU,
+
+           registerRequest -- SMUX peer uses
+               RReqPDU,
+
+           registerResponse -- SNMP agent uses
+               RRspPDU,
+
+
+--               PDUs,   --        -- note that roles are reversed:
+                               --   SNMP agent does get/get-next/set
+                               --   SMUX peer does get-response/trap
+
+
+                              get-request
+                                  GetRequest-PDU,
+
+                              get-next-request
+                                  GetNextRequest-PDU,
+
+                              get-response
+                                  GetResponse-PDU,
+
+                              set-request
+                                  SetRequest-PDU,
+
+                              trap
+                                  Trap-PDU,
+
+
+           commitOrRollback -- SNMP agent uses
+               SOutPDU
+      }
+
+
+   -- open PDU
+   -- currently only simple authentication
+
+  OpenPDU ::=
+       CHOICE {
+          simple
+              SimpleOpen
+       }
+
+   SimpleOpen ::=
+       [APPLICATION 0] IMPLICIT
+           SEQUENCE {
+               version     -- of SMUX protocol
+                   INTEGER {
+                       version-1(0)
+                   },
+
+               identity    -- of SMUX peer, authoritative
+                   OBJECT IDENTIFIER,
+
+               description -- of SMUX peer, implementation-specific
+                   DisplayString,
+
+               password    -- zero length indicates no authentication
+                   OCTET STRING
+           }
+
+
+   -- close PDU
+
+   ClosePDU ::=
+       [APPLICATION 1] IMPLICIT
+           INTEGER {
+               goingDown(0),
+               unsupportedVersion(1),
+               packetFormat(2),
+               protocolError(3),
+               internalError(4),
+               authenticationFailure(5)
+           }
+
+
+   -- insert PDU
+
+   RReqPDU ::=
+       [APPLICATION 2] IMPLICIT
+           SEQUENCE {
+               subtree
+                   ObjectName,
+
+               priority    -- the lower the better, "-1" means default
+                   INTEGER (-1..2147483647),
+
+               operation
+                   INTEGER {
+                       delete(0),    -- remove registration
+                       readOnly(1),  -- add registration, objects are RO
+                       readWrite(2)  --   .., objects are RW
+                   }
+           }
+
+   RRspPDU ::=
+       [APPLICATION 3] IMPLICIT
+           INTEGER {
+               failure(-1)
+
+              -- on success the non-negative priority is returned
+           }
+
+   SOutPDU ::=
+       [APPLICATION 4] IMPLICIT
+           INTEGER {
+               commit(0),
+               rollback(1)
+           }
+
+          -- PDUs
+
+          GetRequest-PDU ::=
+              [0]
+                  IMPLICIT PDU
+
+          GetNextRequest-PDU ::=
+              [1]
+                  IMPLICIT PDU
+
+          GetResponse-PDU ::=
+              [2]
+                  IMPLICIT PDU
+
+          SetRequest-PDU ::=
+              [3]
+                  IMPLICIT PDU
+
+          PDU ::=
+                  SEQUENCE {
+                     request-id
+                          INTEGER,
+
+                      error-status      -- sometimes ignored
+                          INTEGER {
+                              noError(0),
+                              tooBig(1),
+                              noSuchName(2),
+                              badValue(3),
+                              readOnly(4),
+                              genErr(5)
+                          },
+
+                      error-index       -- sometimes ignored
+                         INTEGER,
+
+                      variable-bindings -- values are sometimes ignored
+                          VarBindList
+                  }
+
+          Trap-PDU ::=
+              [4]
+                 IMPLICIT SEQUENCE {
+                      enterprise        -- type of object generating
+                                        -- trap, see sysObjectID in [5]
+
+
+                          OBJECT IDENTIFIER,
+
+                      agent-addr        -- address of object generating
+                          NetworkAddress, -- trap
+
+                      generic-trap      -- generic trap type
+                          INTEGER {
+                              coldStart(0),
+                              warmStart(1),
+                              linkDown(2),
+                              linkUp(3),
+                              authenticationFailure(4),
+                              egpNeighborLoss(5),
+                              enterpriseSpecific(6)
+                          },
+
+                      specific-trap  -- specific code, present even
+                          INTEGER,   -- if generic-trap is not
+                                     -- enterpriseSpecific
+
+                      time-stamp     -- time elapsed between the last
+                          TimeTicks, -- (re)initialization of the network
+                                     -- entity and the generation of the trap
+
+                       variable-bindings -- "interesting" information
+                          VarBindList
+                  }
+
+
+          -- variable bindings
+
+          VarBind ::=
+                  SEQUENCE {
+                      name
+                          ObjectName,
+
+                      value
+                          ObjectSyntax
+                  }
+
+         VarBindList ::=
+                  SEQUENCE OF
+                     VarBind
+
+
+
+   END

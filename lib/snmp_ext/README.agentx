@@ -1,0 +1,24 @@
+This is an implementation of AgentX (RFC2741) for the OTP snmp agent.
+
+Configuration
+-------------
+Add to snmp_ext.conf
+
+  %% To start as a master
+  {agentx, master}.               %% behave as an AgentX master
+  {agentxListenIp, {A,B,C,D}}.    %% default is {127,0,0,1}
+  {agentxListenPort, int()}.      %% default is 705
+  {agentxTimeout, int()}.         %% default is 15000 (ms)
+
+  %% To start as a agent
+  {agentx, agent}.                %% behave as an AgentX agent
+  {agentxMasterIp, {A,B,C,D}}.    %% default is {127,0,0,1}
+  {agentxMasterPort, int()}.      %% default is 705
+  {agentxTimeout, int()}.         %% default is 15000 (ms)
+
+
+TODO
+----
+An agent could be implemented as a specific snmp_net_if process, I
+think.  The MPD and VAC would be dummies.  This should be easy.
+Registration and index allocation etc should be done a function calls.

@@ -1,0 +1,40 @@
+This is an implementation of SMUX (RFC1227) for the OTP snmp agent.
+
+Configuration - not yet used
+-------------
+Add to snmp_ext.conf
+
+  {smux, true}.               %% turn on SMUX; behave as a SMUX master
+  {smuxListenIp, {A,B,C,D}}.  %% default is {127,0,0,1}
+  {smuxListenPort, int()}.    %% default is 199
+  {smuxTimeout, int()}.       %% default is 15000 (ms)
+  {smuxSecret, string()}.     %% default is no checking
+
+Start
+-----
+1. start snmp master agent
+2. snmp_smux_admin:start_link({127,0,0,1}, 1999, snmp_master_agent,
+                              15000, undefined).
+   this will start the SMUX master process and register it with the erlang
+   snmp_master_agent.  it will listen for SMUX requests on 127.0.0.1:1999
+
+
+Limitations
+-----------
+The agent does not handle the priority field.  When a register request
+is received, the subtree is registered, and priority 0 is returned.
+
+Registration deletions are not handled.  All registrations are removed
+when the SMUX connection is closed though.
+
+read-only and read-write registrations are handled in the same way.
+
+The SMUX MIB is not implemented.
+
+
+FIXME
+-----
+  -  snmp_mib must handle EXIT from subagent, call
+       snmp_mib_data:unregister_subagent on exit
+  o  make simple-minded option to SMUX, which makes one vb packets
+     to each subagent

@@ -1,0 +1,26 @@
+TEST-MIB DEFINITIONS ::= BEGIN
+ 
+IMPORTS
+    experimental   FROM RFC1155-SMI
+    OBJECT-TYPE    FROM RFC-1212
+    ;
+ 
+test       OBJECT IDENTIFIER ::= { experimental 7 }
+ 
+testStr OBJECT-TYPE
+         SYNTAX  OCTET STRING (SIZE (0..255))
+         ACCESS  read-write
+         STATUS  mandatory
+         DESCRIPTION
+	   "test"
+       ::= { test 1 }
+ 
+testInt OBJECT-TYPE
+         SYNTAX  INTEGER
+         ACCESS  read-write
+         STATUS  mandatory
+         DESCRIPTION
+	   "test"
+       ::= { test 2 }
+ 
+END

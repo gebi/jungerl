@@ -1,0 +1,20 @@
+General
+-------
+  Acts as a subagent towards the snmp master agent, and as a SNMP
+  v1/v2c manager towards the real SNMP agent.  This setup is useful
+  when you want to have a master-subagent relation, but the agent
+  doesn't support SMUX or AgentX.  The foreign SNMP agent must be
+  configured to send traps to this process.  There is one process per
+  agent connection.
+
+  NOTE: Two-phase SET cannot be implemented!  This means that in the
+  worst case, we'll have to send a undoFailed.  In the normal case,
+  where the subagent implements a whole MIB tree, each SET request to
+  the master agent will contain either no or all varbinds to this
+  subagent.
+
+
+TODO
+----
+  o  handle timeouts (and retransmits ?)
+  o  test!

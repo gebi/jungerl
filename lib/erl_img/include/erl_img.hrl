@@ -47,7 +47,6 @@
 	  height   = 0,
 	  palette,          %% list [{R,G,B}]
 	  format,           %% pixmap format
-	  transparent,      %% transparent color if used
 	  attributes = [],  %% extension codes
 	  pixels   = []     %% [ {Ri,binary(Row)} ]
 	 }).

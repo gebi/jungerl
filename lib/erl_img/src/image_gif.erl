@@ -103,7 +103,7 @@ read(Fd,IMG,RowFun,St0) ->
 	    ?dbg("Background=~w, AspectRatio=~w\n",
 		 [Background, AspectRatio]),
 	    As = [{'Background',Background},
-		  {'AspectRation',AspectRatio},
+		  {'AspectRatio',AspectRatio},
 		  {'Sort',Sort} | IMG#erl_image.attributes],
 	    IMG1 = IMG#erl_image { palette = Palette, attributes = As},
 	    read_data(Fd, IMG1, RowFun, St0, []);
@@ -309,7 +309,7 @@ read_palette(Fd, 1, Pixel) ->
 rd_palette(Bin, Map, 0) -> 
     reverse(Map);
 rd_palette(<<R:8,G:8,B:8, Bin/binary>>, Map, I) ->
-    rd_palette(Bin, [{R*255,G*255,B*255} | Map], I-1).
+    rd_palette(Bin, [{R bsl 8,G bsl 8,B bsl 8} | Map], I-1).
 
 
 
@@ -317,16 +317,8 @@ rd_palette(<<R:8,G:8,B:8, Bin/binary>>, Map, I) ->
 write(Fd, IMG) ->
     write_info(Fd, IMG),
     Palette = IMG#erl_image.palette,
-    Background = 
-	case lists:keysearch('Background', 1, IMG#erl_image.attributes) of
-	    false -> 0;
-	    {value,{_,B}} -> B
-	end,
-    AspectRatio = 
-	case lists:keysearch('AspectRatio', 1, IMG#erl_image.attributes) of
-	    false -> 0;
-	    {value,{_,A}} -> A
-	end,
+    Background = attribute('Background',IMG#erl_image.attributes,0),
+    AspectRatio = attribute('AspectRatio', IMG#erl_image.attributes,0),
     if list(Palette) ->
 	    PLen = length(Palette),
 	    ColorRes = if PLen > 0, PLen =< 256 ->
@@ -360,7 +352,7 @@ write_palette(Fd, Map, Pixel) ->
 
 wr_palette(Fd, _, 0) -> ok;
 wr_palette(Fd, [{R,G,B}|Map], I) ->
-    file:write(Fd, <<(R div 255):8, (G div 255):8, (B div 255):8>>),
+    file:write(Fd, <<(R bsr 8):8, (G bsr 8):8, (B bsr 8):8>>),
     wr_palette(Fd, Map, I-1);
 wr_palette(Fd, [], I) ->
     file:write(Fd, <<0:8, 0:8, 0:8>>),
@@ -388,6 +380,7 @@ write_pixmaps(Fd, IMG, []) ->
 
 
 write_image(Fd, Pm) ->
+    file:write(Fd, <<?IMAGE>>),
     file:write(Fd,
 	       <<(Pm#erl_pixmap.left):16/little,
 		(Pm#erl_pixmap.top):16/little,
@@ -395,6 +388,8 @@ write_image(Fd, Pm) ->
 		(Pm#erl_pixmap.height):16/little>>),
     Palette = Pm#erl_pixmap.palette,
     Interlaced = attribute('Interlaced', Pm#erl_pixmap.attributes, 0),
+    %% Special code for none compressed data!!!
+    Inline     = attribute('Inline', Pm#erl_pixmap.attributes, 0),
     if list(Palette) ->
 	    PLen = length(Palette),
 	    ColorRes = if PLen > 0, PLen =< 256 ->
@@ -418,11 +413,17 @@ write_image(Fd, Pm) ->
     write_pixels(Fd,
 		 Pm#erl_pixmap.pixels, 
 		 Pm#erl_pixmap.width, 
-		 Pm#erl_pixmap.height, Interlaced).
+		 Pm#erl_pixmap.height, Interlaced, Inline).
 
-write_pixels(Fd, Pixels, Width, Height, Interlaced) ->
+write_pixels(Fd, Pixels, Width, Height, Interlaced, Inline) ->
     Bin = collect_pixels(Pixels, Width, Height, Interlaced),
-    {LZWCodeSize, Bin1} = lzw:compress_gif(Bin),
+    {LZWCodeSize, Bin1} = 
+	if Inline == 1 ->
+		%% FIXME: check that all pixels are 7 bit !!!!!
+		{7,<<128, Bin/binary, 129>>};
+	   true ->
+		lzw:compress_gif(Bin)
+	end,
     ?dbg("compress: orig_size=~w, size=~w codesize=~w\n",
 	 [size(Bin), size(Bin1), LZWCodeSize]),
     file:write(Fd, <<LZWCodeSize>>),

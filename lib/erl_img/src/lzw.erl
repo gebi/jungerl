@@ -493,41 +493,45 @@ compress(Bin,Stripe,MinCodeSize,MaxCodeSize,NextFn) ->
 	     nextfn   = NextFn
 	    },
     ?dbg("compress: mincodesize=~w, z=~w\n",[MinCodeSize,Z]),
-    comp0(Bin,Stripe,StartLen,Z,{0,[]},[]).
+    comp0(Bin,Stripe,StartLen,Z,{0,[],[]}).
 
 
-comp0(Bin,Stripe,BitLen,Z,Build,Acc) ->
+comp0(Bin,Stripe,BitLen,Z,Build) ->
     init_comp(Z#z.first-3),
-    {NBuild, Nacc} = write({BitLen,Z#z.clear}, Build, Acc),
-    comp1(Bin,0,Stripe,[],Z#z.startlen,Z#z.first,Z,NBuild,Nacc).
+    NBuild = write(Z#z.clear, BitLen, Build),
+    comp1(Bin,0,Stripe,[],Z#z.startlen,Z#z.first,Z,NBuild).
 
-comp1(<<>>,CC,Stripe,Omega,BitLen,Count,Z,Build,Acc) ->
+
+comp1(<<>>,CC,Stripe,Omega,BitLen,Count,Z,Build) ->
     Code = ?get_lzw(Omega),
-    {NBuild, Nacc} =  write({BitLen,Code}, Build, Acc),
-    NewBL = BitLen,
-    {{TotBitLen, Codes}, N2acc} = write({NewBL,Z#z.eoi}, NBuild, Nacc),
+    NBuild =  write(Code, BitLen, Build),
+    {TotBitLen,Codes, Acc} = write(Z#z.eoi, BitLen, NBuild),
     PaddL = 8 - (TotBitLen rem 8),
-    Bin = buildbin(reverse([{PaddL, 0}|Codes])),
-    list_to_binary(reverse([Bin|N2acc]));
+    Bin = if PaddL == 8 ->
+		  buildbin(reverse(Codes));
+	     true ->
+		  buildbin(reverse([{PaddL, 0}|Codes]))
+	  end,
+    {Z#z.startlen-1, list_to_binary(reverse([Bin|Acc]))};
 
-comp1(Bin,CC,Stripe,Omega,BitLen,Count,Z,Build,Acc) when CC == Stripe ->
+comp1(Bin,CC,Stripe,Omega,BitLen,Count,Z,Build) when CC == Stripe ->
     Code =?get_lzw(Omega),
-    {NBuild, NAcc} = write({BitLen,Code}, Build, Acc),
+    NBuild = write(Code, BitLen, Build),
     if Count+2 == Z#z.next ->
 	    BitLen1 = BitLen+1,
 	    NextCode = (Z#z.nextfn)(BitLen1),
 	    Z1 = Z#z { next = NextCode },
-	    comp0(Bin,Stripe,BitLen1,Z1,NBuild,NAcc);
+	    comp0(Bin,Stripe,BitLen1,Z1,NBuild);
        true ->
-	    comp0(Bin,Stripe,BitLen,Z,NBuild,NAcc)
+	    comp0(Bin,Stripe,BitLen,Z,NBuild)
     end;
 
-comp1(<<Char:8, Bin/binary>>,CC,Stripe,Omega,BitLen,Count,Z,Build,Acc) ->
+comp1(<<Char:8, Bin/binary>>,CC,Stripe,Omega,BitLen,Count,Z,Build) ->
     NewOmega = [Char|Omega],
     case ?get_lzw(NewOmega) of
         undefined ->
             Code = ?get_lzw(Omega),
-            {NBuild, NAcc} = write({BitLen,Code}, Build, Acc),
+            NBuild = write(Code,BitLen,Build),
             ?add_lzw(NewOmega, Count),
 	    if Count+2 == Z#z.next ->
 		    BitLen1 = BitLen+1,
@@ -535,57 +539,45 @@ comp1(<<Char:8, Bin/binary>>,CC,Stripe,Omega,BitLen,Count,Z,Build,Acc) ->
 		    Z1 = Z#z { next = NextCode },
 		    if Z#z.next == Z#z.max ->
 			    Code2 =?get_lzw([Char]),
-			    {NBuild2,NAcc2}=write({BitLen,Code2},NBuild,NAcc),
-			    comp0(Bin,Stripe,BitLen1,Z1,NBuild2,NAcc2);
+			    NBuild2 = write(Code2,BitLen,NBuild),
+			    comp0(Bin,Stripe,BitLen1,Z1,NBuild2);
 		       true ->
 			    comp1(Bin,CC+1,Stripe,[Char],BitLen1,
-				  Count+1,Z1,NBuild,NAcc)
+				  Count+1,Z1,NBuild)
 		    end;
 	       true ->
 		    comp1(Bin,CC+1,Stripe,[Char],BitLen,
-			  Count+1,Z,NBuild, NAcc)
+			  Count+1,Z,NBuild)
 	    end;
         _ ->
-            comp1(Bin,CC+1,Stripe,NewOmega,BitLen,Count,Z,Build,Acc)
+            comp1(Bin,CC+1,Stripe,NewOmega,BitLen,Count,Z,Build)
     end.
 
-
-write({_,undefined}, _, _) -> 
-    erlang:fault({undef,value});
-write({CLen, Code}, {Totlen, List}, Acc) ->
+%% FIXME: must be able to write lsb byte order and bit order!
+write(Code, CLen, {Totlen, List, Acc}) ->
     ?dbg("write: ~w/~w\n", [Code, CLen]),
     NewLen = CLen + Totlen,
     if 
         NewLen rem 8 == 0 ->
-            case catch buildbin(reverse([{CLen,Code}|List])) of
+            case buildbin(reverse([{CLen,Code}|List])) of
                 Bin when binary(Bin) ->
-                    {{0, []}, [Bin|Acc]};
+                    {0, [],[Bin|Acc]};
                 {Bin, NewList} when binary(Bin) ->
                     Sum = foldl(fun({X,_}, Sum) -> X + Sum end, 0, NewList),
-                    {{Sum, reverse(NewList)}, [Bin|Acc]};
-                Else ->
-                    io:format("~p:~p Error ~p ~p ~n", [?MODULE, ?LINE, Else, 
-                                                       [{CLen, Code}, {Totlen, List}]]),
-                    erlang:fault({?MODULE, write, {internal_error, ?LINE}})
-            end;
-        NewLen > 100 -> 
-            case catch buildbin(reverse([{CLen,Code}|List])) of
-                {Bin, NewList} when binary(Bin) ->                  
-                    Sum = foldl(fun({X,_}, Sum) -> X + Sum end, 0, NewList),
-                    {{Sum, reverse(NewList)}, [Bin|Acc]};
-                Else ->
-                    io:format("~p:~p Error ~p ~p ~n", [?MODULE, ?LINE, Else, 
-                                                       [{CLen, Code}, {Totlen, List}]]),
-                    erlang:fault({?MODULE, write, {internal_error, ?LINE}})
-            end;
+                    {Sum,reverse(NewList),[Bin|Acc]}
+	    end;
+
+        NewLen > 100 ->
+            {Bin,NewList} = buildbin(reverse([{CLen,Code}|List])),
+	    Sum = foldl(fun({X,_}, Sum) -> X + Sum end, 0, NewList),
+	    {Sum,reverse(NewList),[Bin|Acc]};
+
         true ->
-            {{Totlen + CLen,[{CLen,Code}|List]}, Acc}
+            {Totlen+CLen,[{CLen,Code}|List], Acc}
     end.
 
-
-
-buildbin([{8,0}]) ->
-    <<>>;
+buildbin([{L,C}]) ->
+    <<C>>;
 buildbin([{L1, C1},{L2,C2}]) ->
     <<C1:L1, C2:L2>>;
 buildbin([{L1,C1},{L2,C2},{L3,C3}]) ->
@@ -610,6 +602,9 @@ buildbin([{L1,C1},{L2,C2},{L3,C3},{L4,C4},{L5,C5},
     <<P9:AddL,Keep9:KeepL, _:SkipL>> = <<C9:L9,0:TempFill>>,
     Bin = <<C1:L1,C2:L2,C3:L3,C4:L4,C5:L5,C6:L6,C7:L7,C8:L8,P9:AddL>>,
     NewList = [{KeepL, Keep9}|Rest],
-    {Bin, NewList}.
+    {Bin, NewList};
+buildbin([]) ->
+    <<>>.
+
 
 

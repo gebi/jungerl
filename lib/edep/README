@@ -1,0 +1,47 @@
+
+edep install
+------------
+
+Add a symbolic link to edep/scripts/edep from for example /usr/local/bin
+updated the JERLHOME to point to the jungerl home location. (fixme)
+
+The edep script needs a modern version of getopt and will probably not
+work on MaxOSX 1.2.x (maybe 1.3?) (fixme)
+
+compiler options supported
+--------------------------
+
+  -W     ignored
+  -v     ignored
+  -I     used for -include
+  -o     used for target path in dependency rule
+  -D     ignored
+  -b     ignored
+  -pa    used with include_lib
+  -pz    used with include_lib
+  -MM    skip dependency rules to OTP libraries
+  +term  I think it works ???
+
+Usage
+-----
+
+Typical usage in a makefile:
+
+all:	$(OBJS)
+
+depend:
+	edep -MM -o ../ebin $(ERLC_FLAGS) $(SOURCES) > depend.mk
+
+clean:
+	rm -rf $(OBJS) depend.mk
+
+-include depend.mk
+
+	
+
+
+
+
+
+
+

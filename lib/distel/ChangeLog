@@ -1,5 +1,8 @@
 2004-10-27  Luke Gorrie  <luke@synap.se>
 
+	* elisp/erl-service.el (erl-refactor-subfunction): Strip text
+	properties from refactored text.
+
 	* elisp/erl.el (&erl-group-leader-loop): Make *erl-output* a plain
 	Emacs buffer created on demand. Previously it was actually the
 	Distel group leader process and so it was bad to kill it (now it's

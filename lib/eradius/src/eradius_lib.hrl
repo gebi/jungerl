@@ -49,6 +49,14 @@
 -define(RTCAdmin_Reboot,           7).
 -define(RTCNAS_Reboot,            11).
 
+%% In a server we need to store properties of a NAS. This is used as
+%% an mnesia record as well as in call processing.
+-record(nas_prop, {
+          ip,
+          secret,
+          mf,
+          trace = false
+         }).
 
 %%- Radius accounting server info.
 -record( radacct , {

@@ -7,19 +7,17 @@ Erlang compiler. You can compile from Erlang to Core Erlang with
 
 which generates "foo.core".
 
-CLAW is just for fun. It is currently only-just complete enough to
-compile and run a factorial program, written by hand in a Lispy syntax
-but using only Core Erlang constructs.
+CLAW is just for fun.
 
-The overall strategy is to write a compiler as much as possible by
-simple macro-transformation from Core Erlang to Lisp.
+core-parse.lisp defines the parser. The parsing actions are really
+compilation steps, one for each syntactic construct, and are defined
+in core-compiler.lisp. The files are split mainly because the parser
+is a bit slow to compile.
 
-To run the factorial program, just go into the source directory, start
-a fresh Common Lisp (e.g. CLISP or CMUCL), and enter:
-
-  (load "runme")
-
-Exciting, huh?
+The idea is to do part of the work with macros, and part in the
+parser. Macros will define a few key constructs, like pattern
+matching, and then the parser will generate readable and runnable lisp
+code directly, using the new macros in the generated code.
 
 -- luke@bluetail.com
 

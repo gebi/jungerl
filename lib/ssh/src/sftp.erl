@@ -19,6 +19,7 @@
 %%--------------------------------------------------------------------
 %% External exports
 -export([start/3, start_link/3]).
+-export([start/2, start_link/2]).
 -export([start/1, start_link/1]).
 
 -compile(export_all).
@@ -161,12 +162,18 @@ write_file_loop(Pid, Handle, Pos, Bin, Remain, PacketSz) ->
 %%--------------------------------------------------------------------
 start_link(CM) ->
     gen_server:start_link(?MODULE, [CM], []).
+
+start_link(Host, Opts) ->
+    gen_server:start_link(?MODULE, [Host,22,Opts], []).
     
 start_link(Host, Port, Opts) ->
     gen_server:start_link(?MODULE, [Host,Port,Opts], []).
 
 start(CM) ->
     gen_server:start(?MODULE, [CM], []).
+
+start(Host, Opts) ->
+    gen_server:start(?MODULE, [Host,22,Opts], []).
     
 start(Host, Port, Opts) ->
     gen_server:start(?MODULE, [Host,Port,Opts], []).

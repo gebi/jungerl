@@ -164,7 +164,6 @@ yes_no(SSH, Prompt) when record(SSH,ssh) ->
     (SSH#ssh.io_cb):yes_no(Prompt).
 
 read_password(SSH, Prompt) when pid(SSH) ->
-    io:format("read_password\n"),
     {ok, CB} = call(SSH, {get_cb, io}),
     CB:read_password(Prompt);
 read_password(SSH, Prompt) when record(SSH,ssh) ->
@@ -664,7 +663,6 @@ server_kex(S, SSH, Kex) ->
 
 
 ssh_main(S, User, SSH) ->
-    io:format("SSH main ~p\n",[self()]),
     receive
 	{tcp, S, Data} ->
 	    %% This is a lazy way of gettting events without block
@@ -735,7 +733,7 @@ ssh_main(S, User, SSH) ->
 	    ssh_main(S, User, SSH1);
 
 	Other ->
-	    io:format("ssh_loop: got ~p\n", [Other]),
+	    ?dbg(true, "ssh_loop: got ~p\n", [Other]),
 	    ssh_main(S, User, SSH)
     end.
 %%

@@ -11,10 +11,12 @@
 %%--------------------------------------------------------------------
 %% Include files
 %%--------------------------------------------------------------------
+-include("../include/ssh.hrl").
 
 %%--------------------------------------------------------------------
 %% External exports
 -export([start/1, start_link/1]).
+-export([start/2, start_link/2]).
 -export([start/3, start_link/3]).
 
 -export([forward/5, backward/5]).
@@ -37,12 +39,18 @@
 
 start_link(CM) ->
     gen_server:start_link(?MODULE, [CM], []).
+
+start_link(Host, Opts) ->
+    gen_server:start_link(?MODULE, [Host,22,Opts], []).
     
-start_link(Host, Port, Auth) ->
-    gen_server:start_link(?MODULE, [Host,Port,Auth], []).
+start_link(Host, Port, Opts) ->
+    gen_server:start_link(?MODULE, [Host,Port,Opts], []).
 
 start(CM) ->
     gen_server:start(?MODULE, [CM], []).
+
+start(Host, Opts) ->
+    gen_server:start(?MODULE, [Host,22,Opts], []).
     
 start(Host, Port, Auth) ->
     gen_server:start(?MODULE, [Host,Port,Auth], []).
@@ -101,7 +109,7 @@ handle_call({forward, LocalIP, LocalPort, RemoteIP, RemotePort},From,State) ->
     RIP = ip_address(RemoteIP),
     Me = self(),
     Prog = fun(S) ->
-		   io:format("accepted\n"),
+		   ?dbg(true, "accepted\n", ""),
 		   gen_tcp:controlling_process(S, Me),
 		   gen_server:cast(Me,{forward, S, RemoteIP, RemotePort})
 	   end,
@@ -135,20 +143,20 @@ handle_call(Request, From, State) ->
 handle_cast({forward, S, RemoteIP, RemotePort}, State) ->
     case inet:peername(S) of
 	{ok,{OrigIP, OrigPort}} ->
-	    io:format("peer ~p ~p remote ~p ~p\n", 
-		      [OrigIP, OrigPort, RemoteIP, RemotePort]),
+	    ?dbg(true, "peer ~p ~p remote ~p ~p\n", 
+		 [OrigIP, OrigPort, RemoteIP, RemotePort]),
 	    case ssh_cm:direct_tcpip(State#state.cm, 
 				     RemoteIP, RemotePort,
 				     OrigIP, OrigPort) of
 		{ok, Channel} ->
-		    io:format("got channel ~p\n", [Channel]),
+		    ?dbg(true, "got channel ~p\n", [Channel]),
 		    ssh_cm:set_user_ack(State#state.cm, Channel, true),
 		    put({channel,S}, Channel),
 		    put({socket,Channel}, S),
 		    inet:setopts(S, [{active, once}]),
 		    {noreply, State};
 		{error, Error} ->
-		    io:format("forward: error ~p\n", [Error]),
+		    ?dbg(true, "forward: error ~p\n", [Error]),
 		    gen_tcp:close(S),
 		    {noreply, State}
 	    end;
@@ -173,14 +181,14 @@ handle_info({tcp, S, Data}, State) ->
 	undefined ->
 	    {noreply, State};	    
 	Channel ->
-	    io:format("sending ~p -> ~p\n", [S, Channel]),
+	    ?dbg(true, "sending ~p -> ~p\n", [S, Channel]),
 	    %% send and wait for ack
 	    ssh_cm:send_ack(State#state.cm, Channel, Data),
 	    inet:setopts(S, [{active, once}]),
 	    {noreply, State}
     end;
 handle_info({tcp_closed, S}, State) ->
-    io:format("tcp: closed: ~p\n", [S]),
+    ?dbg(true, "tcp: closed: ~p\n", [S]),
     case get({channel,S}) of
 	undefined -> 
 	    {noreply, State};
@@ -191,23 +199,23 @@ handle_info({tcp_closed, S}, State) ->
 
 handle_info({ssh_cm, CM, {data, Channel, Type, Data}}, State) ->
     if Type == 0 ->
-	    io:format("ssh_cm: data: ~p\n", [Channel]),
+	    ?dbg(true, "ssh_cm: data: ~p\n", [Channel]),
 	    case get({socket,Channel}) of
 		undefined ->{noreply, State};
 		S ->
-		    io:format("sending ~p -> ~p\n", [Channel,S]),
+		    ?dbg(true, "sending ~p -> ~p\n", [Channel,S]),
 		    gen_tcp:send(S, Data),
 		    ssh_cm:adjust_window(CM, Channel, size(Data)),
 		    {noreply, State}
 	    end;
        true  ->
-	    io:format("STDERR: ~s\n", [binary_to_list(Data)]),
+	    ?dbg(true, "STDERR: ~s\n", [binary_to_list(Data)]),
 	    ssh_cm:adjust_window(CM, Channel, size(Data)),
 	    {noreply, State}
     end;
 
 handle_info({ssh_cm, CM, {closed, Channel}}, State) ->
-    io:format("ssh_cm: closed: ~p\n", [Channel]),
+    ?dbg(true, "ssh_cm: closed: ~p\n", [Channel]),
     case get({socket, Channel}) of
 	undefined -> {noreply, State};
 	S ->
@@ -218,7 +226,7 @@ handle_info({ssh_cm, CM, {closed, Channel}}, State) ->
     end;
 
 handle_info({ssh_cm, CM, {eof, Channel}}, State) ->
-    io:format("ssh_cm: eof: ~p\n", [Channel]),
+    ?dbg(true, "ssh_cm: eof: ~p\n", [Channel]),
     case get({socket,Channel}) of
 	undefined -> {noreply, State};
 	S ->

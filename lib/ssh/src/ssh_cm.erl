@@ -89,11 +89,11 @@ start_link(Name, Host, Port, Opts) ->
 %% special ssh distribution version
 %%
 dist_start(Node) ->
-    Opts1 = case init:get_arguments('ssh-password') of
+    Opts1 = case init:get_argument('ssh_password') of
 	       {ok, [[Passwd]]} -> [{password, Passwd}];
 	       error -> []
 	   end,
-    Opts2 = case init:get_arguments('ssh-user') of
+    Opts2 = case init:get_argument('ssh_user') of
 		{ok, [[User]]} -> [{user, User}];
 		error -> []
 	    end,

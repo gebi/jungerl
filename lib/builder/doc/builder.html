@@ -78,6 +78,13 @@ OTP release script builder.
      other than <code>[AppName]</code> or whatever is in the
      <code>.rel</code> file.</dd>
   
+   <dt>{app_vsn, string()}</dt>
+     <dd>This option can be used to assign a version to the current
+      application. If the application directory has a version suffix,
+      the version suffix will override this option. If the directory
+      has no suffix, the default vsn will be "BLDR", unless 'app_vsn'
+      has been specified.</dd>
+  
    <dt>{apps, [App : AppName | {AppName,Vsn} | {AppName,Vsn,EbinDir}]}</dt>
      <dd>This is a way to identify which applications should be included
        in the build. The way builder determines which applications should

@@ -150,6 +150,7 @@ grep(P, T) -> grep([P], T).
 grp([], _) -> [];
 grp(P, []) -> P;
 grp(P, T) when tuple(T) -> grp(P--[T], tuple_to_list(T));
+grp(P, Port) when port(Port) -> grp(P, list_to_atom(erlang:port_to_list(Port)));
 grp(P, Rf) when reference(Rf) -> grp(P, list_to_atom(erlang:ref_to_list(Rf)));
 grp(P, Pid) when pid(Pid) -> grp(P, list_to_atom(pid_to_list(Pid)));
 grp(P, L) when list(L) -> 

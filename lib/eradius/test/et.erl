@@ -5,7 +5,7 @@
 %%% Purpose : eradius test code
 %%% Created : 25 Sep 2003 by Torbjorn Tornkvist <tobbe@bluetail.com>
 %%%----------------------------------------------------------------------
--export([local/0, duva/0, korp/0]).
+-export([local/0, duva/1, korp/0]).
 
 -include("eradius.hrl").
 -include("eradius_dict.hrl").
@@ -13,8 +13,8 @@
 local() -> 
     go({127,0,0,1}, "tobbe", "qwe123", "qwe123", {127,0,0,1}).
 
-duva() ->
-    go({192,168,128,1}, "support", "mortuta42", "mortuta42", {192,168,128,32}).
+duva(Passwd) ->
+    go({192,168,128,1}, "support", Passwd, Passwd, {192,168,128,32}).
 
 korp() ->
     go({192,168,128,47}, "tobbe", "qwe123", "mortuta42", {192,168,128,32}).

@@ -1,0 +1,7 @@
+{name, "lisperl"}.
+{vsn, {1,0}}.
+{summary, "A Lisp reader/parser implementation."}.
+{author, "Vlad Dumitrescu", "vlad_dumitrescu@hotmail.com", "2004-04-02"}.
+{keywords, ["lisp"]}.
+{needs, []}.
+{abstract,"Lisp reader/parser supporting user-definable syntax macro characters"}.

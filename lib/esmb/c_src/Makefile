@@ -15,12 +15,13 @@ md4: $(MD4_DRV_SO)
 iconv: $(ICONV_DRV_SO)
 
 $(MD4_DRV_SO): $(MD4_SHLIB_OBJS)
-	ld -G -o $@ $^
+	$(LD_SHARED) -o $@ $^
+	#ld -G -o $@ $^
 	# Symlink is only to help when using "jerl" script.
 	-ln -s $(MD4_DRV_SO) ../ebin
 
 $(ICONV_DRV_SO): $(ICONV_SHLIB_OBJS)
-	ld -G -o $@ $^
+	$(LD_SHARED) -o $@ $^
 	# Symlink is only to help when using "jerl" script.
 	-ln -s $(ICONV_DRV_SO) ../ebin
 
@@ -40,6 +41,6 @@ test.o: test.c
 	$(CC) $(CFLAGS) -o $@ -c -fpic $(ERL_INCLUDE) $<
 
 clean:
-	-rm -f $(ICONV_DRV_SO) $(MD4_DRV_SO) ../ebin/*.so
+	-rm -f $(ICONV_DRV_SO) $(MD4_DRV_SO) ../ebin/*.so *.o
 
 .INTERMEDIATE: $(MD4_SHLIB_OBJS) $(ICONV_SHLIB_OBJS)

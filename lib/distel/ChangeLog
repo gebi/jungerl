@@ -1,3 +1,8 @@
+2004-10-26  Martin Bjorklund  <mbj@bluetail.com>
+
+	* elisp/distel.el (distel-menu-items): Use erl-choose-nodename in
+	the menu.
+
 2004-10-25  Luke Gorrie  <luke@synap.se>
 
 	* elisp/derl.el (derl-send-name): Lie to Erlang by saying that we

@@ -240,8 +240,14 @@ dec_attributes(A0, Acc) ->
 
 dec_attr_val(A, Bin) when A#attribute.type == string -> 
     [{A, binary_to_list(Bin)}];
-dec_attr_val(A, <<I/integer>>) when A#attribute.type == integer -> 
-    [{A, I}];
+dec_attr_val(A, I0) when A#attribute.type == integer -> 
+    L = size(I0)*8,
+    case I0 of
+        <<I:L/integer>> ->
+            [{A, I}];
+        _ ->
+            [{A, I0}]
+    end;
 dec_attr_val(A, <<B,C,D,E>>) when A#attribute.type == ipaddr -> 
     [{A, {B,C,D,E}}];
 dec_attr_val(A, Bin) when A#attribute.type == octets -> 
@@ -254,7 +260,7 @@ dec_attr_val(A, Bin) when A#attribute.type == octets ->
     end;
 dec_attr_val(A, Val) -> 
     io:format("Uups...A=~p~n",[A]),
-    {A, Val}.
+    [{A, Val}].
 
 dec_vend_attr_val(_VendId, <<>>) -> [];
 dec_vend_attr_val(VendId, <<Vtype:8, Vlen:8, Vbin/binary>>) ->

@@ -604,34 +604,37 @@ dec_trans2_find_x2(Req, Pdu, SubCmd) ->
     %%io:format("  No.of entries = ~p~n",[SearchCount]),
     %%io:format("  EOF search ?  = ~p~n",[EndOfSearch]),
     %%io:format("  LastNameOset  = ~p~n",[LastNameOffset]),
-    Finfo = dec_info_standard(Data, SearchCount),
+    Finfo = dec_info_standard(Res, Data, SearchCount),
     #find_result{sid = Sid, eos = to_bool(EndOfSearch), finfo = Finfo}.
 
 %%% ---
 
-dec_info_standard(Data, Max) ->
-    dec_info_standard(Data, Max, 1).
+dec_info_standard(Req, Data, Max) ->
+    Ucode = length(null(Req)), % FIXME , length factor
+    dec_info_standard(Ucode, Data, Max, 1).
 
-dec_info_standard(<<_:4/binary, DT:12/binary, Size:32/little,
+dec_info_standard(Ucode, <<_:4/binary, DT:12/binary, Size:32/little,
 		  _:4/binary, Attr:16/little, Len, 
 		  Rest0/binary>>, Max, I) when I<Max->
-    <<Filename:Len/binary, _Null, Rest/binary>> = Rest0,
+    Ulen = Len * Ucode,
+    <<Filename:Ulen/binary, _:Ucode/binary, Rest/binary>> = Rest0,
     F = #file_info{name = Filename,
 		   size = Size,
 		   attr = Attr,
 		   date_time = dec_dt_info_std(DT)},
-    [F | dec_info_standard(Rest, Max, I+1)];
-dec_info_standard(<<Rkey:4/binary, DT:12/binary, Size:32/little,
+    [F | dec_info_standard(Ucode, Rest, Max, I+1)];
+dec_info_standard(Ucode, <<Rkey:4/binary, DT:12/binary, Size:32/little,
 		  _:4/binary, Attr:16/little, Len, 
 		  Rest0/binary>>, Max, Max) ->
-    <<Filename:Len/binary, _Null, Rest/binary>> = Rest0,
+    Ulen = Len * Ucode,
+    <<Filename:Ulen/binary, _:Ucode/binary, Rest/binary>> = Rest0,
     F = #file_info{name = Filename,
 		   size = Size,
 		   attr = Attr,
 		   date_time = dec_dt_info_std(DT),
 		   resume_key = Rkey},
     [F];
-dec_info_standard(Data, Max, I) ->
+dec_info_standard(Ucode, Data, Max, I) ->
     io:format("ERROR: Missing file info I=~p~n",[I]),
     sleep(2),
     io:format("FLUSH: ~p~n",[receive X -> X after 0 -> false end]),
@@ -920,8 +923,9 @@ create_options(X) when X#candx.type == dir  -> ?DIR_OPEN_OPTIONS.
 %%% ---
 
 smb_trans2_find_next2_pdu(InReq, Path, Sid) ->
-    {Wc,Wp} = wp_trans2_find_x2(?SMB_TRANS2_FIND_NEXT2, length(Path)),
-    Bf = bf_trans2_find_next2(Path, Sid),
+    {Wc,Wp} = wp_trans2_find_x2(?SMB_TRANS2_FIND_NEXT2, 
+				sizeof(Path), length(null(InReq))),
+    Bf = bf_trans2_find_next2(InReq, Path, Sid),
     Rec = #smbpdu{cmd = ?SMB_COM_TRANSACTION2,
 		  pid = InReq#smbpdu.pid,
 		  uid = InReq#smbpdu.uid,
@@ -936,7 +940,7 @@ smb_trans2_find_next2_pdu(InReq, Path, Sid) ->
     %%io:format("trans2_find_next2: ByteCount = ~p~n",[Rec#smbpdu.bc]),
     {Rec, enc_smb(Rec)}.
 
-bf_trans2_find_next2(Path, Sid) ->
+bf_trans2_find_next2(InReq, Path, Sid) ->
     %% Flags ::= DoNotClose,CloseAtEndOfSearch,ReturnResumeKey,ContinueSearch,NoBackupIntent
     %% ContinueSearch,Resume,CloseAtEOS,
     Flags = <<16#000e:16/little>>,
@@ -946,16 +950,17 @@ bf_trans2_find_next2(Path, Sid) ->
 		    <<Sid:16/little>>, % Search attribute or SID
 		    <<512:16/little>>, % Max # of entries returned
 		    <<?SMB_INFO_STANDARD:16/little>>, % What info to return in the result
-		    <<0:32/little>>, % Resume key
-		    Flags,       % Flags
-		    Path,[0]     % Search pattern
+		    <<0:32/little>>,   % Resume key
+		    Flags,             % Flags
+		    Path, null(InReq)  % Search pattern
 		    ]).
 
 %%% ---
 
 smb_trans2_find_first2_pdu(InReq, Path) ->
-    {Wc,Wp} = wp_trans2_find_x2(?SMB_TRANS2_FIND_FIRST2, length(Path)),
-    Bf = bf_trans2_find_first2(Path),
+    {Wc,Wp} = wp_trans2_find_x2(?SMB_TRANS2_FIND_FIRST2, 
+				sizeof(Path), length(null(InReq))),
+    Bf = bf_trans2_find_first2(InReq, Path),
     Rec = #smbpdu{cmd = ?SMB_COM_TRANSACTION2,
 		  pid = InReq#smbpdu.pid,
 		  uid = InReq#smbpdu.uid,
@@ -971,17 +976,17 @@ smb_trans2_find_first2_pdu(InReq, Path) ->
     {Rec, enc_smb(Rec)}.
 
 
-wp_trans2_find_x2(SubCmd, PathLen) ->
+wp_trans2_find_x2(SubCmd, PathLen, NullLen) ->
     %% How to compute the offset values (no.of bytes):
     %% ParamOffset = ?SMB_HEADER_LEN + ThisLen + WordCount + ByteCount + Pad
     %%             = ?SMB_HEADER_LEN + 30 + 1 + 2 + 3
     %%             = ?SMB_HEADER_LEN + 36
-    %% ParamLen    = ParameterBytesLen + PathLen + NullByte
-    %%             = 12 + PathLen + 1
-    %% DataOffset  = ParamOffset + ParamLen + NullByte
-    %%             = ParamOffset + ParamLen
+    %% ParamLen    = ParameterBytesLen + PathLen + NullByteLen
+    %%             = 12 + PathLen + NullByteLen
+    %% DataOffset  = ParamOffset + ParamLen
+    %%
     ParamOffset = ?SMB_HEADER_LEN + 36,
-    ParamLen    = 13 + PathLen,
+    ParamLen    = 12 + PathLen + NullLen,
     DataOffset  = ParamOffset + ParamLen,
     ParamCount  = DataOffset - ParamOffset,
     {15,                         % WordCount = 14 + SetupCount
@@ -1003,7 +1008,7 @@ wp_trans2_find_x2(SubCmd, PathLen) ->
       SubCmd:16/little           % Setup words (# = Setup word count)
       >>}.
 
-bf_trans2_find_first2(Path) ->
+bf_trans2_find_first2(InReq, Path) ->
     %% Sa ::= Archive,Directory,Volume,System,Hidden,ReadOnly
     %% Include: Hidden, System and Directory in search result
     Sa = <<16#0016:16/little>>,
@@ -1017,14 +1022,18 @@ bf_trans2_find_first2(Path) ->
 		    <<512:16/little>>, % Max # of entries returned
 		    Flags,       % Flags
 		    <<?SMB_INFO_STANDARD:16/little>>, % What info to return in the result
-		    <<0:32/little>>, % Storage type
-		    Path,[0]     % Search pattern
+		    <<0:32/little>>,  % Storage type
+		    Path, null(InReq) % Search pattern
 		    ]).
+
+sizeof(B) when binary(B) -> size(B);
+sizeof(L) when list(L)   -> length(L).
+
 
 %%% ---
 
 smb_check_directory_pdu(InReq, Path) ->
-    Bf = bf_check_directory(Path),
+    Bf = bf_check_directory(InReq, Path),
     Rec = #smbpdu{cmd = ?SMB_CHECK_DIRECTORY,
 		  pid = InReq#smbpdu.pid,
 		  uid = InReq#smbpdu.uid,
@@ -1036,9 +1045,9 @@ smb_check_directory_pdu(InReq, Path) ->
     %%io:format("check_directory: ByteCount = ~p~n",[Rec#smbpdu.bc]),
     {Rec, enc_smb(Rec)}.
 
-bf_check_directory(Path) ->
-    list_to_binary([?BUF_FMT_ASCII,   % Buffer format
-		    Path,[0]]).       % Dir path
+bf_check_directory(InReq, Path) ->
+    list_to_binary([?BUF_FMT_ASCII,      % Buffer format
+		    Path, null(InReq)]). % Dir path
 
 %%% ---
     
@@ -1066,7 +1075,7 @@ wp_tree_connect_andx(Neg) ->
       1:16/little>>}.            % PasswordLength (incl. NULL)
 
 bf_tree_connect_andx(Neg, Path, Service) when ?NTLM_0_12(Neg) ->
-    list_to_binary([0,           % Password
+    list_to_binary([0,               % Password
 		    Path, null(Neg), % filesystem 
 		    Service, [0]]);  % service
 %%%
@@ -1075,8 +1084,15 @@ bf_tree_connect_andx(Neg, Path, Service) ->
 		    Path, [0],   % filesystem
 		    Service, [0]]).  % service
     
-null(Neg) when ?USE_UNICODE(Neg) -> [0,0];
-null(_)                          -> [0].
+
+null(Neg) when record(Neg,smb_negotiate_res),
+	       ?USE_UNICODE(Neg) -> 
+    [0,0];
+null(Pdu) when record(Pdu,smbpdu),
+	       ?F2_USE_UNICODE(Pdu) -> 
+    [0,0];
+null(_) -> 
+    [0].
 
 %%% ---
 
@@ -1174,14 +1190,14 @@ bf_session_setup_andx(Neg, U, Passwd, UPasswd) ->
 			       band ?SECMODE_CHALLENGE) > 0) ).
 
 enc_lm_passwd(Neg, Passwd) when ?CORE_PROTOCOL(Neg) ->
-    {Passwd, length(Passwd)};
+    {Passwd, sizeof(Passwd)};
 enc_lm_passwd(Neg, Passwd) when ?PRE_DOS_LANMAN_2_1(Neg), 
 			     ?USE_ENCRYPTION(Neg) ->
     EncKey = Neg#smb_negotiate_res.encryption_key,
     EncPasswd = lm_challenge_response(Passwd, EncKey),
-    {EncPasswd, size(EncPasswd)};
+    {EncPasswd, sizeof(EncPasswd)};
 enc_lm_passwd(Neg, Passwd) ->
-    {Passwd, length(Passwd)}.
+    {Passwd, sizeof(Passwd)}.
 
 enc_nt_passwd(Neg, Passwd, Cset) when ?NTLM_0_12(Neg), 
 				      ?USE_ENCRYPTION(Neg) ->
@@ -1191,9 +1207,9 @@ enc_nt_passwd(Neg, Passwd, Cset) when ?NTLM_0_12(Neg),
     iconv:close(Cd),
     EncKey = Neg#smb_negotiate_res.encryption_key,
     EncPasswd = nt_challenge_response(UCS2pw, EncKey),
-    {EncPasswd, size(EncPasswd)};
+    {EncPasswd, sizeof(EncPasswd)};
 enc_nt_passwd(Neg, Passwd, _) ->
-    {Passwd, length(Passwd)}.
+    {Passwd, sizeof(Passwd)}.
 
 %%%
 %%% TEST LM-SessionKey: 
@@ -1430,7 +1446,7 @@ recv(S) ->
 dec_msg(<<?POSITIVE_SESSION_RESPONSE,Flags,Length:16>>) ->
     {ok, ?POSITIVE_SESSION_RESPONSE};
 dec_msg(<<?SESSION_SERVICE, _, Length:16, SMB_pdu/binary>>) ->
-    {ok, ?SESSION_SERVICE, get_more(Length, size(SMB_pdu), [SMB_pdu])};
+    {ok, ?SESSION_SERVICE, get_more(Length, sizeof(SMB_pdu), [SMB_pdu])};
 dec_msg(<<?SESSION_KEEP_ALIVE, _/binary>>) ->
     {ok, ?SESSION_KEEP_ALIVE};
 dec_msg(<<?NEGATIVE_SESSION_RESPONSE,Flags,Length:16,Ecode>>) ->

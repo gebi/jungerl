@@ -124,6 +124,10 @@
 -define(FLAGS2_NTLM, (?FLAGS2_LONG_NAMES bor 
 		      ?FLAGS2_UNICODE)).
 
+-define(F2_USE_UNICODE(Pdu), 
+	((Pdu#smbpdu.flags2 band ?FLAGS2_UNICODE) > 0)).
+
+
 %%% NB: Multi-byte values must be sent sent with the LSB first !!
 -record(smbpdu, {
 	  cmd,               % SMB command , 1 byte

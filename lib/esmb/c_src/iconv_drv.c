@@ -4,6 +4,7 @@
  * $Id$
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <iconv.h>
 #include <errno.h>
@@ -172,19 +173,20 @@ static int driver_send_error(t_iconvdrv *iv, ErlDrvTermData *am)
 static void iv_open(t_iconvdrv *iv, char *tocode, char *fromcode)
 {
     int len;
-    iconv_t *cd;
+    iconv_t cd;
     ErlDrvBinary *bin;
 
-    if ((*cd = iconv_open(tocode, fromcode)) == (iconv_t) -1) {
+    if ((cd = iconv_open(tocode, fromcode)) == (iconv_t) -1) {
 	driver_send_error(iv, &am_einval);
     }
     else {
 	len = sizeof(iconv_t);
 	if (!(bin = driver_alloc_binary(len))) {
+            iconv_close(cd);
 	    driver_send_error(iv, &am_enomem);
 	}
 	else {
-	    memcpy(bin->orig_bytes, cd, len);
+	    memcpy(bin->orig_bytes, &cd, len);
 	    driver_send_bin(iv, bin, len);
 	    driver_free_binary(bin);
 	}

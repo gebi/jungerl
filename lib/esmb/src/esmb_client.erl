@@ -24,6 +24,8 @@ istart(Path, User) -> start(Path, User, "WORKGROUP", ?CSET_ISO_8859_1).
 ustart(Path, User) -> start(Path, User, "WORKGROUP", ?CSET_UTF8).
 
 start(Path, User, Wgroup, Charset) ->
+    md4:start(),
+    iconv:start(),
     case host_share(Path) of
 	{Host, Share} ->
 	    spawn(fun() -> init(Host, Share, User, Wgroup, Charset) end);
@@ -33,21 +35,16 @@ start(Path, User, Wgroup, Charset) ->
 
 init(Host, Share, User, Wgroup, Charset) ->
     put(charset, Charset),
-    Called = ucase(Host),
-    Caller = esmb:caller(),
-    {ok,S,Neg} = esmb:connect(Caller, Called),
+    {ok,S,Neg} = esmb:connect(Host),
     Pw = get_passwd(),
     U = #user{pw = Pw, name = User, primary_domain = Wgroup},
     Pdu0 = esmb:user_logon(S, Neg, U),
     esmb:exit_if_error(Pdu0, "Login failed"),
-    WinPath = mk_winpath(Neg, "//"++Called++"/"++User, Charset),
+    WinPath = mk_winpath(Neg, "//"++Host++"/"++User, Charset),
     Path = to_ucs2(Neg, WinPath, Charset),
     Pdu1 = esmb:tree_connect(S, Neg, Pdu0, Path),
     esmb:exit_if_error(Pdu1, "Tree connect failed"),
     shell(S, Neg, {Pdu1, "\\\\"}).
-
-mk_path(Called, User) ->
-    "\\\\" ++ Called ++ "\\" ++ ucase(User).
 
 
 shell(S, Neg, {_Pdu, Cwd} = State) ->

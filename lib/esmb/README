@@ -23,10 +23,12 @@ Finally, NetBIOS is described in RFC 1001,1002.
 To see what protocols messages that are sent when using
 the smbclient program. Try the following commands:
 
-  smbclient //korp/tobbe -U tobbe -m LANMAN1
-  smbclient korp -L -U tobbe -m LANMAN1
+  smbclient //korp/tobbe -U tobbe
+  smbclient korp -L -U tobbe 
 
-By using the -m switch you force smbclient to negotiate
-the same dialect that esmb currently is using.
+A nice CIFS explanation can also be found here:
+
+  http://www.ubiqx.org/cifs/
+
 
 Good luck, Tobbe

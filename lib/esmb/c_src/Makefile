@@ -8,22 +8,13 @@ ICONV_DRV_SO = ../priv/iconv_drv.so
 MD4_SHLIB_OBJS = md4_drv.o md4.o
 ICONV_SHLIB_OBJS = iconv_drv.o
 
-all: md4 iconv
-
-md4: $(MD4_DRV_SO)
-
-iconv: $(ICONV_DRV_SO)
+all: $(MD4_DRV_SO) $(ICONV_DRV_SO)
 
 $(MD4_DRV_SO): $(MD4_SHLIB_OBJS)
 	$(LD_SHARED) -o $@ $^
-	#ld -G -o $@ $^
-	# Symlink is only to help when using "jerl" script.
-	-ln -s $(MD4_DRV_SO) ../ebin
 
 $(ICONV_DRV_SO): $(ICONV_SHLIB_OBJS)
 	$(LD_SHARED) -o $@ $^
-	# Symlink is only to help when using "jerl" script.
-	-ln -s $(ICONV_DRV_SO) ../ebin
 
 test: test.o md4.o
 	$(CC) -o md4test test.o md4.o

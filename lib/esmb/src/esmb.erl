@@ -7,7 +7,7 @@
 %%% $Id$
 %%% --------------------------------------------------------------------
 -export([called_name/1, calling_name/1, ucase/1, lcase/1, check_dir/3,
-	 connect/2, connect/3, connect/4, close/1, user_logon/3, emsg/3,
+	 connect/1, connect/2, connect/3, close/1, user_logon/3, emsg/3,
 	 tree_connect/4, tree_connect/5, list_dir/3, called/1,
 	 open_file_ro/3, open_file_rw/3, stream_read_file/3,
 	 read_file/3, mkdir/3, rmdir/3, is_ok/2,
@@ -90,14 +90,12 @@ list_shares(Host, User, Passwd) ->
     list_shares(Host, User, Passwd, ?DEFAULT_WORKGROUP, []).
 
 list_shares(Host, User, Passwd, Workgroup, SockOpts) ->
-    Called = called(Host),
-    Caller = caller(),
-    case connect(Caller, Called, SockOpts) of
+    case connect(Host, SockOpts) of
 	{ok,S,Neg} ->
 	    U = #user{pw = Passwd, name = User, primary_domain = Workgroup},
 	    Pdu0 = user_logon(S, Neg, U),
 	    exit_if_error(Pdu0, "Login failed"),
-	    Path = "\\\\" ++ Called ++ "\\IPC" ++ [$$], % make the Emacs mode happy...
+	    Path = "\\\\*SMBSERVER\\IPC" ++ [$$], % make the Emacs mode happy...
 	    Pdu1 = tree_connect(S, Neg, Pdu0, ipc_path(Neg, Path), ?SERVICE_ANY_TYPE),
 	    exit_if_error(Pdu1, "Tree connect failed"),
 	    {Req, Pdu2} = smb_list_shares_pdu(Pdu1),
@@ -222,16 +220,15 @@ bf_list_shares(TransName) ->
 %%% Setup a socket, initiate an NBSS session and 
 %%% negotiate the protocol dialect.
 %%%---------------------------------------------------------------------
-connect(Caller, Called)           -> connect(Caller, Called, []).
-connect(Caller, Called, SockOpts) -> connect(Caller, Called, SockOpts, ?PORT).
+connect(Host)           -> connect(Host, []).
+connect(Host, SockOpts) -> connect(Host, SockOpts, ?PORT).
 
-connect(Caller, Called, SockOpts, Port) ->
-    ?dbg("~w(~w): enter connect, Caller=~p Called=~p~n",
-	   [?MODULE, ?LINE, Caller, Called]),
+connect(Host, SockOpts, Port) ->
+    ?dbg("~w(~w): enter connect, Host=~p ~n", [?MODULE, ?LINE, Host]),
     Opts = [binary, {packet, 0}|SockOpts],
-    case gen_tcp:connect(lcase_host(Called), Port, Opts) of
+    case gen_tcp:connect(Host, Port, Opts) of
 	{ok,S} ->
-	    case nbss_session_request(S, Called, Caller) of
+	    case nbss_session_request(S, "*SMBSERVER", caller()) of
 		{ok,_} ->
 		    {ok, S, negotiate(S)};
 		_ ->
@@ -253,7 +250,6 @@ write_file(S, Neg, InReq, Finfo) ->
 
 write_file(S, Neg, InReq, Finfo, Bin, Written) when ?LT_BUFSIZE(Neg,Bin) ->
     {Req, Pdu} = smb_write_andx_pdu(InReq, Finfo, Bin, Written),
-    %%io:format("~p(~p): writing ~p bytes~n",[?MODULE,?LINE,size(Bin)]),
     case decode_smb_response(Req, nbss_session_service(S, Pdu)) of
 	{ok, Wrote} ->
 	    {ok, Wrote + Written};
@@ -1102,8 +1098,6 @@ smb_check_directory_pdu(InReq, Path) ->
 		  flags2 = InReq#smbpdu.flags2,
 		  bc  = size(Bf),
 		  bf  = Bf},
-    %%io:format("check_directory: WordCount = ~p~n",[Rec#smbpdu.wc]),
-    %%io:format("check_directory: ByteCount = ~p~n",[Rec#smbpdu.bc]),
     {Rec, enc_smb(Rec)}.
 
 bf_check_directory(InReq, Path) ->
@@ -1123,8 +1117,6 @@ smb_tree_connect_andx_pdu(Neg, InReq, Path, Service) ->
 		  wp = Wp,
 		  bc  = size(Bf),
 		  bf  = Bf},
-    %%io:format("tree_connect_andx: WordCount = ~p~n",[Rec#smbpdu.wc]),
-    %%io:format("tree_connect_andx: ByteCount = ~p~n",[Rec#smbpdu.bc]),
     {Rec, enc_smb(Rec)}.
 
 wp_tree_connect_andx(Neg) ->
@@ -1177,7 +1169,6 @@ smb_session_setup_andx_pdu(Neg, U) when ?NTLM_0_12(Neg),
 					?USE_UNICODE(Neg) ->
     ?dbg("~w(~w): session_setup_andx, ntlm_0.12 + Unicode Capa=~w~n",
 	 [?MODULE,?LINE, Neg#smb_negotiate_res.srv_capabilities]),
-    %%{Passwd, PwLen}   = enc_lm_passwd(Neg, U#user.pw),
     {UPasswd, UPwLen} = enc_nt_passwd(Neg, U#user.pw, U#user.charset),
     {Wc,Wp} = wp_session_setup_andx(Neg, U, 0, UPwLen), 
     Bf = bf_session_setup_andx(Neg, U, UPasswd),
@@ -1356,7 +1347,6 @@ ex(K, D)  ->
     exit("fatal_error").
 
 e(K,D) -> 
-    %%io:format("crypto:des_cbc_encrypt(~p, 0, ~p) ~n", [K,D]),
     B = crypto:des_cbc_encrypt(s2k(K), null_vector(), D).
 
 null_vector() -> <<0,0,0,0,0,0,0,0>>.
@@ -1401,8 +1391,6 @@ s2k(<<B0:7/binary,B1:7/binary>>) ->
     
 
 s16x(Passwd) -> 
-    %%io:format("====== ~p b(~p)~n", [p14(Passwd), swab(p14(Passwd))]),
-    %%io:format("------ ~p b(~p)~n", [p14(Passwd), s2k(p14(Passwd))]),
     ex(p14(Passwd), n8()).
 
 p14(Passwd) when size(Passwd) =< 14 ->
@@ -1512,7 +1500,6 @@ recv(S) ->
 	{tcp,S,Bin} ->
 	    case dec_msg(Bin) of
 		{ok, ?SESSION_KEEP_ALIVE} ->
-		    io:format("recv: got KEEP_ALIVE~n", []),
 		    recv(S);
 		Else ->
 		    Else
@@ -1618,7 +1605,6 @@ to_bool(_) -> true.
 
 hexprint(L) ->
     F = fun(H, Acc) ->
-		%%io:format("~c~.16B",[Acc,H]),
 		io:format("~c~s",[Acc,i2x(H)]),
 		$,
 	end,

@@ -11,6 +11,8 @@ If a program is giving you trouble, just put an empty file called SKIP
 in its top-level directory. For example, if you want to skip the
 'tuntap' program, you can do: touch lib/tuntap/SKIP
 
+If you want to compile only one program or library, you can just do 'make conf'
+and then type make in the lib/PROGRAMNAME directory of your choice.
 
 How to add an application to the Jungerl
 ======================================================================

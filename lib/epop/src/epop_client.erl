@@ -397,9 +397,15 @@ init_options(Uid,Adr,Options) ->
 
 user_address(User) ->
     case string:tokens(User,"@") of
-	[Uid,Adr] -> {Uid,Adr};
+	List when length(List)>1 -> make_uid_address(List);
 	_ -> throw({error,address_format})
     end.
+
+make_uid_address(L) -> make_uid_address(L, "").
+
+make_uid_address([_Uid, Adr], Uid) -> {Uid++_Uid, Adr};
+make_uid_address([_Uid|L], Uid)    -> make_uid_address(L, Uid++_Uid++"@").
+    
 
 set_options([{snoop,Flag}|T],S) ->
     set_options(T,S#sk{snoop=Flag});

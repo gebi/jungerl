@@ -708,7 +708,11 @@ tokenise(Cs,St) ->
 tokenise([$<|Cs], Acc, St, Ln0) ->
     case collect_names(Cs,Ln0) of
         {[[$/|Name]],Ln1,[$>|Cs1]} ->
-	    tokenise(Cs1, [?TAG_END(to_name(Name),Ln0,St) | Acc],St, Ln1);
+	    case cut_tag(Name, St) of
+		true -> tokenise(Cs1,Acc,St,Ln1);
+		false ->
+		    tokenise(Cs1,[?TAG_END(to_name(Name),Ln0,St)|Acc],St,Ln1)
+	    end;
         {[[$/|Name]|_],Ln1,[$>|Cs1]} ->
 	    {error, {bad_end_tag,to_name(Name)}};
 	{["!--#"++Cmd,{comment,Data}],Ln1,[$-,$-,$>|Cs1]} ->
@@ -718,12 +722,16 @@ tokenise([$<|Cs], Acc, St, Ln0) ->
             Tag = to_name("!--"),
 	    tokenise(Cs1,[?TAG(Tag,Ln0,St,[{comment,Cmd++Data}])|Acc],St,Ln1);
         {[Name|Args],Ln1,[$>|Cs1]} ->
-	    case to_name(Name) of
-		p ->
-		    {Ln2,Cs2} = skip_white(Cs1,Ln1),
-		    tokenise(Cs2,[?TAG(p,Ln0,St,Args)|Acc],St,Ln2);
-		Tag ->
-		    tokenise(Cs1, [?TAG(Tag,Ln0,St,Args)|Acc],St,Ln1)
+	    case cut_tag(Name, St) of
+		true -> tokenise(Cs1,Acc,St,Ln1);
+		false ->
+		    case to_name(Name) of
+			p ->
+			    {Ln2,Cs2} = skip_white(Cs1,Ln1),
+			    tokenise(Cs2,[?TAG(p,Ln0,St,Args)|Acc],St,Ln2);
+			Tag ->
+			    tokenise(Cs1, [?TAG(Tag,Ln0,St,Args)|Acc],St,Ln1)
+		    end
 	    end;
         {_, [$>|Cs1]} ->
 	    {error, no_tag};
@@ -735,6 +743,16 @@ tokenise([C|Cs], Acc, St, Ln0) ->
     tokenise(Cs1, [?PCDATA(Ln0,St,Raw)|Acc], St, Ln1);
 tokenise([], Acc, St, Ln) ->
     {ok, St, reverse(Acc)}.
+
+%% Check if we should remove certain invalid tags 
+%% (such as o:p buggy outlook XML tags...)
+cut_tag(Name, St) ->
+    case member($:, Name) of
+	true ->
+	    member(nonstrict, St#state.extensions);
+	false ->
+	    false
+    end.
 
 
 ssi_path(St) ->

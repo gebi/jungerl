@@ -181,7 +181,7 @@ sequence. For general information about Emacs' online help, use
       nil
       ("Create an interactive erlang session buffer" erl-ie-show-session)
       nil
-      ("Specify which node to connect to" erl-get-nodename)
+      ("Specify which node to connect to" erl-choose-nodename)
       )))
   "*Description of the Distel menu used by Erlang Extended mode.
 

@@ -268,8 +268,8 @@ dec_vend_attr_val(VendId, <<Vtype:8, Vlen:8, Vbin/binary>>) ->
     <<Vval:Len/binary,Vrest/binary>> = Vbin,
     Vkey = {VendId,Vtype},
     case eradius_dict:lookup(Vkey) of
-	A when record(A, attribute) ->
-	    dec_attr_val(Vkey, Vval) ++ dec_vend_attr_val(VendId, Vrest);
+	[A] when record(A, attribute) ->
+	    dec_attr_val(A, Vval) ++ dec_vend_attr_val(VendId, Vrest);
 	_ ->
 	    [{Vkey,Vval} | dec_vend_attr_val(VendId, Vrest)]
     end.

@@ -1,13 +1,13 @@
 
 SUBDIRS = src
-APPNAME=plain_fsm
+APPNAME=lines
 BINDIR=ebin
 INCDIR=inc
 DOCDIR=doc
 EDOCDIR="../edoc/ebin"
 STOOLSDIR="../syntax_tools/ebin"
 XMERLDIR="../xmerl/ebin"
-DOC_OPTS=[{title,"Welcome to Plain_FSM"}]
+DOC_OPTS=[{title,"The Lines Module"}]
 
 all: all-subdirs
 

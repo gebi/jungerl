@@ -3,7 +3,7 @@ INCLUDE=../inc
 EMULATOR=beam
 ERL_COMPILE_FLAGS += -I $(INCLUDE) +warn_unused_vars +nowarn_shadow_vars +warn_unused_import
 
-SOURCES=  plain_fsm.erl
+SOURCES=  lines.erl
 
 OBJECTS=$(SOURCES:%.erl=$(EBIN)/%.$(EMULATOR))
 

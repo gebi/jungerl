@@ -1,3 +1,21 @@
+%%% The contents of this file are subject to the Erlang Public License,
+%%% Version 1.0, (the "License"); you may not use this file except in
+%%% compliance with the License. You may obtain a copy of the License at
+%%% http://www.erlang.org/license/EPL1_0.txt
+%%%
+%%% Software distributed under the License is distributed on an "AS IS"
+%%% basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
+%%% the License for the specific language governing rights and limitations
+%%% under the License.
+%%%
+%%% The Original Code is plain_fsm-0.4.
+%%%
+%%% The Initial Developer of the Original Code is Ericsson Telecom
+%%% AB. Portions created by Ericsson are Copyright (C), 1998, Ericsson
+%%% Telecom AB. All Rights Reserved.
+%%%
+%%% Contributor(s): ______________________________________.
+
 %%%-------------------------------------------------------------------
 %%% File    : plain_fsm.erl
 %%% @author Ulf Wiger, <ulf.wiger@ericsson.com>
@@ -51,7 +69,7 @@
 %% stable state. </p>
 %% 
 %% <p>In the states where you want to handle system messages, you have 
-%% two choices:</p>
+%% three choices:</p>
 %% 
 %% <h3>(A) Insert the system messages in the receive clause:</h3>
 %% 
@@ -73,7 +91,24 @@
 %% <code>system_shutdown()</code>, <code>format_status()</code>, which
 %% are required callbacks when you handle system messages directly.</p>
 %%
-%% <h3>(B) Write a pseudo wrapper function around your receive clause:</h3>
+%% <h3>(B) Handle system messages and unknown messages together:</h3>
+%% 
+%% <pre>
+%% idle(S) ->
+%%    Parent = plain_fsm:info(parent),
+%%    receive
+%%       ... %% your original code here
+%%       Msg ->
+%%          plain_fsm:handle_msg(Msg, State, fun(S1) -> idle(S1) end)
+%%    end.
+%% </pre>
+%%
+%% <p>This is quite convenient if the receive statement already has a 
+%% 'catch-all' clause, discarding unknown messages. 
+%% <code>plain_fsm:handle_msg/3</code> will handle system messages properly
+%% and ignore any other message.</p>
+%%
+%% <h3>(C) Write a pseudo wrapper function around your receive clause:</h3>
 %%
 %% <pre>
 %% idle(S) ->
@@ -90,6 +125,9 @@
 %% would be confusing (you cannot solve the problem using a real function
 %% that way.) On the plus side, this is a fairly small violation of both
 %% the original code and Erlang's semantics.</p>
+%%
+%% <p><i>Note that for this to work, you must include "plain_fsm.hrl"
+%% in your module.</i></p>
 %%
 %% <h4>Example</h4>
 %% <p>In the module <a href="../src/fsm_example.erl">fsm_example.erl</a>
@@ -163,6 +201,7 @@
 %%% Functions to be called from within the state machine:
 -export([extended_receive/1,
 	 handle_system_msg/4,
+	 handle_msg/3,
 	 parent_EXIT/2,
 	 store_name/1,
 	 info/1]).
@@ -296,6 +335,12 @@ info(What) ->
 %% to a set of receive patterns handling system messages and parent termination
 %% according to the OTP rules. The transform requires that the surrounding
 %% function has exactly one argument (the "State" or "Loop Data".)</p>
+%% <p>To trigger the parse_transform, include the file 
+%% <code>plain_fsm.hrl</code> (found in <code>plain_fsm/inc/</code>) in
+%% your module, and the Erlang compiler must be able to find the module 
+%% <code>plain_fsm.beam</code>. If <code>erlc</code> is used, this is
+%% accomplished by adding <code>-pa .../plain_fsm/ebin</code> to the 
+%% <code>erlc</code> command.</p>
 %% @end
 extended_receive(_Expr) ->
     exit(cannot_be_called_directly).
@@ -344,6 +389,42 @@ handle_system_msg(Req, From, State, Cont) ->
 			  {Sys1, State}).
 
 
+%% @spec handle_msg(Msg, State, Cont::cont()) -> NEVER_RETURNS
+%%
+%% @doc Called in a "catch-all" clause within a receive statement.
+%% <p>This function never returns. It will handle system messages
+%% properly and ignore anything else.
+%% Example:</p>
+%% <pre>
+%% idle(S) ->
+%%   receive
+%%      ...
+%%      Msg ->
+%%          plain_fsm:handle_msg(Msg, S, fun(S1) ->
+%%                                                idle(S1)
+%%                                       end)
+%%   end.
+%% </pre>
+%%
+%% <p>Note that this function should <i>only</i> be used if it is known
+%% to be safe to discard unknown messages. In most state machines there should
+%% be at least <i>one</i> state where unknown messages are discarded; in 
+%% these states, the handle_msg/3 function can be a convenient way to 
+%% handle both unknown messages and system messages.</p>
+%%
+%% <p>The <code>Cont</code> argument should be either a fun with one argument
+%% (the new state), which jumps back into the user code in the proper place,
+%% or it can be the name of a function (in this case, 'idle'). In the latter
+%% case, the function in question must be exported; in the former case, this
+%% is not necessary.</p>
+%% @end
+handle_msg({system, From, Req}, State, Cont) ->
+    handle_system_msg(Req, From, State, Cont);
+handle_msg(_Other, State, Cont) ->
+    %% Unknown message -- ignore.
+    continue(State, Cont).
+    
+
 %% @hidden
 %% @spec system_continue(Parent, Debug, IntState) -> USER_CODE
 %%
@@ -351,15 +432,19 @@ handle_system_msg(Req, From, State, Cont) ->
 %%
 system_continue(Parent, Debug, IntState) ->
     #info{} = I = get({?MODULE, info}),
-    {#sys{mod = Mod, cont = Cont} = Sys, State} = IntState,
+    {#sys{cont = Cont} = Sys, State} = IntState,
     put({?MODULE, info}, I#info{parent = Parent, debug = Debug,
 				sys = Sys}),
-    case Cont of
-	_ when function(Cont) ->
-	    Cont(State);
-	_ when atom(Cont) ->
-	    Mod:Cont(State)
-    end.
+    continue(State, Cont).
+
+
+
+continue(State, Cont) when function(Cont) ->
+    Cont(State);
+continue(State, Cont) when atom(Cont) ->
+    #info{sys = #sys{mod = Mod}} = get({?MODULE, info}),
+    Mod:Cont(State).
+
 
 %% @hidden
 %% @spec system_terminate(Reason, Parent, Debug, IntState) -> EXIT

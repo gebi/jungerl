@@ -53,7 +53,7 @@ A behaviour/support library for writing plain Erlang FSMs.<ul><li><a href="#desc
   stable state. </p>
  
   <p>In the states where you want to handle system messages, you have
-  two choices:</p>
+  three choices:</p>
  
   <h3>(A) Insert the system messages in the receive clause:</h3>
  
@@ -75,7 +75,24 @@ A behaviour/support library for writing plain Erlang FSMs.<ul><li><a href="#desc
   <code>system_shutdown()</code>, <code>format_status()</code>, which
   are required callbacks when you handle system messages directly.</p>
  
-  <h3>(B) Write a pseudo wrapper function around your receive clause:</h3>
+  <h3>(B) Handle system messages and unknown messages together:</h3>
+ 
+  <pre>
+  idle(S) ->
+     Parent = plain_fsm:info(parent),
+     receive
+        ... %% your original code here
+        Msg ->
+           plain_fsm:handle_msg(Msg, State, fun(S1) -> idle(S1) end)
+     end.
+  </pre>
+ 
+  <p>This is quite convenient if the receive statement already has a
+  'catch-all' clause, discarding unknown messages.
+  <code>plain_fsm:handle_msg/3</code> will handle system messages properly
+  and ignore any other message.</p>
+ 
+  <h3>(C) Write a pseudo wrapper function around your receive clause:</h3>
  
   <pre>
   idle(S) ->
@@ -92,6 +109,9 @@ A behaviour/support library for writing plain Erlang FSMs.<ul><li><a href="#desc
   would be confusing (you cannot solve the problem using a real function
   that way.) On the plus side, this is a fairly small violation of both
   the original code and Erlang's semantics.</p>
+ 
+  <p><i>Note that for this to work, you must include "plain_fsm.hrl"
+  in your module.</i></p>
  
   <h4>Example</h4>
   <p>In the module <a href="../src/fsm_example.erl">fsm_example.erl</a>
@@ -155,6 +175,7 @@ A behaviour/support library for writing plain Erlang FSMs.<ul><li><a href="#desc
 <table width="100%" border="1"><tr><td valign="top"><a href="#behaviour_info-1">behaviour_info/1</a></td><td>Defines which functions this behaviour expects to be exported from
   the user's callback module.</td></tr>
 <tr><td valign="top"><a href="#extended_receive-1">extended_receive/1</a></td><td>Virtual function used to wrap receive clauses.</td></tr>
+<tr><td valign="top"><a href="#handle_msg-3">handle_msg/3</a></td><td>Called in a "catch-all" clause within a receive statement.</td></tr>
 <tr><td valign="top"><a href="#handle_system_msg-4">handle_system_msg/4</a></td><td>Called when the process receives a system message.</td></tr>
 <tr><td valign="top"><a href="#info-1">info/1</a></td><td>retrieves meta-data for the plain_fsm process.</td></tr>
 <tr><td valign="top"><a href="#parent_EXIT-2">parent_EXIT/2</a></td><td>Handles parent termination properly.</td></tr>
@@ -198,7 +219,42 @@ A behaviour/support library for writing plain Erlang FSMs.<ul><li><a href="#desc
   wrapper around a receive clause. It will be transformed at compile time
   to a set of receive patterns handling system messages and parent termination
   according to the OTP rules. The transform requires that the surrounding
-  function has exactly one argument (the "State" or "Loop Data".)</p></p>
+  function has exactly one argument (the "State" or "Loop Data".)</p>
+  <p>To trigger the parse_transform, include the file
+  <code>plain_fsm.hrl</code> (found in <code>plain_fsm/inc/</code>) in
+  your module, and the Erlang compiler must be able to find the module
+  <code>plain_fsm.beam</code>. If <code>erlc</code> is used, this is
+  accomplished by adding <code>-pa .../plain_fsm/ebin</code> to the
+  <code>erlc</code> command.</p></p>
+
+<h3><a name="handle_msg-3">handle_msg/3</a></h3>
+<p><tt>handle_msg(Other::Msg, State::State, Cont::<a href="#type-cont">cont()</a>) -> NEVER_RETURNS</tt></p>
+<p>Called in a "catch-all" clause within a receive statement.
+  <p>This function never returns. It will handle system messages
+  properly and ignore anything else.
+  Example:</p>
+  <pre>
+  idle(S) ->
+    receive
+       ...
+       Msg ->
+           plain_fsm:handle_msg(Msg, S, fun(S1) ->
+                                                 idle(S1)
+                                        end)
+    end.
+  </pre>
+ 
+  <p>Note that this function should <i>only</i> be used if it is known
+  to be safe to discard unknown messages. In most state machines there should
+  be at least <i>one</i> state where unknown messages are discarded; in
+  these states, the handle_msg/3 function can be a convenient way to
+  handle both unknown messages and system messages.</p>
+ 
+  <p>The <code>Cont</code> argument should be either a fun with one argument
+  (the new state), which jumps back into the user code in the proper place,
+  or it can be the name of a function (in this case, 'idle'). In the latter
+  case, the function in question must be exported; in the former case, this
+  is not necessary.</p></p>
 
 <h3><a name="handle_system_msg-4">handle_system_msg/4</a></h3>
 <p><tt>handle_system_msg(Req::Req, From::From, State::State, Cont::<a href="#type-cont">cont()</a>) -> NEVER_RETURNS</tt></p>

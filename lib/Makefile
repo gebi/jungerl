@@ -9,6 +9,7 @@ LIBS := \
 	gd1_drv \
 	slang \
 	lersp \
+        lines \
 	measurement \
 	msc \
 	plain_fsm \
@@ -46,7 +47,9 @@ ce: edoc
 edoc: syntax_tools xmerl
 ermacs: slang msc
 enfs: rpc
+lines: edoc
 measurement: edoc
+plain_fsm: edoc
 wiki: pico
 wumpus: edoc
 xmlrpc: xmerl

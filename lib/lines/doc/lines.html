@@ -1,0 +1,193 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Module lines</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body bgcolor="white">
+<h1>Module lines</h1>
+Efficient array of lines
+ 
+  <p>This module implements an efficient array of lines (e.g. for text
+  editor.)
+  It allows for append, as well as insert, replace, delete in any position
+  with reasonable access times.</p>
+  <p>Rough benchmarking indicates (on a 440MHz Ultra):</p>
+ 
+  <table>
+  <tr>
+    <td><b>NoOfLines</b></td>
+    <td><b>Append (uSec)</b></td>
+    <td><b>Read (uSec)</b></td>
+    <td><b>Delete (uSec)</b></td>
+  </tr>
+  <tr>
+  <td>100</td>	    <td>9</td>	<td>7</td>   <td>7</td>
+  </tr><tr>
+  <td>1,000</td>   <td>14</td>	<td>10</td>  <td>11</td>
+  </tr><tr>
+  <td>10,000</td>  <td>22</td>	<td>13</td>  <td>15</td>
+  </tr><tr>
+  <td>100,000</td> <td>30</td>	<td>16</td>  <td>18</td>
+  </tr>
+  </table>
+ 
+  <p>Comment on the benchmark: The times for Append and Delete are mean
+  times for "growing file" and "shrinking file", that is, starting from
+  an empty array and inserting 100,000 lines took ca 3 seconds; deleting
+  them took ca 1.8 seconds. The Read test involved accessing all lines
+  in the full array and calculating the mean time.</p>
+ 
+  <p>There is also a function, new/[1,2] to create an array of a given
+  size with default content. This function is <i>much</i> more efficient
+  than growing the array from scratch. For example, creating an array
+  of 100,000 elements using new(100000, []) took ca 12 ms on the same Ultra.
+  One may compare this to the built-in function erlang:make_tuple/2, with
+  which the corresponding operation (erlang:make_tuple(100000,[]) took
+  ca 5 ms. Of course, appending an element to a tuple of size 100,000
+  then takes ca 6 ms, whereas append on the lines array takes 30 usec.</p>
+ 
+  <p>The array doesn't care what goes into each position. In other words,
+  it can be used for any datatype -- not just lines of text.</p>.<ul><li><a href="#description">Description</a></li><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul><p><b>Authors:</b> Ulf Wiger, (<a href="mailto:ulf.wiger@ericsson.com"><tt>ulf.wiger@ericsson.com</tt></a>).</p>
+<h2><a name="description">Description</a></h2>Efficient array of lines
+ 
+  <p>This module implements an efficient array of lines (e.g. for text
+  editor.)
+  It allows for append, as well as insert, replace, delete in any position
+  with reasonable access times.</p>
+  <p>Rough benchmarking indicates (on a 440MHz Ultra):</p>
+ 
+  <table>
+  <tr>
+    <td><b>NoOfLines</b></td>
+    <td><b>Append (uSec)</b></td>
+    <td><b>Read (uSec)</b></td>
+    <td><b>Delete (uSec)</b></td>
+  </tr>
+  <tr>
+  <td>100</td>	    <td>9</td>	<td>7</td>   <td>7</td>
+  </tr><tr>
+  <td>1,000</td>   <td>14</td>	<td>10</td>  <td>11</td>
+  </tr><tr>
+  <td>10,000</td>  <td>22</td>	<td>13</td>  <td>15</td>
+  </tr><tr>
+  <td>100,000</td> <td>30</td>	<td>16</td>  <td>18</td>
+  </tr>
+  </table>
+ 
+  <p>Comment on the benchmark: The times for Append and Delete are mean
+  times for "growing file" and "shrinking file", that is, starting from
+  an empty array and inserting 100,000 lines took ca 3 seconds; deleting
+  them took ca 1.8 seconds. The Read test involved accessing all lines
+  in the full array and calculating the mean time.</p>
+ 
+  <p>There is also a function, new/[1,2] to create an array of a given
+  size with default content. This function is <i>much</i> more efficient
+  than growing the array from scratch. For example, creating an array
+  of 100,000 elements using new(100000, []) took ca 12 ms on the same Ultra.
+  One may compare this to the built-in function erlang:make_tuple/2, with
+  which the corresponding operation (erlang:make_tuple(100000,[]) took
+  ca 5 ms. Of course, appending an element to a tuple of size 100,000
+  then takes ca 6 ms, whereas append on the lines array takes 30 usec.</p>
+ 
+  <p>The array doesn't care what goes into each position. In other words,
+  it can be used for any datatype -- not just lines of text.</p>
+<h2><a name="types">Data Types</a></h2>
+
+<h3><a name="type-line">line()</a></h3>
+<p><tt>line() = term()</tt></p>
+<p>Typically a string, but could be anything really.</p>
+
+<h3><a name="type-line_array">line_array()</a></h3>
+<p><tt>line_array() = tuple()</tt></p>
+<p>A 10-ary balanced tree.</p>
+
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1"><tr><td valign="top"><a href="#append-2">append/2</a></td><td>Appends Line to the end of Array.</td></tr>
+<tr><td valign="top"><a href="#convert_from_list-1">convert_from_list/1</a></td><td>Converts a list of "lines" to an array.</td></tr>
+<tr><td valign="top"><a href="#convert_to_list-1">convert_to_list/1</a></td><td>Converts an array to a list of lines.</td></tr>
+<tr><td valign="top"><a href="#count-1">count/1</a></td><td>Returns the number of lines stored in the array.</td></tr>
+<tr><td valign="top"><a href="#delete-2">delete/2</a></td><td>Deletes the line in position LineNo.</td></tr>
+<tr><td valign="top"><a href="#insert-3">insert/3</a></td><td>Inserts NewLine *before* the line in position LineNo.</td></tr>
+<tr><td valign="top"><a href="#insert_after-3">insert_after/3</a></td><td>Inserts NewLine *after* the line in position LineNo
+  (<code>LineNo > 0</code>).</td></tr>
+<tr><td valign="top"><a href="#new-0">new/0</a></td><td>Creates a new line array.</td></tr>
+<tr><td valign="top"><a href="#new-1">new/1</a></td><td><p>Equivalent to <a href="#new-2"><tt>new(N, [])</tt></a>.</p>
+</td></tr>
+<tr><td valign="top"><a href="#new-2">new/2</a></td><td>Make an array of N lines.</td></tr>
+<tr><td valign="top"><a href="#nth-2">nth/2</a></td><td>Returns the line in position LineNo.</td></tr>
+<tr><td valign="top"><a href="#replace-3">replace/3</a></td><td>Replaces the line in position LineNo with NewLine.</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3><a name="append-2">append/2</a></h3>
+<p><tt>append(Line::<a href="#type-line">line()</a>, Array::<a href="#type-line_array">line_array()</a>) -> <a href="#type-line_array">line_array()</a></tt></p>
+<p>Appends Line to the end of Array.
+  <p>e.g. <code>append(x, [1,2,3,4]) => [1,2,3,4,x].</code></p>
+  <p>Returns the modified array.</p></p>
+
+<h3><a name="convert_from_list-1">convert_from_list/1</a></h3>
+<p><tt>convert_from_list(L::list()) -> <a href="#type-line_array">line_array()</a></tt></p>
+<p>Converts a list of "lines" to an array.
+  <p>This is done in an efficient manner.</p>
+ </p>
+
+<h3><a name="convert_to_list-1">convert_to_list/1</a></h3>
+<p><tt>convert_to_list(X1::<a href="#type-line_array">line_array()</a>) -> list()</tt></p>
+<p>Converts an array to a list of lines.
+ </p>
+
+<h3><a name="count-1">count/1</a></h3>
+<p><tt>count(Array::<a href="#type-line_array">line_array()</a>) -> integer()</tt></p>
+<p>Returns the number of lines stored in the array
+ </p>
+
+<h3><a name="delete-2">delete/2</a></h3>
+<p><tt>delete(LineNo::integer(), Array::<a href="#type-line_array">line_array()</a>) -> <a href="#type-line_array">line_array()</a></tt></p>
+<p>Deletes the line in position LineNo.
+  <p>e.g. <code>delete(3, [1,2,3,4]) => [1,2,4].</code></p>
+  <p>Returns the modified array.</p></p>
+
+<h3><a name="insert-3">insert/3</a></h3>
+<p><tt>insert(LineNo::integer(), Array::<a href="#type-line_array">line_array()</a>, NewLine::<a href="#type-line">line()</a>) -> <a href="#type-line_array">line_array()</a></tt></p>
+<p>Inserts NewLine *before* the line in position LineNo.
+  <p>e.g. <code>insert(3, [1,2,3,4], x) => [1,2,x,3,4].</code></p>
+  <p>Returns the modified array.</p></p>
+
+<h3><a name="insert_after-3">insert_after/3</a></h3>
+<p><tt>insert_after(LineNo::integer(), Array::<a href="#type-line_array">line_array()</a>, NewLine::<a href="#type-line">line()</a>) -> <a href="#type-line_array">line_array()</a></tt></p>
+<p>Inserts NewLine *after* the line in position LineNo
+  (<code>LineNo > 0</code>).
+  <p>e.g. <code>insert(3, [1,2,3,4], x) => [1,2,3,x,4].</code></p>
+  <p>Returns the modified array.</p></p>
+
+<h3><a name="new-0">new/0</a></h3>
+<p><tt>new() -> <a href="#type-line_array">line_array()</a></tt></p>
+<p>Creates a new line array.
+ </p>
+
+<h3><a name="new-1">new/1</a></h3>
+<tt>new(N) -> term()
+</tt><p>Equivalent to <a href="#new-2"><tt>new(N, [])</tt></a>.</p>
+
+
+<h3><a name="new-2">new/2</a></h3>
+<p><tt>new(N::integer(), DefaultLine::term()) -> <a href="#type-line_array">line_array()</a></tt></p>
+<p>Make an array of N lines. Each line will be initialized to DefaultLine.
+  <p>This is _much_ faster and more space efficient than growing an
+  array line by line.</p>
+ </p>
+
+<h3><a name="nth-2">nth/2</a></h3>
+<p><tt>nth(LineNo::integer(), Array::<a href="#type-line_array">line_array()</a>) -> <a href="#type-line">line()</a></tt></p>
+<p>Returns the line in position LineNo
+ </p>
+
+<h3><a name="replace-3">replace/3</a></h3>
+<p><tt>replace(LineNo::integer(), Array::<a href="#type-line_array">line_array()</a>, NewLine::<a href="#type-line">line()</a>) -> <a href="#type-line_array">line_array()</a></tt></p>
+<p>Replaces the line in position LineNo with NewLine.
+  <p>e.g. <code>replace(3, [1,2,3,4], x) => [1,2,x,4].</code></p>
+  <p>Returns the modified array.</p></p>
+</body>
+</html>

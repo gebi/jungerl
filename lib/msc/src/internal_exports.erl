@@ -16,7 +16,7 @@
 %%
 %%   -module(foo).
 %%   -export([a/1]).
-%%   -compile({parse_transform,external_exports}).
+%%   -compile({parse_transform,internal_exports}).
 %%   a(X)   -> foo:bar(X).
 %%   b()    -> true.
 %%   c(X,Y) -> pig:oink(X, Y).

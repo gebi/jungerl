@@ -1,0 +1,7 @@
+2004-07-22  Luke Gorrie  <luke@bluetail.com>
+
+	* src/hub.erl: New file implementing an ethernet hub.
+
+	* c_src/psocket_srv.c (main): Don't require the interface to be
+	RUNNING, i.e. have the cable plugged in. There's no need.
+

@@ -64,5 +64,11 @@ $(DOC_DIR)/%.html: %.erl
 	mv *.html $(DOC_DIR)
 
 # C linking items
+
 NSL_LIBS = @NSL_LIBS@
 SOCKET_LIBS = @SOCKET_LIBS@
+
+# Miscellaneous
+
+GROFF = @GROFF@
+PS2PDF = @PS2PDF@

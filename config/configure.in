@@ -14,6 +14,11 @@ AC_PROG_CC
 AC_PATH_PROG(ERL, erl, erl)
 AC_PATH_PROG(ERLC, erlc, erlc)
 
+dnl Check for "groff" and "ps2pdf", do something silly and harmless if
+dnl they are not available.
+AC_PATH_PROG(GROFF, [groff], [echo groff is not available])
+AC_PATH_PROG(PS2PDF, [ps2pdf], [echo ps2pdf is not available])
+
 ERLDIR=`awk -F= '/ROOTDIR=/ { print [$]2; exit; }' $ERL`
 AC_SUBST(ERLDIR)
 

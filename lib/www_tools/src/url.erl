@@ -93,7 +93,7 @@ get_http(IP, Port, URL, Opts, Timeout) ->
 receive_data(Socket, Timeout, Bin) ->
     receive
 	{tcp, Socket, B} ->
-	    io:format(".", []),
+	    %io:format(".", []),
 	    receive_data(Socket, Timeout, concat_binary([Bin,B]));
 	{tcp_closed, Socket} ->
 	    Data0 = binary_to_list(Bin),

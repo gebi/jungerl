@@ -16,10 +16,7 @@
 -export([proc_tag/1]).
 -export([mass/1]).
 
--record(state, {line = 0, 
-		hits = 0,
-		send = [],
-		filter = []}).
+-record(state, {line = 0, hits = 0, send = [], filter = []}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 file(FileName) -> file(FileName, '').

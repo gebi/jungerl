@@ -30,15 +30,15 @@ start(Path, User, Wgroup) ->
 
 init(Host, Share, User, Wgroup) ->
     Called = ucase(Host),
-    Caller = caller(),
+    Caller = esmb:caller(),
     {ok,S,Neg} = esmb:connect(Caller, Called),
     Pw = get_passwd(),
     U = #user{pw = Pw, name = User, primary_domain = Wgroup},
     Pdu0 = esmb:user_logon(S, Neg, U),
-    exit_if_error(Pdu0, "Login failed"),
+    esmb:exit_if_error(Pdu0, "Login failed"),
     Path = "\\\\" ++ Called ++ "\\" ++ ucase(User),
     Pdu1 = esmb:tree_connect(S, Neg, Pdu0, Path),
-    exit_if_error(Pdu1, "Tree connect failed"),
+    esmb:exit_if_error(Pdu1, "Tree connect failed"),
     shell(S, Neg, {Pdu1, "\\\\"}).
 
 
@@ -186,12 +186,6 @@ check_attr(_A, [])  ->
 read_line(Cwd) ->
     rm_last_char(io:get_line(list_to_atom(swap(Cwd, $\\, $/) ++ "> "))).
 
-exit_if_error(Pdu, Dmsg) when Pdu#smbpdu.eclass == ?SUCCESS -> true;
-exit_if_error(Pdu, Dmsg) ->
-    Emsg = esmb:emsg(Pdu#smbpdu.eclass, Pdu#smbpdu.ecode, Dmsg),
-    io:format("ERROR: ~s~n", [Emsg]),
-    exit({error, Emsg}).
-
 get_passwd() ->
     rm_last_char(io:get_line('Password: ')).
 
@@ -200,10 +194,6 @@ rm_last_char([H|T]) -> [H|rm_last_char(T)].
 
 rm_space([$\s|T]) -> rm_space(T);
 rm_space(Cs)      -> Cs.
-
-caller() ->
-    {ok, Host} = inet:gethostname(),
-    ucase(Host).
 
 %%% Extract the Host and Share part
 host_share([$\s|T])   -> 

@@ -26,6 +26,7 @@
 -define(SMB_CLOSE,               16#04).
 -define(SMB_DELETE,              16#06).
 -define(SMB_CHECK_DIRECTORY,     16#10).
+-define(SMB_COM_TRANSACTION,     16#25).
 -define(SMB_OPEN_ANDX,           16#2d).
 -define(SMB_READ_ANDX,           16#2e).
 -define(SMB_WRITE_ANDX,          16#2f).
@@ -146,14 +147,20 @@
 -define(BUF_FMT_VARIABLE_BLOCK, 16#05).
 
 
+-define(MAX_BUFFER_SIZE, 8192).  % arbitrary default value...
+
 %%% This record hold the negotiation result.
 %%% (Add entries when more complex dialects are being implemented !)
 -record(smb_negotiate_res, {
 	  dialect_index,        % Example: ?PCNET_1_0
 	  security_mode,        % PCNET_1_0 < Dialect <= LANMAN_2_1
 	  encryption_key,       % PCNET_1_0 < Dialect <= LANMAN_2_1
-	  max_buffer_size=4096  % arbitrary default value
+	  max_buffer_size=?MAX_BUFFER_SIZE
 	  }).
+
+-define(SECMODE_SHARE,     16#0).
+-define(SECMODE_USER,      16#1).
+-define(SECMODE_CHALLENGE, 16#2).
 
 %%% Add more dialects when we can support them.
 %%% Make sure to not break the successive order of
@@ -169,6 +176,21 @@
 -define(MaxMpxCount,   2).      % ? ,max multiplexed pending req.
 -define(VcNumber,      2325).   % ? 
 
+
+%%% Tree-Connect-AndX service types
+-define(SERVICE_DISK_SHARE, "A:").
+-define(SERVICE_ANY_TYPE,   "?????").
+
+%%% Share type info returned from "list shares" request
+-define(SHARETYPE_DISKTREE,   0).
+-define(SHARETYPE_PRINTQ,     1).
+-define(SHARETYPE_DEVICE,     2).
+-define(SHARETYPE_IPC,        3).
+
+-record(share_info, {
+	  name,        % The share name
+	  type         % ?SHARETYPE_xxxx
+	  }).
 
 %%% User info
 -record(user, {

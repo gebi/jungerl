@@ -8,9 +8,11 @@
 %%% --------------------------------------------------------------------
 -export([called_name/1, calling_name/1, ucase/1, lcase/1, check_dir/3,
 	 connect/2, connect/3, connect/4, close/1, user_logon/3, emsg/3,
-	 tree_connect/4, list_dir/3, open_file_ro/3, open_file_rw/3, 
+	 tree_connect/4, tree_connect/5, list_dir/3, 
+	 open_file_ro/3, open_file_rw/3, 
 	 read_file/3, client/2, client/3, mkdir/3, rmdir/3, 
-	 close_file/2, write_file/4, delete_file/3]).
+	 close_file/2, write_file/4, delete_file/3, caller/0,
+	 exit_if_error/2, list_shares/3, l/3]).
 -export([dec_smb/1, tt_name/1]).
 -export([zeros/1,p14/1,s16x/1,s21_lm_session_key/1,ex/2,swab/1,
 	 challenge_response/2, crtest/0, e/2]).
@@ -19,10 +21,164 @@
 -define(PORT, 139).
 
 
+%%%---------------------------------------------------------------------
+%%% Holy cow ! It turns out ugly already from the beginning.
 %%% 
+%%% "list shares" is using the Lanman Remote API protocol
+%%% which runs on top of SMB. So right now we do some
+%%% special treatment for just this message.
+%%%
+%%% See also: <http://www.thursby.com/CIFS/rap/>
+%%%
+%%%---------------------------------------------------------------------
+-define(DOLLAR, [36]).   
+
+l(Host, User, Passwd) ->
+    case catch list_shares(Host, User, Passwd) of
+	{ok, Res} ->
+	    io:format("\n~-15.s ~s~n",["SHARE","TYPE"]),
+	    io:format("~s~n",[string:copies("-",30)]),
+	    F = fun(X) -> io:format("~-15.s ~s~n",
+				   [b2l(X#share_info.name),
+				   share_type(X#share_info.type)])
+		end,
+	    lists:foreach(F, Res),
+	    io:nl();
+	Else ->
+	    Else
+    end.
+
+share_type(?SHARETYPE_DISKTREE) -> "Directory tree";
+share_type(?SHARETYPE_PRINTQ)   -> "Printer queue";
+share_type(?SHARETYPE_DEVICE)   -> "Comm. device";
+share_type(?SHARETYPE_IPC)      -> "IPC".
+    
+
+list_shares(Host, User, Passwd) ->
+    Called = ucase(Host),
+    Caller = caller(),
+    case connect(Caller, Called) of
+	{ok,S,Neg} ->
+	    U = #user{pw = Passwd, name = User},
+	    Pdu0 = user_logon(S, Neg, U),
+	    exit_if_error(Pdu0, "Login failed"),
+	    Path = "\\\\" ++ Called ++ "\\IPC" ++ [$$], % make the Emacs mode happy...
+	    Pdu1 = tree_connect(S, Neg, Pdu0, Path, ?SERVICE_ANY_TYPE),
+	    exit_if_error(Pdu1, "Tree connect failed"),
+	    {Req, Pdu2} = smb_list_shares_pdu(Pdu1),
+	    decode_list_shares_response(Req, nbss_session_service(S, Pdu2));
+	Else ->
+	    Else
+    end.
+
+
+decode_list_shares_response(Req, {ok, _, ResPdu}) ->
+    Res = dec_smb(Req, ResPdu),   
+    <<TotParamCount:16/little,
+     TotDataCount:16/little,
+     0:16/little,
+     ParamCount:16/little,
+     ParamOffset:16/little,
+     ParamDisplacement:16/little,
+     DataCount:16/little,
+     DataOffset:16/little,
+     DataDisplacement:16/little,
+     SetupCount,
+    _/binary>> = Res#smbpdu.wp,
+    <<_,                      % what is this ?
+     Status:16/little,        % success(0), access_denied(5)
+     Convert:16/little,       
+     EntryCount:16/little,    % # of entries returned
+     AvailEntries:16/little,  % # of available entries
+     Entries/binary>> = Res#smbpdu.bf,
+    if (Status == ?SUCCESS) ->
+	    warning(EntryCount, AvailEntries, 
+		    "<Warning>: Buffer too small to fit all entries !"),
+	    {ok, parse_entries(EntryCount, Entries)};
+       true ->
+	    {error, list_shares}
+    end.
+
+parse_entries(0, _) -> 
+    [];
+parse_entries(N, <<ShareName:13/binary,
+		  _CstrNull,
+		  ShareType:16/little,
+		  _CharPtr:4/binary,
+		  Rest/binary>>) -> 
+    [#share_info{name = l2b(rm_trailing_nulls(b2l(ShareName))),
+		 type = ShareType}|
+     parse_entries(N-1, Rest)].
+
+rm_trailing_nulls(Str) ->
+    rm_nulls(lists:reverse(Str)).
+
+rm_nulls([0|T]) -> rm_nulls(T);    
+rm_nulls(L)     -> lists:reverse(L).
+       
+warning(X,X,_) -> true;
+warning(_,_,S) -> io:format("~s~n", [S]).
+
+smb_list_shares_pdu(InReq) ->
+    {Wc,Wp} = wp_list_shares(),
+    Bf = bf_list_shares("\\PIPE\\LANMAN"),
+    Rec = #smbpdu{cmd = ?SMB_COM_TRANSACTION,
+		  pid = InReq#smbpdu.pid,
+		  uid = InReq#smbpdu.uid,
+		  tid = InReq#smbpdu.tid,
+		  wc  = Wc,
+		  wp  = Wp,
+		  bc  = size(Bf),
+		  bf  = Bf},
+    {Rec, enc_smb(Rec)}.
+
+
+wp_list_shares() ->
+    %% How to compute the offset values (no.of bytes):
+    %% ParamOffset = ?SMB_HEADER_LEN + ThisLen + WordCount + ByteCount + length(TransName) + NullByte
+    %%             = ?SMB_HEADER_LEN + 1 + 14*2 + 2 + 12 + 1
+    %%             = ?SMB_HEADER_LEN + 44
+    %% ParamLen    = <Length of the Lanman RAP block below>
+    %% DataOffset  = ParamOffset + ParamLen + NullByte
+    %%             = ParamOffset + ParamLen
+    ParamOffset = ?SMB_HEADER_LEN + 44,
+    ParamLen    = 19, % The Lanman RAP block
+    DataOffset  = ParamOffset + ParamLen,
+    ParamCount  = DataOffset - ParamOffset,
+    {14,                         % WordCount = 14
+     <<ParamCount:16/little,     % Total parameter bytes sent
+      0:16/little,               % Total data bytes sent
+      10:16/little,              % Max parameter bytes to return
+      ?MAX_BUFFER_SIZE:16/little,% Max data bytes to return
+      0,                         % Max setup words to return
+      0,                         % reserved
+      0:16/little,               % Flags
+      0:32/little,               % timeout , 0 = return immediately
+      0:16/little,               % reserved2
+      ParamLen:16/little,        % Parameter bytes sent this buffer
+      ParamOffset:16/little,     % Offset (from header start) to parameters
+      0:16/little,               % Data bytes sent this buffer
+      DataOffset:16/little,      % Offset (from header start) to data
+      0,                         % Count of setup words
+      0                          % reserved3 (pad above to word boundary)
+      >>}.
+
+bf_list_shares(TransName) ->
+    list_to_binary([TransName,0, % Name of transaction
+		    %% --- Start of Parameter Block (19 bytes) ---
+		    <<0:16/little>>,% Function Code: NetShareEnum(0)
+		    "WrLeh",0,   % Parameter Descriptor
+		    "B13BWz",0,  % Return Descriptor
+		    <<1:16/little>>, % Detail level
+		    <<?MAX_BUFFER_SIZE:16/little>> % Receive buffer size
+		    ]).
+
+
+
+%%%---------------------------------------------------------------------
 %%% Setup a socket, initiate an NBSS session and 
 %%% negotiate the protocol dialect.
-%%% 
+%%%---------------------------------------------------------------------
 connect(Caller, Called)           -> connect(Caller, Called, []).
 connect(Caller, Called, SockOpts) -> connect(Caller, Called, SockOpts, ?PORT).
 
@@ -45,6 +201,7 @@ close(S) ->
 
 client(Path, User)         -> esmb_client:start(Path, User).
 client(Path, User, Wgroup) -> esmb_client:start(Path, User, Wgroup).
+
 	    
 
 -define(LT_BUFSIZE(Neg, Bin), 
@@ -141,7 +298,10 @@ check_dir(S, InReq, Path) ->
     decode_smb_response(Req, nbss_session_service(S, Pdu)).
 
 tree_connect(S, Neg, InReq, Path) ->
-    {Req, Pdu} = smb_tree_connect_andx_pdu(Neg, InReq, Path),
+    tree_connect(S, Neg, InReq, Path, ?SERVICE_DISK_SHARE).
+
+tree_connect(S, Neg, InReq, Path, Service) ->
+    {Req, Pdu} = smb_tree_connect_andx_pdu(Neg, InReq, Path, Service),
     decode_smb_response(Req, nbss_session_service(S, Pdu)).
 
 negotiate(S) ->
@@ -809,9 +969,9 @@ bf_check_directory(Path) ->
 
 %%% ---
     
-smb_tree_connect_andx_pdu(Neg, InReq, Path) ->
+smb_tree_connect_andx_pdu(Neg, InReq, Path, Service) ->
     {Wc,Wp} = wp_tree_connect_andx(Neg),
-    Bf = bf_tree_connect_andx(Neg, Path),
+    Bf = bf_tree_connect_andx(Neg, Path, Service),
     Rec = #smbpdu{cmd = ?SMB_TREE_CONNECT_ANDX,
 		  pid = InReq#smbpdu.pid,
 		  uid = InReq#smbpdu.uid,
@@ -831,10 +991,10 @@ wp_tree_connect_andx(Neg)  when ?PRE_DOS_LANMAN_2_1(Neg) ->
       0:16/little,               % Flags
       1:16/little>>}.            % PasswordLength (incl. NULL)
 
-bf_tree_connect_andx(Neg, Path) when ?PRE_DOS_LANMAN_2_1(Neg) ->
+bf_tree_connect_andx(Neg, Path, Service) when ?PRE_DOS_LANMAN_2_1(Neg) ->
     list_to_binary([0,           % Password
 		    Path, [0],   % filesystem
-		    "A:",[0]]).  % service
+		    Service, [0]]).  % service
     
 
 %%% ---
@@ -873,12 +1033,18 @@ bf_session_setup_andx(Neg,U, Passwd) ->
 		    U#user.native_os,[0],
 		    U#user.native_lanman,[0]]).
 
+-define(USE_ENCRYPTION(Neg), ((Neg#smb_negotiate_res.security_mode 
+			       band ?SECMODE_CHALLENGE) > 0) ).
+
 enc_passwd(Neg, Passwd) when ?CORE_PROTOCOL(Neg) ->
     {Passwd, length(Passwd)};
-enc_passwd(Neg, Passwd) when ?PRE_DOS_LANMAN_2_1(Neg) ->
+enc_passwd(Neg, Passwd) when ?PRE_DOS_LANMAN_2_1(Neg), 
+			     ?USE_ENCRYPTION(Neg) ->
     EncKey = Neg#smb_negotiate_res.encryption_key,
     EncPasswd = challenge_response(Passwd, EncKey),
-    {EncPasswd, size(EncPasswd)}.
+    {EncPasswd, size(EncPasswd)};
+enc_passwd(Neg, Passwd) ->
+    {Passwd, length(Passwd)}.
 
 %%%
 %%% TEST: smbclient //korp/tobbe -U tobbe -m LANMAN1
@@ -908,8 +1074,6 @@ challenge_response(Passwd, Challenge) when binary(Passwd) ->
     ex(s21_lm_session_key(Passwd), Challenge);
 challenge_response(Passwd, Challenge) when list(Passwd) -> 
     challenge_response(list_to_binary(Passwd), Challenge).
-
-%%    ex(s21_nt_session_key(Passwd), Challenge).
 
 ex(<<K0:7/binary,K1:7/binary>>, Data) when size(Data) == 8 ->
     concat_binary([e(K0, Data),
@@ -1078,11 +1242,8 @@ recv(S) ->
     end.
 
 dec_msg(<<?POSITIVE_SESSION_RESPONSE,Flags,Length:16>>) ->
-    %%io:format("Got: Positive-Session-Response~n",[]),
     {ok, ?POSITIVE_SESSION_RESPONSE};
 dec_msg(<<?SESSION_SERVICE, _, Length:16, SMB_pdu/binary>>) ->
-    %%io:format("Got: Sessio-Service msg, len=~w, size=~w~n",
-    %%[Length, size(SMB_pdu)]),
     {ok, ?SESSION_SERVICE, get_more(Length, size(SMB_pdu), [SMB_pdu])};
 dec_msg(<<?SESSION_KEEP_ALIVE, _/binary>>) ->
     {ok, ?SESSION_KEEP_ALIVE};
@@ -1200,3 +1361,20 @@ emsg(?ERRDOS, ?ERRbadfile)  -> "File not found";
 emsg(?ERRDOS, ?ERRbadpath)  -> "Directory invalid";
 emsg(?ERRDOS, ?ERRnofids)   -> "Too many open files";
 emsg(?ERRDOS, ?ERRnoaccess) -> "Access denied".
+
+caller() ->
+    {ok, Host} = inet:gethostname(),
+    ucase(Host).
+
+exit_if_error(Pdu, Dmsg) when Pdu#smbpdu.eclass == ?SUCCESS -> true;
+exit_if_error(Pdu, Dmsg) ->
+    Emsg = emsg(Pdu#smbpdu.eclass, Pdu#smbpdu.ecode, Dmsg),
+    throw({error, Emsg}).
+
+l2b(L) when list(L)   -> list_to_binary(L);
+l2b(B) when binary(B) -> B.
+
+b2l(B) when binary(B) -> binary_to_list(B);
+b2l(L) when list(L)   -> L.
+
+

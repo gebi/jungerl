@@ -1,17 +1,31 @@
+include ../../../support/include.mk
 
-O_FILES = md4_drv.o md4.o 
+CFLAGS += -I$(ERL_C_INCLUDE_DIR) -I.
 
-DRIVER_H_DIR = /usr/local/lib/erlang/usr/include
-FPIC = -fpic -shared
-CFLAGS += -I$(DRIVER_H_DIR) $(FPIC)
+MD4_DRV_SO = ../priv/md4_drv.so
 
-OUTPUT = ../priv/md4_drv.so
+SHLIB_OBJS = md4_drv.o md4.o
 
-all: $(O_FILES)
-	$(CC) -o $(OUTPUT) $(CFLAGS) -DDYNAMIC_DRIVER $(O_FILES)
+all: $(MD4_DRV_SO)
+
+$(MD4_DRV_SO): $(SHLIB_OBJS)
+	ld -G -o $@ $^
+	# Symlink is only to help when using "jerl" script.
+	-ln -s $(MD4_DRV_SO) ../ebin
 
 test: test.o md4.o
 	$(CC) -o md4test test.o md4.o
 
+md4_drv.o: md4_drv.c
+	$(CC) $(CFLAGS) -o $@ -c -fpic $(ERL_INCLUDE) $<
+
+md4.o: md4.c
+	$(CC) $(CFLAGS) -o $@ -c -fpic $(ERL_INCLUDE) $<
+
+test.o: test.c
+	$(CC) $(CFLAGS) -o $@ -c -fpic $(ERL_INCLUDE) $<
+
 clean:
-	rm -f *.o md4test $(OUTPUT)
+	-rm -f $(MD4_DRV_SO) ../ebin/*.so
+
+.INTERMEDIATE: $(SHLIB_OBJS)

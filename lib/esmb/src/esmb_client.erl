@@ -181,7 +181,7 @@ ls(S, Neg, {Pdu0, Cwd} = State) ->
     Udir = to_ucs2(Neg, add_wildcard(Neg, Cset, WinPath), Cset),
     Pdu = esmb:list_dir(S, Pdu0, Udir),
     print_file_info(Neg, Pdu#smbpdu.finfo),
-    {Pdu, Cwd}
+    {Pdu, Cwd}.
 
 print_file_info(Neg, L) ->
     F = fun(X) ->

@@ -341,6 +341,7 @@
 -define(ERRbadpath,  3).      % Directory invalid
 -define(ERRnofids,   4).      % Too many open files
 -define(ERRnoaccess, 5).      % Access denied
+-define(ERRnoshare,  16#43).  % Share does not exist
 	
 
 %%% Gregorian second from year 0 to 1601 AD

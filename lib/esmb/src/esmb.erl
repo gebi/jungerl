@@ -84,7 +84,7 @@
 	 connect/1, connect/2, connect/3, close/1, error_p/1,
 	 user_logon/3, user_logon/4, emsg/3, get_user_groups/4,
 	 tree_connect/4, tree_connect_ipc/4, tree_connect/5, 
-	 list_dir/3, called/1, negotiate/1,
+	 list_dir/3, called/1, negotiate/1, sign_p/1, ssn/1,
 	 open_file_ro/3, open_file_rw/3, stream_read_file/3,
 	 read_file/3, mkdir/3, rmdir/3, is_ok/2, unicode_p/1,
 	 astart/0, istart/0, ustart/0, start/0, to_ucs2_and_null/2,
@@ -103,6 +103,9 @@
 -define(PORT, 139).
 
 
+-define(sdbg(S,A), true).
+%%-define(sdbg(S,A), ?elog(S,A)).
+
 %%% ==============================================
 %%% ====== T Y P E  D E C L A R A T I O N S ======
 %%% ==============================================
@@ -119,8 +122,6 @@
 %%%
 %%% @type bstring() = string() | binary()
 %%%
-
-
 
 
 %%% @hidden
@@ -321,7 +322,7 @@ ipc_path(_Neg, Path) ->
 
 
 decode_list_shares_response(Req, {ok, _, ResPdu}) ->
-    Res = safe_dec_smb(Req, ResPdu),   
+    Res = safe_dec_smb(Req, ResPdu), % NB: may throw(Pdu)
     <<TotParamCount:16/little,
      TotDataCount:16/little,
      0:16/little,
@@ -627,12 +628,12 @@ write_file(S, Neg, InReq, Finfo) ->
 	(Neg#smb_negotiate_res.max_buffer_size >= size(Bin))).
 
 write_file(S, Neg, InReq, Finfo, Bin, Written) when ?LT_BUFSIZE(Neg,Bin) -> 
-    {Req, Pdu} = smb_write_andx_pdu(InReq, Finfo, Bin, Written),
-    case decode_smb_response(Req, nbss_session_service(S, Pdu)) of
-	{ok, Wrote} ->
-	    {ok, Wrote + Written, Req};
+    {Req1, Pdu} = smb_write_andx_pdu(InReq, Finfo, Bin, Written),
+    case decode_smb_response(Req1, nbss_session_service(S, Pdu)) of
+	{ok, Wrote, Req2} ->
+	    {ok, Wrote + Written, Req2};
 	_ ->
-	    {error, Req#smbpdu{eclass = ?INTERNAL, emsg = "write_file"}}
+	    {error, Req1#smbpdu{eclass = ?INTERNAL, emsg = "write_file"}}
     end;
 write_file(S, Neg, InReq, Finfo, Bin, Written) ->
     {B1,B2} = split_binary(Bin, Neg#smb_negotiate_res.max_buffer_size - ?HEADER_SIZE),
@@ -838,21 +839,20 @@ delete_file(S, InReq, Path) ->
 %%%
 list_dir(S, InReq, Path) ->
     {Req, Pdu} = smb_trans2_find_first2_pdu(InReq, Path),
-    dbg_smb("list_dir: got trans2_find_first2", Req),
     case decode_smb_response(Req, nbss_session_service(S, Pdu)) of
-	X when X#find_result.eos == true -> 
-	    Req#smbpdu{finfo = X#find_result.finfo};
-	X -> 
-	    list_dir_cont(S, Req, Path, X#find_result.sid, X#find_result.finfo)
+	{Req2, X} when X#find_result.eos == true -> 
+	    Req2#smbpdu{finfo = X#find_result.finfo};
+	{Req2, X} -> 
+	    list_dir_cont(S, Req2, Path, X#find_result.sid, X#find_result.finfo)
     end.
 
 list_dir_cont(S, InReq, Path, Sid, Finfo) ->
     {Req, Pdu} = smb_trans2_find_next2_pdu(InReq, Path, Sid),
     case decode_smb_response(Req, nbss_session_service(S, Pdu)) of
-	X when X#find_result.eos == true -> 
-	    Req#smbpdu{finfo = Finfo ++ X#find_result.finfo};
-	X -> 
-	    list_dir_cont(S, Req, Path, Sid, Finfo ++ X#find_result.finfo)
+	{Req2, X} when X#find_result.eos == true -> 
+	    Req2#smbpdu{finfo = Finfo ++ X#find_result.finfo};
+	{Req2, X} -> 
+	    list_dir_cont(S, Req2, Path, Sid, Finfo ++ X#find_result.finfo)
     end.
     
 
@@ -1066,7 +1066,7 @@ dec_write_andx(Req, Pdu) ->
     _:2/binary,                % Remaining (reserved)
     _:4/binary,                % reserved
     _/binary>> = Res#smbpdu.wp,
-    {ok, Count}.
+    {ok, Count, Res}.
     
 
 %%% ---
@@ -1130,7 +1130,7 @@ dec_nt_create_andx(Req, Pdu) ->
 %%% ---
 
 dec_transaction(Req, Pdu) ->
-    Res = safe_dec_smb(Req, Pdu),
+    Res = safe_dec_smb(Req, Pdu),  % NB: may throw(Pdu)
     <<TotParamCount:16/little,
      TotDataCount:16/little,
      _:16/little,                % reserved
@@ -1207,7 +1207,7 @@ dec_transaction(Req, Pdu) ->
 	end).
 		
 dec_trans2_find_x2(Req, Pdu, SubCmd) ->
-    Res = safe_dec_smb(Req, Pdu),
+    Res = safe_dec_smb(Req, Pdu),  % NB: may throw(Pdu)
     <<TotParamCount:16/little,
     TotDataCount:16/little,
     0:16/little,
@@ -1229,11 +1229,12 @@ dec_trans2_find_x2(Req, Pdu, SubCmd) ->
 		   EaErrorOffset,
 		   LastNameOffset,
 		   Res#smbpdu.bf),
-    %%<<_:DataOffset/unit:8, Data/binary>> = Pdu,
     <<_:DataOffset/binary, Data/binary>> = Pdu,
     Finfo = dec_find_file_dir_info(Res, Data, SearchCount),
     %%print_fd_info(Finfo),
-    #find_result{sid = Sid, eos = to_bool(EndOfSearch), finfo = Finfo}.
+    {Res, #find_result{sid = Sid, 
+		       eos = to_bool(EndOfSearch), 
+		       finfo = Finfo}}.
 
 %%% ---
 
@@ -1393,7 +1394,7 @@ large_integer(<<LowPart:32/little, HiPart:32/little>>) ->
 safe_dec_smb(Req, Pdu) ->
     case catch dec_smb(Req, Pdu) of
 	R when R#smbpdu.eclass == ?SUCCESS -> R;
-	R when record(R,smbpdu)            -> throw({error,R});
+	R when record(R,smbpdu)            -> throw(R);
 	Else                               -> throw({error,{dec_smb,Else}})
     end.
 
@@ -1421,7 +1422,7 @@ dec_smb(Req,
 	Rest/binary>>) ->
     <<Wp:Wc/binary-unit:16, Bc:16/little, Bf/binary>> = Rest,
     SSN = Req#smbpdu.sign_seqno,
-    ?elog("dec_smb: new SSN=~p~n",[SSN+1]),
+    ?sdbg("dec_smb: new SSN=~p~n",[SSN+1]),
     Req#smbpdu{cmd    = Cmd,
 	       eclass = Eclass,
 	       ecode  = Ecode,
@@ -2273,12 +2274,12 @@ enc_smb(Pdu, Data) when ?SIGN_SMB(Pdu) ->
 	   Data/binary>>,
     Mac = mac(Pdu#smbpdu.mac_key, Bin),
     <<Head:14/binary,_:8/binary,Tail/binary>> = Bin,
-    ?elog("SMB signing required, SSN=~p NewSSN=~p~n", [SSN,SSN+1]),
+    ?sdbg("SMB signing required, SSN=~p NewSSN=~p~n", [SSN,SSN+1]),
     {Pdu#smbpdu{sign_seqno = SSN + 1},
      <<Head/binary,Mac/binary,Tail/binary>>};
 %%
 enc_smb(Pdu, Data) ->
-    ?elog("SMB signing NOT required !!~n", []),
+    ?sdbg("SMB signing NOT required !!~n", []),
     Cmd    = Pdu#smbpdu.cmd,
     Eclass = Pdu#smbpdu.eclass,
     Ecode  = Pdu#smbpdu.ecode,
@@ -2515,7 +2516,8 @@ emsg(?ERRDOS, ?ERRbadfunc)  -> "Invalid function";
 emsg(?ERRDOS, ?ERRbadfile)  -> "File not found";
 emsg(?ERRDOS, ?ERRbadpath)  -> "Directory invalid";
 emsg(?ERRDOS, ?ERRnofids)   -> "Too many open files";
-emsg(?ERRDOS, ?ERRnoaccess) -> "Access denied".
+emsg(?ERRDOS, ?ERRnoaccess) -> "Access denied";
+emsg(?ERRDOS, ?ERRnoshare)  -> "Share does not exist".
 
 %%% @private
 caller() ->
@@ -2561,6 +2563,39 @@ error_p(Pdu) when Pdu#smbpdu.eclass == ?INTERNAL ->
 error_p(Pdu) ->
     Emsg = emsg(Pdu#smbpdu.eclass, Pdu#smbpdu.ecode, ""),
     {true, Pdu#smbpdu.ecode, Emsg}.
+
+
+%%%
+%%% @spec unicode_p(Pdu::pdu() | Neg::neg()) -> false | true
+%%%
+%%% @doc Checks if Unicode has been negotiated or not.
+%%%
+%%% @end
+%%%
+unicode_p(Neg) when record(Neg,smb_negotiate_res),?USE_UNICODE(Neg) -> true;
+unicode_p(Pdu) when record(Pdu,smbpdu),?F2_USE_UNICODE(Pdu)         -> true; 
+unicode_p(_)                                                        -> false.
+
+%%%
+%%% @spec sign_p(Pdu::pdu()) -> false | true
+%%%
+%%% @doc Checks if SMB signing has been negotiated or not.
+%%%
+%%% @end
+%%%
+sign_p(Pdu) when record(Pdu,smbpdu),?SIGN_SMB(Pdu)  -> true; 
+sign_p(_)                                           -> false.
+
+%%%
+%%% @spec ssn(Pdu::pdu()) -> integer()
+%%%
+%%% @doc Returns the SMB signing sequence counter.
+%%%
+%%% @end
+%%%
+ssn(Pdu) when record(Pdu,smbpdu),?SIGN_SMB(Pdu)  -> Pdu#smbpdu.sign_seqno;
+ssn(_)                                           -> 0.
+
 
 %%% @private
 l2b(L) when list(L)   -> list_to_binary(L);
@@ -2609,11 +2644,6 @@ to_ucs2(_, Str) ->
 
 null2(UnicodeP) when UnicodeP == true -> <<0,0>>;
 null2(_)                              -> <<0>>.
-
-%%% @private
-unicode_p(Neg) when record(Neg,smb_negotiate_res),?USE_UNICODE(Neg) -> true;
-unicode_p(Pdu) when record(Pdu,smbpdu),?F2_USE_UNICODE(Pdu)         -> true; 
-unicode_p(_)                                                        -> false.
 
 %%% @private
 ucs2_to_ascii(Ustr) ->

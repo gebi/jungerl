@@ -10,8 +10,8 @@
 
 -import(lists, [foreach/2]).
 
--compile(export_all).
-%%-export([Function/Arity, ...]).
+-export([start_link/2, start_link/3]).
+-export([init/3]).
 
 %% start_link(Port, [EndPoint]) -> pid()
 %%
@@ -43,7 +43,6 @@ loop(Tunnel, Socket, EPs) ->
     ?MODULE:loop(Tunnel, Socket, EPs).
 
 init_tunnel(Dev) ->
-    tuntap:init(),
     Tun = tuntap:open_tuntap(tap, Dev),
     Dev = tuntap:device_name(Tun),
     io:format("Alive and kicking on ~p~n", [Dev]),

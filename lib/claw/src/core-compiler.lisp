@@ -15,8 +15,7 @@
 (defun module (name exports attributes defs)
   `(progn
     (defpackage ,name
-      (:export ,@(loop for symbol in exports
-                       collect (symbol-name symbol))))
+      (:export ,@(mapcar #'symbol-name exports)))
     (in-package ,name)
     (defvar ,(intern "*attributes*" (find-package name)) ',attributes)
     ,@defs))
@@ -32,7 +31,6 @@
 
 (defun am (name)
   (intern name :a))
-  `(ATOM ,name))
 
 (defun integer (i)
   i)

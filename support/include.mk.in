@@ -24,6 +24,17 @@ ifndef no_debug_info
   ERLC_FLAGS += +debug_info
 endif
 
+ifndef no_erlc_workaround
+# Ugly workaround. The erlc in R9B-0 sometimes uses a
+# stand-alone-erlang based compiler called 'ecc', which is not
+# properly compatible - it fails to find some include files. Giving
+# this -pa argument on the command line guarantees that the normal
+# compiler will be used instead of ecc, in R9B-0.
+#
+# See erts/etc/common/erlc.c in OTP for details.
+  ERLC_FLAGS += -pa /fake
+endif
+
 ifdef debug
   ERLC_FLAGS += -Ddebug
 endif

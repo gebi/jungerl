@@ -1,15 +1,19 @@
-include ../../../support/include.mk
+#include ../../../support/include.mk
+ERLC = erlc
+ERLC_FLAGS = -W +debug_info
+EBIN = ../ebin
+INC = ../inc
 
-ERLS  = $(shell echo *.erl)
+ERLS  = $(wildcard *.erl)
 FILES =	$(patsubst %.erl, %, $(ERLS))
-DEPS = $(patsubst %, ../ebin/%.beam, panHost panTarg panScan panLib)
+DEPS = $(patsubst %, $(EBIN)/%.beam, panHost panTarg panScan panLib)
 
 default: all
 all: $(FILES)
 
-$(FILES): % : ../ebin/%.beam
+$(FILES): % : $(EBIN)/%.beam
 
-$(DEPS): ../ebin/%.beam : %.erl ../inc/pan.hrl
-	$(ERLC) -o ../ebin -I ../inc $(ERLC_FLAGS) $<
-../ebin/%.beam:		  %.erl
-	$(ERLC) -o ../ebin $(ERLC_FLAGS) $<
+$(DEPS): $(EBIN)/%.beam : %.erl $(INC)/pan.hrl
+	$(ERLC) -o $(EBIN) -I $(INC) $(ERLC_FLAGS) $<
+$(EBIN)/%.beam:		  %.erl
+	$(ERLC) -o $(EBIN) $(ERLC_FLAGS) $<

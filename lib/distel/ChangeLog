@@ -1,5 +1,11 @@
 2004-10-25  Luke Gorrie  <luke@synap.se>
 
+	* elisp/derl.el (derl-send-name): Lie to Erlang by saying that we
+	support extended PIDs. This way we can establish distribution with
+	R10B-0, which doesn't seem to actually send extended pids
+	initially. (This is a lame workaround but I'm in a hurry and the
+	extended-pid format is not documented.)
+
 	* doc/distel.texi: Updated to describe `erl-choose-nodename' and
 	the fact that `C-u' is now a regular prefix argument instead of a
 	new-node-chooser.

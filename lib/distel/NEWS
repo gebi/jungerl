@@ -14,6 +14,10 @@ Jungerl version:
 	Love for reimplementing it in Elisp using floats (and doing a
 	whole slew of cleanups besides).
 
+	Distel now tricks R10B-0 into thinking that it can support
+	extended pids. This allows distribution to be established. Of
+	course it would be better to really support them :-)
+
 Version 3.3:
 
 	A User Manual is now available from the homepage,

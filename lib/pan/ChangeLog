@@ -1,3 +1,7 @@
+2003-05-27  Mats Cronqvist  <etxmacr@cbe2077>
+
+	* released pan-1_03...
+
 2003-05-12  Mats Cronqvist  <etxmacr@cbe2077>
 
 	* src/panLib.erl (grep/2): made funs grepable 

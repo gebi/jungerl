@@ -1,0 +1,800 @@
+<html>
+<head>
+<title>Documentation for C# BigInteger Class</title>
+</head>
+
+<body>
+<table width="100%" border=0>
+<tr BGCOLOR="#FBEDBB">
+<h1>Documentation for C# BigInteger class</h1>
+</tr>
+<tr bgcolor="#FBEDBB">
+<b>By Chew Keong TAN</b><p>
+Comments, bugs and suggestions to (www.codeproject.com/csharp/biginteger.asp)<p>
+</tr>
+<tr bgcolor="#ffcc99">
+Updated 23 September, 2002
+</tr>
+</table>
+
+<a href="#Constructors">Constructors</a>&nbsp&nbsp
+<a href="#PublicMethods">Public Methods</a>&nbsp&nbsp
+<a href="#PrivateMethods">Private Methods</a>&nbsp&nbsp
+<a href="#References">References</a><p>
+
+<b>Copyright (c) 2002 Chew Keong TAN</b><br>
+<b>All rights reserved.</b><p>
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, and/or sell copies of the Software, and to permit persons
+to whom the Software is furnished to do so, provided that the above
+copyright notice(s) and this permission notice appear in all copies of
+the Software and that both the above copyright notice(s) and this
+permission notice appear in supporting documentation.<p>
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+OF THIRD PARTY RIGHTS. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+HOLDERS INCLUDED IN THIS NOTICE BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL
+INDIRECT OR CONSEQUENTIAL DAMAGES, OR ANY DAMAGES WHATSOEVER RESULTING
+FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
+NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
+WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.<p>
+<hr>
+<h2>Disclaimer</h2><p>
+Although reasonable care has been taken to ensure the correctness of this
+implementation, this code should never be used in any application without
+proper verification and testing.  I disclaim all liability and responsibility
+to any person or entity with respect to any loss or damage caused, or alleged
+to be caused, directly or indirectly, by the use of this BigInteger class.
+<hr><p>
+
+Overloaded Operators +, -, *, /, %, >>, <<, ==, !=, >, <, >=, <=, &, |, ^, ++, --, ~
+
+
+<h2><a name="Constructors">Constructors</a></h2>
+<TABLE BORDER="1" cellpadding="10" width="100%">
+<TR BGCOLOR="#ffcc99">
+<TH>Method</TH>
+<TH>Description</TH>
+</TR>
+
+
+<tr>
+<td valign="top">
+<b>BigInteger()</b>
+</td>
+<td>
+Value of BigInteger is initialized to 0.
+</td>
+</tr>
+
+<tr>
+<td valign="top">
+<b>BigInteger(long value)</b>
+</td>
+<td>
+Default value provided by a signed long integer.<p>
+Throws <b>ArithmeticException</b> if input value is larger than the maximum size of the BigInteger.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top">
+<b>BigInteger(ulong value)</b>
+</td>
+<td>
+Default value provided by an unsigned long integer.<p>
+Throws <b>ArithmeticException</b> if input value is larger than the maximum size of the BigInteger.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top">
+<b>BigInteger(BigInteger bi)</b>
+</td>
+<td>
+Default value is provided by a BigInteger.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top">
+<b>BigInteger(string value, int radix)</b>
+</td>
+<td>
+Default value is provided by a string of digits of the specified base.<p>
+
+<b>Example (base 10)</b><p>
+To initialize <i>a</i> with the default value of 1234 in base 10<br>
+        BigInteger a = new BigInteger("1234", 10)<p>
+
+To initialize <i>a</i> with the default value of -1234<br>
+        BigInteger a = new BigInteger("-1234", 10)<p>
+
+<b>Example (base 16)</b><p>
+
+To initialize <i>a</i> with the default value of 0x1D4F in base 16<br>
+        BigInteger a = new BigInteger("1D4F", 16)<p>
+
+To initialize <i>a</i> with the default value of -0x1D4F<br>
+        BigInteger a = new BigInteger("-1D4F", 16)<p>
+
+Note that string values are specified in the sign and magnitude format.<p>
+Throws <b>ArithmeticException</b> if<br>
+(1) Invalid characters are found in the string. <br>
+(2) Specified value exceeds the maximum representable value of the BigInteger.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top">
+<b>BigInteger(byte[] inData)</b>
+</td>
+<td>
+Default value provided by an array of bytes<p>
+
+The lowest index of the input byte array (i.e [0]) should contain the
+most significant byte of the number, and the highest index should
+contain the least significant byte.<p>
+
+<b>Example</b><p>
+To initialize "a" with the default value of 0x1D4F in base 16<br>
+byte[] temp = { 0x1D, 0x4F };<br>
+BigInteger a = new BigInteger(temp)<p>
+
+Note that this method of initialization does not allow the sign to
+be specified.<p>
+Throws <b>ArithmeticException</b> if the number of input bytes exceed the maximum
+representable value of the BigInteger.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top">
+<b>BigInteger(byte[] inData, int inLen)</b>
+</td>
+<td>
+Default value provided by an array of bytes of the specified length.<p>
+Throws <b>ArithmeticException</b> if<br>
+(1) The number of input bytes exceed the maximum representable value of the BigInteger.<br>
+(2) The value of <i>inLen</i> exceeds the length of <i>inData</i>.
+</td>
+</tr>
+
+<tr>
+<td valign="top">
+<b>BigInteger(uint[] inData)</b>
+</td>
+<td>
+Default value provided by an array of unsigned integers.<p>
+Throws <b>ArithmeticException</b> if the number of input integers exceed the maximum
+representable value of the BigInteger.
+</td>
+
+</tr>
+</table>
+
+
+<h2><a name="PublicMethods">Public Methods</a></h2><p>
+<TABLE BORDER="1" cellpadding="10" width="100%">
+<TR bgcolor="#ffcc99">
+<TH>Return Type</TH>
+<TH>Method</TH>
+<TH>Description</TH>
+</TR>
+
+<tr>
+<td valign="top" width="1%">BigInteger</td>
+<td valign="top">
+<b>abs()</b>
+</td>
+<td>
+Returns the absolute value of <i>this</i>.<p>
+Throws <b>ArithmeticException</b> if the negated value is too large to fit the BigInteger.
+This happens if the value of <i>this</i>, prior to negation, holds the maximum negative
+2's complement value that can be represented by the BigInteger.
+
+</td>
+</tr>
+
+<tr>
+<td valign="top" width="1%">int</td>
+<td valign="top">
+<b>bitCount()</b>
+</td>
+<td>
+Returns the position of the most significant bit in the BigInteger.<p>
+
+<b>Example</b><p>
+1) Returns 0, if the value of the BigInteger is 0...0000 0000<sub>2</sub>.<br>
+2) Returns 1, if the value of the BigInteger is 0...0000 0001<sub>2</sub>.<br>
+3) Returns 2, if the value of the BigInteger is 0...0000 0010<sub>2</sub>.<br>
+4) Returns 2, if the value of the BigInteger is 0...0000 0011<sub>2</sub>.<br>
+</td>
+</tr>
+
+<tr>
+<td valign="top" width="1%">bool</td>
+<td valign="top">
+<b>FermatLittleTest(int confidence)</b>
+</td>
+<td>
+Probabilistic primality test based on Fermat's little theorem.<p>
+
+For any a < p if<br>
+a<sup>p-1</sup> mod p != 1 then p is not prime.<p>
+
+Otherwise, p is probably prime.<p>
+Input parameter <i>confidence</i> determines the number of trials. A random
+value <i>a</i> is generated for each trial and False is returned if a<sup>p-1</sup> mod p != 1
+for any <i>a</i>.<p>
+Returns <b>True</b> if <i>this</i> is probably prime. i.e.<br>
+a<sup>p-1</sup> mod p = 1 for all <i>a's</i> that were tested.<p>
+Returns <b>False</b> if <i>this</i> is definitely composite.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">BigInteger</td>
+<td valign="top">
+<b>gcd(BigInteger bi)</b>
+</td>
+<td>
+Returns the greatest common divisor of <i>this</i> and bi.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">BigInteger</td>
+<td valign="top">
+<b>genCoPrime(int bits, Random rand)</b>
+</td>
+<td>
+Generates a random positive BigInteger with the specified number of bits such
+that gcd(number, <i>this</i>) = 1
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">static BigInteger</td>
+<td valign="top">
+<b>genPseudoPrime(int bits, int confidence, Random rand)</b>
+</td>
+<td>
+Generates a random positive BigInteger with the specified number of bits and is possibly prime.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">void</td>
+<td valign="top">
+<b>genRandomBits(int bits, Random rand)</b>
+</td>
+<td>
+Populates <i>this</i> with the specified amount of random bits.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">byte[]</td>
+<td valign="top">
+<b>getBytes()</b>
+</td>
+<td>
+Returns the value of the BigInteger as a byte array.<p>
+The lowest index contains the MSB.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">int</td>
+<td valign="top">
+<b>IntValue()</b>
+</td>
+<td>
+Returns the lowest 4 bytes of the BigInteger as an int.
+</td>
+</tr>
+
+<tr>
+<td valign="top" width="1%">bool</td>
+<td valign="top">
+<b>isProbablePrime(int confidence)</b>
+</td>
+<td>
+Determines whether <i>this</i> BigInteger is probably prime using Rabin-Miller's test.<p>
+Prior to the test, trial divisions are carried out using prime numbers below 2000.
+If any of the primes divides <i>this</i> BigInteger, then it is not prime.<p>
+Input parameter <i>confidence</i> determines the number of trials for Rabin-Miller's test.<p>
+Returns <b>True</b> if <i>this</i> is probably prime.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">bool</td>
+<td valign="top">
+<b>isProbablePrime()</b>
+</td>
+<td>
+Determines whether <i>this</i> BigInteger is probably prime using a combination of
+base 2 strong pseudoprime test and Lucas strong pseudoprime test.<p>
+The sequence of the primality test is as follows,
+<ol>
+<li>
+Trial divisions are carried out using prime numbers below 2000.
+If any of the primes divides <i>this</i> BigInteger, then it is not prime.
+</li>
+<li>
+Perform base 2 strong pseudoprime test.  If <i>this</i> is a base 2 strong pseudoprime,
+proceed on to the next step.
+</li>
+<li>
+Perform strong Lucas pseudoprime test.
+</li>
+</ol>
+Returns <b>True</b> if <i>this</i> is both a base 2 strong pseudoprime and a strong
+Lucas pseudoprime.<p>
+For a detailed discussion of this primality test, see <a href="#References">[6]</a>.
+
+</td>
+
+
+
+<tr>
+<td valign="top" width="1%">static int</td>
+<td valign="top">
+<b>Jacobi(BigInteger a, BigInteger b)</b>
+</td>
+<td>
+Computes the Jacobi Symbol for a and b.<br>
+Algorithm taken from <a href="#References">[3] and [4]</a>.<p>
+Throws <b>ArgumentException</b> if b is not odd.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">long</td>
+<td valign="top">
+<b>LongValue()</b>
+</td>
+<td>
+Returns the lowest 8 bytes of the BigInteger as a long.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">static BigInteger[]</td>
+<td WIDTH="35%" valign="top">
+<b>LucasSequence(BigInteger P, BigInteger Q, BigInteger k, BigInteger n)</b>
+</td>
+<td>
+Returns the k<sup>th</sup> number in the Lucas Sequence reduced modulo n.<p>
+
+Index doubling is used to speed up the process.  For example, to calculate V<sub>k</sub>,
+we maintain two numbers in the sequence V<sub>n</sub> and V<sub>n+1</sub>.<p>
+
+To obtain V<sub>2n</sub>, we use the identity<p>
+V<sub>2n</sub> = (V<sub>n</sub> * V<sub>n</sub>) - (2 * Q<sup>n</sup>)<p>
+To obtain V<sub>2n+1</sub>, we first write it as<p>
+V<sub>2n+1</sub> = V<sub>(n+1) + n</sub><p>
+and use the identity<p>
+V<sub>m+n</sub> = (V<sub>m</sub> * V<sub>n</sub>) - (Q<sup>n</sup> * V<sub>m-n</sub>)<p>
+
+Hence,<p>
+V<sub>(n+1) + n</sub> = (V<sub>n+1</sub> * V<sub>n</sub>) - (Q<sup>n</sup> * V<sub>(n+1) - n</sub>)<p>
+= (V<sub>n+1</sub> * V<sub>n</sub>) - (Q<sup>n</sup> * V<sub>1</sub>)<p>
+= (V<sub>n+1</sub> * V<sub>n</sub>) - (Q<sup>n</sup> * P)<p>
+
+We use k in its binary expansion and perform index doubling for each
+bit position.  For each bit position that is set, we perform an
+index doubling followed by an index addition.  This means that for V<sub>n</sub>,
+we need to update it to V<sub>2n+1</sub>.  For V<sub>n+1</sub>, we need to update it to
+V<sub>(2n+1)+1</sub> = V<sub>2*(n+1)</sub><p>
+
+<b>Returns an array of 3 BigIntegers with,</b><br>
+[0] = U<sub>k</sub><br>
+[1] = V<sub>k</sub><br>
+[2] = Q<sup>n</sup><p>
+
+Where,<br>
+U<sub>0</sub> = 0 % n, U<sub>1</sub> = 1 % n<br>
+V<sub>0</sub> = 2 % n, V<sub>1</sub> = P % n<p>
+
+For a detailed discussion of the algorithm and identities, refer to
+<a href="#References">[6],[7],[8] and [9].</a>
+</td>
+</tr>
+
+
+
+<tr>
+<td valign="top" width="1%">BigInteger</td>
+<td valign="top">
+<b>max(BigInteger bi)</b>
+</td>
+<td>
+Returns max(<i>this</i>, bi)
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">BigInteger</td>
+<td valign="top">
+<b>min(BigInteger bi)</b>
+</td>
+<td>
+Returns min(<i>this</i>, bi)
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">BigInteger</td>
+<td valign="top">
+<b>modInverse(BigInteger modulus)</b>
+</td>
+<td>
+Returns the modulo inverse of <i>this</i>.<p>
+The modulus inverse is defined as the unique number <i>x</i> such that<br>
+(<i>this</i> * x) mod modulus = 1<p>
+Throws <b>ArithmeticException</b> if the inverse does not exist.  (i.e. gcd(this, modulus) != 1)
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">BigInteger</td>
+<td valign="top">
+<b>modPow(BigInteger exp, BigInteger n)</b>
+</td>
+<td>
+Returns the value of <i>this</i> raised to the power of exp, modulo n.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">bool</td>
+<td valign="top">
+<b>RabinMillerTest(int confidence)</b>
+</td>
+<td>
+Probabilistic primality test based on Rabin-Miller's.<p>
+
+For any p > 0 with p - 1 = 2<sup>s</sup> * t<br>
+p is probably prime if for any a < p,<p>
+1) a<sup>t</sup> mod p = 1 or<br>
+2) a<sup>(2^j)*t</sup> mod p = p-1 for some 0 <= j <= s-1<p>
+
+Otherwise, p is composite.<p>
+Input parameter <i>confidence</i> determines the number of trials. A random
+value <i>a</i> is generated for each trial and False is returned if<p>
+1) a<sup>t</sup> mod p != 1 AND<br>
+2) a<sup>(2^j)*t</sup> mod p != p-1 for all 0 <= j <= s-1.<p>
+for any <i>a</i>.<p>
+Returns <b>True</b> if <i>this</i> is probably prime.<p>
+Returns <b>False</b> if <i>this</i> is definitely composite.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">void</td>
+<td WIDTH="35%" valign="top">
+<b>setBit()</b>
+</td>
+<td>
+Sets the value of the specified bit to 1.<p>
+The Least Significant Bit position is 0.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">BigInteger</td>
+<td WIDTH="35%" valign="top">
+<b>sqrt()</b>
+</td>
+<td>
+Returns a value that is equivalent to the integer square root
+of the BigInteger.<p>
+The integer square root of an integer <i>n</i> is defined as the largest integer
+<i>a</i> such that <i>(a * a) &lt= n</i>
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">bool</td>
+<td WIDTH="35%" valign="top">
+<b>SolovayStrassenTest(int confidence)</b>
+</td>
+<td>
+Probabilistic primality test based on Solovay-Strassen.<p>
+
+p is probably prime if for any a < p,<br>
+a<sup>(p-1)/2</sup> mod p = J(a, p)<p>
+
+where J is the Jacobi symbol.<p>
+
+Otherwise, p is composite.<p>
+Input parameter <i>confidence</i> determines the number of trials. A random
+value <i>a</i> is generated for each trial and False is returned if a<sup>(p-1)/2</sup> mod p != J(a, p)
+for any <i>a</i>.<p>
+Returns <b>True</b> if <i>this</i> is probably prime. i.e.<br>
+a<sup>(p-1)/2</sup> mod p = J(a, p) for all <i>a's</i> that were tested.<p>
+Returns <b>False</b> if <i>this</i> is definitely composite.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">bool</td>
+<td WIDTH="35%" valign="top">
+<b>StrongLucasTest()</b>
+</td>
+<td>
+Implementation of the Lucas Strong Pseudo Prime test.<p>
+
+Let <i>n</i> be an odd number with <i>gcd(n,D) = 1</i>, and <i>n - J(D, n) = 2<sup>s</sup> * d</i>
+with <i>d</i> odd and <i>s >= 0</i>.<p>
+
+If <b>U<sub>d</sub> mod n = 0</b> OR <b>V<sub>2^r*d</sub> mod n = 0</b><br>for
+some <i>0 <= r < s</i>, then <i>n</i>
+is a strong Lucas pseudoprime with parameters (P, Q).  We select
+P and Q based on Selfridge.<p>
+
+Let D be the first element of the sequence
+5, -7, 9, -11, 13, ... for which <i>J(D,n) = -1</i><br>
+Let P = 1, Q = (1-D) / 4<p>
+
+Returns <b>True</b> if number is a strong Lucus pseudo prime.
+Otherwise, returns <b>False</b> indicating that number is composite.<p>
+For a detailed discussion of the algorithm and identities, refer to
+<a href="#References">[6],[7],[8] and [9].</a>
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">string</td>
+<td valign="top">
+<b>ToHexString()</b>
+</td>
+<td>
+Returns a hex string showing the contains of the BigInteger.<p>
+<b>Examples</b><p>
+1) If the value of BigInteger is 255 in base 10, then
+ToHexString() returns "FF"<p>
+2) If the value of BigInteger is -255 in base 10, then
+ToHexString() returns ".....FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF01",
+which is the 2's complement representation of -255.<p>
+</td>
+</tr>
+
+
+
+<tr>
+<td valign="top" width="1%">override string</td>
+<td valign="top">
+<b>ToString()</b>
+</td>
+<td>
+Returns a string representing the BigInteger in base 10.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">string</td>
+<td valign="top">
+<b>ToString(int radix)</b>
+</td>
+<td>
+Returns a string representing the BigInteger in sign-and-magnitude format
+in the specified radix.<p>
+<b>Example</b><br>
+If the value of BigInteger is -255 in base 10, then ToString(16) returns "-FF"<p>
+Throws <b>ArgumentException</b> if radix is not between 2 and 36, inclusive.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">void</td>
+<td WIDTH="35%" valign="top">
+<b>unsetBit()</b>
+</td>
+<td>
+Sets the value of the specified bit to 0.<p>
+The Least Significant Bit position is 0.
+</td>
+</tr>
+
+</table>
+
+
+
+<h2><a name="PrivateMethods">Private Methods</a></h2><p>
+<TABLE BORDER="1" cellpadding="10" width="100%">
+<TR bgcolor="#ffcc99">
+<TH>Return Type</TH>
+<TH>Method</TH>
+<TH>Description</TH>
+</TR>
+
+
+<tr>
+<td valign="top" width="1%">BigInteger</td>
+<td valign="top" width="35%">
+<b>BarrettReduction(BigInteger x, BigInteger n, BigInteger constant)</b>
+</td>
+<td>
+Fast computation of <i>x mod n</i> using Barrett Reduction.
+Value of <i>x</i> must be &lt b<sup>2k</sup>, where <i>b</i> is the base.  In this
+implementation, <i>b = 2<sup>32</sup></i> (uint) and <i>k = number of digits of n</i>.<p>
+The parameter <i>constant</i> requires the precomputed value of <i>b<sup>2k</sup> / n</i><p>
+For details of this algorithm, refer to <a href="#References">[4]</a>.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">static BigInteger[]</td>
+<td valign="top">
+<b>LucasSequenceHelper(BigInteger P, BigInteger Q, BigInteger k, BigInteger n,
+BigInteger constant, int s)</b>
+</td>
+<td>
+Private method that is called by the public <i>LucasSequence</i> method to generate
+the k<sup>th</sup> number in the Lucas sequence.<p>
+<b>Returns an array of 3 BigIntegers with,</b><br>
+[0] = U<sub>k</sub><br>
+[1] = V<sub>k</sub><br>
+[2] = Q<sup>n</sup><p>
+Throws <b>ArgumentException</b> if <i>k</i> is not odd.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">static void</td>
+<td valign="top" width="35%">
+<b>multiByteDivide(BigInteger bi1, BigInteger bi2,
+                   BigInteger outQuotient, BigInteger outRemainder)</b>
+</td>
+<td>
+Supports the division of two numbers with a divisor that has more than 1 digit.<p>
+Used by the overloaded / and % operators.<br>
+Parameters <i>bi1</i> and <i>bi2</i> are the dividend
+and the divisor respectively.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">static void</td>
+<td valign="top" width="35%">
+<b>singleByteDivide(BigInteger bi1, BigInteger bi2,
+                    BigInteger outQuotient, BigInteger outRemainder)</b>
+</td>
+<td>
+Supports the division of two numbers with a divisor that has only 1 digit.<p>
+Used by the overloaded / and % operators.<br>
+Parameters <i>bi1</i> and <i>bi2</i> are the dividend
+and the divisor respectively.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">static int</td>
+<td valign="top" width="35%">
+<b>shiftLeft(uint[] buffer, int shiftVal)</b>
+</td>
+<td>
+Shifts the BigInteger stored in the <i>buffer</i> by the specified number of bits to the left.<p>
+Used by the overloaded << operator.<br>
+Returns the position of the most significant integer that is not 0.
+</td>
+</tr>
+
+<tr>
+<td valign="top" width="1%">static int</td>
+<td valign="top" width="35%">
+<b>shiftRight(uint[] buffer, int shiftVal)</b>
+</td>
+<td>
+Shifts the BigInteger stored in the <i>buffer</i> by the specified number of bits to the right.<p>
+Used by the overloaded >> operator.<br>
+Returns the position of the most significant integer that is not 0.
+</td>
+</tr>
+
+
+<tr>
+<td valign="top" width="1%">bool</td>
+<td valign="top" width="35%">
+<b>LucasStrongTestHelper(BigInteger thisVal)</b>
+</td>
+<td>
+Private method called by the public <i>LucasStrongTest</i> method to perform a Lucas strong
+pseudoprime test on <i>thisVal</i>.
+</td>
+</tr>
+
+
+
+</table>
+
+
+<h2><a name="References">References</a></h2>
+<ol>
+<li>
+D. E. Knuth, "Seminumerical Algorithms", The Art of Computer Programming Vol. 2,
+3rd Edition, Addison-Wesley, 1998.<p>
+</li>
+
+<li>
+K. H. Rosen, "Elementary Number Theory and Its Applications", 3rd Ed,
+Addison-Wesley, 1993.<p>
+</li>
+
+<li>
+B. Schneier, "Applied Cryptography", 2nd Ed, John Wiley & Sons, 1996.<p>
+</li>
+
+<li>
+A. Menezes, P. van Oorschot, and S. Vanstone, "Handbook of Applied Cryptography",
+CRC Press, 1996, <a href="http://www.cacr.math.uwaterloo.ca/hac">www.cacr.math.uwaterloo.ca/hac</a><p>
+</li>
+
+<li>
+A. Bosselaers, R. Govaerts, and J. Vandewalle, "Comparison of Three Modular
+Reduction Functions," Proc. CRYPTO'93, pp.175-186.<p>
+</li>
+
+<li>
+R. Baillie and S. S. Wagstaff Jr, "Lucas Pseudoprimes", Mathematics of Computation,
+Vol. 35, No. 152, Oct 1980, pp. 1391-1417.<p>
+</li>
+
+<li>
+H. C. Williams, "Édouard Lucas and Primality Testing", Canadian Mathematical
+Society Series of Monographs and Advance Texts, vol. 22, John Wiley & Sons, New York,
+NY, 1998.<p>
+</li>
+
+<li>
+P. Ribenboim, "The new book of prime number records", 3rd edition, Springer-Verlag,
+New York, NY, 1995.<p>
+</li>
+
+<li>
+M. Joye and J.-J. Quisquater, "Efficient computation of full Lucas sequences",
+Electronics Letters, 32(6), 1996, pp 537-538.<p>
+</li>
+</ol>
+
+</body>
+</html>

@@ -17,15 +17,12 @@ AC_CHECK_HEADERS(linux/if_tun.h, HAVE_TUNTAP="true")
 dnl For the Slang driver
 
 AC_ARG_WITH(slang-include, [  --with-slang-include=DIR   installed slang library],
-    SLANG_INCLUDE=$withval,
-    if test "x$SLANG_INCLUDE" = x; then
-       SLANG_INCLUDE=/usr/include/slang
-    fi
+    SLANG_INCLUDE=$withval
     )
 
 AC_SUBST(SLANG_INCLUDE)
 
-AC_CHECK_HEADERS(slang.h, HAVE_SLANG="true")
+AC_CHECK_HEADERS(slang.h, HAVE_SLANG="true",,$SLANG_INCLUDE)
 
 case "$target_os" in
      *cygwin*)

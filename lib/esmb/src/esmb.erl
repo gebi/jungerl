@@ -10,7 +10,7 @@
 	 connect/2, connect/3, connect/4, close/1, user_logon/3, emsg/3,
 	 tree_connect/4, tree_connect/5, list_dir/3, called/1,
 	 open_file_ro/3, open_file_rw/3, stream_read_file/3,
-	 read_file/3, mkdir/3, rmdir/3, 
+	 read_file/3, mkdir/3, rmdir/3, is_ok/2,
 	 astart/0, istart/0, ustart/0,
 	 client/2, aclient/2, iclient/2, uclient/2,
 	 close_file/2, write_file/4, delete_file/3, caller/0,
@@ -1623,6 +1623,11 @@ sleep(Sec) ->
 %%%
 %%% Error messages
 %%%
+
+is_ok(Pdu, DefaultEmsg) when Pdu#smbpdu.eclass == ?SUCCESS -> ok;
+is_ok(Pdu, DefaultEmsg) when record(Pdu, smbpdu) ->
+    {error, emsg(Pdu#smbpdu.eclass, Pdu#smbpdu.ecode, DefaultEmsg)}.
+
 emsg(Eclass, Ecode, DefaultEmsg) ->
     case catch emsg(Eclass, Ecode) of
 	{'EXIT', _} -> DefaultEmsg;

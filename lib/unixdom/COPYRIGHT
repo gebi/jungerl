@@ -1,0 +1,98 @@
+All of the files in this source distribution, with one exception,
+are licenced by Sendmail, Inc. under the "BAMS TECHNOLOGY LICENSE",
+which is described below.
+
+The single file which is not covered by the "BAMS TECHNOLOGY LICENSE"
+is src/unixdom_drv.c, which is derived from the file
+erts/emulator/drivers/common/inet_drv.c which is found in the Erlang R7
+source distribution.  inet_drv.c is licensed under the Erlang Public
+License, Version 1.1.  See below for an executive summary of the EPL.
+
+--- snip ---
+
+        BAMS TECHNOLOGY LICENSE
+
+The following license terms and conditions apply to this BAMS
+software ("Software"), unless a different license is obtained from
+Sendmail, Inc. at 6425 Christie Ave, Fourth Floor, Emeryville, CA 94608
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+Copyright (c) 1999 - 2001
+Sendmail, Inc.  All rights reserved.
+
+License Terms:
+
+Use, Modification and Redistribution (including distribution of
+any modified or derived work) of the Software in source and binary
+forms is permitted only if each of the following conditions is met:
+
+1.  Redistributions of the Software and any modifications thereto
+    or accompanying software that uses the Software are made at no
+    charge beyond the reasonable cost of materials and delivery.
+
+2.  Redistributions are accompanied by a complete copy of the Source
+    Code or by an irrevocable offer to provide a complete copy of
+    the Source Code for up to three years at the cost of materials
+    and delivery.  Such redistributions must allow further use,
+    modification, and redistribution of the Source Code under
+    substantially the same terms as this license.  For the purposes
+    of redistribution "Source Code" means the complete compilable
+    and linkable source code of Software including all modifications
+    and all accompanying software that uses the Software.  It does
+    not include accompanying software modules or files that either
+    (a) typically accompany the major components of the operating
+    system on which the executable file runs, or (b) are distributed
+    under another open source license, as defined by the Open Source
+    Initiative (http://www.opensource.org).
+
+3.  Redistributions of source code must retain the copyright notices
+    as they appear in each source code file, these license terms,
+    and the disclaimer/limitation of liability set forth as paragraph
+    6 below.
+
+4.  Redistributions in binary form must reproduce the Copyright
+    Notice, these license terms, and the disclaimer/limitation of
+    liability set forth as paragraph 6 below, in the documentation
+    and/or other materials provided with the distribution.  For
+    the purposes of binary distribution the "Copyright Notice"
+    refers to the following language: "Copyright (c) 1999-2001
+    Sendmail, Inc.  All rights reserved."
+
+5.  Neither the name of Sendmail, Inc. nor its contributors may be
+    used to endorse or promote products derived from this Software
+    without specific prior written permission.  The name "sendmail"
+    is a registered trademark of Sendmail, Inc.
+
+6.  Disclaimer/Limitation of Liability: THIS SOFTWARE IS PROVIDED
+    BY SENDMAIL, INC. AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR
+    IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+    WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+    PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL SENDMAIL, INC. OR
+    CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+    NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+    LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+    CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+    STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+    ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+    ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+--- snip ---
+
+/* ``The contents of this file are subject to the Erlang Public License,
+ * Version 1.1, (the "License"); you may not use this file except in
+ * compliance with the License. You should have received a copy of the
+ * Erlang Public License along with this software. If not, it can be
+ * retrieved via the world wide web at http://www.erlang.org/.
+ * 
+ * Software distributed under the License is distributed on an "AS IS"
+ * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
+ * the License for the specific language governing rights and limitations
+ * under the License.
+ * 
+ * The Initial Developer of the Original Code is Ericsson Utvecklings AB.
+ * Portions created by Ericsson are Copyright 1999, Ericsson Utvecklings
+ * AB. All Rights Reserved.''
+ * 
+ */

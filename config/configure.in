@@ -55,9 +55,12 @@ esac
 AC_SUBST(LD_SHARED)
 
 dnl Skip applications that won't build, after cleaning out old SKIP
-dnl files.
+dnl files. Totally empty SKIP files we leave alone -- we don't create
+dnl them, but the user can.
 
-for f in ../lib/*/SKIP; do rm $f; done
+for f in ../lib/*/SKIP; do
+  if test -s $f; then rm $f; fi
+done
 
 if test -z $HAVE_TUNTAP; then
    echo "No tunnel linux/if_tun.h" > ../lib/tuntap/SKIP

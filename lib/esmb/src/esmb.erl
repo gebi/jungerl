@@ -15,7 +15,8 @@
 	 exit_if_error/2, list_shares/3, list_shares/4, l/3]).
 -export([dec_smb/1, tt_name/1]).
 -export([zeros/1,p14/1,s16x/1,s21_lm_session_key/1,ex/2,swab/1,
-	 challenge_response/2, crtest/0, e/2]).
+	 lm_challenge_response/2, nt_challenge_response/2, 
+	 lmtest/0, nttest/0, e/2]).
 -include("esmb_lib.hrl").
 
 -define(PORT, 139).
@@ -186,6 +187,8 @@ connect(Caller, Called)           -> connect(Caller, Called, []).
 connect(Caller, Called, SockOpts) -> connect(Caller, Called, SockOpts, ?PORT).
 
 connect(Caller, Called, SockOpts, Port) ->
+    ?TRACE("~w(~w): enter connect, Caller=~p Called=~p~n",
+	   [?MODULE, ?LINE, Caller, Called]),
     Opts = [binary, {packet, 0}|SockOpts],
     case gen_tcp:connect(lcase_host(Called), Port, Opts) of
 	{ok,S} ->
@@ -341,10 +344,12 @@ tree_connect(S, Neg, InReq, Path, Service) ->
     decode_smb_response(Req, nbss_session_service(S, Pdu)).
 
 negotiate(S) ->
+    ?TRACE("~w(~w): enter negotiate~n", [?MODULE, ?LINE]),
     {Req, Pdu} = smb_negotiate_pdu(),
     decode_smb_response(Req, nbss_session_service(S, Pdu)).
 
 user_logon(S, Neg, U) ->
+    ?TRACE("~w(~w): enter user_logon, U=~p~n", [?MODULE, ?LINE, U]),
     {Req, Pdu} = smb_session_setup_andx_pdu(Neg, U),
     decode_smb_response(Req, nbss_session_service(S, Pdu)).
 
@@ -387,6 +392,12 @@ decode_smb_response(Req, {ok, _, ResPdu}) when  ?IS(Req, ?SMB_NEGOTIATE) ->
 	    crypto:start(),
 	    lanman_neg_resp(B, Res#smbpdu.bf, 
 			    #smb_negotiate_res{dialect_index = Di});
+	?NT_LM_0_12 ->
+	    crypto:start(),
+	    ?TRACE("~w(~w): decode_neg_resp, size=~p , Buf=~p~n", 
+		   [?MODULE, ?LINE, size(Res#smbpdu.bf), Res#smbpdu.bf]),
+	    ntlm_neg_resp(B, Res#smbpdu.bf, 
+			  #smb_negotiate_res{dialect_index = Di});
 	_ ->
 	    exit(nyi)
     end;
@@ -436,6 +447,27 @@ lanman_neg_resp(<<SecurityMode:16/little,
 			  max_buffer_size = MaxBufferSize,
 			  encryption_key  = EncKey}.
     
+ntlm_neg_resp(<<SecurityMode,
+	      _:2/binary,            % Max pending outstanding requests
+	      _:2/binary,            % Max VCs between client and server
+	      MaxBufferSize:32/little,
+	      _:4/binary,            % Max raw buffer size
+	      _:4/binary,            % Unique token identifying this session
+	      Cap:32/little,         % Server capabilities
+	      _:4/binary,            % System (UTC) time of server (low)
+	      _:4/binary,            % System (UTC) time of server (high)
+	      _:2/binary,            % Time zone of server (minutes from UTC)
+	      EncKeyLen>>,           % Encryption key length
+	      B,
+	      Neg) ->
+    ?TRACE("~w(~w): ntlm_neg_resp EncKeyLen=~p~n", 
+	   [?MODULE, ?LINE, EncKeyLen]),
+    <<EncKey:EncKeyLen/binary, _/binary>> = B,
+    Neg#smb_negotiate_res{security_mode    = SecurityMode,
+			  max_buffer_size  = MaxBufferSize,
+			  srv_capabilities = Cap,
+			  encryption_key   = EncKey}.
+
 
 
 %%% ---
@@ -669,10 +701,6 @@ dec_smb(Req,
 %%% SMB encode routines
 %%% --------------------------------------------------------------------
 
-%%% FIXME : better test when new dialects are added
--define(CORE_PROTOCOL(Neg), (Neg#smb_negotiate_res.dialect_index == 0)).
--define(PRE_DOS_LANMAN_2_1(Neg), (Neg#smb_negotiate_res.dialect_index =< 1)).
-
 
 smb_close_file_pdu(InReq) ->
     {Wc,Wp} = wp_close_file(InReq#smbpdu.fid),
@@ -680,6 +708,7 @@ smb_close_file_pdu(InReq) ->
 		  pid = InReq#smbpdu.pid,
 		  uid = InReq#smbpdu.uid,
 		  tid = InReq#smbpdu.tid,
+		  flags2 = InReq#smbpdu.flags2,
 		  wc = Wc,
 		  wp = Wp},
     %%io:format("close_file: WordCount = ~p~n",[Rec#smbpdu.wc]),
@@ -701,6 +730,7 @@ smb_delete_file_pdu(InReq, Fname) ->
 		  pid = InReq#smbpdu.pid,
 		  uid = InReq#smbpdu.uid,
 		  tid = InReq#smbpdu.tid,
+		  flags2 = InReq#smbpdu.flags2,
 		  wc = Wc,
 		  wp = Wp,
 		  bc  = size(Bf),
@@ -725,6 +755,7 @@ smb_delete_dir_pdu(InReq, Dir) ->
 		  pid = InReq#smbpdu.pid,
 		  uid = InReq#smbpdu.uid,
 		  tid = InReq#smbpdu.tid,
+		  flags2 = InReq#smbpdu.flags2,
 		  bc  = size(Bf),
 		  bf  = Bf},
     %%io:format("delete_directory: WordCount = ~p~n",[Rec#smbpdu.wc]),
@@ -744,6 +775,7 @@ smb_write_andx_pdu(InReq, Finfo, Data, Written) ->
 		  pid = InReq#smbpdu.pid,
 		  uid = InReq#smbpdu.uid,
 		  tid = InReq#smbpdu.tid,
+		  flags2 = InReq#smbpdu.flags2,
 		  wc = Wc,
 		  wp = Wp,
 		  bc = DataLen,
@@ -782,6 +814,7 @@ smb_read_andx_pdu(InReq, Finfo) ->
 		  pid = InReq#smbpdu.pid,
 		  uid = InReq#smbpdu.uid,
 		  tid = InReq#smbpdu.tid,
+		  flags2 = InReq#smbpdu.flags2,
 		  wc = Wc,
 		  wp = Wp},
     %%io:format("read_andx: WordCount = ~p~n",[Rec#smbpdu.wc]),
@@ -825,6 +858,7 @@ smb_nt_create_andx_pdu(InReq, Path, Opts) ->
 		  pid = InReq#smbpdu.pid,
 		  uid = InReq#smbpdu.uid,
 		  tid = InReq#smbpdu.tid,
+		  flags2 = InReq#smbpdu.flags2,
 		  wc = Wc,
 		  wp = Wp,
 		  bc  = size(Bf),
@@ -892,6 +926,7 @@ smb_trans2_find_next2_pdu(InReq, Path, Sid) ->
 		  pid = InReq#smbpdu.pid,
 		  uid = InReq#smbpdu.uid,
 		  tid = InReq#smbpdu.tid,
+		  flags2 = InReq#smbpdu.flags2,
 		  wc  = Wc,
 		  wp  = Wp,
 		  bc  = size(Bf),
@@ -925,6 +960,7 @@ smb_trans2_find_first2_pdu(InReq, Path) ->
 		  pid = InReq#smbpdu.pid,
 		  uid = InReq#smbpdu.uid,
 		  tid = InReq#smbpdu.tid,
+		  flags2 = InReq#smbpdu.flags2,
 		  wc  = Wc,
 		  wp  = Wp,
 		  bc  = size(Bf),
@@ -993,6 +1029,7 @@ smb_check_directory_pdu(InReq, Path) ->
 		  pid = InReq#smbpdu.pid,
 		  uid = InReq#smbpdu.uid,
 		  tid = InReq#smbpdu.tid,
+		  flags2 = InReq#smbpdu.flags2,
 		  bc  = size(Bf),
 		  bf  = Bf},
     %%io:format("check_directory: WordCount = ~p~n",[Rec#smbpdu.wc]),
@@ -1011,6 +1048,7 @@ smb_tree_connect_andx_pdu(Neg, InReq, Path, Service) ->
     Rec = #smbpdu{cmd = ?SMB_TREE_CONNECT_ANDX,
 		  pid = InReq#smbpdu.pid,
 		  uid = InReq#smbpdu.uid,
+		  flags2 = flags2(Neg),
 		  wc = Wc,
 		  wp = Wp,
 		  bc  = size(Bf),
@@ -1019,7 +1057,7 @@ smb_tree_connect_andx_pdu(Neg, InReq, Path, Service) ->
     %%io:format("tree_connect_andx: ByteCount = ~p~n",[Rec#smbpdu.bc]),
     {Rec, enc_smb(Rec)}.
 
-wp_tree_connect_andx(Neg)  when ?PRE_DOS_LANMAN_2_1(Neg) ->
+wp_tree_connect_andx(Neg) ->
     {4,
      <<?NoAndxCmd,              
       0,                         % reserved
@@ -1027,16 +1065,31 @@ wp_tree_connect_andx(Neg)  when ?PRE_DOS_LANMAN_2_1(Neg) ->
       0:16/little,               % Flags
       1:16/little>>}.            % PasswordLength (incl. NULL)
 
-bf_tree_connect_andx(Neg, Path, Service) when ?PRE_DOS_LANMAN_2_1(Neg) ->
+bf_tree_connect_andx(Neg, Path, Service) when ?NTLM_0_12(Neg) ->
+    list_to_binary([0,           % Password
+		    Path, null(Neg), % filesystem 
+		    Service, [0]]);  % service
+%%%
+bf_tree_connect_andx(Neg, Path, Service) ->
     list_to_binary([0,           % Password
 		    Path, [0],   % filesystem
 		    Service, [0]]).  % service
     
+null(Neg) when ?USE_UNICODE(Neg) -> [0,0];
+null(_)                          -> [0].
 
 %%% ---
 
-smb_session_setup_andx_pdu(Neg, U) ->
-    {Passwd, PwLen} = enc_passwd(Neg, U#user.pw),
+%%%
+%%% If the dialect is earlier than "NTLM 0.12" then the client computes
+%%% the response using the "LM session key". If the dialect is "NTLM 0.12"
+%%% then the client may compute the response either using the "LM session key",
+%%% or the "NT session key", or both. The server may choose to refuse
+%%% responses computed using the "LM session key".
+%%%
+smb_session_setup_andx_pdu(Neg, U) when ?PRE_DOS_LANMAN_2_1(Neg) ->
+    ?TRACE("~w(~w): session_setup_andx, pre_dos_lanman_2.1~n",[?MODULE,?LINE]),
+    {Passwd, PwLen}   = enc_lm_passwd(Neg, U#user.pw),
     {Wc,Wp} = wp_session_setup_andx(Neg, U, PwLen),
     Bf = bf_session_setup_andx(Neg, U, Passwd),
     Rec = #smbpdu{cmd = ?SMB_SESSION_SETUP_ANDX,
@@ -1046,70 +1099,164 @@ smb_session_setup_andx_pdu(Neg, U) ->
 		  wp = Wp,
 		  bc  = size(Bf),
 		  bf  = Bf},
-    %%io:format("WordCount = ~p~n",[Rec#smbpdu.wc]),
-    %%io:format("ByteCount = ~p~n",[Rec#smbpdu.bc]),
+    {Rec, enc_smb(Rec)};
+%%%
+smb_session_setup_andx_pdu(Neg, U) when ?NTLM_0_12(Neg) ->
+    ?TRACE("~w(~w): session_setup_andx, ntlm_0.12~n",[?MODULE,?LINE]),
+    %%{Passwd, PwLen}   = enc_lm_passwd(Neg, U#user.pw),
+    {UPasswd, UPwLen} = enc_nt_passwd(Neg, U#user.pw, U#user.charset),
+    {Wc,Wp} = wp_session_setup_andx(Neg, U, 'FIXME', UPwLen),
+    Bf = bf_session_setup_andx(Neg, U, 'FIXME', UPasswd),
+    Rec = #smbpdu{cmd = ?SMB_SESSION_SETUP_ANDX,
+		  pid = mypid(),
+		  mid = 1,
+		  flags2 = flags2(Neg),
+		  wc = Wc,
+		  wp = Wp,
+		  bc  = size(Bf),
+		  bf  = Bf},
     {Rec, enc_smb(Rec)}.
+
+flags2(Neg) when ?USE_UNICODE(Neg) -> ?FLAGS2_NTLM;
+flags2(_)                          -> ?FLAGS2_LONG_NAMES.
 
 wp_session_setup_andx(Neg, U, PwLen) ->
     {10,
      <<?NoAndxCmd,              
       0,                         % reserved
       0:16/little,               % offset to next command WC
-      ?MaxBufferSize:16/little,
+      ?MAX_BUFFER_SIZE:16/little,
       ?MaxMpxCount:16/little,   
       ?VcNumber:16/little,
       0:32/little,               % session key
       PwLen:16/little,
       0:32/little>>}.            % reserved
+%%%    
+wp_session_setup_andx(Neg, U, PwLen, UPwLen) ->
+    {13,
+     <<?NoAndxCmd,              
+      0,                         % reserved
+      0:16/little,               % offset to next command WC
+      ?MAX_BUFFER_SIZE:16/little,
+      ?MaxMpxCount:16/little,   
+      ?VcNumber:16/little,
+      0:32/little,               % session key
+      %%PwLen:16/little,
+      0:16/little,               % ANSI password length
+      UPwLen:16/little,          % UNICODE password length
+      0:32/little,               % reserved
+      ?CAP_UNICODE:32/little>>}. % client capabilities
     
-bf_session_setup_andx(Neg,U, Passwd) ->
+bf_session_setup_andx(Neg, U, Passwd) ->
     list_to_binary([Passwd,
 		    U#user.name,[0],
 		    U#user.primary_domain,[0],
 		    U#user.native_os,[0],
 		    U#user.native_lanman,[0]]).
+%%%
+bf_session_setup_andx(Neg, U, Passwd, UPasswd) ->
+    iconv:start_link(),
+    {ok, Cd}    = iconv:open(?CSET_UCS2, ?CSET_ASCII),
+    {ok, Uname} = iconv:conv(Cd, l2b(U#user.name)),
+    {ok, Udom}  = iconv:conv(Cd, l2b(U#user.primary_domain)),
+    {ok, Unos}  = iconv:conv(Cd, l2b(U#user.native_os)),
+    {ok, Ulan}  = iconv:conv(Cd, l2b(U#user.native_lanman)),
+    iconv:close(Cd),
+    list_to_binary([UPasswd,
+		    [0],         % if Unicode, pad to even byte boundary
+		    Uname,[0,0],
+		    Udom,[0,0],
+		    Unos,[0,0],
+		    Ulan,[0,0]]).
+
 
 -define(USE_ENCRYPTION(Neg), ((Neg#smb_negotiate_res.security_mode 
 			       band ?SECMODE_CHALLENGE) > 0) ).
 
-enc_passwd(Neg, Passwd) when ?CORE_PROTOCOL(Neg) ->
+enc_lm_passwd(Neg, Passwd) when ?CORE_PROTOCOL(Neg) ->
     {Passwd, length(Passwd)};
-enc_passwd(Neg, Passwd) when ?PRE_DOS_LANMAN_2_1(Neg), 
+enc_lm_passwd(Neg, Passwd) when ?PRE_DOS_LANMAN_2_1(Neg), 
 			     ?USE_ENCRYPTION(Neg) ->
     EncKey = Neg#smb_negotiate_res.encryption_key,
-    EncPasswd = challenge_response(Passwd, EncKey),
+    EncPasswd = lm_challenge_response(Passwd, EncKey),
     {EncPasswd, size(EncPasswd)};
-enc_passwd(Neg, Passwd) ->
+enc_lm_passwd(Neg, Passwd) ->
+    {Passwd, length(Passwd)}.
+
+enc_nt_passwd(Neg, Passwd, Cset) when ?NTLM_0_12(Neg), 
+				      ?USE_ENCRYPTION(Neg) ->
+    iconv:start_link(),
+    {ok, Cd} = iconv:open(?CSET_UCS2, Cset),
+    {ok, UCS2pw} = iconv:conv(Cd, l2b(Passwd)),
+    iconv:close(Cd),
+    EncKey = Neg#smb_negotiate_res.encryption_key,
+    EncPasswd = nt_challenge_response(UCS2pw, EncKey),
+    {EncPasswd, size(EncPasswd)};
+enc_nt_passwd(Neg, Passwd, _) ->
     {Passwd, length(Passwd)}.
 
 %%%
-%%% TEST: smbclient //korp/tobbe -U tobbe -m LANMAN1
+%%% TEST LM-SessionKey: 
 %%%
-%%% EncKey = 1cb2c4dc19d52588
+%%%  smbclient //korp/tobbe -U tobbe -m LANMAN1
 %%%
-%%% Passwd = qwe123
+%%%   EncKey = 1cb2c4dc19d52588
 %%%
-%%% Response = b6c89e28077ada40648149220da0ca5c9f5aa481a3f88467
+%%%   Passwd = qwe123
+%%%
+%%%   Response = b6c89e28077ada40648149220da0ca5c9f5aa481a3f88467
+%%%
+%%% TEST NT-SessionKey: 
+%%%
+%%%  smbclient //korp/tobbe -U tobbe
+%%%
+%%%   EncKey = 9d5d78803705c22e
+%%%
+%%%   Passwd = qwe123
+%%%
+%%%   Response = 75e19308dd287c1905f73e519ee5fd41b4ebaa262ed284f4
 %%%
 
-crtest() ->
+lmtest() ->
     EncKey = <<16#1c,16#b2,16#c4,16#dc,16#19,16#d5,16#25,16#88>>,
-    Resp = challenge_response(<<"qwe123">>, EncKey),
-    {Resp == test_response(),
+    Resp = lm_challenge_response(<<"qwe123">>, EncKey),
+    {Resp == lmtest_response(),
      Resp,
-     test_response()}.
+     lmtest_response()}.
 
-test_response() ->
+lmtest_response() ->
     <<16#b6,16#c8,16#9e,16#28,16#07,16#7a,16#da,16#40,16#64,
       16#81,16#49,16#22,16#0d,16#a0,16#ca,16#5c,16#9f,16#5a,
        16#a4,16#81,16#a3,16#f8,16#84,16#67>>.
     
+nttest() ->
+    EncKey = <<16#9d,16#5d,16#78,16#80,16#37,16#05,16#c2,16#2e>> ,
+    iconv:start(),
+    {ok, Cd} = iconv:open(?CSET_UCS2, ?CSET_ASCII),
+    {ok, UCS2pw} = iconv:conv(Cd, l2b("qwe123")),
+    iconv:close(Cd),
+    Resp = nt_challenge_response(UCS2pw, EncKey),
+    {Resp == nttest_response(),
+     Resp,
+     nttest_response()}.
 
-challenge_response(Passwd, Challenge) when binary(Passwd) -> 
-    %%io:format("s21_lm_session_key(Passwd)=~p~n",[s21_lm_session_key(Passwd)]),
+nttest_response() ->
+    <<16#75,16#e1,16#93,16#08,16#dd,16#28,16#7c,16#19,16#05,
+     16#f7,16#3e,16#51,16#9e,16#e5,16#fd,16#41,16#b4,16#eb,
+     16#aa,16#26,16#2e,16#d2,16#84,16#f4>>.
+    
+
+lm_challenge_response(Passwd, Challenge) when binary(Passwd) -> 
     ex(s21_lm_session_key(Passwd), Challenge);
-challenge_response(Passwd, Challenge) when list(Passwd) -> 
-    challenge_response(list_to_binary(Passwd), Challenge).
+lm_challenge_response(Passwd, Challenge) when list(Passwd) -> 
+    lm_challenge_response(list_to_binary(Passwd), Challenge).
+
+
+nt_challenge_response(Passwd, Challenge) when binary(Passwd) -> 
+    ex(s21_nt_session_key(Passwd), Challenge);
+nt_challenge_response(Passwd, Challenge) when list(Passwd) -> 
+    nt_challenge_response(list_to_binary(Passwd), Challenge).
+
 
 ex(<<K0:7/binary,K1:7/binary>>, Data) when size(Data) == 8 ->
     concat_binary([e(K0, Data),
@@ -1201,6 +1348,8 @@ smb_negotiate_pdu() ->
     Rec = #smbpdu{cmd = ?SMB_NEGOTIATE,
 		  pid = mypid(),
 		  mid = 1,
+		  %% Assume "NT LM 0.12" dialect with Unicode !
+		  flags2 = ?FLAGS2_NTLM, 
 		  bc  = size(Bf),
 		  bf  = Bf},
     {Rec, enc_smb(Rec)}.
@@ -1237,12 +1386,14 @@ enc_smb(Pdu) ->
      Bf/binary>>. 
 
 
-%%% Until we get DES support we can't negotiate any
-%%% other dialect version !!
+%%% See also the header file for dialect index.
 dialects() ->
     %%<<?BUF_FMT_DIALECT, <<"PC NETWORK PROGRAM 1.0">>/binary, 0>>.
+    %%<<?BUF_FMT_DIALECT, <<"PC NETWORK PROGRAM 1.0">>/binary, 0,
+     %% ?BUF_FMT_DIALECT, <<"LANMAN1.0">>/binary, 0>>.
     <<?BUF_FMT_DIALECT, <<"PC NETWORK PROGRAM 1.0">>/binary, 0,
-      ?BUF_FMT_DIALECT, <<"LANMAN1.0">>/binary, 0>>.
+      ?BUF_FMT_DIALECT, <<"LANMAN1.0">>/binary, 0,
+      ?BUF_FMT_DIALECT, <<"NT LM 0.12">>/binary, 0>>.
 
     
 mypid() ->
@@ -1258,7 +1409,6 @@ nbss_session_request(S, Called, Calling) ->
     send_recv(S, nbss_session_request_pdu(Called, Calling)).
 
 nbss_session_service(S, SMB_pdu) ->
-    %%io:format("SMB_pdu: ~p~n",[SMB_pdu]),
     send_recv(S, nbss_session_service_pdu(SMB_pdu)).
 
 send_recv(S, Packet) ->
@@ -1285,10 +1435,11 @@ dec_msg(<<?SESSION_KEEP_ALIVE, _/binary>>) ->
     {ok, ?SESSION_KEEP_ALIVE};
 dec_msg(<<?NEGATIVE_SESSION_RESPONSE,Flags,Length:16,Ecode>>) ->
     Emsg =  neg_sess_resp(Ecode),
-    io:format("Got NEGATIVE_SESSION_RESPONSE: ~s~n",[Emsg]),
+    ?TRACE("~w(~w): Got NEGATIVE_SESSION_RESPONSE: ~s~n",
+	   [?MODULE, ?LINE, Emsg]),
     {error, neg_sess_resp(Ecode)};
 dec_msg(Bin) ->
-    io:format("Got: ~p~n",[Bin]),
+    ?TRACE("~w(~w): nbs_session_resp Got: ~p~n",[?MODULE, ?LINE, Bin]),
     {error, Bin}.
 
 get_more(Expected, Got, Bins) when Got < Expected ->

@@ -199,6 +199,9 @@ static void iv_conv(t_iconvdrv *iv, iconv_t cd, char *ip, int ileft)
 
     op = &outbuf[0];
 
+    /* Reset cd to initial state */
+    iconv(cd, NULL, NULL, NULL, NULL);
+
     if (iconv(cd, &ip, &ileft, &op, &oleft) == (size_t) -1) {
 	fprintf(stderr, "iconv failed \n");
     }

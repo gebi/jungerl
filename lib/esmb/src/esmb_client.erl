@@ -36,10 +36,21 @@ init(Host, Share, User, Wgroup) ->
     U = #user{pw = Pw, name = User, primary_domain = Wgroup},
     Pdu0 = esmb:user_logon(S, Neg, U),
     esmb:exit_if_error(Pdu0, "Login failed"),
-    Path = "\\\\" ++ Called ++ "\\" ++ ucase(User),
+    Path = mk_path(Neg, Called, User),
     Pdu1 = esmb:tree_connect(S, Neg, Pdu0, Path),
     esmb:exit_if_error(Pdu1, "Tree connect failed"),
     shell(S, Neg, {Pdu1, "\\\\"}).
+
+mk_path(Neg, Called, User) when ?USE_UNICODE(Neg) ->
+    Path = "\\\\" ++ Called ++ "\\" ++ ucase(User),
+    iconv:start(),
+    {ok, Cd}    = iconv:open(?CSET_UCS2, ?CSET_ASCII),
+    {ok, Upath}  = iconv:conv(Cd, l2b(Path)),
+    iconv:close(Cd),
+    Upath;
+%%%
+mk_path(Neg, Called, User) ->
+    "\\\\" ++ Called ++ "\\" ++ ucase(User).
 
 
 shell(S, Neg, {_Pdu, Cwd} = State) ->
@@ -208,4 +219,5 @@ eat_until(Cs, X) ->
 eat_until([X|T] = Cs, X, Acc) -> {lists:reverse(Acc), Cs};
 eat_until([H|T], X, Acc)      -> eat_until(T, X, [H|Acc]).
     
-
+l2b(L) when list(L)   -> list_to_binary(L);
+l2b(B) when binary(B) -> B.

@@ -118,7 +118,11 @@
 -define(DIR_OPEN_OPTIONS,   16#00000001).
 
 
+-define(FLAGS2_LONG_NAMES,  16#0001).
+-define(FLAGS2_UNICODE,     16#8000).
 
+-define(FLAGS2_NTLM, (?FLAGS2_LONG_NAMES bor 
+		      ?FLAGS2_UNICODE)).
 
 %%% NB: Multi-byte values must be sent sent with the LSB first !!
 -record(smbpdu, {
@@ -126,7 +130,7 @@
 	  eclass=0,          % error-class , 1 byte
 	  ecode=0,           % error-code  , 2 bytes
 	  flags=16#8,        % flags       , 1 byte  (path names are caseless)
-	  flags2=16#0001,    % flags2      , 2 bytes (long file names allowed)
+	  flags2=?FLAGS2_LONG_NAMES,% flags2,2 bytes 
 	  tid=0,             % Tree ID     , 2 bytes
 	  pid=0,             % Process ID  , 2 bytes
 	  uid=0,             % User ID     , 2 bytes
@@ -157,6 +161,7 @@
 	  dialect_index,        % Example: ?PCNET_1_0
 	  security_mode,        % PCNET_1_0 < Dialect <= LANMAN_2_1
 	  encryption_key,       % PCNET_1_0 < Dialect <= LANMAN_2_1
+	  srv_capabilities=0,
 	  max_buffer_size=?MAX_BUFFER_SIZE
 	  }).
 
@@ -164,20 +169,36 @@
 -define(SECMODE_USER,      16#1).
 -define(SECMODE_CHALLENGE, 16#2).
 
+-define(SCAP_UNICODE,  16#0004).
+
+-define(USE_UNICODE(Neg), 
+	((Neg#smb_negotiate_res.srv_capabilities band ?SCAP_UNICODE) > 0)).
+
 %%% Add more dialects when we can support them.
 %%% Make sure to not break the successive order of
 %%% the dialects we are sending in the neg-req, so
 %%% that we know which dialect that was choosen !
 -define(PCNET_1_0,   0).    % PC NETWORK PROGRAM 1.0
 -define(LANMAN_1_0,  1).    % LANMAN 1.0
+-define(NT_LM_0_12,  2).    % NT LM 0.12
+
+%%% Some tests for choosen dialect
+-define(CORE_PROTOCOL(Neg), 
+	(Neg#smb_negotiate_res.dialect_index == ?PCNET_1_0)).
+-define(PRE_DOS_LANMAN_2_1(Neg), 
+	(Neg#smb_negotiate_res.dialect_index == ?LANMAN_1_0)).
+-define(NTLM_0_12(Neg), 
+	(Neg#smb_negotiate_res.dialect_index == ?NT_LM_0_12)).
+
 
 
 %%% Session_Setup_AndX parameter values
 -define(NoAndxCmd ,    16#FF).  % secondary (X) command, or none
--define(MaxBufferSize, 4096).   % ? ,mac client buffer size
 -define(MaxMpxCount,   2).      % ? ,max multiplexed pending req.
 -define(VcNumber,      2325).   % ? 
 
+%%% Session_Setup_AndX capabilities
+-define(CAP_UNICODE,   16#0004).
 
 %%% Tree-Connect-AndX service types
 -define(SERVICE_DISK_SHARE, "A:").
@@ -196,13 +217,18 @@
 
 %%% User info
 -define(DEFAULT_WORKGROUP,  "WORKGROUP").
+-define(DEFAULT_CHARSET,    "ASCII").
 -record(user, {
 	  pw,
 	  name,
 	  primary_domain = ?DEFAULT_WORKGROUP,
 	  native_os      = "Linux",
-	  native_lanman  = "esmb"
+	  native_lanman  = "esmb",
+	  charset        = ?DEFAULT_CHARSET
 	  }).
+
+-define(CSET_UCS2,   "UCS2").
+-define(CSET_ASCII,  "ASCII").
 
 %%% File info
 -record(file_info, {
@@ -257,5 +283,11 @@
 %%% Gregorian second from year 0 to 1601 AD
 %%%  calendar:datetime_to_gregorian_seconds({{1601,1,1},{0,0,0}}).
 -define(GREG_SEC_0_TO_1601,  50522745600).
+
+-ifdef(DEBUG).
+-define(TRACE(Fstr, Args), error_logger:info_msg(Fstr, Args)).
+-else.
+-define(TRACE(Fstr, Args), true).
+-endif.
 
 -endif.

@@ -1,0 +1,9 @@
+# This file is automatically sync'd to ~erlang/.ssh/authorized_keys on
+# timebomb.mine.nu. If you add the contents of your ~/.ssh/id_rsa.pub
+# file to the list below then you will be able to login to that
+# machine as user 'erlang' by using your key.
+
+# See ssh(1) for a discussion of the authorized_keys mechanism and
+# ssh-keygen(1) for how to create a key if you don't have one already.
+
+ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAIEAzeKXDu3qNcwbuYOWZYroBdciBlfz1vqVR2rrEMVQtmOOoKAI+sNhlTrvoika8tGN3iKKEmlOjiKkdFEu4isRFtJov4eSF3vaq1+f9XKkWET3DVx6EWEpUZlO1Kca7HolncZ32Gw58SlvcCMsryDDcsWcD4YjRQJi6Ku1LTRJh4E= luke@cockatoo

@@ -3,6 +3,7 @@ LIBS := \
 	ce \
 	distel \
 	edoc \
+	eldap \
 	enfs \
 	erl_cgi \
 	ermacs \

@@ -96,8 +96,8 @@ static ErlDrvData md4drv_start(ErlDrvPort port, char *buf)
 
 static void md4drv_stop(ErlDrvData drv_data)
 {
-    t_md4drv *gz = (t_md4drv*) drv_data;
-    driver_free(gz);
+    t_md4drv *md4 = (t_md4drv*) drv_data;
+    driver_free(md4);
 }
 
 
@@ -160,7 +160,7 @@ static void md4drv_from_erlang(ErlDrvData drv_data, char *buf, int len)
  * Initialize and return a driver entry struct
  */
 
-DRIVER_INIT(gzdrv)
+DRIVER_INIT(md4drv)
 {
   am_value        = driver_mk_atom("value");
   am_error        = driver_mk_atom("error");

@@ -19,13 +19,13 @@
 -define(DEFPROCS, all).
 -define(DEFTPS, []).
 %%% mandatory args (added automagically)
--define(MANDFLAGS, [set_on_spawn,timestamp,call]).
+-define(MANDFLAGS, [timestamp,call]).
 -define(MANDTPS, []).
 %%% flag aliases
 -define(DBGFLAGS, []).
--define(GCFLAGS,  [garbage_collection]).
+-define(GCFLAGS,  [set_on_spawn,garbage_collection,procs]).
+-define(PERFFLAGS, ?GCFLAGS++[running]).
 -define(PROCFLAGS, ?GCFLAGS++[running,send,'receive']).
--define(PERFFLAGS, ?GCFLAGS++[running,procs]).
 -define(PROFFLAGS, ?PERFFLAGS++[return_to,arity]).
 -define(ALLFLAGS, ?PROFFLAGS++[send,'receive']).
 

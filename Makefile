@@ -9,7 +9,7 @@ clean:
 
 	@for dir in $(LIB_DIRS); do (cd $$dir; $(MAKE) clean); done
 
-$(LIBS): $(MK_INCLUDE)
+$(LIBS): conf $(MK_INCLUDE)
 	(cd lib/$@; $(MAKE) all)
 
 $(MK_INCLUDE): $(MK_INCLUDE).in

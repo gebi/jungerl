@@ -5,7 +5,7 @@
 %%% Purpose : eradius test code
 %%% Created : 25 Sep 2003 by Torbjorn Tornkvist <tobbe@bluetail.com>
 %%%----------------------------------------------------------------------
--export([local/0, duva/1, korp/0]).
+-export([local/0, duva/1]).
 
 -include("eradius.hrl").
 -include("eradius_dict.hrl").
@@ -15,10 +15,6 @@ local() ->
 
 duva(Passwd) ->
     go({192,168,128,1}, "support", Passwd, Passwd, {192,168,128,32}).
-
-korp() ->
-    go({192,168,128,47}, "tobbe", "qwe123", "mortuta42", {192,168,128,32}).
-
 
 go(IP, User, Passwd, Shared, NasIP) ->
     TraceFun = fun(_E,Str,Args) ->

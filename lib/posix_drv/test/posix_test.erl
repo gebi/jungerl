@@ -1,3 +1,5 @@
+%%% Copyright (c) 2003, Scott Lystig Fritchie.  All rights reserved.
+%%% See the file "../LICENSE" for license details.
 
 -module(posix_test).
 -define(DRV, posix_drv).
@@ -83,7 +85,7 @@ r1(P) ->
 	{ok, SID1} when integer(SID1) -> ok
     end,
     case ?DRV:getppid(P) of
-	{ok, PGRP1} when integer(PGRP1) -> ok
+	{ok, PPID1} when integer(PPID1) -> ok
     end,
 
     MyPid = list_to_integer(os:getpid()),

@@ -6,6 +6,7 @@ LIBS := \
 	erl_cgi \
 	ermacs \
 	ex11 \
+	gd1_drv \
 	slang \
 	lersp \
 	measurement \
@@ -26,13 +27,13 @@ all: $(LIBS)
 
 clean:
 	@for dir in $(LIBS); do \
-	  if [ ! -e $@/SKIP ]; then \
+	  if [ ! -f $@/SKIP ]; then \
 	    (cd $$dir; $(MAKE) $@) \
 	  fi \
 	done
 
 $(LIBS):
-	@if [ ! -e $@/SKIP ]; then \
+	@if [ ! -f $@/SKIP ]; then \
 	  (cd $@; $(MAKE) all) \
 	fi
 

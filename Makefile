@@ -6,7 +6,7 @@ clean:
 
 $(LIBS): conf $(MK_INCLUDE)
 # Build a program, unless it has a file called SKIP in its top directory
-	if [ ! -e lib/$@/SKIP ]; then (cd lib/$@; $(MAKE) all); fi
+	if [ ! -f lib/$@/SKIP ]; then (cd lib/$@; $(MAKE) all); fi
 
 $(MK_INCLUDE): $(MK_INCLUDE).in
 	$(MAKE) conf

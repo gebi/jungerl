@@ -45,6 +45,9 @@ directory Makefile like this:
   If you depend on other applications, add a line that says so. (These
   are down near the bottom.)
 
+Note that Applications in the Jungerl should be compatible with the
+latest released version of Erlang/OTP!
+
 
 Makefile Helpers
 ----------------------------------------------------------------------

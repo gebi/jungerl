@@ -36,14 +36,14 @@ loop(Tunnel, Socket, EPs) ->
 		    EPs);
 	{udp, Socket, _, _, Packet} ->
 	    io:format("Got ~p byte packet on UDP~n", [size(Packet)]),
-	    tunnel:write(Tunnel, Packet)
+	    tuntap:write(Tunnel, Packet)
     end,
     ?MODULE:loop(Tunnel, Socket, EPs).
 
 init_tunnel() ->
-    tunnel:init(),
-    {ok, Tun} = tunnel:open_tap(),
-    Dev = tunnel:device_name(Tun),
+    tuntap:init(),
+    Tun = tuntap:open_tap(),
+    Dev = tuntap:device_name(Tun),
     io:format("Alive and kicking on ~p~n", [Dev]),
     {ok, Tun}.
 

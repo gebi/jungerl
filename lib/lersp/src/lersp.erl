@@ -20,6 +20,8 @@ repl(S0) ->
 	{'EXIT', Rsn} ->
 	    io:format("Crash: ~w~n", [Rsn]),
 	    repl(S0);
+	finished ->
+	    ok;
 	S1 ->
 	    repl(S1)
     end.
@@ -27,6 +29,8 @@ repl(S0) ->
 read(S0) ->
     {io:get_line('lersp> '), S0}.
 
+eval({eof, _}) ->
+    throw(finished);
 eval({Line, S0}) ->
     {Val,S1} = lersp_eval:eval_exprs(lersp_parse:parse_all(Line), S0).
 

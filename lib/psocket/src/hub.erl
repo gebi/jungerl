@@ -15,7 +15,7 @@
 %%
 %% This is what an ethernet hub does.
 %%
-%% e.g. hub(["eth0", "eth1"]).
+%% e.g. run(["eth0", "eth1"]).
 run(IfNames) ->
     loop(map(fun open_if/1, IfNames)).
 

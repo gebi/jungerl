@@ -43,7 +43,8 @@ Prerequisites
     1> 
 
 * You must have the Spread library compiled and installed on your
-  system.  This driver is known to work with version 3.17.0 of Spread.
+  system.  This driver is known to work with version 3.17.0 of
+  Spread.  The source can be obtained from http://www.spread.org/.
 
   If you are building this driver as part of the EDTK source
   distribtion, edit the Makefile for the paths to the "sp.h" C header

@@ -1,0 +1,204 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Module builder</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body bgcolor="white">
+<h1>Module builder</h1>
+<ul><li>
+<a href="#index">Function index</a></li><li>
+<a href="#exported">Exported functions</a></li></ul>
+
+<h2>Description</h2>
+OTP release script builder.
+  
+   <p>This program compiles .rel, .script, .boot and sys.config files
+    for erlang applications. It supports incremental and recursive builds,
+    and is intended to be (much) easier and safer to use than doing it all
+    manually. This program does not generate beam code from Erlang source
+    files.</p>
+  
+   <p>The program makes some assumptions:</p>
+     <ul><li>The application is store in a directory whose name is
+             composed with the name of the application '-' the version
+             number of the application (i.e. myapp-1.0)</li>
+         <li>The release and app file used in input are simplified subset
+             of the final Erlang release and app file. Some differences:
+             Versions are handled automatically; You do not need to add
+             the erts version tuple in the rel.src file; the application,
+             currently being built is mandatory in the list of apps in the
+             rel.src file; etc.</li>
+     </ul>
+  
+   <p>The program (henceforth called 'builder') can be customized
+    using a number of options. The options are prioritized in
+   the following order: (1) those given as arguments to the
+   <code>builder:go/1</code> function, those in the BUILD_OPTIONS
+   file, and (3) the hard-coded defaults.</p>
+  
+   <p>Valid options are</p>
+   <dl>
+   <dt>{app_dir, dirname()}</dt>
+     <dd>The application directory of the application being built.
+       The default value is Current Working Directory.</dd>
+  
+   <dt>{build_options, filename()}</dt>
+     <dd>A filename pointing to a BUILD_OPTIONS file. This is a file
+       containing erlang expressions, each terminated by "." -- just
+       like a file processed using file:eval/1. The last expression
+       in the file should result in a list of
+       <code>{Key,Value}</code> options.
+       If this option is not given, builder will look in [AppDir] and
+       <code>[AppDir]/src</code> for a file called BUILD_OPTIONS.<br>
+       Pre-bound variables are:
+       <ul>
+        <li><code>ScriptName  : filename()</code>,
+         the name of the script file.</li>
+       </ul></dd>
+   <dt>{report, Level : atom()}</dt>
+     <dd>Specifies the reporting level. The following levels are recognized:
+       none, progress, verbose, debug.</dd>
+  
+   <dt>{out_dir, dirname()}</dt>
+     <dd>Specifies where [AppName].script, [AppName].boot, and sys.config
+       should be written. Default is <code>[AppDir]/priv</code>.</dd>
+  
+   <dt>{sys_config, filename()}</dt>
+     <dd>Specifies the location of the sys.config file. Default is
+       <code>[OutDir]/sys.config</code>.</dd>
+  
+   <dt>{rel_file, filename()}</dt>
+     <dd>Specifies which .rel file should be used as input for the
+       build process. Default is
+       <code>[AppDir]/src/[AppName].rel.src</code>.</dd>
+  
+   <dt>{rel_name, string()}</dt>
+     <dd>This option can be used if the release should be called something
+     other than <code>[AppName]</code> or whatever is in the
+     <code>.rel</code> file.</dd>
+  
+   <dt>{apps, [App : AppName | {AppName,Vsn} | {AppName,Vsn,EbinDir}]}</dt>
+     <dd>This is a way to identify which applications should be included
+       in the build. The way builder determines which applications should
+       be included is this:<ul>
+       <li>If there is a <code>.rel.src</code> file, the applications
+        listed in this file are included first, in the order in which
+        they are listed.</li>
+       <li>After this, all applications listed in the 'applications'
+        attribute of the <code>.app.src</code> file are added (if not
+        already listed), also in the order in which they are listed.</li>
+       <li>Then, all remaining applications in the 'apps' list are added
+        in order.</li>
+       <li>Finally, any included applications listed in the
+        <code>.rel.src</code> file, not already listed, are added.
+        (note that applications listed in 'included_applications' of
+         the <code>.app.src</code> file are not included here. The
+         <code>.rel</code> file can be used to override this definition,
+         so it would be an error to include it at this point.)</li>
+       </ul>
+     </dd>
+  
+   <dt>{path, [PathExpr]}</dt>
+     <dd>Specifies the search path when locating applications. Default is
+       code:get_path(). PathExpr can contain wildcards, e.g.
+       <code>"/OTP/lib/kernel*/ebin"</code> (basically anything that
+       <code>regexp:sh_to_awk/1</code> understands.)</dd>
+  
+   <dt>{skip, [ModuleName : atom()]}</dt>
+     <dd>Lists modules that should not be included in the generated .app
+       file for the current application. If not specified, builder will
+       locate all modules under <code>[AppDir]/src</code>, extract
+       their module names, and include these module names in the
+       <code>'modules'</code> list of the <code>.app</code> file.</dd>
+  
+   <dt>{make_app, true | false | auto}</dt>
+     <dd>If true, builder will generate an .app file from an .app.src
+      file; if false, it will try to use an existing .app file; if
+      auto, it will build an .app file if no .app file exists
+      Default is 'auto'.</dd>
+  
+   <dt>{make_rel, true | false}</dt>
+     <dd>If true, builder will generate a .rel file from a .rel.src file;
+     if false, it will assume that there is a working .rel file.
+     Default: false if the rel_file option has been specified; true
+     otherwise.</dd>
+  
+   <dt>{make_boot, true | false}</dt>
+     <dd>If true, builder will run <code>systools:make_script()</code>
+     to generate .script and .boot files in [OutDir]. If false, it
+     will assume that there is a working .boot file. Default is true.</dd>
+   </dl>
+  
+   <dt>{systools, Options : [Opt]}</dt>
+     <dd>If specified, <code>Options</code> will be passed to the
+     <code>systools:make_script()</code> command for building the
+     <code>.boot</code> script. Note that the <code>'path'</code> option
+     is generated by builder. It cannot be overridden.
+     See <code>erl -man systools</code> for available options.</dd>
+  
+   <dt>{sh_script, auto | none}</dt>
+     <dd>If <code>'auto'</code>, builder will generate a small sh script
+     that makes it easier to start the system; If <code>'none'</code>,
+     no script will be generated. Default is <code>'none'</code> on
+     non-UNIX systems and <code>'auto'</code> on UNIX systems.</dd>
+  
+   <dt>{erl_opts, Opts : string()}</dt>
+     <dd>If specified, and if a sh_script is generated (see above),
+      <code>Opts</code> will be appended to the <code>erl</code>
+      command line. The builder will automatically put in options to
+      identify the boot script, sys.config, and possible boot variables.</dd>
+  
+   <dt>{config, Config : {file, filename()} | {M,F,A} | Data}</dt>
+     <dd>If present, this option should either point to a file that
+     contains a subset of data for a sys.config file (same format as
+     sys.config), or give a <code>{M,F,A}</code> tuple, where
+     <code>apply(M,F,A)</code> results in a list,
+     <code>[{AppName, [{Key, Value}]}]</code>, or finally just specify
+     the data in place. The builder will look for similar <code>config</code>
+     directives in any BUILD_OPTIONS files of other applications that
+     are part of the build, and all inputs will be merged
+     into a common <code>sys.config</code>.</dd>
+  
+   <dt>{{config,OtherApp}, Config}</dt>
+     <dd>This is a way to specify environment variables for another
+     application in the build options. <code>Config</code> in this case
+     is the same as <code>Config</code> above. The difference between
+     this option and specifying environment variables for the other
+     application using the above option, is that with a simple
+     <code>{config, ...}</code> directive, builder will also check
+     for a similar directive in the other application, and all
+     different inputs will be merged. Using a <code>{{config,App},...}</code>
+     option, builder will not look into that application further.</dd>
+
+<h2><a name="index">Function Index</a></h2>
+
+<table width="100%" border="1"><tr><th colspan="2" align="left">Exported Functions</th></tr>
+<tr><td><a href="#early_debug_on-0">early_debug_on/0</a></td><td/></tr>
+<tr><td><a href="#find_app-2">find_app/2</a></td><td/></tr>
+<tr><td><a href="#go-0">go/0</a></td><td/></tr>
+<tr><td><a href="#go-1">go/1</a></td><td/></tr>
+</table>
+
+<h2><a name="exported">Exported Functions</a></h2>
+
+<h3><a name="early_debug_on-0">early_debug_on/0</a></h3>
+
+<p><code>early_debug_on() -> term()</code></p>
+<p> </p>
+
+<h3><a name="find_app-2">find_app/2</a></h3>
+
+<p><code>find_app(Arg1, Arg2) -> term()</code></p>
+<p> </p>
+
+<h3><a name="go-0">go/0</a></h3>
+
+<p><code>go() -> term()</code></p>
+<p> </p>
+
+<h3><a name="go-1">go/1</a></h3>
+
+<p><code>go(Arg1) -> term()</code></p>
+<p> </p></body>
+</html>

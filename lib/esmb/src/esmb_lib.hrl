@@ -9,6 +9,8 @@
 -define(SESSION_SERVICE,           16#00).
 -define(SESSION_REQUEST,           16#81).
 -define(POSITIVE_SESSION_RESPONSE, 16#82).
+-define(NEGATIVE_SESSION_RESPONSE, 16#83).
+-define(RETARGET_SESSION_RESPONSE, 16#84).
 -define(SESSION_KEEP_ALIVE,        16#85).
 
 
@@ -193,10 +195,11 @@
 	  }).
 
 %%% User info
+-define(DEFAULT_WORKGROUP,  "WORKGROUP").
 -record(user, {
 	  pw,
 	  name,
-	  primary_domain = "WORKGROUP",
+	  primary_domain = ?DEFAULT_WORKGROUP,
 	  native_os      = "Linux",
 	  native_lanman  = "esmb"
 	  }).

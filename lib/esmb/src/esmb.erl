@@ -8,11 +8,11 @@
 %%% --------------------------------------------------------------------
 -export([called_name/1, calling_name/1, ucase/1, lcase/1, check_dir/3,
 	 connect/2, connect/3, connect/4, close/1, user_logon/3, emsg/3,
-	 tree_connect/4, tree_connect/5, list_dir/3, 
-	 open_file_ro/3, open_file_rw/3, 
+	 tree_connect/4, tree_connect/5, list_dir/3, called/1,
+	 open_file_ro/3, open_file_rw/3, stream_read_file/3,
 	 read_file/3, client/2, client/3, mkdir/3, rmdir/3, 
 	 close_file/2, write_file/4, delete_file/3, caller/0,
-	 exit_if_error/2, list_shares/3, l/3]).
+	 exit_if_error/2, list_shares/3, list_shares/4, l/3]).
 -export([dec_smb/1, tt_name/1]).
 -export([zeros/1,p14/1,s16x/1,s21_lm_session_key/1,ex/2,swab/1,
 	 challenge_response/2, crtest/0, e/2]).
@@ -55,11 +55,14 @@ share_type(?SHARETYPE_IPC)      -> "IPC".
     
 
 list_shares(Host, User, Passwd) ->
-    Called = ucase(Host),
+    list_shares(Host, User, Passwd, ?DEFAULT_WORKGROUP).
+
+list_shares(Host, User, Passwd, Workgroup) ->
+    Called = called(Host),
     Caller = caller(),
     case connect(Caller, Called) of
 	{ok,S,Neg} ->
-	    U = #user{pw = Passwd, name = User},
+	    U = #user{pw = Passwd, name = User, primary_domain = Workgroup},
 	    Pdu0 = user_logon(S, Neg, U),
 	    exit_if_error(Pdu0, "Login failed"),
 	    Path = "\\\\" ++ Called ++ "\\IPC" ++ [$$], % make the Emacs mode happy...
@@ -184,7 +187,7 @@ connect(Caller, Called, SockOpts) -> connect(Caller, Called, SockOpts, ?PORT).
 
 connect(Caller, Called, SockOpts, Port) ->
     Opts = [binary, {packet, 0}|SockOpts],
-    case gen_tcp:connect(lcase(Called), Port, Opts) of
+    case gen_tcp:connect(lcase_host(Called), Port, Opts) of
 	{ok,S} ->
 	    case nbss_session_request(S, Called, Caller) of
 		{ok,_} ->
@@ -228,22 +231,55 @@ write_file(S, Neg, InReq, Finfo, Bin, Written) ->
     end.
 	
 
+-define(STREAM_READ,  true).
+-define(READ_ALL,     false).
+
+%%%
+%%% Return the received chunk + a continuation:
+%%% 
+%%%   ok | {more, Bin, Cont} | {error, Emsg}
+%%%
+stream_read_file(S, InReq, Finfo) ->
+    read_file(S, InReq, Finfo, true, []).
+
+%%%
+%%% Return when everything has been received.
+%%%
+%%%   {ok, Bin} | {error, Emsg}
+%%%
 read_file(S, InReq, Finfo) ->
-    read_file(S, InReq, Finfo, []).
+    read_file(S, InReq, Finfo, false, []).
 
 -define(READ_ENOUGH(F), (F#file_info.size =< F#file_info.data_len)).
 -define(MORE_TO_READ(F), (F#file_info.size > F#file_info.data_len)).
 
-read_file(S, InReq, Finfo, Acc) when ?READ_ENOUGH(Finfo) ->
+read_file(S, InReq, Finfo, ?STREAM_READ, Acc) when ?READ_ENOUGH(Finfo) ->
+    ok;
+read_file(S, InReq, Finfo, ?READ_ALL, Acc) when ?READ_ENOUGH(Finfo) ->
     {B, _} = split_binary(concat_binary(lists:reverse(Acc)), 
 			  Finfo#file_info.size),
     {ok, B};
-read_file(S, InReq, Finfo, Acc) when ?MORE_TO_READ(Finfo) ->
+read_file(S, InReq, Finfo, Rtype, Acc) when ?MORE_TO_READ(Finfo) ->
     {Req, Pdu} = smb_read_andx_pdu(InReq, Finfo),
     case decode_smb_response(Req, nbss_session_service(S, Pdu)) of
 	{ok, Res, Data} -> 
 	    Dlen = Finfo#file_info.data_len + size(Data),
-	    read_file(S, InReq, Finfo#file_info{data_len = Dlen}, [Data | Acc]);
+	    if (Rtype == ?STREAM_READ) ->
+		    Cont = fun() ->
+				   read_file(S, 
+					     InReq, 
+					     Finfo#file_info{data_len = Dlen},
+					     Rtype,
+					     Acc)
+			   end,
+		    {more, Data, Cont};
+	       true ->
+		    read_file(S, 
+			      InReq, 
+			      Finfo#file_info{data_len = Dlen}, 
+			      Rtype,
+			      [Data | Acc])
+	    end;
 	_ ->
 	    {error, decoding_read_andx}
     end.
@@ -1247,6 +1283,10 @@ dec_msg(<<?SESSION_SERVICE, _, Length:16, SMB_pdu/binary>>) ->
     {ok, ?SESSION_SERVICE, get_more(Length, size(SMB_pdu), [SMB_pdu])};
 dec_msg(<<?SESSION_KEEP_ALIVE, _/binary>>) ->
     {ok, ?SESSION_KEEP_ALIVE};
+dec_msg(<<?NEGATIVE_SESSION_RESPONSE,Flags,Length:16,Ecode>>) ->
+    Emsg =  neg_sess_resp(Ecode),
+    io:format("Got NEGATIVE_SESSION_RESPONSE: ~s~n",[Emsg]),
+    {error, neg_sess_resp(Ecode)};
 dec_msg(Bin) ->
     io:format("Got: ~p~n",[Bin]),
     {error, Bin}.
@@ -1258,6 +1298,13 @@ get_more(Expected, Got, Bins) when Got < Expected ->
     end;
 get_more(_, _, Bins) ->
     concat_binary(lists:reverse(Bins)).
+
+neg_sess_resp(16#80) -> "Not listening on called name";
+neg_sess_resp(16#81) -> "Not listening for calling name";
+neg_sess_resp(16#82) -> "Called name not present";
+neg_sess_resp(16#83) -> "Called name present, but insufficient resources";
+neg_sess_resp(16#8F) -> "Unspecified error";
+neg_sess_resp(_)     -> "Unknown error code".
 
 
 nbss_session_request_pdu(Called, Calling) ->
@@ -1280,9 +1327,11 @@ nbss_session_service_pdu(SMB_pdu) when binary(SMB_pdu) ->
 -define(NETBIOS_SX_WORKSTATION,   16#00).  % Workstation service
 -define(NETBIOS_SX_FILESERVER,    16#20).  % File server service
 
+called_name({A,B,C,D} = IP) -> called_name(ip2str(IP));
 called_name(Name) when length(Name) =< ?NETBIOS_NAME_LEN -> 
     nb_name(Name, ?NETBIOS_SX_FILESERVER).
 
+calling_name({A,B,C,D} = IP) -> calling_name(ip2str(IP));
 calling_name(Name) when length(Name) =< ?NETBIOS_NAME_LEN -> 
     nb_name(Name, ?NETBIOS_SX_WORKSTATION).
 
@@ -1310,6 +1359,8 @@ l1msn(B) -> (B bsr 4) + $A.
 l1lsn(B) -> (B band 16#0F) + $A.
 
 
+lcase_host(T) when tuple(T) -> T;
+lcase_host(L) when list(L)  -> lcase(L).
 
 ucase([C|Cs]) when C>=$a,C=<$z -> [C-32|ucase(Cs)]; % a-z
 ucase([C|Cs])                  -> [C|ucase(Cs)];
@@ -1366,6 +1417,11 @@ caller() ->
     {ok, Host} = inet:gethostname(),
     ucase(Host).
 
+called({A,B,C,D}) ->
+    lists:flatten(io_lib:format("~w.~w.~w.~w", [A,B,C,D]));
+called(Host) when list(Host) ->
+    ucase(Host).
+
 exit_if_error(Pdu, Dmsg) when Pdu#smbpdu.eclass == ?SUCCESS -> true;
 exit_if_error(Pdu, Dmsg) ->
     Emsg = emsg(Pdu#smbpdu.eclass, Pdu#smbpdu.ecode, Dmsg),
@@ -1377,4 +1433,9 @@ l2b(B) when binary(B) -> B.
 b2l(B) when binary(B) -> binary_to_list(B);
 b2l(L) when list(L)   -> L.
 
+
+ip2str({A,B,C,D}) -> 
+    lists:flatten(io_lib:format("~w.~w.~w.~w",[A,B,C,D]));
+ip2str(L) when list(L) -> 
+    L.
 

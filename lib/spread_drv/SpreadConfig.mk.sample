@@ -4,9 +4,9 @@
 # are too complex to bother with.  Instead, you must configure
 # them manually.  The process goes like this:
 #
-# 1. Create a file named CVSROOT/jungerl/config/SpreadConfig.mk
+# 1. Create a file named CVSROOT/jungerl/support/SpreadConfig.mk
 #    Feel free to copy this file file as a template to make your
-#    life easier: copy it to ../../config/SpreadConfig.mk.
+#    life easier: copy it to ../../support/SpreadConfig.mk.
 #
 # 2. Edit the SpreadConfig.mk file to define the "make" variables that
 #    the spread_drv Makefiles are expecting:

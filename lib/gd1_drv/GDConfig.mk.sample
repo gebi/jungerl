@@ -4,9 +4,9 @@
 # libXpm are too complex to bother with.  Instead, you must configure
 # them manually.  The process goes like this:
 #
-# 1. Create a file named CVSROOT/jungerl/config/GDConfig.mk
+# 1. Create a file named CVSROOT/jungerl/support/GDConfig.mk
 #    Feel free to copy this file file as a template to make your
-#    life easier: copy it to ../../config/GDConfig.mk.
+#    life easier: copy it to ../../support/GDConfig.mk.
 #
 # 2. Edit the GDConfig.mk file to define the "make" variables that
 #    the gd1_drv Makefiles are expecting:

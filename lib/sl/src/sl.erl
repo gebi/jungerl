@@ -30,6 +30,9 @@
 -define(SL_SET_XOFFCHAR,   42).
 -define(SL_SET_ECHO,   44).
 -define(SL_SET_MODE,   46).
+-define(SL_SET_EOLCHAR, 48).
+-define(SL_SET_EOL2CHAR, 50).
+
 
 -define(SL_GET_DEV,    21).
 -define(SL_GET_BAUD,   23).
@@ -44,6 +47,8 @@
 -define(SL_GET_XOFFCHAR,   43).
 -define(SL_GET_ECHO,   45).
 -define(SL_GET_MODE,   47).
+-define(SL_GET_EOLCHAR, 49).
+-define(SL_GET_EOL2CHAR, 51).
 
 -define(SL_OK,    0).
 -define(SL_ERROR, 1).
@@ -69,7 +74,8 @@ stop(P) when port(P) ->
 
 options() ->
     [dev, baud, csize, bufsz, buftm, stopb, parity,
-     hwflow, swflow, xonchar, xoffchar, echo, mode].
+     hwflow, swflow, xonchar, xoffchar, eolchar, eol2char, 
+     echo, mode].
 
 
 getopts(P, [Opt|Opts]) ->
@@ -94,6 +100,8 @@ getopt(P, Opt) ->
 	swflow -> reply0(erlang:port_control(P, ?SL_GET_SWFLOW, []));
 	xonchar    -> reply0(erlang:port_control(P, ?SL_GET_XONCHAR, []));
 	xoffchar   -> reply0(erlang:port_control(P, ?SL_GET_XOFFCHAR, []));
+	eolchar    -> reply0(erlang:port_control(P, ?SL_GET_EOLCHAR, []));
+	eol2char   -> reply0(erlang:port_control(P, ?SL_GET_EOL2CHAR, []));
 	echo   -> reply0(erlang:port_control(P, ?SL_GET_ECHO, []));
 	mode  ->
 	    case reply0(erlang:port_control(P, ?SL_GET_MODE, [])) of
@@ -117,6 +125,8 @@ setopt(P, Opt, Arg) ->
 	swflow -> reply0(erlang:port_control(P, ?SL_SET_SWFLOW, bool(Arg)));
 	xoffchar -> reply0(erlang:port_control(P, ?SL_SET_XOFFCHAR, <<Arg:32>> ));
 	xonchar  -> reply0(erlang:port_control(P, ?SL_SET_XONCHAR, <<Arg:32>>));
+	eolchar -> reply0(erlang:port_control(P,?SL_SET_EOLCHAR,<<Arg:32>>));
+	eol2char -> reply0(erlang:port_control(P,?SL_SET_EOL2CHAR,<<Arg:32>>));
 	echo   -> reply0(erlang:port_control(P, ?SL_SET_ECHO, bool(Arg)));
 	binary -> ok;
 	mode   ->

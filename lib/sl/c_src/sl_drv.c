@@ -210,6 +210,9 @@ static struct _rate {
 #define SL_SET_XOFFCHAR 42
 #define SL_SET_ECHO     44
 #define SL_SET_MODE     46
+#define SL_SET_EOLCHAR  48
+#define SL_SET_EOL2CHAR 50
+
 
 #define SL_GET_DEV      21
 #define SL_GET_BAUD     23
@@ -224,6 +227,8 @@ static struct _rate {
 #define SL_GET_XOFFCHAR 43
 #define SL_GET_ECHO     45
 #define SL_GET_MODE     47
+#define SL_GET_EOLCHAR  49
+#define SL_GET_EOL2CHAR 51
 
 #define SL_OK     0
 #define SL_ERROR  1
@@ -252,6 +257,8 @@ static struct _rate {
 #define FL_XONCHAR     0x0200
 #define FL_XOFFCHAR    0x0400
 #define FL_ECHO        0x0800
+#define FL_EOLCHAR     0x1000
+#define FL_EOL2CHAR    0x2000
 #define FL_MODE        0x8000  /* mode update */
 
 typedef struct _sl_t
@@ -284,6 +291,8 @@ typedef struct _sl_t
     int        echo;      /* Local echo */
     int        xonchar;   /* XON character (for swflow) */
     int        xoffchar;  /* XOFF character (for swflow) */
+    int        eolchar;   /* EOL character */
+    int        eol2char;  /* EOL character */
     int        bufsz;     /* Number of bytes buffer */
     int        buftm;     /* Buffer fill timeout */
     int        mode;      /* (pending mode RAW | LINE) */
@@ -677,6 +686,49 @@ static int get_xoffchar(sl_t* slp)
 #endif
 }
 
+static void set_eolchar(sl_t* slp, int eolchar)
+{
+#ifdef __WIN32__
+    /* FIXME */
+#else
+    slp->tio.c_cc[VEOL] = eolchar;
+#endif
+}
+
+static int get_eolchar(sl_t* slp)
+{
+#ifdef __WIN32__
+    return '\r';
+#else
+    return slp->tio.c_cc[VEOL];
+#endif
+}
+
+static void set_eol2char(sl_t* slp, int eol2char)
+{
+#ifdef __WIN32__
+    /* FIXME */
+#else
+#ifdef VEOL2
+    slp->tio.c_cc[VEOL2] = eol2char;
+#endif
+#endif
+}
+
+static int get_eol2char(sl_t* slp)
+{
+#ifdef __WIN32__
+    return 0;
+#else
+#ifdef VEOL2
+    return slp->tio.c_cc[VEOL2];
+#else
+    return 0;
+#endif
+#endif
+}
+
+
 static void set_swflow(sl_t* slp, int on)
 {
 #ifdef __WIN32__
@@ -829,6 +881,12 @@ static void do_update(sl_t* slp)
 
     if (slp->flags & FL_XOFFCHAR)
 	set_xoffchar(slp, slp->xoffchar);
+
+    if (slp->flags & FL_EOLCHAR)
+	set_eolchar(slp, slp->eolchar);	
+
+    if (slp->flags & FL_EOL2CHAR)
+	set_eol2char(slp, slp->eol2char);
 
     if (slp->flags & FL_HWFLOW)
 	set_hwflow(slp, slp->hwflow);
@@ -1400,6 +1458,37 @@ static int sl_ctl(ErlDrvData data, unsigned int cmd, char* buf, int len,
 	    return ctl_reply_int(slp->xoffchar, rbuf, rsize);
 	else if (slp->com != INVALID)
 	    return ctl_reply_int(get_xoffchar(slp), rbuf, rsize);
+	else
+	    return ctl_error(SL_ERR_BADARG, rbuf, rsize);
+
+
+    case SL_SET_EOLCHAR:
+	if (len != 4)
+	    return ctl_error(SL_ERR_BADARG, rbuf, rsize);
+	slp->eolchar = get_int32(buf);	
+	slp->flags |= FL_EOLCHAR;
+	return ctl_reply(SL_OK, NULL, 0, rbuf, rsize);
+
+    case SL_GET_EOLCHAR:
+	if (slp->flags & FL_EOLCHAR)
+	    return ctl_reply_int(slp->eolchar, rbuf, rsize);
+	else if (slp->com != INVALID)
+	    return ctl_reply_int(get_eolchar(slp), rbuf, rsize);
+	else
+	    return ctl_error(SL_ERR_BADARG, rbuf, rsize);
+
+    case SL_SET_EOL2CHAR:
+	if (len != 4)
+	    return ctl_error(SL_ERR_BADARG, rbuf, rsize);
+	slp->eol2char = get_int32(buf);	
+	slp->flags |= FL_EOL2CHAR;
+	return ctl_reply(SL_OK, NULL, 0, rbuf, rsize);
+
+    case SL_GET_EOL2CHAR:
+	if (slp->flags & FL_EOL2CHAR)
+	    return ctl_reply_int(slp->eol2char, rbuf, rsize);
+	else if (slp->com != INVALID)
+	    return ctl_reply_int(get_eol2char(slp), rbuf, rsize);
 	else
 	    return ctl_error(SL_ERR_BADARG, rbuf, rsize);
 

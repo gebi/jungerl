@@ -74,44 +74,42 @@ start(Candidates, Dest) ->
 %% directly by user code.
 
 server(Candidates, Dest) ->
-  loop(Candidates, Dest).
+  loop(Candidates, Candidates, Dest, []).
 
-loop(Candidates, Dest) ->
+loop(Candidates, Working, Dest, Chars) ->
   receive
+    {Pid, flush} ->
+      gen_string(lists:reverse(Chars), Dest),
+      Pid ! {self(), flush, ok},
+      loop(Candidates, Candidates, Dest, []);
     {Pid, xlat_char, Char} ->
-      % find all the things in candidates that start with char
-      case get_candidates(Candidates, Char) of
+      % find all the things in our candidates that start with char
+      sub_loop(Candidates, Working, Dest, Chars, Char)
+  end.
+
+sub_loop(Candidates, Working, Dest, Chars, Char) ->
+  case get_candidates(Working, Char) of
+    [] ->
+      % ce_log:write("got nothin ~p", [{Char, Chars}]),
+      % we got nothin.  just send the chars they sent so far
+      case Chars of
         [] ->
-	  % we got nothin.  just send the char they sent.
 	  Dest ! {self(), xlat_char, Char},
-	  loop(Candidates, Dest);
-	[{"", To} | Tail] ->
-	  % we got a match.
-	  gen_string(To, Dest),
-	  loop(Candidates, Dest);
-	NewCandidates ->
-	  % we got more than one matching candidate.
-	  sub_loop(NewCandidates, Dest, [Char]),
-	  loop(Candidates, Dest)
-      end
-  end.
-
-sub_loop(Candidates, Dest, Chars) ->
-  receive
-    {Pid, xlat_char, Char} ->
-      % find all the things in candidates that start with char
-      case get_candidates(Candidates, Char) of
-        [] ->
-	  % we got nothin.  just send the string they sent.
-	  gen_string(lists:reverse(Chars) ++ [Char], Dest);
-	[{"", To} | Tail] ->
-	  % we got a match.
-	  gen_string(To, Dest);
-	NewCandidates ->
-	  % still ambiguous
-	  sub_loop(NewCandidates, Dest, [Char | Chars])
-      end
-  end.
+	  loop(Candidates, Candidates, Dest, []);
+	_ ->
+	  % we now have to invalidate our assumptions about these
+          gen_string(lists:reverse(Chars), Dest),
+	  % and immediately re-check this char from the beginning
+          sub_loop(Candidates, Candidates, Dest, [], Char)
+      end;
+    [{"", To} | Tail] ->
+      % we got a match.
+      gen_string(To, Dest),
+      loop(Candidates, Candidates, Dest, []);
+    NewCandidates ->
+      % we got more than one partially matching candidate.
+      loop(Candidates, NewCandidates, Dest, [Char | Chars])
+ end.
 
 get_candidates(L, Char) ->
   lists:sort(lists:foldl(fun
@@ -133,7 +131,6 @@ gen_string(String, Dest) ->
 
 send(Pid, Chars) when is_list(Chars) ->
   lists:foreach(fun(Char) ->
-    timer:sleep(100),
     Pid ! {self(), xlat_char, Char}
   end, Chars),
   ok;

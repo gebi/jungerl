@@ -50,6 +50,7 @@
 -export([read/2, read/3, write/2, delete/2]).
 -export([foreach/2, fold/2, fold/3, all_records/1]).
 -export([update_counter/2]).
+-export([export/3, import/3]).
 
 %%% DB MANAGEMENT %%%
 
@@ -214,6 +215,51 @@ update_counter(Table, Key) ->
 			  end) of
     {atomic, N} -> {ok, N};
            Else -> Else
+  end.
+
+%% @spec export(io_device(), table(), FieldNames::[atom()]) -> ok | {error, Reason}
+%% @doc Exports a table to a disk file. For simplicity,
+%% FieldNames should be the output of <code>record_info(fields, Table)</code>
+
+export(IoDevice, Table, FieldNames) ->
+  fold(Table, fun(Record, ok) ->
+    io:fwrite(IoDevice, "~p.~n", [map_fields(Record, FieldNames)])
+  end, ok),
+  io:fwrite(IoDevice, "end_of_records.~n").
+
+map_fields(Record, FieldNames) ->
+  map_fields(tl(tuple_to_list(Record)), FieldNames, []).
+
+map_fields([], [], Acc) -> Acc;
+map_fields([Field | Fields], [FieldName | FieldNames], Acc) ->
+  map_fields(Fields, FieldNames, [{FieldName, Field} | Acc]).
+
+%% @spec import(io_device(), table(), FieldNames::[atom()]) -> ok | {error, Reason}
+%% @doc Imports a disk file into a table. For simplicity,
+%% FieldNames should be the output of <code>record_info(fields, Table)</code>
+
+import(IoDevice, Table, FieldNames) ->
+  case io:read(IoDevice, '') of
+    {ok, end_of_records} ->
+      ok;
+    {ok, TupleList} ->
+      Record = map_record(Table, TupleList, FieldNames),
+      write(Table, Record),
+      import(IoDevice, Table, FieldNames)
+  end.
+
+map_record(Table, TupleList, FieldNames) ->
+  list_to_tuple([Table | map_record0(TupleList, FieldNames, [])]).
+
+map_record0(TupleList, [], Acc) ->
+  lists:reverse(Acc);
+map_record0(TupleList, [FieldName | FieldNames], Acc) ->
+  case lists:keysearch(FieldName, 1, TupleList) of
+    {value, {FieldName, FieldValue}} ->
+      map_record0(TupleList, FieldNames, [FieldValue | Acc]);
+    error ->
+      % should fill in the default value, will fill in atom 'default'
+      map_record0(TupleList, FieldNames, [default | Acc])
   end.
 
 %%% END of ce_db.erl %%%

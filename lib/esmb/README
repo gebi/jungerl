@@ -1,5 +1,16 @@
 
 ###########################################
+###### Fri Jan 21 14:49:59 CET 2005  ######
+###########################################
+
+Added support for Digital Signing, i.e every
+SMB packet is signed by inserting a checksum
+in every packet sent to the server.
+
+/Tobbe
+
+
+###########################################
 ###### Fri Oct 15 12:56:23 CEST 2004 ######
 ###########################################
 

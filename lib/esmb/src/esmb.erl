@@ -941,7 +941,6 @@ user_logon(S, Neg, User, Passwd) ->
 %%% @private
 user_logon(S, Neg, U) ->
     {Req, Pdu} = smb_session_setup_andx_pdu(Neg, U),
-    ?elog("user_logon ~n",[]),
     decode_smb_response(Req, nbss_session_service(S, Pdu)).
 
 
@@ -2547,7 +2546,7 @@ exit_if_error(Pdu, Dmsg) ->
 
 %%%
 %%% @spec error_p(Pdu::pdu()) -> 
-%%%               false | {error, Ecode::integer(), Emsg::string()}
+%%%               false | {true, Ecode::integer(), Emsg::string()}
 %%%
 %%% @doc Checks the error class/code in the <em>Pdu</em>. If no error
 %%%      it returns <em>false</em>. Otherwise it returns a tuple

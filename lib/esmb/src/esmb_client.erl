@@ -33,7 +33,6 @@ start(Path, User, Wgroup, Charset) ->
     iconv:start(),
     case host_share(Path) of
 	{Host, Share} ->
-	    io:format("Share=~p~n",[Share]),
 	    spawn(fun() -> init(Host, Share, User, Wgroup, Charset) end);
 	Else ->
 	    Else
@@ -45,15 +44,20 @@ init(Host, Share, User, Wgroup, Charset) ->
     Pw = get_passwd(),
     U = #user{pw = Pw, name = User, primary_domain = Wgroup},
     Pdu0 = esmb:user_logon(S, Neg, U),
-    esmb:exit_if_error(Pdu0, "Login failed"),
-    WinPath = mk_winpath(Neg, "//"++Host++"/"++Share, Charset),
-    Path = to_ucs2(Neg, WinPath, Charset),
-    Pdu1 = esmb:tree_connect(S, Neg, Pdu0, Path),
-    case esmb:error_p(Pdu1) of
-	false -> 
-	    shell(S, Neg, {Pdu1, "\\\\"});
-	{true, _Ecode, Emsg} -> 
-	    io:format("<ERROR>: ~p~n", [Emsg]),
+    case esmb:error_p(Pdu0) of
+	false ->
+	    WinPath = mk_winpath(Neg, "//"++Host++"/"++Share, Charset),
+	    Path = to_ucs2(Neg, WinPath, Charset),
+	    Pdu1 = esmb:tree_connect(S, Neg, Pdu0, Path),
+	    case esmb:error_p(Pdu1) of
+		false -> 
+		    shell(S, Neg, {Pdu1, "\\\\"});
+		{true, _Ecode, Emsg} -> 
+		    io:format("TreeConnect failed, reason: ~p~n", [Emsg]),
+		    {error, Emsg}
+	    end;
+	{true, _Ecode, Emsg} ->
+	    io:format("Login failed, reason: ~p~n", [Emsg]),
 	    {error, Emsg}
     end.
 
@@ -171,13 +175,13 @@ delete(S, Neg, {Pdu0, Cwd}, File0) ->
     {Pdu, Cwd}.
 
 
-ls(S, Neg, {Pdu, Cwd} = State) ->
+ls(S, Neg, {Pdu0, Cwd} = State) ->
     Cset = get(charset),
     WinPath = mk_winpath(Neg, Cwd, Cset),
     Udir = to_ucs2(Neg, add_wildcard(Neg, Cset, WinPath), Cset),
-    Rpdu = esmb:list_dir(S, Pdu, Udir),
-    print_file_info(Neg, Rpdu#smbpdu.finfo),
-    State.
+    Pdu = esmb:list_dir(S, Pdu0, Udir),
+    print_file_info(Neg, Pdu#smbpdu.finfo),
+    {Pdu, Cwd}
 
 print_file_info(Neg, L) ->
     F = fun(X) ->

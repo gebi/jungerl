@@ -12,6 +12,7 @@
 
 -export([start_link/2, start_link/3]).
 -export([init/3]).
+-export([loop/3]).
 
 %% start_link(Port, [EndPoint]) -> pid()
 %%
@@ -25,6 +26,7 @@ start_link(Port, EPs, Dev) ->
 init(Port, EPs, Dev) ->
     {ok, Socket} = gen_udp:open(Port, [binary]),
     {ok, Tunnel} = init_tunnel(Dev),
+    tuntap:set_active(Tunnel, true),
     loop(Tunnel, Socket, EPs).
 
 loop(Tunnel, Socket, EPs) ->
@@ -43,7 +45,7 @@ loop(Tunnel, Socket, EPs) ->
 
 init_tunnel(Dev) ->
     Tun = tuntap:open_tuntap(tap, Dev),
-    Dev = tuntap:device_name(Tun),
-    io:format("Alive and kicking on ~p~n", [Dev]),
+    Name = tuntap:device_name(Tun),
+    io:format("Alive and kicking on ~p~n", [Name]),
     {ok, Tun}.
 

@@ -94,7 +94,7 @@ send_email(Options) ->
       {error, host_not_found}
   end.
 send_email0(HostIP, Host, Options, EnvHost, EnvUser) ->
-  log("host: ~p ~p", [Host, HostIP]),
+  ce_log:write("host: ~p ~p", [Host, HostIP]),
   Port = get_opt(Options, port, 25),
   EnvSender = EnvUser ++ "@" ++ EnvHost,
   Originator = get_opt(Options, originator, EnvHost),
@@ -190,7 +190,7 @@ server(Options) ->
   EnvHost = ce_lib:to_string(os:getenv("HOST")),
   EnvUser = ce_lib:to_string(os:getenv("USER")),
   Host = get_opt(Options, host, EnvHost),
-  log("host: ~p", [Host]),
+  ce_log:write("host: ~p", [Host]),
   Port = get_opt(Options, port, 25),
   {Module, Function} = get_opt(Options, handler, no_handler_specified),
   Pid = ce_socket:server(?MODULE, server,  [Host, Module, Function], Port,
@@ -244,7 +244,7 @@ server_data_loop(Socket, Data) ->
 get_line(Socket) ->
   {ok, L} = gen_tcp:recv(Socket, 0),
   Line = ce_string:chomp(L),
-  log("R:~s", [Line]),
+  ce_log:write("R:~s", [Line]),
   Line.
 
 %% @spec expect(socket(), integer()) -> ok
@@ -265,7 +265,7 @@ expect(Socket, Code) ->
 %% @doc Sends a line of text to the given socket.
 
 send_line(Socket, Line) ->
-  log("S:~s", [Line]),
+  ce_log:write("S:~s", [Line]),
   gen_tcp:send(Socket, Line ++ eol()),
   ok.
 
@@ -294,14 +294,6 @@ get_opt(Options, Key, Default) ->
       end
   end.
 
-%% @spec log(string(), [term()]) -> ok
-%% @doc Logs a string to the terminal.
-
-log(Fmt, Args) ->
-  Term = {calendar:local_time(), lists:flatten(io_lib:format(Fmt, Args))},
-  io:fwrite("~p~n", [Term]),
-  ok.
-
 %% @spec eol() -> string()
 %% @doc Returns the internet line terminator sequence.
 
@@ -309,3 +301,4 @@ eol() ->
   "\r\n".
 
 %%% END of ce_smtp.erl %%%
+

@@ -1,4 +1,4 @@
-%%% BEGIN ce_memoize.erl %%%
+%%% BEGIN ce_log.erl %%%
 %%%
 %%% ce - Miscellaneous Programming Support Libraries for Erlang/OTP
 %%% Copyright (c)2003 Cat's Eye Technologies.  All rights reserved.
@@ -33,54 +33,51 @@
 %%% OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 %%% POSSIBILITY OF SUCH DAMAGE. 
 
-%% @doc Memoization (cacheing) design pattern.
+%% @doc Wrapper around <code>disk_log</code> to simplify logging.
 %%
-%% <p>When functions are executed using <code>ce_memoize:apply/4</code>,
-%% their results are saved for future reference (subsequent calls to
-%% <code>apply/4</code>) in an ets table.  This can be useful for values
-%% which are slow to initially calculate and rarely change thereafter,
-%% and where speed is desired for every access.</p>
-%%
+%% <p>This module adds datestamping and terminal output to the
+%% usual <code>disk_log</code>.  It also provides a simpler,
+%% less flexible interface (e.g. only asynchronous logging is
+%% allowed.)</p>
+%% 
 %% @end
 
--module(ce_memoize).
+-module(ce_log).
 -vsn('JUNGERL').
 -author('catseye@catseye.mb.ca').
 -copyright('Copyright (c)2003 Cat`s Eye Technologies. All rights reserved.').
 
--export([start/1]).
--export([apply/4]).
--export([flush/1]).
+-export([open/1, write/1, write/2]).
 
-%% @spec start(memo_name()) -> ok
-%%         memo_name() = atom()
-%% @doc Starts the memoization service.
+%% @spec open(filename()) -> ok | {error, Reason}
+%% @doc Opens a logfile.  This step is optional; if no logfile is
+%% opened, messages will only be logged to the terminal.
 
-start(Name) ->
-  ets:new(Name, [public, named_table]),
+open(LogFile) ->
+  disk_log:open([{name, ?MODULE}, {file, LogFile}]).
+
+%% @spec write(string()) -> ok
+%% @doc Logs a message.
+
+write(String) ->
+  {Date, Time} = calendar:local_time(),
+  DateString = ce_calendar:logfile_datetime({Date, Time}),
+  {Module, Function, Arity} = hd(tl(ce_lib:call_stack())),
+  Term = {{Date, Time}, {Module, Function, Arity}, String},
+  case disk_log:info(?MODULE) of
+    List when is_list(List) ->
+      disk_log:alog(?MODULE, Term);
+    {error, Reason} ->
+      ok
+  end,
+  io:fwrite("~s [~p:~p/~p] ~s~n",
+    [DateString, Module, Function, Arity, String]),
   ok.
 
-%% @spec apply(memo_name(), module(), function(), args()) -> term()
-%%         args() = [term()]
-%% @doc Applies a function, memoizing (cacheing) the results.
+%% @spec write(string(), [term()]) -> ok
+%% @doc Logs a formatted message.
 
-apply(Name, Module, Function, Args) ->
-  case ets:lookup(Name, {Module, Function, Args}) of
-    [] ->
-      Result = erlang:apply(Module, Function, Args),
-      ets:insert(Name, {{Module, Function, Args}, Result}),
-      Result;
-    [{{Module, Function, Args}, Result}] ->
-      Result;
-    Else ->
-      Else
-  end.
+write(Fmt, Args) ->
+  write(lists:flatten(io_lib:format(Fmt, Args))).
 
-%% @spec flush(memo_name()) -> ok
-%% @doc Flushes the given memoization table.
-
-flush(Name) ->
-  ets:delete_all_objects(Name),
-  ok.
-
-%%% END of ce_memoize.erl %%%
+%%% END of ce_log.erl %%%

@@ -40,7 +40,7 @@
 -module(ce_tot).
 -vsn('JUNGERL').
 -author('catseye@catseye.mb.ca').
--copyright('Copyright (c)2002 Cat`s Eye Technologies. All rights reserved.').
+-copyright('Copyright (c)2003 Cat`s Eye Technologies. All rights reserved.').
 
 -export([new/3]).
 -export([get/3, put/4]).

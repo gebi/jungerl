@@ -40,7 +40,7 @@
 -module(ce_string).
 -vsn('JUNGERL').
 -author('catseye@catseye.mb.ca').
--copyright('Copyright (c)2002 Cat`s Eye Technologies. All rights reserved.').
+-copyright('Copyright (c)2003 Cat`s Eye Technologies. All rights reserved.').
 
 -export([extract/2, extract/3, pad/2, pad/3, keyvalue/1, keyvalue/2]).
 -export([join/2, join/3, uc/1, lc/1, chomp/1, split/2]). % perl-like functions
@@ -300,3 +300,4 @@ unescape([92, $r | T], A) -> unescape(T, [A | "\r"]);
 unescape([H | T], A) -> unescape(T, [A | H]).
 
 %%% END of ce_string.erl %%%
+

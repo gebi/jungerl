@@ -1,7 +1,7 @@
 %%% BEGIN ce_math.erl %%%
 %%%
 %%% ce - Miscellaneous Programming Support Libraries for Erlang/OTP
-%%% Copyright (c)2002 Cat's Eye Technologies.  All rights reserved.
+%%% Copyright (c)2003 Cat's Eye Technologies.  All rights reserved.
 %%%
 %%% Redistribution and use in source and binary forms, with or without
 %%% modification, are permitted provided that the following conditions
@@ -40,7 +40,7 @@
 -module(ce_math).
 -vsn('JUNGERL').
 -author('catseye@catseye.mb.ca').
--copyright('Copyright (c)2002 Cat`s Eye Technologies. All rights reserved.').
+-copyright('Copyright (c)2003 Cat`s Eye Technologies. All rights reserved.').
 
 -export([ceil/1, ceil/2, max/2, min/2, sgn/1, fix/1, floor/1]).
 -export([gcf/2, lcm/2]).

@@ -64,7 +64,7 @@
 -module(ce_event).
 -vsn('JUNGERL').
 -author('catseye@catseye.mb.ca').
--copyright('Copyright (c)2002 Cat`s Eye Technologies. All rights reserved.').
+-copyright('Copyright (c)2003 Cat`s Eye Technologies. All rights reserved.').
 
 -export([new_manager/1, add_handler/4, add_handlers/2, notify/4]).
 -export([test/0]).

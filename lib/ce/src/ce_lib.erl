@@ -1,7 +1,7 @@
 %%% BEGIN ce_lib.erl %%%
 %%%
 %%% ce - Miscellaneous Programming Support Libraries for Erlang/OTP
-%%% Copyright (c)2002 Cat's Eye Technologies.  All rights reserved.
+%%% Copyright (c)2003 Cat's Eye Technologies.  All rights reserved.
 %%%
 %%% Redistribution and use in source and binary forms, with or without
 %%% modification, are permitted provided that the following conditions
@@ -40,11 +40,12 @@
 -module(ce_lib).
 -vsn('JUNGERL').
 -author('catseye@catseye.mb.ca').
--copyright('Copyright (c)2002 Cat`s Eye Technologies. All rights reserved.').
+-copyright('Copyright (c)2003 Cat`s Eye Technologies. All rights reserved.').
 
 -export([iterate/4, repeat/2]).
 -export([breed/1]).
 -export([eval/1]).
+-export([call_stack/0]).
 -export([clean/2, place/2]).
 -export([attempt/2, attempt/3]).
 -export([compose/1]).
@@ -96,6 +97,14 @@ eval(S, PT) when list(S) ->
   % execute all parse transforms in PT
   {value, Y, _} = erl_eval:exprs(C, erl_eval:bindings(erl_eval:new_bindings())),
   Y.
+
+%% @spec call_stack() -> [{Module, Function, Arity}]
+%% @doc Returns the current Erlang call stack (not including
+%% <code>ce_lib:call_stack/0</code>).
+
+call_stack() ->
+  {'EXIT', {Error, CallStack}} = (catch 1 = 2),
+  tl(CallStack).
 
 %% @spec place(term(), term()) -> ok
 %% @doc Places the given value in the process dictionary iff the given key

@@ -40,11 +40,11 @@
 -module(ce_file).
 -vsn('JUNGERL').
 -author('catseye@catseye.mb.ca').
--copyright('Copyright (c)2002 Cat`s Eye Technologies. All rights reserved.').
+-copyright('Copyright (c)2003 Cat`s Eye Technologies. All rights reserved.').
 
 -export([exists/1, size/1, last_modified/1]).
 -export([is_dir/1, is_world_readable/1, is_world_executable/1, is_binary/1]).
--export([dump/2, log/2, log/3, each_line/3, slurp/1]).
+-export([dump/2, each_line/3, slurp/1]).
 -export([create/2, create/3, find/3]).
 -export([import_fields/5, import_columns/4, import/4]).
 -export([app_name/1, app_version/1]).
@@ -167,29 +167,6 @@ dump(Filename, List) ->
       {ok, List};
     Other ->
       Other
-  end.
-
-%% @spec log(atom(), string()) -> {ok, string()} | {error, Reason}
-%% @doc Naively logs a line both to a text file and to the console.
-
-log(App, Text) ->
-  log0(App, Text).
-log(App, Fmt, List) ->
-  log0(App, io_lib:format(Fmt, List)).
-  
-log0(App, Text) ->
-  Filename = filename:join(code:priv_dir(App), "log.txt"),
-  Str = lists:flatten(io_lib:format(
-    "~w ~s ~s", [App, ce_calendar:logfile_datetime(), Text])),
-  case file:open(Filename, [write, append]) of
-    {ok, Device} ->
-      io:fwrite(Device, "~s\r\n", [Str]),     % TODO: check operating system
-      file:close(Device),
-      io:fwrite("~s~n", [Str]),   % on console
-      {ok, Str};
-    Other0 ->
-      io:fwrite("~s~n", [Str]),   % on console
-      Other0
   end.
 
 %% @spec each_line(fun(), term(), filename()) -> term()
@@ -388,3 +365,4 @@ complete(DirName, [FileName | Tail], PartialFileName, Length, Acc) ->
   end.
 
 %%% END of ce_file.erl %%%
+

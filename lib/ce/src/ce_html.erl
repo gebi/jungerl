@@ -1,7 +1,7 @@
 %%% BEGIN ce_html.erl %%%
 %%%
 %%% ce - Miscellaneous Programming Support Libraries for Erlang/OTP
-%%% Copyright (c)2002 Cat's Eye Technologies.  All rights reserved.
+%%% Copyright (c)2003 Cat's Eye Technologies.  All rights reserved.
 %%%
 %%% Redistribution and use in source and binary forms, with or without
 %%% modification, are permitted provided that the following conditions

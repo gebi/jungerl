@@ -44,8 +44,8 @@
 -copyright('Copyright (c)2003 Cat`s Eye Technologies. All rights reserved.').
 
 -export([rfc_1123_datetime/0, rfc_1123_datetime/1]).
--export([logfile_datetime/0]).
--export([timestamp/0]).
+-export([logfile_datetime/0, logfile_datetime/1]).
+-export([timestamp/0, timestamp/1]).
 
 %% @spec rfc_1123_datetime() -> string()
 %% @equiv rfc_1123_datetime(calendar:universal_time())
@@ -80,25 +80,40 @@ rfc_1123_datetime({{Y, M, D}, {H, I, S}}) ->
    11 -> "Nov";
    12 -> "Dec"
   end,
-  lists:flatten(io_lib:format("~s, ~2.2.0w ~s ~w ~2.2.0w:~2.2.0w:~2.2.0w GMT",
-                              [Dow, D, Month, Y, H, I, S])).
+  lists:flatten(io_lib:format(
+    "~s, ~2.2.0w ~s ~w ~2.2.0w:~2.2.0w:~2.2.0w GMT",
+    [Dow, D, Month, Y, H, I, S])).
 
 %% @spec logfile_datetime() -> string()
-%% @doc Returns a date/time string which is suitable for a log file.
+%% @equiv logfile_datetime(calendar:local_time())
 
 logfile_datetime() ->
-  {{Y, M, D}, {H, I, S}} = calendar:local_time(),
-  lists:flatten(io_lib:format("~w.~2.2.0w.~2.2.0w ~2.2.0w:~2.2.0w:~2.2.0w",
-                             [Y, M, D, H, I, S])).
+  logfile_datetime(calendar:local_time()).
+
+%% @spec logfile_datetime({date(), time()}) -> string()
+%% @doc Returns a date/time string which is suitable for a log file.
+%% This sort of date/time looks like "2003.08.14 08:49:05".
+
+logfile_datetime({{Y, M, D}, {H, I, S}}) ->
+  lists:flatten(io_lib:format(
+    "~w.~2.2.0w.~2.2.0w ~2.2.0w:~2.2.0w:~2.2.0w",
+    [Y, M, D, H, I, S])).
 
 %% @spec timestamp() -> string()
-%% @doc Returns a timestamp string which is both human-readable and unique.
-%% This sort of date/time looks like "20020814.184025.148330".
+%% @equiv timestamp(calendar:local_time())
 
 timestamp() ->
-  {{Y, M, D}, {H, I, S}} = calendar:local_time(),
+  timestamp(calendar:local_time()).
+
+%% @spec timestamp({date(), time()}) -> string()
+%% @doc Returns a timestamp string which is both human-readable and unique
+%% within the node on which it is generated.
+%% This sort of date/time looks like "20030814.184025.148330".
+
+timestamp({{Y, M, D}, {H, I, S}}) ->
   {_, _, Us} = erlang:now(),
-  lists:flatten(io_lib:format("~w~2.2.0w~2.2.0w.~2.2.0w~2.2.0w~2.2.0w.~6.6.0w",
-                             [Y, M, D, H, I, S, Us])).
+  lists:flatten(io_lib:format(
+    "~w~2.2.0w~2.2.0w.~2.2.0w~2.2.0w~2.2.0w.~6.6.0w",
+    [Y, M, D, H, I, S, Us])).
 
 %%% END of ce_calendar.erl %%%

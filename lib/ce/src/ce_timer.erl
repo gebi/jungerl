@@ -1,7 +1,7 @@
 %%% BEGIN ce_timer.erl %%%
 %%%
 %%% ce - Miscellaneous Programming Support Libraries for Erlang/OTP
-%%% Copyright (c)2002 Cat's Eye Technologies.  All rights reserved.
+%%% Copyright (c)2003 Cat's Eye Technologies.  All rights reserved.
 %%%
 %%% Redistribution and use in source and binary forms, with or without
 %%% modification, are permitted provided that the following conditions
@@ -40,7 +40,7 @@
 -module(ce_timer).
 -vsn('JUNGERL').
 -author('catseye@catseye.mb.ca').
--copyright('Copyright (c)2002 Cat`s Eye Technologies. All rights reserved.').
+-copyright('Copyright (c)2003 Cat`s Eye Technologies. All rights reserved.').
 
 -export([sleep/1, sleep_forever/0, sleep_until_registered/1]).
 -export([now_diff/2]).

@@ -43,7 +43,7 @@
 -module(ce_db).
 -vsn('JUNGERL').
 -author('catseye@catseye.mb.ca').
--copyright('Copyright (c)2002 Cat`s Eye Technologies. All rights reserved.').
+-copyright('Copyright (c)2003 Cat`s Eye Technologies. All rights reserved.').
 
 -export([create/1, connect/3]).
 -export([probe_db_nodes/1]).

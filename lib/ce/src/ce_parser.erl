@@ -1,7 +1,7 @@
 %%% BEGIN ce_parser.erl %%%
 %%%
 %%% ce - Miscellaneous Programming Support Libraries for Erlang/OTP
-%%% Copyright (c)2002 Cat's Eye Technologies.  All rights reserved.
+%%% Copyright (c)2003 Cat's Eye Technologies.  All rights reserved.
 %%%
 %%% Redistribution and use in source and binary forms, with or without
 %%% modification, are permitted provided that the following conditions
@@ -44,7 +44,7 @@
 -module(ce_parser).
 -vsn('JUNGERL').
 -author('catseye@catseye.mb.ca').
--copyright('Copyright (c)2002 Cat`s Eye Technologies. All rights reserved.').
+-copyright('Copyright (c)2003 Cat`s Eye Technologies. All rights reserved.').
 
 -export([scan/2, parse/3]).
 -export([test/0, eval/1]).
@@ -247,3 +247,4 @@ op(A, times, B) -> A * B;
 op(A, divide, B) -> A div B.
 
 %%% END of ce_parser.erl %%%
+

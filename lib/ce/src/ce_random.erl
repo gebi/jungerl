@@ -40,7 +40,7 @@
 -module(ce_random).
 -vsn('JUNGERL').
 -author('catseye@catseye.mb.ca').
--copyright('Copyright (c)2002 Cat`s Eye Technologies. All rights reserved.').
+-copyright('Copyright (c)2003 Cat`s Eye Technologies. All rights reserved.').
 
 -export([seed/0, pick/1, dist/1, scramble/1, d/2]).
 

@@ -1,7 +1,7 @@
 %%% BEGIN ce_lists.erl %%%
 %%%
 %%% ce - Miscellaneous Programming Support Libraries for Erlang/OTP
-%%% Copyright (c)2002 Cat's Eye Technologies.  All rights reserved.
+%%% Copyright (c)2003 Cat's Eye Technologies.  All rights reserved.
 %%%
 %%% Redistribution and use in source and binary forms, with or without
 %%% modification, are permitted provided that the following conditions
@@ -40,7 +40,7 @@
 -module(ce_lists).
 -vsn('JUNGERL').
 -author('catseye@catseye.mb.ca').
--copyright('Copyright (c)2002 Cat`s Eye Technologies. All rights reserved.').
+-copyright('Copyright (c)2003 Cat`s Eye Technologies. All rights reserved.').
 
 -export([find_first/2, trunc/1, delete/2, replace/3, between/2]).
 -export([split/2, partition/2, replace_all/3]).
@@ -287,3 +287,4 @@ diff([Head1 | Tail1], List2=[Head2 | Tail2], Pos, Acc) ->
   diff(Tail1, List2, Pos + 1, [{insert, Pos, [Head1]} | Acc]).
 
 %%% END of ce_lists.erl %%%
+

@@ -1,0 +1,105 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>The gen_leader application</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body bgcolor="white">
+<h1>The gen_leader application</h1>
+<p><b>Version:</b> 1.0
+</p>
+<p><b>Authors:</b> Ulf Wiger (<a href="mailto:ulf.wiger@ericsson.com"><tt>ulf.wiger@ericsson.com</tt></a>), Thomas Arts (<a href="mailto:thomas.arts@ituniv.se"><tt>thomas.arts@ituniv.se</tt></a>).</p>
+A leader election behaviour modeled after gen_server.
+<p>This behaviour intends to make it reasonably
+straightforward to implement a fully distributed and fault-tolerant
+server with master-slave semantics.</p>
+
+<p>The leader election algorithm used is designed to find a leader
+in constant time. A prerequisite is that all candidates are known
+from the beginning (but obviously, they do not all need to be alive.)</p>
+
+<p>The gen_leader behaviour supports nearly everything that gen_server
+does (some functions, such as multicall() and the internal timeout,
+have been removed), and adds a few callbacks and API functions to 
+support leader election etc.</p>
+
+<h2>Example</h2>
+
+<p>Included is an example program, a global dictionary,
+<a href="gdict.html">gdict</a>, based on the modules gen_leader and dict.
+The callback implementing the global dictionary is called
+'test_cb', for no particularly logical reason.</p>
+
+<h3>gdict</h3>
+
+<p><a href="gdict.html">gdict</a> consists of 50 lines of code, essentially
+emulating the interface of <code>dict.erl</code>. The "magic" in
+gdict is performed by two macros:
+<pre>
+-define(store(Dict,Expr,Legend),
+        gen_leader:leader_call(Dict, {store, fun(D) ->
+                                                     Expr
+                                             end})).
+
+-define(lookup(Dict, Expr, Legend),
+        gen_leader:call(Dict, {lookup, fun(D) ->
+                                               Expr
+                                       end})).
+</pre></p>
+
+<p>(<code>Legend</code> was a means to hook in some debugging info,
+but is currently not used.)</p>
+
+<p>Using these macros, the update functions in <code>dict.erl</code>
+can be mapped to a set of gen_leader processes maintaining a
+replicated dictionary:</p>
+
+<pre>
+store(Key, Value, Dict) ->
+    ?store(Dict, dict:store(Key,Value,D), store).
+
+fetch(Key, Dict) -> ?lookup(Dict, dict:fetch(Key,D), fetch).
+</pre>
+
+<p>... and so on.</p>
+
+<p>Instantiating a global dictionary is done via
+<code>gdict:new/3</code>:</p>
+
+<pre>
+new(Name, Candidates, Workers) ->
+    gen_leader:start(Name,Candidates, Workers, test_cb, dict:new(), []).
+</pre>
+
+<h3>test_cb</h3>
+
+<p><a href="test_cb.html">test_cb</a> consists of 49 lines of code, and is the
+<code>gen_leader</code> callback module supporting gdict. The "magic"
+is performed by the following lines:</p>
+<pre>
+handle_leader_call({store,F}, From, Dict, E) ->
+    NewDict = F(Dict),
+    {reply, ok, {store, F}, NewDict};
+...
+from_leader({store,F}, Dict, E) ->
+    NewDict = F(Dict),
+    {ok, NewDict}.
+
+handle_call({lookup, F}, From, Dict) ->
+    Reply = F(Dict),
+    {reply, Reply, Dict}.
+</pre>
+
+<p>Note that updates are served through the leader, using
+<code>gen_leader:leader_call/2</code> and
+<code>handle_leader_call/4</code> respectively, while lookups
+are served locally, using <code>gen_leader:call/2</code> and
+<code>handle_call/3</code>. More details are found in <a href="test_cb.html">test_cb</a>.</p>
+
+
+<h2>Callbacks</h2>
+
+<p>Documentation of the required callbacks can be found in the
+example callback <a href="test_cb.html" target="overviewFrame">test_cb</a>.</p>
+</body>
+</html>

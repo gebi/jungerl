@@ -7,6 +7,7 @@ LIBS := \
 	ermacs \
 	ex11 \
 	gd1_drv \
+        gen_leader \
 	slang \
 	lersp \
         lines \
@@ -47,6 +48,7 @@ ce: edoc
 edoc: syntax_tools xmerl
 ermacs: slang msc
 enfs: rpc
+gen_leader: edoc
 lines: edoc
 measurement: edoc
 plain_fsm: edoc

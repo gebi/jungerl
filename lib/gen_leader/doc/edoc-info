@@ -1,0 +1,3 @@
+{application,gen_leader}.
+{packages,[]}.
+{modules,[gdict,gen_leader,test_cb]}.

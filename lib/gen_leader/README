@@ -1,0 +1,215 @@
+
+
+Leader election behaviour (gen_leader)
+--------------------------------------
+Vsn     : 1.0
+Date    : 2003-04-03
+
+Authors: Thomas Arts <thomas.arts@ituniv.se>
+	 Ulf Wiger <ulf.wiger@ericsson.com>
+
+
+This application implements a leader election behaviour modeled after
+gen_server. This behaviour intends to make it reasonably
+straightforward to implement a fully distributed server with
+master-slave semantics.
+
+The gen_leader behaviour supports nearly everything that gen_server
+does (some functions, such as multicall() and the internal timeout,
+have been removed), and adds a few callbacks and API functions to 
+support leader election etc.
+
+Also included is an example program, a global dictionary, based
+on the modules gen_leader and dict. The callback implementing the
+global dictionary is called 'test_cb', for no particularly logical
+reason.
+
+
+Interface functions:
+
+start(Name, CandidateNodes, Workers, Module, Arg, Options)
+start_link(Name, CandidateNodes, Workers, Module, Arg, Options)
+   -> {ok,Pid} | error()
+
+   Name : atom()	Locally registered name of the server
+			Note that {global,Name} is not supported,
+			since the idea is to have one instance of
+			the server on each node.
+
+   CandidateNodes : [atom()]
+		        List of nodes that can become master.
+			Currently, the programmer must ensure that
+			this list is the same on all nodes.
+
+   Workers : [atom()]	List of nodes that will run an instance of 
+			the server, but cannot be considered for the
+			master role.
+
+   Module : atom()	Name of the callback module.
+
+   Arg : term()		Argument passed to the Mod:init/1 function
+
+   Options : [term()]	Same as the gen_server options.
+
+
+call(Server, Request)
+call(Server, Request, Timeout)
+cast(Server, Message)
+reply(Client, Reply)
+
+   Identical to the gen_server counterparts.
+
+
+leader_call(Name, Request)
+leader_call(Name, Request, Timeout)
+   -> term()
+
+   Performs a gen_server-like call to the leader server. The call is 
+   made via the local server, and is buffered until a leader is found.
+   If the leader dies during the call, the function exits with reason
+   'leader_died'.
+
+
+leader_cast(Name, Msg)
+   -> ok.
+
+   Performs a gen_server-like cast to the leader server. Otherwise 
+   Semantically the same as gen_server:cast/2.
+
+
+Callbacks:
+
+  (valid for all nodes)
+
+Module:init(Arg) -> {ok, State} | {stop, Reason} | ignore
+
+   Identical to the gen_server counterpart.
+
+Module:handle_call(Request, From, State) ->
+   {reply, Reply, NState}
+   | {ok, NState}
+   | {noreply, NState}
+   | {stop, Reason, NState}
+   | {stop, Reply, Reason, NState}
+
+   Election : opaque()
+
+  This function is called in response to a gen_leader:call/[2,3],
+  which always goes to the local instance of the server.
+  {ok, NState} is synonym with {noreply, NState}.
+
+Module:handle_cast(Message, State) ->
+   {ok, NState}
+   | {stop, Reason, NState}
+
+  This function is called in response to a gen_leader:cast/2,
+  which always sends a message to the local instance of the server.
+
+Module:handle_info(Message, State) ->
+   {ok, NState}
+   | {stop, Reason, NState}
+
+  This function is called in response to any incoming message not
+  recognized as a call, cast, leader_call, leader_cast, internal
+  leader negotiation message or system message.
+
+Module:terminate(Reason, State) -> void()
+
+  This function is called before terminating the server instance.
+  The return value is ignored. Note that this function is not 
+  called if the server dies due to an EXIT message (if the server
+  is not trapping exits).
+
+Module:code_change(OldVsn, State, Election, Extra) ->
+   {ok, NState}
+   | {ok, NState, NElection}
+
+  This function is called when the server should update its internal
+  state due to code replacement. See SASL User's Guide for more 
+  information. Note that it is possible here to also update the 
+  otherwise opaque Election variable. This could be one way to 
+  add candidate nodes in service.
+
+  (only called on the leader node)
+
+Module:elected(State, Election) -> {ok,Synch,NewState}.
+   State : term()
+   Synch : term()
+   Election : opaque()
+
+   This function is called when a leader is first elected, and each
+   time another server has surrendered to the current leader.
+
+   Synch will be passed along to the server(s) that surrendered, and 
+   can e.g. be used to maintain a replicated state.
+
+   Election is opaque, and can be used to call some helper functions
+   (see below)
+
+Module:handle_DOWN(Node, State, Election) 
+   -> {ok,NewState} | {ok,Broadcast,NewState}.
+
+Module:handle_leader_call(Request, From, State, E) ->
+   {reply, Reply, NState}
+   | {reply, Reply, Broadcast, NState}
+   | {ok, NState}
+   | {noreply, NState}
+   | {stop, Reason, NState}
+   | {stop, Reason, Reply, NState}
+
+   This function is called on the leader node in response to a 
+   gen_leader:leader_call/[2,3]. It is similar to handle_call/3
+   for a gen_server callback, but also allows the leader to send
+   a broadcast message to all other instances of the server.
+   The return value {ok, NState} is synonym with {noreply,NState}.
+
+   Note that when using gen_leader:reply/2, it is necessary to 
+   use gen_leader:reply(From, {leader,reply,Reply}). Otherwise,
+   the reply will not reach the client.
+
+BUG: Module:handle_leader_cast/3 is never called.
+
+
+  (only called on non-leader nodes)
+
+Module:surrendered(State, Synch, Election) -> {ok, NewState}.
+
+   This function is called whenever a new leader is elected, or 
+   a new server instance recognizes the current leader. Synch is 
+   the data returned from the corresponding elected/2 call on the
+   leader node.
+
+Module:from_leader(Broadcast, State, Election) ->
+   {ok,NState}
+   | {stop, Reason, NState}
+
+   This function is called on all non-leader nodes in response to
+   a broadcast message from the leader (e.g. triggered in
+   handle_leader_call/4).
+
+
+
+Query functions for the callback module:
+
+
+  For the functions below, the Election argument is passed along
+  in the callback functions. The contents of this variable are 
+  to be considered internal to the gen_leader module, and should
+  not be inspected other than through the use of these helper functions.
+
+alive(Election) -> [atom()]
+ 
+   Returns a list of nodes where an instance of the server is running.
+
+down(Election) -> [atom()]
+
+   Returns a list of nodes currently down.
+
+candidates(Election) -> [atom()]
+
+   Returns a list of known candidate nodes.
+
+workers(Election) -> [atom()]
+
+   Returns a list of known worker nodes.
+

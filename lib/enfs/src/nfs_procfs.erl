@@ -27,43 +27,74 @@ getattr(root) ->
     %% Timestamp = {Secs, MicroSecs} (used for atime/mtime/ctime)
     %% Size = integer()
     {dir, rx};
+getattr({node, N}) ->
+    {dir, rx};
 getattr({pid, P}) ->
     {dir, rx};
-getattr({registered, P}) ->
+getattr({registered, N, P}) ->
     {dir, rx};
 getattr(ID) ->
     {file, r, now_timestamp(), filesize(ID)}.
 
 dirlist(root) ->
-    Procs = [erlang:pid_to_list(P) -- "<>" || P <- erlang:processes()],
-    Registered = [atom_to_list(R) || R <- erlang:registered()],
-    {ok, Procs ++ Registered};
-dirlist({registered, R}) ->
-    case whereis(R) of
+    {ok, [atom_to_list(Node) || Node <- [node()] ++ nodes()]};
+
+dirlist({node, Node}) ->
+    case rpc:call(Node, erlang, processes, []) of
+	{badrpc, _} ->
+	    {error, io};
+	Procs ->
+	    case rpc:call(Node, erlang, registered, []) of
+		{badrpc, _} ->
+		    {error, io};
+		Regs ->
+		    ProcNms = [erlang:pid_to_list(P) -- "<>" || P <- Procs],
+		    Registered = [atom_to_list(R) || R <- Regs],
+		    {ok, ProcNms ++ Registered}
+	    end
+    end;
+
+dirlist({registered, Node, R}) ->
+    case rpc:call(Node, erlang, whereis, [R]) of
 	undefined ->
 	    {error, noent};
-	Pid ->
+	{badrpc, _} ->
+	    {error, io};
+	Pid when pid(Pid) ->
 	    dirlist({pid, Pid})
     end;
 dirlist({pid, P}) ->
-    case erlang:process_info(P) of
-	undefined ->
-	    {error, noent};
+    case rpc:call(node(P), erlang, process_info, [P]) of
+	{badrpc, _} ->
+	    {error, io};
 	Info ->
 	    {ok, [atom_to_list(A) || {A, _} <- Info]}
     end.
 
 lookup(root, Child) ->
+    %% Child is a node name
+    Node = list_to_atom(Child),
+    if Node == node() ->
+	    {ok, {node, node()}};
+       true ->
+	    case net_adm:ping(Node) of
+		pang ->
+		    {error, io};
+		pong ->
+		    {ok, {node, Node}}
+	    end
+    end;
+lookup({node, Node}, Child) ->
     %% Child could be either a pid or a registered name
     case catch list_to_pid("<"++Child++">") of
 	{'EXIT', _} ->
 	    %% Not a pid - registered name
-	    {ok, {registered, list_to_atom(Child)}};
+	    {ok, {registered, Node, list_to_atom(Child)}};
 	Pid ->
 	    {ok, {pid, Pid}}
     end;
-lookup({registered, R}, Child) ->
-    {ok, {property, {registered, R}, list_to_atom(Child)}};
+lookup({registered, Node, R}, Child) ->
+    {ok, {property, {registered, Node, R}, list_to_atom(Child)}};
 lookup({pid, P}, Child) ->
     {ok, {property, {pid, P}, list_to_atom(Child)}}.
 
@@ -76,10 +107,17 @@ read({property, P, Name}) ->
     end.
 
 get_process_info({pid, P}, Name) ->
-    erlang:process_info(P, Name);
-get_process_info({registered, R}, Name) ->
-    case whereis(R) of
+    case rpc:call(node(P), erlang, process_info, [P, Name]) of
+	{badrpc, _} ->
+	    undefined;
+	Info ->
+	    Info
+    end;
+get_process_info({registered, Node, R}, Name) ->
+    case rpc:call(Node, erlang, whereis, [R]) of
 	undefined ->
+	    undefined;
+	{badrpc, _} ->
 	    undefined;
 	Pid ->
 	    get_process_info({pid, Pid}, Name)

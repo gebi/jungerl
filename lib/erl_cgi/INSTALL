@@ -1,0 +1,52 @@
+
+ESP for apache (run once solution)
+----------------------------------
+
+1a. In Mime section add:
+	AddHandler esp-script .esp
+
+2a. Add to conf:
+	Action esp-script /cgi-bin/esp
+
+3a. add the following lines to /var/www/cgi-bin/esp
+
+#!/bin/sh
+#
+# Esp handler
+#
+export HOME=/
+exec <path>/erl -nouser -pa /<path>/ebin -s erl_cgi
+
+
+ESP for apache (deamon solution)
+--------------------------------
+
+1b. In Mime section add:
+	AddHandler esp-script .esp
+
+2b. Add to conf:
+	Action esp-script /cgi-bin/esp_cat
+
+3b. copy the file esp_cat to /var/www/cgi-bin/
+
+4b. start erl_cgi_srv as a service in rc.d
+
+
+ESP for IIS (run once solution)
+-------------------------------
+
+1a. Create the .esp handler under the Virtual Server,
+   this is done by right-click when selecting the server and
+   then selecting Properties.
+   Goto the "Home Directory" Tab and Configuration,
+   Browse or enter. 
+        "<path>\program files\erl5.1\bin\erl.exe" -nouser -pa <path>\ebin -s erl_cgi
+
+
+ESP for IIS (deamon solution)
+-----------------------------
+
+1b. start erl_cgi_srv as a service (fixme describe how)
+
+2b. add <path>\esp_cat.exe instead of 1a above.
+

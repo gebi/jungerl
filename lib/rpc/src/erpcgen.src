@@ -64,8 +64,8 @@ fi
 
 noxinfile=`echo $infile | sed 's;.x$;;'`
 
-if [ ! -f $xfile ]; then
-	echo "Sorry, file $xfile does not exist"
+if [ ! -f $noxinfile.x ]; then
+	echo "Sorry, file $noxinfile.x does not exist"
 	exit 1
 fi
 

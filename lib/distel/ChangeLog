@@ -1,3 +1,10 @@
+2004-10-27  Luke Gorrie  <luke@synap.se>
+
+	* elisp/erl.el (&erl-group-leader-loop): Make *erl-output* a plain
+	Emacs buffer created on demand. Previously it was actually the
+	Distel group leader process and so it was bad to kill it (now it's
+	fine).
+
 2004-10-26  Martin Bjorklund  <mbj@bluetail.com>
 
 	* elisp/distel.el (distel-menu-items): Use erl-choose-nodename in

@@ -1,0 +1,29 @@
+
+{application, ssh,
+ [{description, "SSH protocol"},
+  {vsn, "%VSN%"},
+  {modules, 
+	[
+	 'PKCS-1',
+	 'DSS',
+	 ssh_math,
+	 ssh_rsa,
+	 ssh_dsa,
+	 ssh_bits,
+	 ssh_file,
+	 ssh_io,
+	 ssh_proto,
+	 ssh_cm,
+	 ssh_userauth,
+	 ssh_xfer,
+	 ssh_tcp,
+	 ssh_tcp_wrap,
+	 ssh_dist,
+	 ssh_epmd,
+	 ssh,
+	 sftp
+	]},
+  {registered, []},
+  {env, []}]}.
+
+  

@@ -64,21 +64,18 @@ raw_get_url(URL, Timeout) ->
 	{error, Why} ->
 	    {error, {badURL,URL}};
 	{http, HostName, Port, File} ->
-            {ok, Host} = inet:gethostbyname(HostName),
-            IP = hd(Host#hostent.h_addr_list),
-	    get_http(IP, Port, File, ["Host: ", HostName], Timeout)
+	    get_http(HostName, Port, File, [], Timeout)
     end.
 
 raw_get_url(URL, Timeout, {IP, Port}) ->
     get_http(IP, Port, URL, [], Timeout).
 
 get_http(IP, Port, URL, Opts, Timeout) ->
-    %% io:format("ip = ~p, port = ~p, url = ~p~n", [ IP, Port, URL]),
+    %% io:format("ip = ~p, port = ~p, url = ~p~n", [ IP, Port, URL ]),
     Cmd = ["GET ", URL, " HTTP/1.1\r\n", Opts, "\r\n\r\n"],
     %% io:format("Cmd=~p\n", [Cmd]),
     %% io:format("url_server: fetching ~p ~p ~p~n", [IP, Port, URL]),
     case catch
-      % socket:client('STREAM','AF_INET',{IP,Port},{binary_packet,0})
       gen_tcp:connect(IP, Port,
        [binary, {packet, raw}, {nodelay, true}, {active, true}]) of
 	{'EXIT', Why} -> 

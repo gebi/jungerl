@@ -6,6 +6,9 @@ Simple! You just do 'make' to build all the erlang programs.
 If you want, you can add the bin/ directory to your $PATH, and use the
 useful program(s) in there!
 
+If a program is giving you trouble, just put a file called SKIP in its
+top-level directory. For example, if you want to skip the 'tuntap'
+program, do:  touch lib/tuntap/SKIP
 
 
 How to add an application to the Jungerl

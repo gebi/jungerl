@@ -1,6 +1,8 @@
 
 If you are interested in helping out implementing the full 
-X11 protocols + a toolkit on top of it, then let me know. 
+X11 protocols + some extensions (like GLX) + a toolkit on top 
+of it, then let me know. 
+
 Basically to add a new request, add a record for the 
 request/event/error in the file ex11.hrl, then add the 
 corresponding decoding and/or encoding routines in ex11_proto.erl. 

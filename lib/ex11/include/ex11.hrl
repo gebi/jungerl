@@ -21,9 +21,8 @@
 %%% AB. Portions created by Ericsson are Copyright (C), 1999, Ericsson
 %%% Telecom AB. All Rights Reserved.
 %%%
-%%% Contributor(s): ______________________________________.
+%%% Contributor(s): Vlad Dumitrescu, vlad_dumitrescu@hotmail.com.
 %%%
-%%% $Id$
 %%% ---------------------------------------------------------------------
 
 %% --------------------------------------------------

@@ -20,12 +20,13 @@
 %%% AB. Portions created by Ericsson are Copyright (C), 1999, Ericsson
 %%% Telecom AB. All Rights Reserved.
 %%%
-%%% Contributor(s): ______________________________________.
+%%% Contributor(s): Vlad Dumitrescu, vlad_dumitrescu@hotmail.com.
 %%%
 %%%
 %%% Modified: 23 Feb 1998 by tony@cslab.ericsson.se
-%%%           To make it work under Windows.
-%%%
+%%%             To make it work under Windows.
+%%%           25 Feb 2003 by Vlad Dumitrescu
+%%%             Converting to binary format
 %%%---------------------------------------------------------------------
 -export([map_window/2,create_window/2,decode_error/1,
 	 setup_connection/1,decode_refused_connection/1,

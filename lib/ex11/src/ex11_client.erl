@@ -20,12 +20,14 @@
 %%% AB. Portions created by Ericsson are Copyright (C), 1999, Ericsson
 %%% Telecom AB. All Rights Reserved.
 %%%
-%%% Contributor(s): ______________________________________.
+%%% Contributor(s): Vlad Dumitrescu, vlad_dumitrescu@hotmail.com.
 %%%
 %%%
 %%% Modified: 23 Feb 1998 by tony@cslab.ericsson.se
-%%%           To make it work under Windows. Now makes
-%%%           use of ex11_xauth:filename/0.
+%%%             To make it work under Windows. Now makes
+%%%             use of ex11_xauth:filename/0.
+%%%           25 Feb 2003 by Vlad Dumitrescu
+%%%             Converting to binary format
 %%%
 %%%---------------------------------------------------------------------
 -export([start/1,req/2,synchronize/2,flush/1,lock_display/1,unlock_display/1,

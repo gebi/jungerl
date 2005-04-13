@@ -11,9 +11,6 @@ ERLC=erlc
 ERLC_FLAGS=-W $(DEBUG)
 EMULATOR=beam
 
-#../ebin/%.$(EMULATOR): %.erl
-#	$(ERLC) $(ERLC_FLAGS) -o ../ebin $<
-#	$(ERLC) -b $(EMULATOR) $(ERLC_FLAGS) -o ../ebin $<
 
 MODULES = esmb \
 	  esmb_client \

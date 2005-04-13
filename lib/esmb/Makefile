@@ -1,4 +1,5 @@
 
+
 all:
 	(cd src;$(MAKE))
 	-(cd c_src;$(MAKE) -k)
@@ -6,4 +7,7 @@ all:
 clean:
 	(cd src;$(MAKE) clean)
 	(cd c_src;$(MAKE) clean)
+
+release: clean
+	sh ../../support/create_release.sh
 

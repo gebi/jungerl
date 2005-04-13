@@ -1,5 +1,5 @@
 {application,esmb,
- [{description,"esmb handling"},
+ [{description,"Erlang SMB Library"},
   {vsn,"%VSN%"},
   {modules,[%MODULES%]},
   {registered,[]},

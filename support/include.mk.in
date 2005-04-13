@@ -39,6 +39,17 @@ ERL_HEADERS := $(wildcard *.hrl) $(wildcard ../include/*.hrl)
 ERL_OBJECTS := $(ERL_SOURCES:%.erl=$(EBIN_DIR)/%.$(EMULATOR))
 ERL_DOCUMENTS := $(ERL_SOURCES:%.erl=$(DOC_DIR)/%.html)
 
+# Hmm, don't know if you are supposed to like this better... ;-)
+APPSCRIPT = '$$vsn=shift; $$mods=""; while(@ARGV){ $$_=shift; s/^([A-Z].*)$$/\'\''$$1\'\''/; $$mods.=", " if $$mods; $$mods .= $$_; } while(<>) { s/%VSN%/$$vsn/; s/%MODULES%/$$mods/; print; }'
+
+
+../ebin/%.app: %.app.src ../vsn.mk Makefile                 
+	perl -e $(APPSCRIPT) "$(VSN)" $(MODULES) < $< > $@  
+
+../ebin/%.appup: %.appup
+	cp $< $@
+
+
 $(EBIN_DIR)/%.$(EMULATOR): %.erl
 	$(ERLC) $(ERLC_FLAGS) -o $(EBIN_DIR) $<
 

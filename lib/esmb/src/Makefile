@@ -1,4 +1,9 @@
 
+include ../../../support/include.mk
+
+include ../vsn.mk
+VSN=$(ESMB_VSN)
+
 DEBUG=
 
 ERL=erl
@@ -6,14 +11,18 @@ ERLC=erlc
 ERLC_FLAGS=-W $(DEBUG)
 EMULATOR=beam
 
-../ebin/%.$(EMULATOR): %.erl
-	$(ERLC) $(ERLC_FLAGS) -o ../ebin $<
+#../ebin/%.$(EMULATOR): %.erl
+#	$(ERLC) $(ERLC_FLAGS) -o ../ebin $<
 #	$(ERLC) -b $(EMULATOR) $(ERLC_FLAGS) -o ../ebin $<
 
-EFILES = esmb.erl esmb_client.erl esmb_rpc.erl md4.erl iconv.erl
+MODULES = esmb \
+	  esmb_client \
+	  esmb_rpc \
+	  md4 \
+	  iconv
 
 EBIN = ../ebin
-EBIN_FILES = $(EFILES:%.erl=$(EBIN)/%.$(EMULATOR))
+EBIN_FILES = $(MODULES:%=$(EBIN)/%.$(EMULATOR)) $(EBIN)/esmb.app
 
 all: $(EBIN_FILES)
 

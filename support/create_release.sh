@@ -12,11 +12,12 @@ DIR=release/${APP}-${VSN}
 mkdir -p ${DIR}
 mkdir -p ${DIR}/ebin
 
-for i in `ls -d * | sed -e 's/release//g' -e 's/ebin//g'`
+for i in `ls -d * | sed -e 's/release//g'`
 do
   [ -d ${i} ] && cp -Rp ${i} ${DIR} && rm -rf  ${DIR}/${i}/CVS
   [ -f ${i} ] && cp -p ${i} ${DIR} 
 done
 rm -rf ${DIR}/CVS
+rm -rf ${DIR}/ebin/*.beam
 
 (cd release; tar cvzf ${APP}-${VSN}.tar.gz ${APP}-${VSN}; rm -rf ${APP}-${VSN})

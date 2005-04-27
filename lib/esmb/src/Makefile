@@ -15,6 +15,9 @@ EMULATOR=beam
 MODULES = esmb \
 	  esmb_client \
 	  esmb_rpc \
+	  esmb_browser \
+	  esmb_netbios \
+	  esmb_test \
 	  md4 \
 	  iconv
 
@@ -34,3 +37,9 @@ doc:
 
 $(DOCDIR)/%.html:%.erl
 	$(ERL) -noshell -run edoc_run file '"$<"' '[{dir,"$(DOCDIR)"}, {preprocess, true}]' -s init stop
+
+$(EBIN)/esmb_rpc.beam: esmb_lib.hrl esmb_rpc.hrl
+$(EBIN)/esmb.beam: esmb_lib.hrl esmb_rpc.hrl
+$(EBIN)/esmb_client.beam: esmb_lib.hrl esmb_rpc.hrl
+$(EBIN)/esmb_browser.beam: esmb_lib.hrl esmb_netbios.hrl
+$(EBIN)/esmb_netbios.beam: esmb_lib.hrl esmb_netbios.hrl

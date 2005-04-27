@@ -6,18 +6,7 @@
 
 -define(BYTE, integer-unit:8).    % Nice syntactic sugar...
 
-
-%%% --------------------------------------------------------------------
-%%% NetBIOS stuff
-%%% --------------------------------------------------------------------
-
-%%% NetBIOS messages
--define(SESSION_SERVICE,           16#00).
--define(SESSION_REQUEST,           16#81).
--define(POSITIVE_SESSION_RESPONSE, 16#82).
--define(NEGATIVE_SESSION_RESPONSE, 16#83).
--define(RETARGET_SESSION_RESPONSE, 16#84).
--define(SESSION_KEEP_ALIVE,        16#85).
+-define(PORT, 139).
 
 
 
@@ -53,8 +42,9 @@
 -define(SMB_FIND_FILE_DIRECTORY_INFO,      16#101).
 -define(SMB_FIND_FILE_BOTH_DIRECTORY_INFO, 16#104).
 
-%%% Subcommand codes for named pipe operations
--define(SUBCMD_TRANSACT_NM_PIPE,     16#26).
+%%% Subcommand codes for Transaction operations
+-define(SUBCMD_TRANSACT_NM_PIPE,           16#26).
+-define(SUBCMD_TRANSACT_WRITE_MAILSLOT,    1).
 
 
 %%% NT_CREATE_ANDX flags
@@ -94,6 +84,8 @@
 -define(FILE_OPEN,        16#00000001). % Open iff file exist, else fail
 -define(FILE_CREATE,      16#00000002). % Create iff file don't exist, else fail
 -define(FILE_OPEN_IF,     16#00000003). % Open iff file exist, else create
+-define(FILE_OWRITE,      16#00000004). % Overwite iff file exist, else fail
+-define(FILE_OWRITE_IF,   16#00000005). % Overwite iff file exist, else create
 
 %%% Impersonation levels 
 -define(SECURITY_ANONYMOUS,       0).
@@ -131,18 +123,24 @@
 -define(FLAGS2_SUPPORT_SIGNATURES, 16#0004).
 -define(FLAGS2_LONG_NAMES,         16#0001).
 -define(FLAGS2_ERR_STATUS,         16#0000).  % DOS Error codes
-%%%-define(FLAGS2_ERR_STATUS,  16#4000).      % NT  Error codes
+-define(FLAGS2_NT_ERR_CODES,       16#4000).  % NT  Error codes
 -define(FLAGS2_UNICODE,            16#8000).
 
 -define(FLAGS2_NO_UNICODE,     16#7111).
 -define(FLAGS2_UNSET_UNICODE(X), (X band ?FLAGS2_NO_UNICODE)).
 
--define(FLAGS2_NTLM, (?FLAGS2_LONG_NAMES bor 
+%%%
+%%% This is what we will negotiate as default.
+%%%
+-define(FLAGS2_NTLM, (?FLAGS2_LONG_NAMES bor
 		      ?FLAGS2_SUPPORT_SIGNATURES bor
 		      ?FLAGS2_UNICODE)).
 
 -define(F2_USE_UNICODE(Pdu), 
 	((Pdu#smbpdu.flags2 band ?FLAGS2_UNICODE) > 0)).
+
+-define(F2_IS_NT_ERR_CODES(Pdu), 
+	((Pdu#smbpdu.flags2 band ?FLAGS2_NT_ERR_CODES) > 0)).
 
 %%% Create a new record and copy over important stuff!
 -define(CP_PDU(R),(#smbpdu{
@@ -153,7 +151,10 @@
 		  flags2 = R#smbpdu.flags2,
                   mac_key = R#smbpdu.mac_key,
                   signatures = R#smbpdu.signatures,
-                  sign_seqno = R#smbpdu.sign_seqno})).
+                  sign_seqno = R#smbpdu.sign_seqno,
+                  samba2 = R#smbpdu.samba2,
+                  netware = R#smbpdu.netware,
+                  neg = R#smbpdu.neg})).
 
 -define(SIGN_SMB(Pdu), (Pdu#smbpdu.signatures == true)).
 
@@ -181,7 +182,10 @@
 	  mac_key,           % Encryption key used for SMB signing
 	  finfo=[],          % List of #file_info{} records
 	  emsg="",           % Internal-error msg string
-	  cont               % Continuation: F()
+	  cont,              % Continuation: F()
+	  samba2=false,      % Samba 2 == Old list share method
+	  netware=false,     % NetWare == Old list share method
+	  neg                % The #smb_negotiate_res{} record
 	 }).
 
 %%% Buffer value-tags
@@ -190,6 +194,14 @@
 -define(BUF_PATHNAME,           16#03).
 -define(BUF_FMT_ASCII,          16#04).
 -define(BUF_FMT_VARIABLE_BLOCK, 16#05).
+
+%% Character sets
+-define(CSET_UCS2,         "UCS2").
+-define(CSET_UCS2LE,       "UCS-2LE").
+-define(CSET_UTF8,         "UTF-8").
+-define(CSET_ASCII,        "ASCII").
+-define(CSET_ISO_8859_1,   "ISO-8859-1").
+-define(CSET_SJIS_WIN,     "SJIS-WIN").
 
 
 -define(HEADER_SIZE, 100).        % max_data_sent = max_buffer_size - header_size
@@ -203,7 +215,11 @@
 	  security_mode,        % PCNET_1_0 < Dialect <= LANMAN_2_1
 	  encryption_key,       % PCNET_1_0 < Dialect <= LANMAN_2_1
 	  srv_capabilities=0,
-	  max_buffer_size=?MAX_BUFFER_SIZE
+	  max_buffer_size=?MAX_BUFFER_SIZE,
+	  samba2=false,
+	  samba2_cset=?CSET_ASCII,
+	  netware=false,
+	  flags2                % copy of the flags2 field from the neg. PDU
 	  }).
 
 %%% SecurityMode flags when LANMAN is negotiated
@@ -218,6 +234,13 @@
 
 -define(USE_UNICODE(Neg),
 	((Neg#smb_negotiate_res.srv_capabilities band ?SCAP_UNICODE) > 0)).
+
+-define(DONT_USE_UNICODE(Neg), (not ?USE_UNICODE(Neg))).
+
+%%% Apparently, Netware have the Unicode capability set to zero,
+%%% but the flags2 bit indicates the use of Unicode... :-/
+-define(USE_UNICODE_ANYWAY(Neg), 
+	((Neg#smb_negotiate_res.flags2 band ?FLAGS2_UNICODE) > 0)).
 
 -define(USE_ENCRYPTION(Neg), ((Neg#smb_negotiate_res.security_mode 
 			       band ?SECMODE_CHALLENGE) > 0) ).
@@ -272,6 +295,18 @@
 	  type         % ?SHARETYPE_xxxx
 	  }).
 
+%%% Server type bit fields (see also C.Hertel's book)
+-define(SV_TYPE_ALL,           16#FFFFFFFF). % to query for all servers
+-define(SV_TYPE_DOMAIN_ENUM,   16#80000000).
+%%% ...lots of more bit fields....
+-define(SV_TYPE_SERVER,        16#00000002). % offers SMB file service
+-define(SV_TYPE_WORKSTATION,   16#00000001). 
+
+-record(server_info, {
+	  name,        % The share name
+	  type         % ?SV_TYPE_xxxx
+	  }).
+
 %%% User info
 -define(DEFAULT_WORKGROUP,  "WORKGROUP").
 -define(DEFAULT_CHARSET,    "ASCII").
@@ -281,14 +316,15 @@
 	  primary_domain = ?DEFAULT_WORKGROUP,
 	  native_os      = "Linux",
 	  native_lanman  = "esmb",
-	  charset        = ?DEFAULT_CHARSET
+	  charset        = ?DEFAULT_CHARSET,
+	  auth_domain    = ?DEFAULT_WORKGROUP,
+	  host,
+	  port           = ?PORT,
+	  share          = "",
+	  path           = "",
+	  context        = ""
 	  }).
 
--define(CSET_UCS2,         "UCS2").
--define(CSET_UCS2LE,       "UCS-2LE").
--define(CSET_UTF8,         "UTF-8").
--define(CSET_ASCII,        "ASCII").
--define(CSET_ISO_8859_1,   "ISO-8859-1").
 
 %%% File info
 -record(file_info, {
@@ -299,7 +335,9 @@
 	  resume_key,
 	  data_len = 0,  % # of bytes in data
 	  data = [],     % an I/O list
-	  offset = 0     % offset were to start file operation
+	  offset = 0,    % offset were to start file operation
+	  max_count = ?MAX_BUFFER_SIZE, % max # of bytes to return
+	  min_count = ?MAX_BUFFER_SIZE  % min # of bytes to return
 	 }).
 
 %%% Date/Time info
@@ -333,6 +371,7 @@
 -define(ERRSRV,      16#02).  % Error generated by srv netw. file manager
 -define(ERRHRD,      16#03).  % Error is hardware error
 -define(ERRCMD,      16#ff).  % Command was not in SMB format
+-define(ERRNT,       16#aa).  % Our mark for repr. NT-error codes.
 
 %%% ERRDOS error codes
 %-define(INTERNAL,    -1).    % same as above...
@@ -342,6 +381,19 @@
 -define(ERRnofids,   4).      % Too many open files
 -define(ERRnoaccess, 5).      % Access denied
 -define(ERRnoshare,  16#43).  % Share does not exist
+-define(ERRfileexist,16#50).  % File in operation already exists
+-define(ERRdirnotempty,16#91).% Directory not empty (just a guess!!)
+
+%%% ERRSRV error codes
+%-define(INTERNAL,    -1).    % same as above...
+-define(ERRSbadpw,      2).   % Bad password
+-define(ERRSaccess,     4).   % Insufficient access rights
+-define(ERRSinvtid,     5).   % Invalid TID (Transaction ID)
+-define(ERRSinvnetname, 6).   % Invalid network name in tree connect
+
+%%% ERRNT error codes
+%-define(INTERNAL,    -1).    % same as above...
+-define(ERRNTfileisdir, 16#c00000ba). % File is directory
 	
 
 %%% Gregorian second from year 0 to 1601 AD

@@ -34,12 +34,15 @@ start() ->
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
+%%open(To, From) -> {ok, ballen};
 open(To, From) ->
     gen_server:call(?SERVER, {open, l2b(To), l2b(From)}, infinity).
 
+%%conv(Cd, String) -> {ok, l2b(String)};
 conv(Cd, String) when binary(Cd) ->
     gen_server:call(?SERVER, {conv, Cd, l2b(String)}, infinity).
 
+%%close(Cd) -> ok;
 close(Cd) when binary(Cd) ->
     gen_server:call(?SERVER, {close, Cd}, infinity).
 
@@ -56,7 +59,7 @@ close(Cd) when binary(Cd) ->
 %%----------------------------------------------------------------------
 init([]) ->
     erl_ddll:start(),
-    {ok, Path} = load_path(?DRV_NAME ++ ".so"),
+    Path = code:priv_dir(esmb),
     erl_ddll:load_driver(Path, ?DRV_NAME),
     Port = open_port({spawn, ?DRV_NAME}, [binary]),
     {ok, #state{port = Port}}.

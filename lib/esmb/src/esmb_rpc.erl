@@ -268,10 +268,11 @@ rpc_netr_share_enum(S, Pdu, IpStr) ->
     UnicodeP = unicode_p(Pdu),
     SrvSvcPdu = e_rpc_netr_share_enum(UnicodeP, IpStr),
     {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SrvSvcPdu),
-    case catch d_rpc_response(RpcRes) of
-	NseRes when record(NseRes, rpc_response) ->
+    case catch d_rpc_response(S, Pdu2, RpcRes) of
+	{Pdu3, NseRes} when record(NseRes, rpc_response) ->
+	    %%?elog("+++++++ FragType=~p~n",[NseRes#rpc_response.frag_type]),
 	    case catch d_rpc_netr_share_enum(UnicodeP, NseRes) of
-		{ok, Nse} -> {ok,Nse,Pdu2};
+		{ok, Nse} -> {ok,Nse,Pdu3};
 		Else ->
 		    ?elog("d_netr_share_enum failed: ~p~n",[Else]),
 		    throw({error, "netr_share_enum"})
@@ -297,10 +298,10 @@ rpc_samr_connect(S, Pdu, IpStr) ->
     UnicodeP = unicode_p(Pdu),
     SamrPDU = e_rpc_samr_connect2(UnicodeP, IpStr),
     {ok, RpcRes, Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
-    case catch d_rpc_response(RpcRes) of
-	Resp1 when record(Resp1, rpc_response) ->
+    case catch d_rpc_response(S, Pdu2, RpcRes) of
+	{Pdu3, Resp1} when record(Resp1, rpc_response) ->
 	    case catch d_rpc_samr_connect2(UnicodeP, Resp1) of
-		{ok, CtxHandle}   -> {ok, CtxHandle, Pdu2};
+		{ok, CtxHandle}   -> {ok, CtxHandle, Pdu3};
 		{error, Rc} = Err -> throw(Err);
 		Else ->
 		    ?elog("d_samr_connect failed: ~p~n",[Else]),
@@ -325,10 +326,10 @@ rpc_samr_connect(S, Pdu, IpStr) ->
 rpc_samr_close(S, Pdu, CtxHandle) ->
     SamrPDU = e_rpc_samr_close(CtxHandle),
     {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
-    case catch d_rpc_response(RpcRes) of
-	Resp when record(Resp, rpc_response) ->
+    case catch d_rpc_response(S, Pdu2, RpcRes) of
+	{Pdu3, Resp} when record(Resp, rpc_response) ->
 	    case catch d_rpc_samr_close(Resp) of
-		ok                -> {ok, Pdu2};
+		ok                -> {ok, Pdu3};
 		{error, Rc} = Err -> throw(Err);
 		Else ->
 		    ?elog("d_samr_close failed: ~p~n",[Else]),
@@ -352,10 +353,10 @@ rpc_samr_enum_doms(S, Pdu, CtxHandle) ->
     UnicodeP = unicode_p(Pdu),
     SamrPDU = e_rpc_samr_enum_doms(UnicodeP, CtxHandle),
     {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
-    case catch d_rpc_response(RpcRes) of
-	Resp1 when record(Resp1, rpc_response) ->
+    case catch d_rpc_response(S, Pdu2, RpcRes) of
+	{Pdu3, Resp1} when record(Resp1, rpc_response) ->
 	    case d_rpc_samr_enum_doms(UnicodeP, Resp1) of
-		{ok, Doms}        -> {ok, Doms, Pdu2};
+		{ok, Doms}        -> {ok, Doms, Pdu3};
 		{error, Rc} = Err -> throw(Err);
 		Else ->
 		    ?elog("d_samr_enum_dom failed: ~p~n",[Else]),
@@ -385,10 +386,10 @@ rpc_samr_lookup_doms(S, Pdu, CtxHandle, Doms) ->
     Dom = hd(X),
     SamrPDU = e_rpc_samr_lookup_doms(UnicodeP, CtxHandle, Dom),
     {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
-    case catch d_rpc_response(RpcRes) of
-	Resp1 when record(Resp1, rpc_response) ->
+    case catch d_rpc_response(S, Pdu2, RpcRes) of
+	{Pdu3, Resp1} when record(Resp1, rpc_response) ->
 	    case d_rpc_samr_lookup_doms(UnicodeP, Resp1, Dom) of
-		{ok, Ds}          -> {ok, Ds, Pdu2};
+		{ok, Ds}          -> {ok, Ds, Pdu3};
 		{error, Rc} = Err -> throw(Err);
 		Else ->
 		    ?elog("d_samr_lookup_doms failed: ~p~n",[Else]),
@@ -412,10 +413,10 @@ rpc_samr_lookup_doms(S, Pdu, CtxHandle, Doms) ->
 rpc_samr_open_domain(S, Pdu, IpStr, CtxHandle, Domain) ->
     SamrPDU = e_rpc_samr_open_domain(CtxHandle, Domain),
     {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
-    case catch d_rpc_response(RpcRes) of
-	Resp1 when record(Resp1, rpc_response) ->
+    case catch d_rpc_response(S, Pdu2, RpcRes) of
+	{Pdu3, Resp1} when record(Resp1, rpc_response) ->
 	    case d_rpc_samr_open_domain(Resp1) of
-		{ok, CtxHandle2}  -> {ok, CtxHandle2, Pdu2};
+		{ok, CtxHandle2}  -> {ok, CtxHandle2, Pdu3};
 		{error, Rc} = Err -> throw(Err);
 		Else ->
 		    ?elog("d_samr_open_domain failed: ~p~n",[Else]),
@@ -442,10 +443,10 @@ rpc_samr_open_domain(S, Pdu, IpStr, CtxHandle, Domain) ->
 rpc_samr_lookup_names(S, Pdu, IpStr, CtxHandle, Names) ->
     SamrPDU = e_rpc_samr_lookup_names(Pdu, CtxHandle, Names),
     {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
-    case catch d_rpc_response(RpcRes) of
-	Resp1 when record(Resp1, rpc_response) ->
+    case catch d_rpc_response(S, Pdu2, RpcRes) of
+	{Pdu3, Resp1} when record(Resp1, rpc_response) ->
 	    case d_rpc_samr_lookup_names(Resp1) of
-		{ok, Rid, Type}   -> {ok, Rid, Type, Pdu2};
+		{ok, Rid, Type}   -> {ok, Rid, Type, Pdu3};
 		{error, Rc} = Err -> throw(Err);
 		Else ->
 		    ?elog("d_samr_lookup_names failed: ~p~n",[Else]),
@@ -484,10 +485,10 @@ rpc_samr_open_user(S, Pdu, IpStr, CtxHandle, Name, Rid) ->
 rpc_samr_open_user(S, Pdu, IpStr, CtxHandle, User) ->
     SamrPDU = e_rpc_samr_open_user(CtxHandle, User),
     {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
-    case catch d_rpc_response(RpcRes) of
-	Resp1 when record(Resp1, rpc_response) ->
+    case catch d_rpc_response(S, Pdu2, RpcRes) of
+	{Pdu3, Resp1} when record(Resp1, rpc_response) ->
 	    case d_rpc_samr_open_user(Resp1) of
-		{ok, CtxHandle2}  -> {ok,CtxHandle2,Pdu2};
+		{ok, CtxHandle2}  -> {ok,CtxHandle2,Pdu3};
 		{error, Rc} = Err -> throw(Err);
 		Else ->
 		    ?elog("d_samr_open_user failed: ~p~n",[Else]),
@@ -512,10 +513,10 @@ rpc_samr_open_user(S, Pdu, IpStr, CtxHandle, User) ->
 rpc_samr_user_groups(S, Pdu, IpStr, CtxHandle) ->
     SamrPDU = e_rpc_samr_user_groups(CtxHandle),
     {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
-    case catch d_rpc_response(RpcRes) of
-	Resp1 when record(Resp1, rpc_response) ->
+    case catch d_rpc_response(S, Pdu2, RpcRes) of
+	{Pdu3, Resp1} when record(Resp1, rpc_response) ->
 	    case d_rpc_samr_user_groups(Resp1) of
-		{ok, RidList}     -> {ok,RidList,Pdu2};
+		{ok, RidList}     -> {ok,RidList,Pdu3};
 		{error, Rc} = Err -> throw(Err);
 		Else ->
 		    ?elog("d_samr_user_groups failed: ~p~n",[Else]),
@@ -541,10 +542,10 @@ rpc_samr_user_groups(S, Pdu, IpStr, CtxHandle) ->
 rpc_samr_lookup_rids(S, Pdu, IpStr, CtxHandle, Ns0) ->
     SamrPDU = e_rpc_samr_lookup_rids(CtxHandle, Ns0),
     {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
-    case catch d_rpc_response(RpcRes) of
-	Resp1 when record(Resp1, rpc_response) ->
+    case catch d_rpc_response(S, Pdu2, RpcRes) of
+	{Pdu3, Resp1} when record(Resp1, rpc_response) ->
 	    case d_rpc_samr_lookup_rids(unicode_p(Pdu), Resp1, Ns0) of
-		{ok, Ns}          -> {ok,Ns,Pdu2};
+		{ok, Ns}          -> {ok,Ns,Pdu3};
 		{error, Rc} = Err -> throw(Err);
 		Else ->
 		    ?elog("d_samr_lookup_rids failed: ~p~n",[Else]),
@@ -754,7 +755,7 @@ e_samr_connect2(UnicodeP, IpStr) ->
 	  0:32/little,            % Offset for first elem in array
 	  ActualCount:32/little,
 	  UipStr/binary>>,
-    Pad = 4 - (size(B0) rem 4),
+    Pad = size(B0) rem 4,
     AccessMask = ?SAMR_ACCESS_MASK,
     <<B0/binary,
       0:Pad/?BYTE,
@@ -778,7 +779,7 @@ e_ss_netr_share_enum(UnicodeP, IpStr) when list(IpStr) ->
 	  Offset:32/little,       % Offset for first elem in array
 	  ActualCount:32/little,
 	  UipStr/binary>>,
-    Pad = 4 - (size(B0) rem 4),
+    Pad = size(B0) rem 4,
     %% Different information levels are available,
     %% representing the amount of information returned.
     %% If changing the level here, then the decode routine 
@@ -1114,6 +1115,7 @@ str_extract(UnicodeP, ActualCount, B0) ->
 str_extract2(UnicodeP, ActualCount, B0) ->
     Nchars = nchars(UnicodeP),
     Len    = ActualCount * Nchars,
+    X = Len+4,
     if ((ActualCount rem 2) == 0) ->
 	    <<S0:Len/binary,
 	     B1/binary>> = B0,
@@ -1132,13 +1134,80 @@ str_extract2(UnicodeP, ActualCount, B0) ->
 %%% Decode an RPC response
 %%%
 
-d_rpc_response(<<?RPC_VERSION, ?RPC_MINOR_VERSION, 
-		?RPC_OP_RESPONSE, B/binary>>) ->
+-define(DCE_RPC_HSIZE,  16#18).  % DCE/RPC header size in bytes
+
+d_rpc_response(S, Pdu, Packet) ->
+    frag_handler(S, Pdu, d_rpc_response_0(Packet)).
+
+frag_handler(_, Pdu, R) when R#rpc_response.frag_type == ?FRAG_LAST ->
+    %% Just one packet !
+    {Pdu, R};
+frag_handler(S, Pdu, R) when R#rpc_response.frag_type == ?FRAG_FIRST ->
+    %% First fragmented packet !
+    AllocHint = R#rpc_response.alloc_hint,
+    DataLen = R#rpc_response.frag_len - ?DCE_RPC_HSIZE,
+    Dbin = trim_binary(R#rpc_response.data, DataLen),
+    %%?elog("############### FIRST FRAG: Ahint=~p , Dlen=~p , DataLen=~p , size(Dbin)=~p~n", 
+    %%[AllocHint, DataLen, DataLen, size(Dbin)]), 
+    frag_handler(S, Pdu, R, AllocHint, DataLen, [Dbin]).
+
+frag_handler(S, Pdu, R, Ahint, Dlen, Acc) 
+  when R#rpc_response.frag_type =/= ?FRAG_LAST ->
+    ReadSize = frag_read_size(R#rpc_response.frag_len, Ahint, Dlen),
+    Finfo = #file_info{max_count = ReadSize, min_count = ReadSize},
+    {Pdu1, Packet} = read_frag(S, Pdu, Finfo),
+    R1 = d_rpc_response_0(Packet),
+    DataLen = R1#rpc_response.frag_len - ?DCE_RPC_HSIZE,
+    Dbin = trim_binary(R1#rpc_response.data, DataLen),
+    %%?elog("############### MIDDLE FRAG: Ahint=~p , Dlen=~p , DataLen=~p , size(Dbin)=~p~n", 
+    %%[Ahint, DataLen+Dlen, DataLen, size(Dbin)]),
+    frag_handler(S, Pdu1, R1, Ahint, Dlen + DataLen, [Dbin|Acc]);
+frag_handler(S, Pdu, R, Ahint, Dlen, Acc) 
+  when R#rpc_response.frag_type == ?FRAG_LAST ->
+    Data = concat_binary(lists:reverse(Acc)),
+    %%?elog("############### LAST FRAG: Ahint=~p , size(Data)=~p~n", [Ahint, size(Data)]),
+    {Pdu, R#rpc_response{frag_type    = ?FRAG_LAST,
+			 frag_len     = Ahint + ?DCE_RPC_HSIZE,
+			 alloc_hint   = Ahint,
+			 data         = Data}}.
+
+read_frag(S, Pdu, Finfo) ->
+    {Pdu1, Bin} = esmb:smb_read_andx_pdu(Pdu, Finfo),
+    case esmb:decode_smb_response(Pdu1, esmb:nbss_session_service(S, Bin)) of
+	{ok, Pdu2, Packet} -> 
+	    {Pdu2, Packet};
+	_ ->
+	    throw({error, Pdu1#smbpdu{eclass = ?INTERNAL, 
+				      emsg   = "read_frag/3"}})
+    end.
+
+trim_binary(Bin, Size) when size(Bin) > Size -> 
+    element(1, split_binary(Bin, Size));
+trim_binary(Bin, _) -> 
+    Bin.
+
+
+%%%
+%%% How much data should we ask for ?
+%%% For now we assume that the FragLen that we have got
+%%% is an upper bound on what we can ask for.
+%%% It is (apparently) important however to not ask for
+%%% more than what could be expected.
+%%%
+frag_read_size(FragLen, Ahint, Dlen) ->
+    Expected = Ahint - Dlen,
+    PacketSize = Expected + ?DCE_RPC_HSIZE,
+    if (PacketSize > FragLen) -> FragLen;
+       true                   -> PacketSize
+    end.
+
+d_rpc_response_0(<<?RPC_VERSION, ?RPC_MINOR_VERSION, 
+		  ?RPC_OP_RESPONSE, B/binary>>) ->
     d_rpc_response_1(B);
-d_rpc_response(<<?RPC_VERSION, ?RPC_MINOR_VERSION, 
-		?RPC_OP_FAULT, B/binary>>) ->
+d_rpc_response_0(<<?RPC_VERSION, ?RPC_MINOR_VERSION, 
+		  ?RPC_OP_FAULT, B/binary>>) ->
     d_rpc_fault(B);
-d_rpc_response(<<RPC_VERSION, RPC_MINOR_VERSION, OP, _/binary>>) ->
+d_rpc_response_0(<<RPC_VERSION, RPC_MINOR_VERSION, OP, _/binary>>) ->
     ?elog("d_rpc_response got unknown Op: ~p~n",[OP]),
     throw({error,"unknown_op"}).
 
@@ -1159,14 +1228,17 @@ d_rpc_response_1(Resp) ->
      CancelCount,
      _,                        % reserved
      Bin/binary>> = Resp,
-    #rpc_response{frag_len     = FragLength,
+    #rpc_response{frag_type    = frag_type(PacketFlags),
+		  frag_len     = FragLength,
 		  alloc_hint   = AllocHint,
 		  call_id      = Call_ID,
 		  ctx_id       = Context_ID,
 		  cancel_count = CancelCount,
 		  data         = Bin}.
 
-
+frag_type(PF) when ?IS_FRAG_LAST(PF)  -> ?FRAG_LAST;
+frag_type(PF) when ?IS_FRAG_FIRST(PF) -> ?FRAG_FIRST;
+frag_type(_)                          -> ?FRAG_PART.
     
            
 

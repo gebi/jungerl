@@ -80,7 +80,7 @@
 %%% $Id$
 %%% --------------------------------------------------------------------
 -module(esmb).
--export([called_name/1, calling_name/1, ucase/1, lcase/1, check_dir/3,
+-export([ucase/1, lcase/1, check_dir/3, bin2ip/1,
 	 connect/1, connect/2, connect/3, close/1, error_p/1,
 	 user_logon/3, user_logon/4, emsg/3, get_user_groups/4,
 	 tree_connect/4, tree_connect_ipc/4, tree_connect/5, 
@@ -89,18 +89,26 @@
 	 read_file/3, mkdir/3, rmdir/3, is_ok/2, unicode_p/1,
 	 astart/0, istart/0, ustart/0, start/0, to_ucs2_and_null/2,
 	 client/2, aclient/2, iclient/2, uclient/2, to_ucs2/2,
-	 close_file/2, close_file/3, write_file/4, hexprint/1, b2l/1,
+	 close_file/2, close_file/3, write_file/4, write_file/3, 
+	 hexprint/1, b2l/1, do_ls/3, mailslot_browse_transaction/2,
 	 delete_file/3, caller/0, named_pipe_transaction/4,
-	 named_pipe_transaction/3, ucs2_to_ascii/1,
-	 exit_if_error/2, list_shares/3, list_shares/5,
-	 list_shares_old/3, list_shares_old/5, l/3]).
+	 named_pipe_transaction/3, ucs2_to_ascii/1, ip2bin/1,
+	 exit_if_error/2, list_shares/3, list_shares/5, 
+	 dec_transaction_req/2, list_server_rap/3,
+	 list_shares_old/3, list_shares_old/5, l/3, parse_uri/1,
+	 smb_read_andx_pdu/2, decode_smb_response/2]).
 
--export([mac_test/0,mac_test2/1,nt_key_test/2]).
+-export([b2l/1, ip2bin/1, ip2str/1, lcase/1, sizeof/1]).
+
+-export([mac_test/0,mac_test2/1,nt_key_test/2,lm_key_test/2]).
+
+-import(esmb_netbios, [called_name/1, calling_name/1, nbss_session_request/3,
+		       nbss_session_service/2, nbss_datagram_service/2]).
+
 
 -include("esmb_lib.hrl").
 -include("esmb_rpc.hrl").
 
--define(PORT, 139).
 
 
 -define(sdbg(S,A), true).
@@ -158,7 +166,84 @@ aclient(Path, User) -> esmb_client:astart(Path, User).
 iclient(Path, User) -> esmb_client:istart(Path, User).
 %%% @hidden
 uclient(Path, User) -> esmb_client:ustart(Path, User).
+
 	    
+%%%
+%%% SMB URI's "according" to: draft-crhertel-smb-url-08.txt
+%%% Or rather:
+%%%
+%%%  smb://[[[authdomain;]user@]host[:port]/[share/[path/][file]][?context]
+%%%
+parse_uri("smb://" ++ T) ->
+    catch parse_uri(T, #user{}).
+
+parse_uri(Str, U) ->
+    case parse_uri_part(Str) of
+	{Tok, $;, Rest} ->
+	    parse_uri(Rest, U#user{auth_domain = Tok});
+	{Tok, $@, Rest} ->
+	    parse_uri(Rest, U#user{name = Tok});
+	{Tok, $:, Rest} ->
+	    parse_port(Rest, U#user{host = Tok});
+	{Tok, $/, Rest} ->
+	    parse_share(Rest, U#user{host = Tok});
+	Host ->
+	    U#user{host = Host}
+    end.
+
+parse_uri_part(Str) ->
+    parse_uri_part(Str, []).
+
+parse_uri_part([$;|T], Acc) ->
+    {lists:reverse(Acc), $;, T};
+parse_uri_part([$@|T], Acc) ->
+    {lists:reverse(Acc), $@, T};
+parse_uri_part([$:|T], Acc) ->
+    {lists:reverse(Acc), $:, T};
+parse_uri_part([$/|T], Acc) ->
+    {lists:reverse(Acc), $/, T};
+parse_uri_part([H|T], Acc) ->
+    parse_uri_part(T, [H|Acc]);
+parse_uri_part([], Acc) ->
+    lists:reverse(Acc).
+
+parse_port(Str, U) ->
+    parse_port(Str, U, []).
+
+parse_port([$/|T], U, Acc) ->
+    parse_share(T, U#user{port = l2i_x(lists:reverse(Acc))});
+parse_port([H|T], U, Acc) ->
+    parse_port(T, U, [H|Acc]);
+parse_port([], U, Acc) ->
+    U#user{port = l2i_x(lists:reverse(Acc))}.
+
+parse_share(Str, U) ->
+    parse_share(Str, U, []).
+
+parse_share([$/|T], U, Acc) ->
+    parse_path(T, U#user{share = lists:reverse(Acc)});
+parse_share([H|T], U, Acc) ->
+    parse_share(T, U, [H|Acc]);
+parse_share([], U, Acc) ->
+    U#user{share = lists:reverse(Acc)}.
+
+parse_path(Str, U) ->
+    parse_path(Str, U, []).
+
+parse_path([$?|T], U, Acc) ->
+    U#user{path = lists:reverse(Acc), context = T};
+parse_path([H|T], U, Acc) ->
+    parse_path(T, U, [H|Acc]);
+parse_path([], U, Acc) ->
+    U#user{path = lists:reverse(Acc)}.
+
+
+l2i_x(Str) ->
+    case catch list_to_integer(Str) of
+	I when integer(I) -> I;
+	_ -> throw({error, "Port is not an integer value"})
+    end.
+
 
 %%%---------------------------------------------------------------------
 %%% Holy cow ! It turns out ugly already from the beginning.
@@ -228,8 +313,10 @@ list_shares(Host, User, Passwd) ->
 %%%
 list_shares(Host0, User, Passwd, Workgroup, SockOpts) ->
     case catch list_shares0(Host0, User, Passwd, Workgroup, SockOpts) of
-	{'EXIT', _Reason} -> {error, "list_shares internal"};
-	Else              -> Else
+	{'EXIT', Reason} -> 
+	    {error, "list_shares internal"};
+	Else -> 
+	    Else
     end.
 
 list_shares0(Host0, User, Passwd, Workgroup, SockOpts) ->
@@ -239,16 +326,49 @@ list_shares0(Host0, User, Passwd, Workgroup, SockOpts) ->
 	    U = #user{pw = Passwd, name = User, primary_domain = Workgroup},
 	    Pdu0 = user_logon(S, Neg, U),
 	    exit_if_error(Pdu0, "Login failed"),
-	    IPC = "\\\\"++Host++"\\IPC"++[$$],
-	    Path1 = to_ucs2(unicode_p(Neg), IPC),
-	    Pdu1 = tree_connect(S, Neg, Pdu0, Path1, ?SERVICE_NAMED_PIPE),
-	    exit_if_error(Pdu1, "Tree connect failed"),
-	    Res = (catch do_list_shares(S, Pdu1, Host)),
-	    close(S),
-	    Res;
+	    if (Pdu0#smbpdu.samba2 == true) or (Pdu0#smbpdu.netware == true) ->
+		    %% Samba-2 and NetWare doesn't support DCE/RPC !!
+		    %% Do it the old way...
+		    esmb:close(S),
+		    list_shares_old(Host, User, Passwd, Workgroup, SockOpts);
+	       true ->
+		    IPC = "\\\\"++Host++"\\IPC"++[$$],
+		    Path1 = to_ucs2(unicode_p(Neg), IPC),
+		    Pdu1 = tree_connect(S, Neg, Pdu0, Path1, 
+					?SERVICE_NAMED_PIPE),
+		    exit_if_error(Pdu1, "Tree connect failed"),
+		    Res = (catch do_list_shares(S, Pdu1, Host)),
+		    close(S),
+		    Res
+	    end;
 	Else ->
 	    Else
     end.
+
+%%% Debug function
+do_ls(S, Pdu, Host) ->
+    if (Pdu#smbpdu.samba2 == true) or (Pdu#smbpdu.netware == true) ->
+	    {Req, Pdu1} = smb_list_shares_pdu(Pdu),
+	    decode_list_shares_response(Req, nbss_session_service(S, Pdu1));
+       true ->
+	    do_list_shares(S, Pdu, Host)
+    end.
+
+
+do_list_shares(S, Pdu, Host) ->
+    {ok,Pdu1} = esmb_rpc:open_srvsvc_pipe(S, Pdu),
+    exit_if_error(Pdu1, "Open file, failed"),
+    %%
+    {ok,Pdu2} = esmb_rpc:rpc_bind(S, Pdu1, ?ST_SRVSVC),
+    {ok,Nse,Pdu3} = esmb_rpc:rpc_netr_share_enum(S, Pdu2, Host),
+    Pdu4 = close_file(S, Pdu3, Pdu1#smbpdu.fid),
+    F = fun(E) -> 
+		#share_info{name = ucs2_to_ascii(E#nse_entry.name),
+			    type = E#nse_entry.type}
+	end,
+    XX = lists:map(F,Nse),
+    {ok, XX}.
+
 
 %%%
 %%% The old (LANMAN RPC) way of doing it !
@@ -277,15 +397,16 @@ list_shares_old(Host, User, Passwd) ->
 %%%      to the ''gen_tcp:connect/3'' function.
 %%% @end
 %%%
-list_shares_old(Host, User, Passwd, Workgroup, SockOpts) ->
+list_shares_old(Host0, User, Passwd, Workgroup, SockOpts) ->
+    Host = h2s(Host0),
     case connect(Host, SockOpts) of
 	{ok,S,Neg} ->
 	    U = #user{pw = Passwd, name = User, primary_domain = Workgroup},
 	    Pdu0 = user_logon(S, Neg, U),
 	    exit_if_error(Pdu0, "Login failed"),
-	    %%Path = "\\\\*SMBSERVER\\IPC" ++ [$$], % make the Emacs mode happy...
-	    Path = "\\\\" ++ h2s(Host) ++ "\\IPC" ++ [$$], % make the Emacs mode happy...
-	    Pdu1 = tree_connect(S, Neg, Pdu0, ipc_path(Neg, Path), ?SERVICE_ANY_TYPE),
+	    Path = "\\\\"++Host++"\\IPC" ++ [$$], 
+	    Path1 = to_ucs2(unicode_p(Neg), Path),
+	    Pdu1 = tree_connect(S, Neg, Pdu0, Path1, ?SERVICE_ANY_TYPE),
 	    exit_if_error(Pdu1, "Tree connect failed"),
 	    {Req, Pdu2} = smb_list_shares_pdu(Pdu1),
 	    decode_list_shares_response(Req, nbss_session_service(S, Pdu2));
@@ -293,33 +414,11 @@ list_shares_old(Host, User, Passwd, Workgroup, SockOpts) ->
 	    Else
     end.
 
-do_list_shares(S, Pdu, Host) ->
-    {ok,Pdu1} = esmb_rpc:open_srvsvc_pipe(S, Pdu),
-    exit_if_error(Pdu1, "Open file, failed"),
-    %%
-    {ok,Pdu2} = esmb_rpc:rpc_bind(S, Pdu1, ?ST_SRVSVC),
-    {ok,Nse,Pdu3} = esmb_rpc:rpc_netr_share_enum(S, Pdu2, Host),
-    {ok,Pdu4} = close_file(S, Pdu3, Pdu1#smbpdu.fid),
-    F = fun(E) -> 
-		#share_info{name = ucs2_to_ascii(E#nse_entry.name),
-			    type = E#nse_entry.type}
-	end,
-    XX = lists:map(F,Nse),
-    {ok, XX}.
 
 h2s({A,B,C,D}) -> 
     lists:flatten(io_lib:format("~w.~w.~w.~w", [A,B,C,D]));
 h2s(Host) when list(Host) -> 
     Host.
-
-ipc_path(Neg, Path) when ?USE_UNICODE(Neg) ->    
-    {ok, Cd}    = iconv:open(?CSET_UCS2, ?CSET_ASCII),
-    {ok, Upath} = iconv:conv(Cd, Path),
-    iconv:close(Cd),
-    Upath;
-ipc_path(_Neg, Path) ->    
-    Path.
-
 
 decode_list_shares_response(Req, {ok, _, ResPdu}) ->
     Res = safe_dec_smb(Req, ResPdu), % NB: may throw(Pdu)
@@ -334,12 +433,21 @@ decode_list_shares_response(Req, {ok, _, ResPdu}) ->
      DataDisplacement:16/little,
      SetupCount,
     _/binary>> = Res#smbpdu.wp,
-    <<_,                      % what is this ?
-     Status:16/little,        % success(0), access_denied(5)
-     Convert:16/little,       
-     EntryCount:16/little,    % # of entries returned
-     AvailEntries:16/little,  % # of available entries
-     Entries/binary>> = Res#smbpdu.bf,
+    if (Res#smbpdu.netware == true) ->
+	    <<Status:16/little,       % success(0), access_denied(5)
+	     Convert:16/little,       
+	     EntryCount:16/little,    % # of entries returned
+	     AvailEntries:16/little,  % # of available entries
+	     _:16,                    % what the f*uck is this ??
+	     Entries/binary>> = Res#smbpdu.bf;
+       true ->
+	    <<_,                      % what the f*uck is this ??
+	     Status:16/little,        % success(0), access_denied(5)
+	     Convert:16/little,       
+	     EntryCount:16/little,    % # of entries returned
+	     AvailEntries:16/little,  % # of available entries
+	     Entries/binary>> = Res#smbpdu.bf
+    end,
     if (Status == ?SUCCESS) ->
 	    warning(EntryCount, AvailEntries, 
 		    "<Warning>: Buffer too small to fit all entries !"),
@@ -369,6 +477,87 @@ warning(X,X,_) -> true;
 warning(_,_,S) -> io:format("~s~n", [S]).
 
 
+%%% ---
+
+decode_list_servers_response(Req, {ok, _, ResPdu}) ->
+    Res = safe_dec_smb(Req, ResPdu), % NB: may throw(Pdu)
+    <<TotParamCount:16/little,
+     TotDataCount:16/little,
+     0:16/little,
+     ParamCount:16/little,
+     ParamOffset:16/little,
+     ParamDisplacement:16/little,
+     DataCount:16/little,
+     DataOffset:16/little,
+     DataDisplacement:16/little,
+     SetupCount,
+    _/binary>> = Res#smbpdu.wp,
+    if (Res#smbpdu.netware == true) ->
+	    <<Status:16/little,       % success(0), access_denied(5)
+	     Convert:16/little,       
+	     EntryCount:16/little,    % # of entries returned
+	     AvailEntries:16/little,  % # of available entries
+	     _:16,                    % what the f*ck is this ??
+	     Entries/binary>> = Res#smbpdu.bf;
+       true ->
+	    <<_,                      % what the f*ck is this ??
+	     Status:16/little,        % success(0), access_denied(5)
+	     Convert:16/little,       
+	     EntryCount:16/little,    % # of entries returned
+	     AvailEntries:16/little,  % # of available entries
+	     Entries/binary>> = Res#smbpdu.bf
+    end,
+    if (Status == ?SUCCESS) ->
+	    warning(EntryCount, AvailEntries, 
+		    "<Warning>: Buffer too small to fit all entries !"),
+	    {ok, parse_srv_entries(EntryCount, Entries)};
+       true ->
+	    {error, "list servers"}
+    end.
+
+%%%
+%%% FIXME , we ignore the comment strings for now...
+%%%
+parse_srv_entries(0, _) -> 
+    [];
+parse_srv_entries(N, <<ServerName:16/binary,
+		      OsMajorVers,
+		      OsMinorVers,
+		      ServerType:32/little,
+		      _CharPtr:4/binary,
+		      Rest/binary>>) -> 
+    [#server_info{name = rm_trailing_nulls(b2l(ServerName)),
+		  type = ServerType}|
+     parse_srv_entries(N-1, Rest)].
+
+
+
+%%% @spec list_server_rap(Host::hostip(), Wgrp::string(),
+%%%                       SockOpts::list()) ->
+%%%            {ok, Servers::servers()} | {error, Emsg::string()}
+%%%
+%%% @doc 
+%%% @end
+%%%
+list_server_rap(Host0, Workgroup, SockOpts) ->
+    Host = h2s(Host0),
+    case connect(Host, SockOpts) of
+	{ok,S,Neg0} ->
+	    Neg = Neg0#smb_negotiate_res{security_mode = 0},
+	    U = #user{pw = "", name = "", primary_domain = Workgroup},
+	    Pdu0 = user_logon(S, Neg, U),
+	    exit_if_error(Pdu0, "Login failed"),
+	    Path = "\\\\"++Host++"\\IPC" ++ [$$], 
+	    Path1 = to_ucs2(unicode_p(Neg), Path),
+	    Pdu1 = tree_connect(S, Neg, Pdu0, Path1, ?SERVICE_ANY_TYPE),
+	    exit_if_error(Pdu1, "Tree connect failed"),
+	    {Req, Pdu2} = smb_list_servers_pdu(Pdu1, Workgroup),
+	    decode_list_servers_response(Req, nbss_session_service(S, Pdu2));
+	Else ->
+	    Else
+    end.
+
+
 %%% 
 %%% Get User Groups
 %%%
@@ -395,7 +584,7 @@ gugs(S, Pdu0, User, IpStr) ->
     {ok,Pdu1} = esmb_rpc:open_samr_pipe(S, Pdu0),
     {ok,Pdu2} = esmb_rpc:rpc_bind(S, Pdu1, ?ST_SAMR),
     {ok,Res,Pdu3} = do_gugs(S, Pdu2, User, IpStr),
-    {ok,Pdu4} = esmb:close_file(S, Pdu3, Pdu1#smbpdu.fid),
+    Pdu4 = esmb:close_file(S, Pdu3, Pdu1#smbpdu.fid),
     {ok,Res,Pdu4}.
 
 do_gugs(S, Pdu0, User, IpStr) ->
@@ -430,8 +619,79 @@ names(E) ->
     names([E]).
 
 
+%%% 
+%%% Mailslot Browse Transaction
+%%% 
+%%%
+%%% @spec mailslot_browse_transaction(Dgm::netbios_dgm(), InReq::pdu(), Rpc::binary()) -> 
+%%%                  {ok, binary(), pdu()} | exception()
+%%%
+%%% @doc This function takes an DCE/RPC packet (<em>RPC</em>), which
+%%%      conforms to the <em>Win32 Mailslot Browse</em> protocol
+%%%      and transmits it, embedded in an SMB-Transaction message,
+%%%      over a NetBIOS-DGM UDP socket.
+%%% @end
+%%%
+mailslot_browse_transaction(Dgm, Rpc) when binary(Rpc) ->
+    Pipe = "\\MAILSLOT\\BROWSE",
+    Path = to_ucs2_and_null(false, Pipe),  % Don't use Unicode
+    mailslot_browse_transaction(Dgm, Rpc, Path).
+
+%%% @private
+mailslot_browse_transaction(Dgm, Rpc, PipeName) 
+  when binary(PipeName), binary(Rpc) ->
+    {_Req, Pdu} = smb_mailslot_browse_transaction(PipeName, Rpc),
+    nbss_datagram_service(Dgm, Pdu).
 
 
+smb_mailslot_browse_transaction(PipeName, Rpc) ->
+    {Wc,Wp} = wp_mailslot_browse(size(PipeName), size(Rpc)),
+    Bf = bf_mailslot_browse(PipeName),
+    Rec = #smbpdu{
+      cmd = ?SMB_COM_TRANSACTION,
+      wc  = Wc,
+      wp  = Wp,
+      bc  = size(Bf) + size(Rpc),
+      bf  = Bf},
+    enc_smb(Rec, Rpc).
+
+wp_mailslot_browse(NameLen, DataSize) ->
+    %% How to compute the offset values (no.of bytes):
+    %% ParamOffset = ?SMB_HEADER_LEN + ThisLen + WordCount + ByteCount + Pad + length(TransName)
+    %%             = ?SMB_HEADER_LEN + 1 + 16*2 + 3 + 1 + NameLen
+    %%             = ?SMB_HEADER_LEN + 37 + NameLen
+    %%
+    ParamOffset = ?SMB_HEADER_LEN + 37 + NameLen,
+    ParamLen    = 0, 
+    DataOffset  = ParamOffset + ParamLen,
+    ParamCount  = DataOffset - ParamOffset,
+    {17,                         % WordCount = 14+3
+     <<ParamCount:16/little,     % Total parameter bytes sent
+      DataSize:16/little,        % Total data bytes sent
+      0:16/little,               % Max parameter bytes to return
+      ?MAX_BUFFER_SIZE:16/little,% Max data bytes to return
+      0,                         % Max setup words to return
+      0,                         % reserved
+      0:16/little,               % Flags
+      1000:32/little,            % timeout = 1000 mSec = 1 Sec
+      0:16/little,               % reserved2
+      ParamLen:16/little,        % Parameter bytes sent this buffer
+      ParamOffset:16/little,     % Offset (from header start) to parameters
+      DataSize:16/little,        % Data bytes sent this buffer
+      DataOffset:16/little,      % Offset (from header start) to data
+      3,                         % Count of setup words
+      0,                         % reserved3 (pad above to word boundary)
+      ?SUBCMD_TRANSACT_WRITE_MAILSLOT:16/little,
+      1:16/little,               % Priority
+      2:16/little                % Class == Unreliable & Broadcast
+      >>}.
+
+bf_mailslot_browse(PipeName) ->
+    list_to_binary([PipeName    % Name of transaction
+		    ]).
+
+
+%%% ---------------------
 %%% 
 %%% Named Pipe Transaction
 %%% 
@@ -503,8 +763,6 @@ bf_named_pipe(PipeName) ->
 		    ]).
 
 
-
-
 %%% ---------------------
 
 smb_list_shares_pdu(InReq) ->
@@ -557,6 +815,61 @@ bf_list_shares(TransName) ->
 		    "B13BWz",0,  % Return Descriptor
 		    <<1:16/little>>, % Detail level
 		    <<?MAX_BUFFER_SIZE:16/little>> % Receive buffer size
+		    ]).
+
+
+%%% ---------------------
+
+smb_list_servers_pdu(InReq, Workgroup) ->
+    {Wc,Wp} = wp_list_servers(sizeof(Workgroup)),
+    Bf = bf_list_servers("\\PIPE\\LANMAN", Workgroup),
+    Rec = ?CP_PDU(InReq)#smbpdu{
+		   cmd = ?SMB_COM_TRANSACTION,
+		   wc  = Wc,
+		   wp  = Wp,
+		   bc  = size(Bf),
+		   bf  = Bf},
+    enc_smb(Rec).
+
+wp_list_servers(WgrpLen) ->
+    %% How to compute the offset values (no.of bytes):
+    %% ParamOffset = ?SMB_HEADER_LEN + ThisLen + WordCount + ByteCount + length(TransName) + NullByte
+    %%             = ?SMB_HEADER_LEN + 1 + 14*2 + 2 + 12 + 1
+    %%             = ?SMB_HEADER_LEN + 44
+    %% ParamLen    = <Length of the Lanman RAP block below>
+    %% DataOffset  = ParamOffset + ParamLen + NullByte
+    %%             = ParamOffset + ParamLen
+    ParamOffset = ?SMB_HEADER_LEN + 44,
+    ParamCount  = ParamLen = 27 + WgrpLen,
+    DataOffset  = ParamOffset + ParamLen,
+    {14,                         % WordCount = 14
+     <<ParamCount:16/little,     % Total parameter bytes sent
+      0:16/little,               % Total data bytes sent
+      10:16/little,              % Max parameter bytes to return
+      ?MAX_BUFFER_SIZE:16/little,% Max data bytes to return
+      0,                         % Max setup words to return
+      0,                         % reserved
+      0:16/little,               % Flags
+      0:32/little,               % timeout , 0 = return immediately
+      0:16/little,               % reserved2
+      ParamCount:16/little,      % Parameter bytes sent this buffer
+      ParamOffset:16/little,     % Offset (from header start) to parameters
+      0:16/little,               % Data bytes sent this buffer
+      DataOffset:16/little,      % Offset (from header start) to data
+      0,                         % Count of setup words
+      0                          % reserved3 (pad above to word boundary)
+      >>}.
+
+bf_list_servers(TransName, Workgroup) ->
+    list_to_binary([TransName,0, % Name of transaction
+		    %% --- Start of Parameter Block (19 bytes) ---
+		    <<16#0068:16/little>>,% Function Code: NetServerEnum2
+		    "WrLehDz",0,   % Parameter Descriptor
+		    "B16BBDz",0,   % Return Descriptor
+		    <<1:16/little>>, % Detail level
+		    <<?MAX_BUFFER_SIZE:16/little>>, % Receive buffer size
+		    <<?SV_TYPE_ALL:32/little>>, % ServerType
+		    Workgroup,0    % Name of Wgrp to list
 		    ]).
 
 
@@ -621,6 +934,9 @@ close(S) ->
 %%%      {@link open_file_rw/3}. Returns the number of bytes written.
 %%% @end
 %%%
+write_file(S, InReq, Finfo) ->
+    write_file(S, InReq#smbpdu.neg, InReq, Finfo).
+
 write_file(S, Neg, InReq, Finfo) ->
     write_file(S, Neg, InReq, Finfo, list_to_binary(Finfo#file_info.data), 0).
 
@@ -738,6 +1054,7 @@ trim_binary(Bin, _) ->
 open_file_ro(S, InReq, Path) ->
     {Req, Pdu} = smb_open_file_ro_pdu(InReq, Path),
     decode_smb_response(Req, nbss_session_service(S, Pdu)).
+	
 
 %%%
 %%% @spec open_file_rw(S::socket(), InReq::pdu(), 
@@ -941,7 +1258,7 @@ user_logon(S, Neg, User, Passwd) ->
 %%% @private
 user_logon(S, Neg, U) ->
     {Req, Pdu} = smb_session_setup_andx_pdu(Neg, U),
-    decode_smb_response(Req, nbss_session_service(S, Pdu)).
+    decode_smb_response(Req#smbpdu{neg = Neg}, nbss_session_service(S, Pdu)).
 
 
 dbg_smb(What, Res) ->
@@ -970,34 +1287,37 @@ dbg_smb(What, Res) ->
 -define(SUB_CMD(Req, SubCmd), (Req#smbpdu.sub_cmd == SubCmd) ).
 
 decode_smb_response(Req, {ok, _, ResPdu}) when  ?IS(Req, ?SMB_NEGOTIATE) ->
-    Res = dec_smb(Req, ResPdu),
+    Res = safe_dec_smb(Req, ResPdu),
     <<Di:16/little, B/binary>> = Res#smbpdu.wp,
     case Di of
 	?PCNET_1_0 ->
-	    #smb_negotiate_res{dialect_index = Di};
+	    #smb_negotiate_res{dialect_index = Di,
+			       flags2 = Res#smbpdu.flags2};
 	?LANMAN_1_0 ->
 	    crypto:start(),
 	    lanman_neg_resp(B, Res#smbpdu.bf, 
-			    #smb_negotiate_res{dialect_index = Di});
+			    #smb_negotiate_res{dialect_index = Di,
+					       flags2 = Res#smbpdu.flags2});
 	?NT_LM_0_12 ->
 	    crypto:start(),
 	    ntlm_neg_resp(B, Res#smbpdu.bf, 
-			  #smb_negotiate_res{dialect_index = Di});
+			  #smb_negotiate_res{dialect_index = Di,
+					     flags2 = Res#smbpdu.flags2});
 	_ ->
 	    exit(nyi)
     end;
 decode_smb_response(Req, {ok, _, ResPdu}) when  ?IS(Req, ?SMB_SESSION_SETUP_ANDX) ->
-    dec_smb(Req, ResPdu);
+    dec_session_setup_andx(Req, ResPdu);
 decode_smb_response(Req, {ok, _, ResPdu}) when  ?IS(Req, ?SMB_TREE_CONNECT_ANDX) ->
-    dec_smb(Req, ResPdu);
+    safe_dec_smb(Req, ResPdu);
 decode_smb_response(Req, {ok, _, ResPdu}) when  ?IS(Req, ?SMB_CHECK_DIRECTORY) ->
-    dec_smb(Req, ResPdu);
+    safe_dec_smb(Req, ResPdu);
 decode_smb_response(Req, {ok, _, ResPdu}) when  ?IS(Req, ?SMB_DELETE_DIRECTORY) ->
-    dec_smb(Req, ResPdu);
+    safe_dec_smb(Req, ResPdu);
 decode_smb_response(Req, {ok, _, ResPdu}) when  ?IS(Req, ?SMB_DELETE) ->
-    dec_smb(Req, ResPdu);
+    safe_dec_smb(Req, ResPdu);
 decode_smb_response(Req, {ok, _, ResPdu}) when  ?IS(Req, ?SMB_CLOSE) ->
-    dec_smb(Req, ResPdu);
+    safe_dec_smb(Req, ResPdu);
 decode_smb_response(Req, {ok, _, ResPdu}) when  ?IS(Req, ?SMB_NT_CREATE_ANDX) ->
     dec_nt_create_andx(Req, ResPdu);
 decode_smb_response(Req, {ok, _, ResPdu}) when  ?IS(Req, ?SMB_READ_ANDX) ->
@@ -1058,79 +1378,108 @@ ntlm_neg_resp(<<SecurityMode,
 %%% ---
 
 dec_write_andx(Req, Pdu) -> 
-    Res = dec_smb(Req, Pdu),   
+    Res = safe_dec_smb(Req, Pdu),   
     <<?NoAndxCmd,              
-    0,                         % reserved
-    _:2/binary,                % offset to next command WC
-    Count:16/little,           % Number of bytes written
-    _:2/binary,                % Remaining (reserved)
-    _:4/binary,                % reserved
-    _/binary>> = Res#smbpdu.wp,
+     _,                         % reserved
+     _:2/binary,                % offset to next command WC
+     Count:16/little,           % Number of bytes written
+     _:2/binary,                % Remaining (reserved)
+     _:4/binary,                % reserved
+     _/binary>> = Res#smbpdu.wp,
     {ok, Count, Res}.
     
 
 %%% ---
 
 dec_read_andx(Req, Pdu) -> 
-    Res = dec_smb(Req, Pdu),   
+    Res = safe_dec_smb(Req, Pdu),   
     <<?NoAndxCmd,              
-    0,                         % reserved
-    _:2/binary,                % offset to next command WC
-    _:2/binary,                % Remaining (reserved) must be -1
-    DcompactMode:16/little,    % ???
-    0:16/little,               % reserved
-    DataLength:16/little,      % Number of data bytes
-    DataOffset:16/little,      % Offset (from header start) to data
-    _:2/binary,                % High 16 bits of number of data bytes if
-                               % CAP_LARGE_READEX; else zero
-    _/binary>> = Res#smbpdu.wp,
+     0,                         % reserved
+     _:2/binary,                % offset to next command WC
+     _:2/binary,                % Remaining (reserved) must be -1
+     DcompactMode:16/little,    % ???
+     0:16/little,               % reserved
+     DataLength:16/little,      % Number of data bytes
+     DataOffset:16/little,      % Offset (from header start) to data
+     _:2/binary,                % High 16 bits of number of data bytes if
+				% CAP_LARGE_READEX; else zero
+     _/binary>> = Res#smbpdu.wp,
     <<_:DataOffset/binary,Data:DataLength/binary, _/binary>> = Pdu,
     {ok, Res, Data}.
     
 
 %%% ---
 
-dec_nt_create_andx(Req, Pdu) -> 
-    Res = dec_smb(Req, Pdu),
-    exit_if_error(Res, "dec_nt_create_andx"),
-    <<?NoAndxCmd,              
-    0,                         % reserved
-    _:2/binary,                % offset to next command WC
-    OpLockLevel,               % The oplock level granted
-    Fid:16/little,             % The file ID
-    CreateAction:32/little,    % The action taken (1 = file opened)
-    CreationTime:8/binary,     % When file was created
-    LastAccessTime:8/binary,   % When file was accessed
-    LastWriteTime:8/binary,    % When file was last written
-    ChangeTime:8/binary,       % When file was last changed
-    _:4/binary,                % The file attributes
-    _:8/binary,                % Allocation size
-    EOF:8/binary,              % The file size 
-    FileType:16/little,        % 0 = Disk file or directory
-    _:2/binary,                % State of IPC device (e.g pipe)
-    Directory,                 % Boolean (0 = Not a directory)
-    _/binary>> = Res#smbpdu.wp,
-    %% NB: The TIME comes in units of 100 nano seconds !!
-    %% Gsec = (CreationTime div 10000000) + ?GREG_SEC_0_TO_1601,
-    %% GDT = calendar:gregorian_seconds_to_datetime(Gsec),
-    %% io:format("CREATION TIME: ~w~n", [GDT]),
-    %% Asec = (LastAccessTime div 10000000) + ?GREG_SEC_0_TO_1601,
-    %% ADT = calendar:gregorian_seconds_to_datetime(Asec),
-    %% io:format("LAST ACCESS TIME: ~w~n", [ADT]),
-    %% Wsec = (LastWriteTime div 10000000) + ?GREG_SEC_0_TO_1601,
-    %% WDT = calendar:gregorian_seconds_to_datetime(Wsec),
-    %% io:format("LAST WRITE TIME: ~w~n", [WDT]),
-    %% Csec = (ChangeTime div 10000000) + ?GREG_SEC_0_TO_1601,
-    %% CDT = calendar:gregorian_seconds_to_datetime(Csec),
-    %%io:format("LAST CHANGE TIME: ~w~n", [CDT]),
-    FileSize = large_integer(EOF),
-    Res#smbpdu{fid       = Fid,
-	       file_size = FileSize}.
+dec_session_setup_andx(Req, Pdu) -> 
+    Res = safe_dec_smb(Req, Pdu),   
+    %% Check for Samba version 2 or NetWare since it requires 
+    %% the old method of listing shares.
+    is_netware(is_samba2(Res)).
+
+is_samba2(Res) ->
+    case regexp:first_match(b2l(Res#smbpdu.bf), "Samba 2") of
+	{match, _, _} -> Res#smbpdu{samba2 = true};
+	_             -> Res#smbpdu{samba2 = false}
+    end.
+
+is_netware(Res) ->
+    case regexp:first_match(b2l(Res#smbpdu.bf), "NetWare") of
+	{match, _, _} -> Res#smbpdu{netware = true};
+	_             -> Res#smbpdu{netware = false}
+    end.
+
+
     
 %%% ---
 
+
+dec_nt_create_andx(Req, Pdu) -> 
+    Res = safe_dec_smb(Req, Pdu),
+    <<?NoAndxCmd,              
+     0,                         % reserved
+     _:2/binary,                % offset to next command WC
+     OpLockLevel,               % The oplock level granted
+     Fid:16/little,             % The file ID
+     CreateAction:32/little,    % The action taken (1 = file opened)
+     CreationTime:8/binary,     % When file was created
+     LastAccessTime:8/binary,   % When file was accessed
+     LastWriteTime:8/binary,    % When file was last written
+     ChangeTime:8/binary,       % When file was last changed
+     _:4/binary,                % The file attributes
+     _:8/binary,                % Allocation size
+     EOF:8/binary,              % The file size 
+     FileType:16/little,        % 0 = Disk file or directory
+     _:2/binary,                % State of IPC device (e.g pipe)
+     Directory,                 % Boolean (0 = Not a directory)
+     _/binary>> = Res#smbpdu.wp,
+    FileSize = large_integer(EOF),
+    Res#smbpdu{fid       = Fid,
+	       file_size = FileSize}.
+
+%% NB: The TIME comes in units of 100 nano seconds !!
+%% Gsec = (CreationTime div 10000000) + ?GREG_SEC_0_TO_1601,
+%% GDT = calendar:gregorian_seconds_to_datetime(Gsec),
+%% io:format("CREATION TIME: ~w~n", [GDT]),
+%% Asec = (LastAccessTime div 10000000) + ?GREG_SEC_0_TO_1601,
+%% ADT = calendar:gregorian_seconds_to_datetime(Asec),
+%% io:format("LAST ACCESS TIME: ~w~n", [ADT]),
+%% Wsec = (LastWriteTime div 10000000) + ?GREG_SEC_0_TO_1601,
+%% WDT = calendar:gregorian_seconds_to_datetime(Wsec),
+%% io:format("LAST WRITE TIME: ~w~n", [WDT]),
+%% Csec = (ChangeTime div 10000000) + ?GREG_SEC_0_TO_1601,
+%% CDT = calendar:gregorian_seconds_to_datetime(Csec),
+%%io:format("LAST CHANGE TIME: ~w~n", [CDT]),
+
+    
+%%% ---
+
+%%%
+%%% This is the decoding of a transaction response.
+%%%
+%%% @private
 dec_transaction(Req, Pdu) ->
     Res = safe_dec_smb(Req, Pdu),  % NB: may throw(Pdu)
+    ?elog("%%%%%%%%%% Wp = ~p~n", [Res#smbpdu.wp]),
     <<TotParamCount:16/little,
      TotDataCount:16/little,
      _:16/little,                % reserved
@@ -1168,7 +1517,29 @@ dec_transaction(Req, Pdu) ->
 		   B1
 	   end,
     {ok, Data, Res}.
-    
+
+%%%    
+%%% This is the decoding of a transaction request.
+%%% NB: This function is used by esmb_browser.erl
+%%%
+dec_transaction_req(Req, Pdu) ->
+    Res = safe_dec_smb(Req, Pdu),  % NB: may throw(Pdu)
+    <<TotParamCount:16/little,
+     TotDataCount:16/little,
+     MaxParamCount:16/little,
+     MaxDataCount:16/little,
+     MaxSetup:16/little,
+     Flags:16/little,
+     Timeout:32/little,         % in mSec
+     0:16,                      % reserved
+     ParamLen:16/little,        % Parameter bytes sent this buffer
+     ParamOffset:16/little,     % Offset (from header start) to parameters
+     DataSize:16/little,        % Data bytes sent this buffer
+     DataOffset:16/little,      % Offset (from header start) to data
+     SetupCount,
+     _/binary>> = Res#smbpdu.wp,
+    Res.
+
 
 
 
@@ -1230,7 +1601,7 @@ dec_trans2_find_x2(Req, Pdu, SubCmd) ->
 		   LastNameOffset,
 		   Res#smbpdu.bf),
     <<_:DataOffset/binary, Data/binary>> = Pdu,
-    Finfo = dec_find_file_dir_info(Res, Data, SearchCount),
+    Finfo = dec_find_file_both_dir_info(Res, Data, SearchCount),
     %%print_fd_info(Finfo),
     {Res, #find_result{sid = Sid, 
 		       eos = to_bool(EndOfSearch), 
@@ -1238,6 +1609,47 @@ dec_trans2_find_x2(Req, Pdu, SubCmd) ->
 
 %%% ---
 
+
+%%%
+%%% The FIND_FILE_BOTH_DIRECTORY_INFO decoder
+%%%
+dec_find_file_both_dir_info(Req, Data, Max) ->
+    Ucode = bytes_per_character(Req),
+    dec_find_file_both_dir_info(Data, Ucode, Max, 1).
+
+dec_find_file_both_dir_info(<<Offset:32/little,  % Offset to next struct
+			     FileIndex:32/little, 
+			     CT:8/binary,        % File creation time
+			     AT:8/binary,        % File access time
+			     WT:8/binary,        % File write time
+			     HT:8/binary,        % File attribute change time
+			     Size:8/binary,      % File size
+			     AllocSize:8/binary, % Allocation size
+			     Attr:32/little,     % Extended file attributes
+			     Len:32/little,      % Length of filename (in bytes)
+			     EaSize:32/little,   % Size of file's ext.attrs
+			     ShortNameLen,       % Length of short fname (bytes)
+			     _,                  % reserved
+			     ShortName:24/binary,% Short name in Unicode(!)
+			     Filename:Len/binary, 
+			     Rest/binary>>,  Ucode, Max, I) when I =< Max ->
+    Strip = Offset - (94 + Len),    % Strip off trailing crap...
+    F = #file_info{name = Filename,
+		   size = large_integer(Size),
+		   attr = Attr,
+		   date_time = dec_dt_find_file(CT, AT, WT)},
+    [F | dec_find_file_both_dir_info(strip(Strip, Rest), Ucode, Max, I+1)];
+dec_find_file_both_dir_info(Rest, Ucode, Max, I) when I > Max ->
+    [];
+dec_find_file_both_dir_info(Rest, Ucode, Max, I) ->
+    ?elog("dec_find_file_both_dir_info: <ERROR> Missing file info I=~p~n",[I]),
+    %%hexprint(b2l(Rest)),
+    [].
+
+
+%%%
+%%% The FIND_FILE_DIRECTORY_INFO decoder
+%%%
 dec_find_file_dir_info(Req, Data, Max) ->
     Ucode = bytes_per_character(Req),
     dec_find_file_dir_info(Data, Ucode, Max, 1).
@@ -1289,8 +1701,11 @@ print_fd_info([H|T]) ->
 print_fd_info([]) ->
     ok.
 
-    
-
+   
+%%% 
+%%% We are not using this format anymore,
+%%% but we keep the code anyway.
+%%%
 dec_info_standard(Req, Data, Max) ->
     Ucode = bytes_per_character(Req),
     dec_info_standard(Data, Ucode, Max, 1).
@@ -1393,6 +1808,7 @@ large_integer(<<LowPart:32/little, HiPart:32/little>>) ->
 
 safe_dec_smb(Req, Pdu) ->
     case catch dec_smb(Req, Pdu) of
+	R when R#smbpdu.eclass == ?ERRNT, R#smbpdu.ecode == ?SUCCESS -> R;
 	R when R#smbpdu.eclass == ?SUCCESS -> R;
 	R when record(R,smbpdu)            -> throw(R);
 	Else                               -> throw({error,{dec_smb,Else}})
@@ -1405,13 +1821,12 @@ safe_dec_smb(Req, Pdu) ->
 %%%    
 %%% NB-2: We need to increment the sequence number counter here !!
 %%%
+%%% @private
 dec_smb(Req, 
 	<<16#FF, $S, $M, $B,          % smb-header
 	Cmd,
-	Eclass, 
-	_,                            % zero (not used)
-	Ecode:16/little,    
-	Flags, 					%
+	Status:4/binary,
+	Flags,
 	Flags2:16/little,
 	_:12/unit:8,                  % Pad (12 bytes)
 	Tid:16/little, 
@@ -1420,6 +1835,14 @@ dec_smb(Req,
 	Mid:16/little,
 	Wc,
 	Rest/binary>>) ->
+    if ((Flags2 band ?FLAGS2_NT_ERR_CODES) > 0) ->
+	    <<Ecode:32/little>> = Status,
+	    Eclass = ?ERRNT;
+       true ->
+	    <<Eclass, 
+	      _,                      % zero (not used)
+	      Ecode:16/little>> = Status
+    end,
     <<Wp:Wc/binary-unit:16, Bc:16/little, Bf/binary>> = Rest,
     SSN = Req#smbpdu.sign_seqno,
     ?sdbg("dec_smb: new SSN=~p~n",[SSN+1]),
@@ -1530,23 +1953,28 @@ wp_write_andx(Fid, FileOffset, Dlen) ->
 
 %%% ---
 
+%%% Note that function also is used when fetching DCE/RPC fragments !!
+
 smb_read_andx_pdu(InReq, Finfo) ->
-    {Wc,Wp} = wp_read_andx(InReq#smbpdu.fid, Finfo#file_info.data_len),
+    {Wc,Wp} = wp_read_andx(InReq#smbpdu.fid, 
+			   Finfo#file_info.data_len,
+			   Finfo#file_info.max_count,
+			   Finfo#file_info.min_count),
     Rec = ?CP_PDU(InReq)#smbpdu{
 		   cmd = ?SMB_READ_ANDX,
 		   wc = Wc,
 		   wp = Wp},
     enc_smb(Rec).
 
-wp_read_andx(Fid, Offset) ->
+wp_read_andx(Fid, Offset, MaxCount, MinCount) ->
     {10,
      <<?NoAndxCmd,              
      0,                         % reserved
      0:16/little,               % offset to next command WC
      Fid:16/little,             % File handle
      Offset:32/little,          % Offset in file to begin read
-     ?MAX_BUFFER_SIZE:16/little,% Max number of bytes to return
-     ?MAX_BUFFER_SIZE:16/little,% Reserved for obsolescent requests
+     MaxCount:16/little,        % Max number of bytes to return
+     MinCount:16/little,        % Reserved for obsolescent requests
      0:32/little,               % High 16 buts of MaxXount if CAP_LARGE READX;
                                 % else must be zero
      0:16/little>>}.            % Remaining, obsolescent requests
@@ -1632,7 +2060,7 @@ share_access(X) when X#candx.type == file -> ?FILE_SHARE_READ;
 share_access(X) when X#candx.type == dir  -> ?FILE_SHARE_RW.
 
 create_dispositions(X) when X#candx.type == file,
-			    X#candx.mode == rw   -> ?FILE_OPEN_IF;
+			    X#candx.mode == rw   -> ?FILE_OWRITE_IF;
 create_dispositions(X) when X#candx.type == file -> ?FILE_OPEN;
 create_dispositions(X) when X#candx.type == dir  -> ?FILE_CREATE.
 
@@ -1664,7 +2092,7 @@ bf_trans2_find_next2(InReq, Path, Sid) ->
 		    %% --- Start of Parameter Block (12 bytes) ---
 		    <<Sid:16/little>>, % Search attribute or SID
 		    <<512:16/little>>, % Max # of entries returned
-		    <<?SMB_FIND_FILE_DIRECTORY_INFO:16/little>>, % What info to return in the result
+		    <<?SMB_FIND_FILE_BOTH_DIRECTORY_INFO:16/little>>, % What info to return in the result
 		    <<0:32/little>>,   % Resume key
 		    Flags,             % Flags
 		    Path, null(InReq)  % Search pattern
@@ -1703,7 +2131,7 @@ wp_trans2_find_x2(SubCmd, PathLen, NullLen) ->
      <<ParamCount:16/little,     % Total parameter bytes sent
       0:16/little,               % Total data bytes sent
       10:16/little,              % Max parameter bytes to return
-      1024:16/little,            % Max data bytes to return
+      4096:16/little,            % Max data bytes to return
       0,                         % Max setup words to return
       0,                         % reserved
       0:16/little,               % Flags
@@ -1731,7 +2159,7 @@ bf_trans2_find_first2(InReq, Path) ->
 		    Sa,          % Search attribute
 		    <<512:16/little>>, % Max # of entries returned
 		    Flags,       % Flags
-		    <<?SMB_FIND_FILE_DIRECTORY_INFO:16/little>>, % What info to return in the result
+		    <<?SMB_FIND_FILE_BOTH_DIRECTORY_INFO:16/little>>, % What info to return in the result
 		    <<0:32/little>>,  % Storage type
 		    Path, null(InReq) % Search pattern
 		    ]).
@@ -1832,6 +2260,23 @@ smb_session_setup_andx_pdu(Neg, U) when ?NTLM_0_12(Neg),
 		  bf  = Bf},
     enc_smb(Rec);
 %%%
+smb_session_setup_andx_pdu(Neg, U) when ?NTLM_0_12(Neg),
+					?USE_UNICODE_ANYWAY(Neg) ->
+    {RN, RNlen, MacKey} = enc_nt_passwd(Neg, U#user.pw, U#user.charset),
+    {Wc,Wp} = wp_session_setup_andx(Neg, U, 0, RNlen), 
+    Bf = bf_session_setup_andx(Neg, U, RN),
+    Rec = #smbpdu{cmd = ?SMB_SESSION_SETUP_ANDX,
+		  pid = mypid(),
+		  mid = 1,
+		  flags2 = flags2(Neg),
+		  signatures = signatures_p(Neg),
+		  mac_key = MacKey,
+		  wc = Wc,
+		  wp = Wp,
+		  bc  = size(Bf),
+		  bf  = Bf},
+    enc_smb(Rec);
+%%%
 smb_session_setup_andx_pdu(Neg, U) when ?NTLM_0_12(Neg) ->
     {Passwd, PwLen, MacKey} = enc_lm_passwd(Neg, U#user.pw),
     {Wc,Wp} = wp_session_setup_andx(Neg, U, PwLen, 0),
@@ -1913,18 +2358,18 @@ bf_session_setup_andx(Neg, U, Passwd) ->
 %%%
 enc_lm_passwd(Neg, Passwd) when ?CORE_PROTOCOL(Neg) ->
     {Passwd, sizeof(Passwd), Passwd};
-enc_lm_passwd(Neg, Passwd) when ?PRE_DOS_LANMAN_2_1(Neg), 
-			     ?USE_ENCRYPTION(Neg) ->
+enc_lm_passwd(Neg, Passwd) when ?USE_ENCRYPTION(Neg) -> 
     EncKey = Neg#smb_negotiate_res.encryption_key,
     RN = lm_challenge_response(Passwd, EncKey),
     LMsessKey = lm_session_key(Passwd),
     MacKey = concat(LMsessKey, RN),
     {RN, sizeof(RN), MacKey};
 enc_lm_passwd(Neg, Passwd) ->
-    %% FIXME , What does this mean ?
     {Passwd, sizeof(Passwd), Passwd}.
 
-lm_session_key(Passwd) ->
+lm_session_key(Passwd) when list(Passwd) ->
+    lm_session_key(l2b(Passwd));
+lm_session_key(Passwd) when binary(Passwd) ->
     concat(head(s16x(Passwd), 8), zeros(8)).
 
 
@@ -2174,9 +2619,17 @@ mac_test(SSN, MacKey, File, Sign) ->
     io:format("COMPUTED SIGNATURE2: ",[]),hexprint(mac(MacKey,New)),
     ok.
 
+
+
 nt_key_test(Passwd, EncKey) ->
     XX = concat(nt_s16(Passwd),
 		nt_challenge_response(Passwd, EncKey)),
+    hexprint(XX),
+    XX.
+
+lm_key_test(Passwd, EncKey) when binary(Passwd) ->
+    XX = concat(lm_s16(Passwd),
+		lm_challenge_response(Passwd, EncKey)),
     hexprint(XX),
     XX.
 	      
@@ -2328,120 +2781,6 @@ mypid() ->
     list_to_integer(Pid).
 
 
-%%% --------------------------------------------------------------------
-%%% NetBIOS code
-%%% --------------------------------------------------------------------
-
-nbss_session_request(S, Called, Calling) ->
-    send_recv(S, nbss_session_request_pdu(Called, Calling)).
-
-nbss_session_service(S, SMB_pdu) ->
-    send_recv(S, nbss_session_service_pdu(SMB_pdu)).
-
-send_recv(S, Packet) ->
-    gen_tcp:send(S, [Packet]),
-    recv(S).
-
-recv(S) ->
-    receive 
-	{tcp,S,Bin} ->
-	    case dec_msg(Bin) of
-		{ok, ?SESSION_KEEP_ALIVE} ->
-		    recv(S);
-		Else ->
-		    Else
-	    end;
-	Else ->
-	    ?elog("esmb got unexpected msg: ~p~n",[Else]),
-	    exit(Else)
-    end.
-
-dec_msg(<<?POSITIVE_SESSION_RESPONSE,Flags,Length:16>>) ->
-    {ok, ?POSITIVE_SESSION_RESPONSE};
-dec_msg(<<?SESSION_SERVICE, _, Length:16, SMB_pdu/binary>>) ->
-    {ok, ?SESSION_SERVICE, get_more(Length, sizeof(SMB_pdu), [SMB_pdu])};
-dec_msg(<<?SESSION_KEEP_ALIVE, _/binary>>) ->
-    {ok, ?SESSION_KEEP_ALIVE};
-dec_msg(<<?NEGATIVE_SESSION_RESPONSE,Flags,Length:16,Ecode>>) ->
-    Emsg =  neg_sess_resp(Ecode),
-    {error, neg_sess_resp(Ecode)};
-dec_msg(Bin) ->
-    ?elog("dec_msg got: ~p~n",[Bin]),
-    {error, Bin}.
-
-get_more(Expected, Got, Bins) when Got < Expected ->
-    receive 
-	{tcp,_,Bin} ->
-	    get_more(Expected, Got + size(Bin), [Bin | Bins])
-    end;
-get_more(_, _, Bins) ->
-    concat_binary(lists:reverse(Bins)).
-
-neg_sess_resp(16#80) -> "Not listening on called name";
-neg_sess_resp(16#81) -> "Not listening for calling name";
-neg_sess_resp(16#82) -> "Called name not present";
-neg_sess_resp(16#83) -> "Called name present, but insufficient resources";
-neg_sess_resp(16#8F) -> "Unspecified error";
-neg_sess_resp(_)     -> "Unknown error code".
-
-
-nbss_session_request_pdu(Called, Calling) ->
-    CalledName = called_name(Called),
-    CallingName = calling_name(Calling) ,
-    Length = size(CalledName) + size(CallingName),
-    <<?SESSION_REQUEST, 0, Length:16, CalledName/binary, CallingName/binary>>.
-
-nbss_session_service_pdu(SMB_pdu) when binary(SMB_pdu) ->
-    Length = size(SMB_pdu),
-    <<?SESSION_SERVICE, 0, Length:16, SMB_pdu/binary>>.
-
-
-%%% The NetBIOS naming convention allows for 16 character in a 
-%%% NetBIOS name. Microsoft, however, limits NetBIOS names to 15
-%%% characters and uses the 16th character as a NetBIOS suffix in
-%%% order to identify functionality installed on the registered device.
-
--define(NETBIOS_NAME_LEN, 15).
--define(NETBIOS_SX_WORKSTATION,   16#00).  % Workstation service
--define(NETBIOS_SX_FILESERVER,    16#20).  % File server service
-
-%%% @private
-called_name({A,B,C,D} = IP) -> called_name(ip2str(IP));
-called_name(Name) when length(Name) =< ?NETBIOS_NAME_LEN -> 
-    nb_name(Name, ?NETBIOS_SX_FILESERVER).
-
-%%% @private
-calling_name({A,B,C,D} = IP) -> calling_name(ip2str(IP));
-calling_name(Name) when length(Name) =< ?NETBIOS_NAME_LEN -> 
-    nb_name(Name, ?NETBIOS_SX_WORKSTATION).
-
-nb_name(Name, Sx) ->
-    Len = 32,
-    list_to_binary([Len | l1enc(Name, Sx, 0)]).
-
-%%% test routine
-tt_name(Name) ->
-    l1enc(Name, $A, 0).
-
--define(SPACE, 16#20).
-
-l1enc([H|T], Sx, N) when N < ?NETBIOS_NAME_LEN ->
-    [l1msn(H),l1lsn(H)|l1enc(T, Sx, N+1)];
-l1enc([], Sx, N) when N < ?NETBIOS_NAME_LEN ->
-    [l1msn(?SPACE),l1lsn(?SPACE)|l1enc([], Sx, N+1)];
-l1enc([], Sx, ?NETBIOS_NAME_LEN) ->
-    [l1msn(Sx),l1lsn(Sx),0].
-
-%%% Level 1 encoding, get most significant nibble
-l1msn(B) -> (B bsr 4) + $A.
-
-%%% Level 1 encoding, get least significant nibble
-l1lsn(B) -> (B band 16#0F) + $A.
-
-
-lcase_host(T) when tuple(T) -> T;
-lcase_host(L) when list(L)  -> lcase(L).
-
 %%% @private
 ucase([C|Cs]) when C>=$a,C=<$z -> [C-32|ucase(Cs)]; % a-z
 ucase([C|Cs])                  -> [C|ucase(Cs)];
@@ -2491,9 +2830,11 @@ sleep(Sec) ->
 %%% @see error_p/1
 %%% @end
 %%%
-is_ok(Pdu, DefaultEmsg) when Pdu#smbpdu.eclass == ?SUCCESS -> ok;
-is_ok(Pdu, DefaultEmsg) when record(Pdu, smbpdu) ->
-    {error, emsg(Pdu#smbpdu.eclass, Pdu#smbpdu.ecode, DefaultEmsg)}.
+is_ok(Pdu, Dmsg) when Pdu#smbpdu.eclass == ?SUCCESS -> ok;
+is_ok(Pdu, Dmsg) 
+  when Pdu#smbpdu.eclass == ?ERRNT, Pdu#smbpdu.ecode == ?SUCCESS -> ok;
+is_ok(Pdu, Dmsg) when record(Pdu, smbpdu) ->
+    {error, emsg(Pdu#smbpdu.eclass, Pdu#smbpdu.ecode, Dmsg)}.
 
 %%%
 %%% @spec emsg(Eclass::integer(), Ecode::integer(), 
@@ -2512,12 +2853,19 @@ emsg(Eclass, Ecode, DefaultEmsg) ->
     end.
 
 %%% See p.118 in CIFS/1.0 doc.
-emsg(?ERRDOS, ?ERRbadfunc)  -> "Invalid function";
-emsg(?ERRDOS, ?ERRbadfile)  -> "File not found";
-emsg(?ERRDOS, ?ERRbadpath)  -> "Directory invalid";
-emsg(?ERRDOS, ?ERRnofids)   -> "Too many open files";
-emsg(?ERRDOS, ?ERRnoaccess) -> "Access denied";
-emsg(?ERRDOS, ?ERRnoshare)  -> "Share does not exist".
+emsg(?ERRDOS, ?ERRbadfunc)     -> "Invalid function";
+emsg(?ERRDOS, ?ERRbadfile)     -> "File not found";
+emsg(?ERRDOS, ?ERRbadpath)     -> "Directory invalid";
+emsg(?ERRDOS, ?ERRnofids)      -> "Too many open files";
+emsg(?ERRDOS, ?ERRnoaccess)    -> "Access denied";
+emsg(?ERRDOS, ?ERRnoshare)     -> "Share does not exist";
+emsg(?ERRDOS, ?ERRfileexist)   -> "File in operation already exists";
+emsg(?ERRDOS, ?ERRdirnotempty) -> "Directory not empty";
+emsg(?ERRSRV, ?ERRSbadpw)      -> "Bad password";
+emsg(?ERRSRV, ?ERRSaccess)     -> "Insufficient access rights";
+emsg(?ERRSRV, ?ERRSinvtid)     -> "Invalid TID (Transaction ID)";
+emsg(?ERRSRV, ?ERRSinvnetname) -> "Invalid network name in tree connect";
+emsg(?ERRNT,  ?ERRNTfileisdir) -> "File is directory".
 
 %%% @private
 caller() ->
@@ -2542,6 +2890,8 @@ called(Host) when list(Host) ->
 %%% @end
 %%%
 exit_if_error(Pdu, Dmsg) when Pdu#smbpdu.eclass == ?SUCCESS -> true;
+exit_if_error(Pdu, Dmsg) 
+  when Pdu#smbpdu.eclass == ?ERRNT, Pdu#smbpdu.ecode == ?SUCCESS -> true;
 exit_if_error(Pdu, Dmsg) ->
     Emsg = emsg(Pdu#smbpdu.eclass, Pdu#smbpdu.ecode, Dmsg),
     throw({error, Emsg}).
@@ -2558,6 +2908,8 @@ exit_if_error(Pdu, Dmsg) ->
 %%% @end
 %%%
 error_p(Pdu) when Pdu#smbpdu.eclass == ?SUCCESS  -> false;
+error_p(Pdu) 
+  when Pdu#smbpdu.eclass == ?ERRNT, Pdu#smbpdu.ecode == ?SUCCESS -> false;
 error_p(Pdu) when Pdu#smbpdu.eclass == ?INTERNAL ->
     {true, ?INTERNAL, Pdu#smbpdu.emsg};
 error_p(Pdu) ->
@@ -2611,6 +2963,21 @@ ip2str({A,B,C,D}) ->
 ip2str(L) when list(L) -> 
     L.
 
+ip2bin({A,B,C,D}) -> 
+    <<A,B,C,D>>;
+ip2bin(L) when list(L) -> 
+    [A,B,C,D] = string:tokens(L, "."),
+    Ai = list_to_integer(A),
+    Bi = list_to_integer(B),
+    Ci = list_to_integer(C),
+    Di = list_to_integer(D),
+    <<Ai, Bi, Ci, Di>>;
+ip2bin(B) when binary(B) -> 
+    B.
+
+bin2ip(<<A,B,C,D>>) -> {A,B,C,D}.
+
+
 i2l(I) when integer(I) -> integer_to_list(I);
 i2l(L) when list(L)    -> L.
 
@@ -2635,12 +3002,12 @@ to_ucs2_and_null(UnicodeP, Str) ->
 
 %%% @private
 to_ucs2(UnicodeP, Str) when UnicodeP == true ->    
-    {ok, Cd}    = iconv:open(?CSET_UCS2, ?CSET_ASCII),
+    {ok, Cd}   = iconv:open(?CSET_UCS2, ?CSET_ASCII),
     {ok, Ustr} = iconv:conv(Cd, Str),
     iconv:close(Cd),
     Ustr;
 to_ucs2(_, Str) ->    
-    Str.
+    l2b(Str).
 
 null2(UnicodeP) when UnicodeP == true -> <<0,0>>;
 null2(_)                              -> <<0>>.

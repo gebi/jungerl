@@ -73,7 +73,8 @@
 %%% -------------------------------------------------------------------
 %%% --- Server Service specific declarations
 %%% -------------------------------------------------------------------
--define(OP_SS_NETR_SHARE_ENUM,  15).
+-define(OP_SS_NETR_SHARE_ENUM,         16#0f).
+-define(OP_SS_NETR_SHARE_ENUM_STICKY,  16#24).
 
 
 %%% -------------------------------------------------------------------
@@ -127,7 +128,16 @@
 	  prov_reason
 	  }).
 
+
+-define(FRAG_PART,  0).
+-define(FRAG_FIRST, 16#01).
+-define(FRAG_LAST,  16#02).
+
+-define(IS_FRAG_LAST(A),  ((A band ?FRAG_LAST) == ?FRAG_LAST)).
+-define(IS_FRAG_FIRST(A), ((A band ?FRAG_FIRST) == ?FRAG_FIRST)).
+
 -record(rpc_response, {
+	  frag_type = ?FRAG_LAST,
 	  frag_len,
 	  alloc_hint,
 	  call_id,

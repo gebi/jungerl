@@ -6,8 +6,9 @@
 %%%
 %%% $Id$
 %%% --------------------------------------------------------------------
--export([start/2, start/4, astart/2, istart/2, ustart/2]).
--export([swap/3, to_ucs2/3, ucs2_to_charset/2]).
+-export([start/1, start/2, astart/1, istart/1, ustart/1]).
+-export([swap/3, to_ucs2/3, ucs2_to_charset/2, user/3, dbg_ls/6]).
+-export([dbg_sh/2, dbg_ls/6]).
 
 -ifdef(tobbe).
 -export([trun/0,ttinit/6]). %%  testing !!
@@ -18,40 +19,83 @@
 -include("esmb_lib.hrl").
 
 
-%%%
-%%% Example: start("//korp/tobbe", "tobbe").
-%%%
-start(Path, User) -> istart(Path, User).
-
-astart(Path, User) -> start(Path, User, "WORKGROUP", ?CSET_ASCII).
-istart(Path, User) -> start(Path, User, "WORKGROUP", ?CSET_ISO_8859_1).
-ustart(Path, User) -> start(Path, User, "WORKGROUP", ?CSET_UTF8).
-
-
-start(Path, User, Wgroup, Charset) ->
-    md4:start(),
-    iconv:start(),
-    case host_share(Path) of
-	{Host, Share} ->
-	    spawn(fun() -> init(Host, Share, User, Wgroup, Charset) end);
+%%% Debug: List shares
+dbg_ls(Ip, Host, User, Passwd, Workgroup, SockOpts) ->
+    case esmb:connect(Ip, SockOpts) of
+	{ok,S,Neg} ->
+	    U = #user{pw = Passwd, name = User, primary_domain = Workgroup},
+	    Pdu0 = esmb:user_logon(S, Neg, U),
+	    esmb:exit_if_error(Pdu0, "Login failed"),
+	    IPC = "\\\\"++Host++"\\IPC"++[$$],
+	    Path1 = esmb:to_ucs2(esmb:unicode_p(Neg), IPC),
+	    Pdu1 = esmb:tree_connect(S, Neg, Pdu0, Path1, ?SERVICE_NAMED_PIPE),
+	    esmb:exit_if_error(Pdu1, "Tree connect failed"),
+	    Res = (catch esmb:do_ls(S, Pdu1, Host)),
+	    esmb:close(S),
+	    Res;
 	Else ->
 	    Else
     end.
 
-init(Host, Share, User, Wgroup, Charset) ->
-    put(charset, Charset),
-    {ok,S,Neg} = esmb:connect(Host),
+%%% Debug shell, connect to IP via a port forwarder. 
+%%% Example: 
+%%%
+%%% esmb_client:dbg_sh("192.168.128.32","smb://win2ktest@172.25.4.114/share").
+%%%
+dbg_sh(Ip, Uri) ->
+    md4:start(),
+    iconv:start(),
+    U = esmb:parse_uri(Uri),
+    Charset = default_charset(),
+    spawn_link(fun() -> init(Ip, U, Charset) end).
+
+
+
+%%%
+%%% Example: start("smb://tobbe@pungmes/tobbe").
+%%%
+start(Uri) -> 
+    start(Uri, default_charset()).
+
+start(Uri, Charset) ->
+    md4:start(),
+    iconv:start(),
+    U = esmb:parse_uri(Uri),
+    spawn_link(fun() -> init(U, Charset) end).
+
+default_charset() ->
+    ?CSET_ISO_8859_1.
+    
+
+astart(Uri) -> start(Uri, ?CSET_ASCII).
+istart(Uri) -> start(Uri, ?CSET_ISO_8859_1).
+ustart(Uri) -> start(Uri, ?CSET_UTF8).
+
+user(User, Pw, Wgrp) ->
+    #user{pw = Pw, name = User, primary_domain = Wgrp}.
+
+
+
+init(User, Charset) ->
+    Ip = User#user.host,
+    init(Ip, User, Charset).
+
+init(Ip, User0, Charset) ->
     Pw = get_passwd(),
-    U = #user{pw = Pw, name = User, primary_domain = Wgroup},
-    Pdu0 = esmb:user_logon(S, Neg, U),
+    User = User0#user{pw = Pw},
+    Host = User#user.host, 
+    SharePath = mk_share_path(User),
+    put(charset, Charset),
+    {ok,S,Neg} = esmb:connect(Ip),
+    Pdu0 = esmb:user_logon(S, Neg, User),
     case esmb:error_p(Pdu0) of
 	false ->
-	    WinPath = mk_winpath(Neg, "//"++Host++"/"++Share, Charset),
+	    WinPath = mk_winpath(Neg, "//"++Host++"/"++SharePath, Charset),
 	    Path = to_ucs2(Neg, WinPath, Charset),
 	    Pdu1 = esmb:tree_connect(S, Neg, Pdu0, Path),
 	    case esmb:error_p(Pdu1) of
 		false -> 
-		    shell(S, Neg, {Pdu1, "\\\\"});
+		    shell(S, Neg, {Pdu1, "\\"});
 		{true, _Ecode, Emsg} -> 
 		    io:format("TreeConnect failed, reason: ~p~n", [Emsg]),
 		    {error, Emsg}
@@ -61,6 +105,10 @@ init(Host, Share, User, Wgroup, Charset) ->
 	    {error, Emsg}
     end.
 
+mk_share_path(User) when User#user.path == "" ->
+    User#user.share;
+mk_share_path(User) ->
+    User#user.share++"/"++User#user.path.
 
 shell(S, Neg, {_Pdu, Cwd} = State) ->
     shell(S, Neg, cmd(read_line(Cwd), S, Neg, State)).
@@ -105,7 +153,7 @@ rm_until([_|T], C)     -> rm_until(T, C).
 swap([H], H, N)   -> [N];
 swap([H|T], H, N) -> [N|swap(T, H, N)];
 swap([H|T], C, N) -> [H|swap(T, C, N)];
-swap([], _, N)    -> [N].  
+swap([], _, _)    -> [].  
 
 
 cat(S, Neg, State, Fname) ->
@@ -226,6 +274,7 @@ read_line(Cwd) ->
     rm_last_char(io:get_line(list_to_atom(swap(Cwd, $\\, $/) ++ "> "))).
 
 get_passwd() ->
+    sleep(10),
     rm_last_char(io:get_line('Password: ')).
 
 rm_last_char([H])   -> [];
@@ -253,6 +302,8 @@ l2b(B) when binary(B) -> B.
 
 b2l(B) when binary(B) -> binary_to_list(B);
 b2l(L) when list(L)   -> L.
+
+sleep(T) -> receive after T -> true end.
 
 %%%
 %%% We are using slash ('/') as a directory separator 
@@ -441,3 +492,5 @@ g20get_file(S, Neg, {Pdu0, Cwd}, Fname0, Fun) ->
     esmb:close_file(S, Pdu2),
     {ok, size(Bin)}.
 -endif.
+
+

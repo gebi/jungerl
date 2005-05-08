@@ -120,7 +120,6 @@ status_code(404) -> not_found;
 status_code(405) -> method_not_allowed;
 status_code(406) -> not_acceptable;
 status_code(407) -> proxy_authentication_required;
-status_code(408) -> request_tunnel;
 status_code(408) -> request_timeout;
 status_code(409) -> conflict;
 status_code(410) -> gone;

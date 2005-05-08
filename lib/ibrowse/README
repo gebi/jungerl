@@ -16,6 +16,11 @@ ibrowse is a HTTP client. The following are a list of features.
 
 Comments to : Chandrashekhar.Mullaparthi@t-mobile.co.uk
 
+CONTRIBUTIONS
+=============
+08-May-2005 - Youns Hafri made a CRUX LINUX port of ibrowse.
+	      http://yhafri.club.fr/crux/index.html
+
 Here are some usage examples. Enjoy!
 
 5> ibrowse:start().

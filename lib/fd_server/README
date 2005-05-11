@@ -1,0 +1,23 @@
+
+The fdserv.erl module makes it possible to open
+up privileged ports from Erlang running as non-root.
+
+Here is an example from the esmb_browser.erl code:
+---------------------------------
+...
+{ok, Fd} = open_socket(137, []),
+....
+
+open_socket(Port,Opts) ->
+    case fdsrv:bind_socket(udp, Port) of
+	{ok, Fd} ->
+	    gen_udp:open(Port, [{fd, Fd}, binary, {broadcast,true} | Opts]);
+	Error ->
+	    ?elog("Couldn't open socket, port=~p: ~p~n",[Port, Error])
+    end. 
+--------------------------------
+
+Here we open the NetBIOS-NameService port 137.
+
+
+

@@ -1,0 +1,8 @@
+{application,fd_server,
+ [{description,"Fd server"},
+  {vsn,"%VSN%"},
+  {modules,[%MODULES%]},
+  {registered,[fdsrv]},
+  {applications,[kernel,stdlib]},
+  {env, []},
+  {mod,{fd_server_app,[]}}]}.

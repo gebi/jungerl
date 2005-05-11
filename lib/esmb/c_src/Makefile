@@ -1,6 +1,6 @@
 include ../../../support/include.mk
 
-CFLAGS += -I$(ERL_C_INCLUDE_DIR) -I.
+CFLAGS += -I$(ERL_C_INCLUDE_DIR) -I../../../support -I.
 
 MD4_DRV_SO = ../priv/md4_drv.so
 ICONV_DRV_SO = ../priv/iconv_drv.so

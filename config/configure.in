@@ -24,7 +24,13 @@ AC_SUBST(ERLDIR)
 
 dnl C header files
 
+AC_CONFIG_HEADER(../support/config.h:config.h.in)
+
 AC_CHECK_HEADERS(linux/if_tun.h, HAVE_TUNTAP="true")
+
+AC_CHECK_HEADERS(malloc.h)
+
+BT_MSG_CONTROL
 
 dnl For the Slang driver. I don't think this is really currect just now..
 
@@ -56,7 +62,7 @@ case "$target_os" in
         LD_SHARED="ld -G"
 	;;
       *darwin*)
-        AC_DEFINE(DARWIN)
+        AC_DEFINE([DARWIN], [], [Description])
         LD_SHARED="cc -bundle -flat_namespace -undefined suppress"
 	;;
       *)

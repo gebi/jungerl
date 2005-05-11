@@ -12,6 +12,7 @@ $(JERL) $(MK_INCLUDE): config.status ../support/include.mk.in ../bin/jerl.in
 	chmod +x $(JERL)
 
 configure: configure.in
+	autoheader
 	autoconf
 
 clean:

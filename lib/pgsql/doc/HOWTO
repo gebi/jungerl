@@ -1,0 +1,14 @@
+The interface is a bit lacking at the moment, but should be sufficient
+for some tasks.
+
+Here is an example:
+
+1> {ok, Db} = pgsql:connect("template1", "localhost", "cos").
+{ok,<0.31.0>}
+2> pgsql:exec(Db, "SELECT * FROM example;").
+{ok,{select,[[{id,"1",int4},{name,"alfa",varchar}],
+             [{id,"2",int4},{name,"beta",varchar}],
+             [{id,"3",int4},{name,"gamma",varchar}]]}}
+3> pgsql:close(Db).
+close
+

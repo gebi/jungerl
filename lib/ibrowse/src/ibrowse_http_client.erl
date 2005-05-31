@@ -204,10 +204,10 @@ handle_info({{send_req, [Url, Headers, Method,
 	    end,
 	    State_2 = case Status of
 			  idle ->
-			      State_1#state{status=get_header,
-					    cur_req=NewReq};
+			      State_1#state{status = get_header,
+					    cur_req = NewReq};
 			  _ ->
-			      State_1
+			      State_1#state{cur_req = NewReq}
 		      end,
 	    case StreamTo of
 		undefined ->

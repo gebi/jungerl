@@ -590,18 +590,32 @@ time it spent in subfunctions."
       s
     (concat s ".")))
 
+(defvar erl-reload-dwim nil
+  "Do What I Mean when reloading beam files. If erl-reload-dwim is non-nil, 
+and the module cannot be found in the load path, we attempt to find the correct
+directory, add it to the load path and retry the load.
+We also don't prompt for the module name.")
+
 (defun erl-reload-module (node module)
   "Reload a module."
   (interactive (list (erl-target-node)
-		     (let* ((module (erlang-get-module))
-			    (prompt (if module
-					(format "Module (default %s): " module)
+		     (if erl-reload-dwim 
+			 (erlang-get-module)
+		       (let* ((module (erlang-get-module))
+			      (prompt (if module
+					  (format "Module (default %s): " module)
 					"Module: ")))
-		       (intern (read-string prompt nil nil module)))))
+			 (intern (read-string prompt nil nil module))))))
   (if (and (eq node edb-monitor-node)
 	   (assq module edb-interpreted-modules))
       (erl-reinterpret-module node module)
-    (erl-eval-expression node (format "c:l('%s')." module))))
+    ;;    (erl-eval-expression node (format "c:l('%s')." module))))
+    (erl-do-reload node module)))
+
+(defun erl-do-reload (node module)
+  (let ((fname (if erl-reload-dwim (buffer-file-name) nil)))
+    (erl-rpc (lambda (result) (message "load: %s" result)) nil 
+	     node 'distel 'reload_module (list module fname))))
 
 (defun erl-reinterpret-module (node module)
   ;; int:i(SourcePath).
@@ -1010,15 +1024,20 @@ The match positions are erl-mfa-regexp-{module,function,arity}-match.")
 
 ;;;; Argument lists
 
-(defun erl-openparen (n node)
-  "Insert a '(' character and show arglist information."
-  (interactive (list (prefix-numeric-value current-prefix-arg)
-                     erl-nodename-cache))
+(defun erl-openparent ()
+  "Insert a '(' character and arglist."
+  (interactive)
   (let ((call (erlang-get-function-under-point)))
-    (self-insert-command n)
+    (erl-print-arglist call erl-nodename-cache (current-buffer))))
+
+(defun erl-openparen (node)
+  "Insert a '(' character and show arglist information."
+  (interactive (list erl-nodename-cache))
+  (let ((call (erlang-get-function-under-point)))
+    (insert "(")
     (erl-print-arglist call node)))
 
-(defun erl-print-arglist (call node)
+(defun erl-print-arglist (call node &optional ins-buffer)
   (when (and node (member node erl-nodes))
     ;; Don't print arglists when we're defining a function (when the
     ;; "call" is at the start of the line)
@@ -1032,16 +1051,17 @@ The match positions are erl-mfa-regexp-{module,function,arity}-match.")
 	  (erl-spawn
 	    (erl-send-rpc node 'distel 'get_arglists
 			  (list mod fun))
-	    (erl-receive (call-mod fun)
+	    (erl-receive (call-mod fun ins-buffer)
 		((['rex 'error])
 		 (['rex arglists]
-		  (message (erl-format-arglists call-mod fun arglists)))))))))))
+		  (let ((argss (erl-format-arglists arglists)))
+		    (if ins-buffer
+			(with-current-buffer ins-buffer (insert argss))
+		      (message "%s:%s%s"  call-mod fun argss))))))))))))
 
-(defun erl-format-arglists (module function arglists)
+(defun erl-format-arglists (arglists)
   (setq arglists (sort* arglists '< :key 'length))
-  (format "%s%s%s"
-          (if module (concat module ":") "")
-          function
+  (format "%s"
           (mapconcat 'identity
                      (mapcar (lambda (arglist)
                                (format "(%s)"

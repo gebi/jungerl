@@ -12,6 +12,7 @@
 -include_lib("kernel/include/file.hrl").
 
 -import(lists, [flatten/1, member/2, sort/1, map/2, foldl/3, foreach/2]).
+-import(filename, [dirname/1,join/1,basename/2]).
 
 -export([rpc_entry/3, eval_expression/1, find_source/1,
          process_list/0, process_summary/1,
@@ -21,6 +22,8 @@
          modules/1, functions/2,
          free_vars/1, free_vars/2,
          apropos/1, apropos/2, describe/3, describe/4]).
+
+-export([reload_module/2]).
 
 -export([gl_proxy/1, tracer_init/2, null_gl/0]).
 
@@ -63,6 +66,37 @@ gl_proxy(GL) ->
     end,
     gl_proxy(GL).
 
+%% ----------------------------------------------------------------------
+%% if c:l(Mod) doesn't work, we look for the beam file in 
+%% srcdir and srcdir/../ebin; add the first one that works to path and 
+%% try c:l again.
+%% srcdir is dirname(EmacsBuffer); we check that the buffer contains Mod.erl
+%% emacs will set File = "" to indicate that we don't want to mess with path
+reload_module(Mod, File) ->
+    case c:l(Mod) of
+	{error,R} ->
+	    case Mod == basename(File,".erl") of
+		true ->
+		    Beams = [join([dirname(File),Mod]),
+			     join([dirname(dirname(File)),ebin,Mod])],
+			case lists:filter(fun is_beam/1, Beams) of
+			    [] -> {error, R};
+			    [Beam|_] -> 
+				code:add_patha(dirname(Beam)),
+				c:l(Mod)
+			end;
+		false ->
+		    {error,R}
+	    end;
+	R -> R
+    end.
+
+is_beam(Filename) ->
+    case file:read_file_info(Filename++".beam") of
+	{ok,_} -> true;
+	{error,_} -> false
+    end.
+	    
 %% ----------------------------------------------------------------------
 
 eval_expression(S) ->
@@ -166,12 +200,12 @@ find_source(Mod) ->
 %% Ret: {true, AbsName} | false
 guess_source_file(Mod, BeamFName) ->
     Erl = ?A2L(Mod) ++ ".erl",
-    Dir = filename:dirname(BeamFName),
+    Dir = dirname(BeamFName),
     TryL = src_from_beam(BeamFName) ++
 	[Dir ++ "/" ++ Erl,
-	 filename:join(Dir ++ "/../src/", Erl),
-	 filename:join(Dir ++ "/../esrc/", Erl),
-	 filename:join(Dir ++ "/../erl/", Erl)],
+	 join([Dir ++ "/../src/", Erl]),
+	 join([Dir ++ "/../esrc/", Erl]),
+	 join([Dir ++ "/../erl/", Erl])],
     try_srcs(TryL).
 
 try_srcs([H | T]) ->
@@ -382,7 +416,7 @@ fprof_preamble({totals, Cnt, Acc, Own}) ->
 fprof_header() ->
     fmt("~sCalls\tACC\tOwn\n", [pad(50, "Function")]).
 
-fprof_entry([{ProcName, Cnt, Acc, Own} | Info]) ->
+fprof_entry([{ProcName, _Cnt, _Acc, Own} | Info]) ->
     %% {process, Name, [Infos]}
     {process, fmt("Process ~s: ~p%", [ProcName, Own]),
      map(fun fprof_process_info/1, Info)};
@@ -429,7 +463,7 @@ fprof_beamfile({M,_,_}) ->
     case code:which(M) of
         Fname when list(Fname) ->
             l2b(Fname);
-        X ->
+        _ ->
             undefined
     end;
 fprof_beamfile(_)                  -> undefined.
@@ -442,7 +476,7 @@ pad(X, A) when atom(A) ->
     pad(X, atom_to_list(A));
 pad(X, S) when length(S) < X ->
     S ++ lists:duplicate(X - length(S), $ );
-pad(X, S) ->
+pad(_X, S) ->
     S.
 
 null_gl() ->
@@ -474,7 +508,7 @@ debug_toggle(Mod, Filename) ->
     end.
 
 debug_add(Modules) ->
-    foreach(fun([Mod, FileName]) ->
+    foreach(fun([_Mod, FileName]) ->
 		    %% FIXME: want to reliably detect whether
 		    %% the module is interpreted, but
 		    %% 'int:interpreted()' can give the wrong
@@ -596,9 +630,9 @@ attach_init(Emacs, Pid) ->
     case int:attached(Pid) of
         {ok, Meta} ->
             attach_loop(#attach{emacs=Emacs,
-                                        meta=Meta,
-                                        status=idle,
-                                        stack={undefined,undefined}});
+				meta=Meta,
+				status=idle,
+				stack={undefined,undefined}});
         error ->
             exit({error, {unable_to_attach, Pid}})
     end.
@@ -615,18 +649,18 @@ attach_loop(Att = #attach{emacs=Emacs, meta=Meta}) ->
             Emacs ! {status, Status},
             ?MODULE:attach_loop(Att#attach{status=Status,
                                            where=undefined});
-        {Meta, Other} ->
+        {Meta, _Other} ->
             %% FIXME: there are more messages to handle, like
             %% re_entry, exit_at
             ?MODULE:attach_loop(Att);
         {emacs, meta, Cmd} when Att#attach.status == break ->
             attach_loop(attach_meta_cmd(Att, Cmd));
-        {emacs, meta, Cmd} ->
+        {emacs, meta, _Cmd} ->
             Emacs ! {message, <<"Not in break">>},
             ?MODULE:attach_loop(Att)
     end.
 
-attach_meta_cmd(Att, Cmd) when Att#attach.status /= break ->
+attach_meta_cmd(Att, _Cmd) when Att#attach.status /= break ->
     Att#attach.emacs ! {message, <<"Not in break">>},    
     Att;
 attach_meta_cmd(Att = #attach{emacs=Emacs, meta=Meta, stack={Pos,Max}}, Cmd) ->
@@ -664,12 +698,14 @@ attach_meta_cmd(Att = #attach{emacs=Emacs, meta=Meta, stack={Pos,Max}}, Cmd) ->
     end.
 
 attach_goto(Emacs, Meta, Mod, Line, Pos, Max) ->
-    Bs = sort(int:meta(Meta, bindings, Pos)),
-    Vars = [{Name, fmt("~s = ~P~n", [pad(10, Name), Val, 9])} ||
-               {Name,Val} <- Bs],
+    Bs = sort(int:meta(Meta, bindings, stack_pos(Pos,Max))),
+    Vars = [{Name, fmt("~s = ~P~n", [pad(10, Name), Val, 9])} || 
+	       {Name,Val} <- Bs],
     Emacs ! {variables, Vars},
     Emacs ! {location, Mod, Line, Pos, Max}.
-
+stack_pos(X,X) -> nostack;
+stack_pos(Pos,_) -> Pos.
+    
 %% ----------------------------------------------------------------------
 %% Completion support
 %% ----------------------------------------------------------------------
@@ -687,9 +723,9 @@ modules(Prefix) ->
 fm_dir(Dir, Prefix, Acc) ->
     case file:list_dir(Dir) of
 	{ok, Files} ->
-	    Mods = [filename:basename(F, ".beam") || F <- Files,
-						     lists:prefix(Prefix, F),
-						     lists:suffix(".beam", F)],
+	    Mods = [basename(F, ".beam") || F <- Files,
+					    lists:prefix(Prefix, F),
+					    lists:suffix(".beam", F)],
 	    Mods ++ Acc;
 	_ ->
 	    Acc
@@ -698,7 +734,7 @@ fm_dir(Dir, Prefix, Acc) ->
 %% Returns: [FunName] of all exported functions of Mod starting with Prefix.
 %% Mod = atom()
 %% Prefix = string()
-functions(Mod, Prefix) ->
+functions(Mod, _Prefix) ->
 %  FIXME: have to decide which approach is better - all loaded or all in path
 %         i, of course, prefer all in path (mbj)
 %    case catch Mod:module_info(exports) of
@@ -739,7 +775,7 @@ free_vars(Text) ->
 free_vars(Text, StartLine) ->
     %% StartLine/EndLine may be useful in error messages.
     {ok, Ts, EndLine} = erl_scan:string(Text, StartLine),
-    Ts1 = lists:reverse(strip(lists:reverse(Ts))),
+    %%Ts1 = lists:reverse(strip(lists:reverse(Ts))),
     Ts2 = [{'begin', 1}] ++ Ts ++ [{'end', EndLine}, {dot, EndLine}],
     case erl_parse:parse_exprs(Ts2) of
         {ok, Es} ->
@@ -930,8 +966,8 @@ best_arg(A1, A2) when atom(A1),atom(A2) ->
 	true -> A2;
 	false -> A1
     end;
-best_arg(A1, A2) when atom(A1) -> A1;
-best_arg(A1, A2)               -> A2.
+best_arg(A1, _A2) when atom(A1) -> A1;
+best_arg(_A1, A2)               -> A2.
 
 %% transpose([[1,2],[3,4],[5,6]]) -> [[1,3,5],[2,4,6]]
 transpose([[]|_]) ->
@@ -1039,8 +1075,8 @@ get_int(B) ->
 
 %% Ret: [{M,F,A}], M = F = binary()
 who_calls(M, F, A) ->
-    [{fmt("~p", [Mod]), fmt("~p", [Fun]), A, Line}
-     || {Mod,Fun,A,Line} <- calls_to(M, F, A)].
+    [{fmt("~p", [Mod]), fmt("~p", [Fun]), Aa, Line}
+     || {Mod,Fun,Aa,Line} <- calls_to(M, F, A)].
 
 %% Ret: [{M,F,A,Line}] of callers to M:F/A
 calls_to(M, F, A) ->
@@ -1133,26 +1169,26 @@ find_calls_from_mod([_ | T], M) ->
 find_calls_from_mod([], _M) ->
     error.
 
-refresh_callers(Callers, Applies) ->
+refresh_callers(Callers, _Applies) ->
     map(fun refresh_dir/1, Callers).
 
 ts(F) ->
     {ok, FI} = file:read_file_info(F),
     FI#file_info.mtime.
-    
+
 refresh_dir({Dir, Mods}) ->
     case file:list_dir(Dir) of
 	{ok, Files} ->
-	    FsMods0 = [{?L2A(filename:basename(F, ".beam")), ts(Dir++"/"++F)} ||
+	    FsMods0 = [{?L2A(basename(F, ".beam")), ts(Dir++"/"++F)} ||
 			  F <- Files,
 			  lists:suffix(".beam", F)],
 	    FsMods = lists:keysort(1, FsMods0),
-	    {Dir, refresh_mods(Mods, FsMods0)};
+	    {Dir, refresh_mods(Mods, FsMods)};
 	_ ->
 	    {Dir, []}
     end.
 
-refresh_mods([{M, Ts, Calls} = H | T1], [{M, Ts} | T2]) -> % not modified
+refresh_mods([{M, Ts, _Calls} = H | T1], [{M, Ts} | T2]) -> % not modified
     [H | refresh_mods(T1, T2)];
 refresh_mods([{M, _, _} | T1], [{M, Ts} | T2]) -> % modified
     [{M, Ts, calls(M)} | refresh_mods(T1, T2)];

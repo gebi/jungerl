@@ -1,3 +1,31 @@
+2005-06-03  Mats Cronqvist  <locmacr@mwlx084>
+
+	* elisp/erl-service.el (erl-openparent): inserts a "(" and the
+	argument list from erl-openparen.
+	
+	(erl-reload-dwim): Do What I Mean to erl-reload-module. when
+	reloading beam files; if erl-reload-dwim is non-nil, and the
+	erlang module cannot be found in the load path, we attempt to find
+	the correct directory. I.e. if we're editing PATH/Mod.erl we look
+	for PATH/Mod.beam orelse PATH/../ebin/Mod.beam. if found we add
+	the dir to the load path and retry the load.  We also don't prompt
+	for the module name. this is your basic bloat.
+
+	* elisp/distel.el (Module): bound M-( to erl-openparent
+
+2005-06-02  Mats Cronqvist  <locmacr@mwlx084>
+
+	* src/distel.erl (reload_module/2): runs c:l/1, if it fails it looks
+	for the beam file in in srcdir and srcdir/../ebin (srcdir is where
+	the .erl file that you're editing lives, it's sent from emacs). if
+	it finds the beam file it adds the appropriate dir to the load
+	path and reruns c:l/1.
+	(stack_pos/2): debugger wouldn't show the variable
+	bindings in the top level function. now it does! 
+	(refresh_dir/1): fixed typo 
+	(Module): imported some functions from filename, renamed some
+	unused vars...
+
 2005-03-25  Mats Cronqvist  <mats.cronqvist@ericsson.com>
 
 	* elisp/derl.el (derl-int32-to-decimal): Rewrote the test for

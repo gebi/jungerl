@@ -14,7 +14,7 @@ PRIV_FILES=../priv/fdsend_drv.so \
 endif
 
 
-CFLAGS += -I$(ERL_C_INCLUDE_DIR) -I../../../support -I.
+CFLAGS += -I$(ERL_C_INCLUDE_DIR) -I../config -I.
 LIBS = -lresolv -lnsl 
 LD_SHARED = ld -shared
 

@@ -1,6 +1,7 @@
 
 
 all:
+	(cd config;$(MAKE))
 	(cd src;$(MAKE))
 	-(cd c_src;$(MAKE) -k)
 

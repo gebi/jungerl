@@ -1,3 +1,7 @@
+2005-06-07  Mats Cronqvist  <locmacr@mwlx084>
+
+	* elisp/derl.el (derl-cookie): made derl-cookie writable
+
 2005-06-03  Mats Cronqvist  <locmacr@mwlx084>
 
 	* elisp/erl-service.el (erl-openparent): inserts a "(" and the

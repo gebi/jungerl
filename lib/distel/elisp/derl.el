@@ -26,7 +26,7 @@
   :group 'distel)
 
 (defvar derl-cookie nil
-  "Cookie to use in distributed erlang connections, or NIL.
+  "*Cookie to use in distributed erlang connections, or NIL.
 When NIL, we read ~/.erlang.cookie.")
 
 ;; Local variables

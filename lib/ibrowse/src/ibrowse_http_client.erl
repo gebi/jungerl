@@ -120,8 +120,8 @@ handle_info({{send_req, [Url, Headers, Method,
 		  false ->
 		      State;
 		   _PHost ->
-		      ProxyUser = get_value(proxy_user, Options),
-		      ProxyPassword = get_value(proxy_password, Options),
+		      ProxyUser = get_value(proxy_user, Options, []),
+		      ProxyPassword = get_value(proxy_password, Options, []),
 		      SaveResponseToFile = get_value(save_response_to_file, Options, false),
 		      Digest = http_auth_digest(ProxyUser, ProxyPassword),
 		      State#state{use_proxy = true,
@@ -486,10 +486,14 @@ add_auth_headers(#url{username = User,
     case UseProxy of
 	false ->
 	    Headers_1;
+	true when ProxyAuthDigest == [] ->
+	    Headers_1;
 	true ->
 	    [{"Proxy-Authorization", ["Basic ", ProxyAuthDigest]} | Headers_1]
     end.
 			
+http_auth_digest([], []) ->
+    [];
 http_auth_digest(Username, Password) ->
     encode_base64(Username ++ [$: | Password]).
 

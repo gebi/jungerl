@@ -238,13 +238,20 @@ open_samr_pipe(S, Pdu0) ->
 %%%
 rpc_bind(S, Pdu, ServiceType) ->
     Rpc = e_rpc_bind(ServiceType),
-    {ok,BindRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, Rpc),
-    case catch d_bind_response(BindRes) of
-	Ack when record(Ack, rpc_bind_ack) ->
-	    {ok,Pdu2};
-	Else ->
-	    throw({error, Else})
+    Pdu2 = esmb:named_pipe_transaction(S, Pdu, Rpc),
+    case esmb:error_p(Pdu2) of
+	false ->
+	    case catch d_bind_response(Pdu2#smbpdu.data) of
+		Ack when record(Ack, rpc_bind_ack) ->
+		    {ok,Pdu2};
+		Else ->
+		    ?elog("<CRASH> rpc_bind, d_bind_response=~p~n",[Else]),
+		    throw({error, Else})
+	    end;
+	{true, _Ecode, Emsg} ->
+	    throw({error, Emsg})
     end.
+	    
 
 
 %%%
@@ -267,20 +274,25 @@ rpc_bind(S, Pdu, ServiceType) ->
 rpc_netr_share_enum(S, Pdu, IpStr) ->
     UnicodeP = unicode_p(Pdu),
     SrvSvcPdu = e_rpc_netr_share_enum(UnicodeP, IpStr),
-    {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SrvSvcPdu),
-    case catch d_rpc_response(S, Pdu2, RpcRes) of
-	{Pdu3, NseRes} when record(NseRes, rpc_response) ->
-	    %%?elog("+++++++ FragType=~p~n",[NseRes#rpc_response.frag_type]),
-	    case catch d_rpc_netr_share_enum(UnicodeP, NseRes) of
-		{ok, Nse} -> {ok,Nse,Pdu3};
+    Pdu2 = esmb:named_pipe_transaction(S, Pdu, SrvSvcPdu),
+    case esmb:error_p(Pdu2) of
+	false ->
+	    case catch d_rpc_response(S, Pdu2, Pdu2#smbpdu.data) of
+		{Pdu3, NseRes} when record(NseRes, rpc_response) ->
+		    case catch d_rpc_netr_share_enum(UnicodeP, NseRes) of
+			{ok, Nse} -> {ok,Nse,Pdu3};
+			Else ->
+			    ?elog("d_netr_share_enum failed: ~p~n",[Else]),
+			    throw({error, "netr_share_enum"})
+		    end;
 		Else ->
-		    ?elog("d_netr_share_enum failed: ~p~n",[Else]),
-		    throw({error, "netr_share_enum"})
+		    ?elog("r_netr_share_enum failed: ~p~n",[Else]),
+		    throw({error, "rpc_response"})
 	    end;
-	Else ->
-	    ?elog("r_netr_share_enum failed: ~p~n",[Else]),
-	    throw({error, "rpc_response"})
+	{true, _Ecode, Emsg} ->
+	    throw({error, Emsg})
     end.
+	
 
 	 
 
@@ -297,20 +309,26 @@ rpc_netr_share_enum(S, Pdu, IpStr) ->
 rpc_samr_connect(S, Pdu, IpStr) ->
     UnicodeP = unicode_p(Pdu),
     SamrPDU = e_rpc_samr_connect2(UnicodeP, IpStr),
-    {ok, RpcRes, Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
-    case catch d_rpc_response(S, Pdu2, RpcRes) of
-	{Pdu3, Resp1} when record(Resp1, rpc_response) ->
-	    case catch d_rpc_samr_connect2(UnicodeP, Resp1) of
-		{ok, CtxHandle}   -> {ok, CtxHandle, Pdu3};
-		{error, Rc} = Err -> throw(Err);
+    Pdu2 = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
+    case esmb:error_p(Pdu2) of
+	false ->
+	    case catch d_rpc_response(S, Pdu2, Pdu2#smbpdu.data) of
+		{Pdu3, Resp1} when record(Resp1, rpc_response) ->
+		    case catch d_rpc_samr_connect2(UnicodeP, Resp1) of
+			{ok, CtxHandle}   -> {ok, CtxHandle, Pdu3};
+			{error, Rc} = Err -> throw(Err);
+			Else ->
+			    ?elog("d_samr_connect failed: ~p~n",[Else]),
+			    throw({error, "samr_connect"})
+		    end;
 		Else ->
-		    ?elog("d_samr_connect failed: ~p~n",[Else]),
-		    throw({error, "samr_connect"})
+		    ?elog("r_samr_connect failed: ~p~n",[Else]),
+		    throw({error, "rpc_response"})
 	    end;
-	Else ->
-	    ?elog("r_samr_connect failed: ~p~n",[Else]),
-	    throw({error, "rpc_response"})
+	{true, _Ecode, Emsg} ->
+	    throw({error, Emsg})
     end.
+
 
 
 %%%
@@ -325,20 +343,26 @@ rpc_samr_connect(S, Pdu, IpStr) ->
 %%%
 rpc_samr_close(S, Pdu, CtxHandle) ->
     SamrPDU = e_rpc_samr_close(CtxHandle),
-    {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
-    case catch d_rpc_response(S, Pdu2, RpcRes) of
-	{Pdu3, Resp} when record(Resp, rpc_response) ->
-	    case catch d_rpc_samr_close(Resp) of
-		ok                -> {ok, Pdu3};
-		{error, Rc} = Err -> throw(Err);
+    Pdu2 = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
+    case esmb:error_p(Pdu2) of
+	false ->
+	    case catch d_rpc_response(S, Pdu2, Pdu2#smbpdu.data) of
+		{Pdu3, Resp} when record(Resp, rpc_response) ->
+		    case catch d_rpc_samr_close(Resp) of
+			ok                -> {ok, Pdu3};
+			{error, Rc} = Err -> throw(Err);
+			Else ->
+			    ?elog("d_samr_close failed: ~p~n",[Else]),
+			    throw({error, "samr_close"})
+		    end;
 		Else ->
-		    ?elog("d_samr_close failed: ~p~n",[Else]),
-		    throw({error, "samr_close"})
+		    ?elog("r_samr_close failed: ~p~n",[Else]),
+		    throw({error, "rpc_response"})
 	    end;
-	Else ->
-	    ?elog("r_samr_close failed: ~p~n",[Else]),
-	    throw({error, "rpc_response"})
+	{true, _Ecode, Emsg} ->
+	    throw({error, Emsg})
     end.
+
 
 
 %%%
@@ -352,20 +376,26 @@ rpc_samr_close(S, Pdu, CtxHandle) ->
 rpc_samr_enum_doms(S, Pdu, CtxHandle) ->
     UnicodeP = unicode_p(Pdu),
     SamrPDU = e_rpc_samr_enum_doms(UnicodeP, CtxHandle),
-    {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
-    case catch d_rpc_response(S, Pdu2, RpcRes) of
-	{Pdu3, Resp1} when record(Resp1, rpc_response) ->
-	    case d_rpc_samr_enum_doms(UnicodeP, Resp1) of
-		{ok, Doms}        -> {ok, Doms, Pdu3};
-		{error, Rc} = Err -> throw(Err);
+    Pdu2 = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
+    case esmb:error_p(Pdu2) of
+	false ->
+	    case catch d_rpc_response(S, Pdu2, Pdu2#smbpdu.data) of
+		{Pdu3, Resp1} when record(Resp1, rpc_response) ->
+		    case d_rpc_samr_enum_doms(UnicodeP, Resp1) of
+			{ok, Doms}        -> {ok, Doms, Pdu3};
+			{error, Rc} = Err -> throw(Err);
+			Else ->
+			    ?elog("d_samr_enum_dom failed: ~p~n",[Else]),
+			    throw({error, "samr_enum_dom"})
+		    end;
 		Else ->
-		    ?elog("d_samr_enum_dom failed: ~p~n",[Else]),
-		    throw({error, "samr_enum_dom"})
+		    ?elog("r_samr_enum_dom failed: ~p~n",[Else]),
+		    throw({error, "rpc_response"})
 	    end;
-	Else ->
-	    ?elog("r_samr_enum_dom failed: ~p~n",[Else]),
-	    throw({error, "rpc_response"})
+	{true, _Ecode, Emsg} ->
+	    throw({error, Emsg})
     end.
+
 
 
 %%%
@@ -385,20 +415,26 @@ rpc_samr_lookup_doms(S, Pdu, CtxHandle, Doms) ->
     %% Just one domain at the moment....
     Dom = hd(X),
     SamrPDU = e_rpc_samr_lookup_doms(UnicodeP, CtxHandle, Dom),
-    {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
-    case catch d_rpc_response(S, Pdu2, RpcRes) of
-	{Pdu3, Resp1} when record(Resp1, rpc_response) ->
-	    case d_rpc_samr_lookup_doms(UnicodeP, Resp1, Dom) of
-		{ok, Ds}          -> {ok, Ds, Pdu3};
-		{error, Rc} = Err -> throw(Err);
+    Pdu2 = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
+    case esmb:error_p(Pdu2) of
+	false ->
+	    case catch d_rpc_response(S, Pdu2, Pdu2#smbpdu.data) of
+		{Pdu3, Resp1} when record(Resp1, rpc_response) ->
+		    case d_rpc_samr_lookup_doms(UnicodeP, Resp1, Dom) of
+			{ok, Ds}          -> {ok, Ds, Pdu3};
+			{error, Rc} = Err -> throw(Err);
+			Else ->
+			    ?elog("d_samr_lookup_doms failed: ~p~n",[Else]),
+			    throw({error, "samr_lookup_doms"})
+		    end;
 		Else ->
-		    ?elog("d_samr_lookup_doms failed: ~p~n",[Else]),
-		    throw({error, "samr_lookup_doms"})
+		    ?elog("r_samr_lookup_doms failed: ~p~n",[Else]),
+		    throw({error, "rpc_response"})
 	    end;
-	Else ->
-	    ?elog("r_samr_lookup_doms failed: ~p~n",[Else]),
-	    throw({error, "rpc_response"})
+	{true, _Ecode, Emsg} ->
+	    throw({error, Emsg})
     end.
+
 
 %%%
 %%% @spec rpc_samr_open_domain(S::socket(), PDU::pdu(), 
@@ -412,19 +448,24 @@ rpc_samr_lookup_doms(S, Pdu, CtxHandle, Doms) ->
 %%%
 rpc_samr_open_domain(S, Pdu, IpStr, CtxHandle, Domain) ->
     SamrPDU = e_rpc_samr_open_domain(CtxHandle, Domain),
-    {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
-    case catch d_rpc_response(S, Pdu2, RpcRes) of
-	{Pdu3, Resp1} when record(Resp1, rpc_response) ->
-	    case d_rpc_samr_open_domain(Resp1) of
-		{ok, CtxHandle2}  -> {ok, CtxHandle2, Pdu3};
-		{error, Rc} = Err -> throw(Err);
+    Pdu2 = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
+    case esmb:error_p(Pdu2) of
+	false ->
+	    case catch d_rpc_response(S, Pdu2, Pdu2#smbpdu.data) of
+		{Pdu3, Resp1} when record(Resp1, rpc_response) ->
+		    case d_rpc_samr_open_domain(Resp1) of
+			{ok, CtxHandle2}  -> {ok, CtxHandle2, Pdu3};
+			{error, Rc} = Err -> throw(Err);
+			Else ->
+			    ?elog("d_samr_open_domain failed: ~p~n",[Else]),
+			    throw({error, "samr_open_domain"})
+		    end;
 		Else ->
-		    ?elog("d_samr_open_domain failed: ~p~n",[Else]),
-		    throw({error, "samr_open_domain"})
+		    ?elog("r_samr_open_domain failed: ~p~n",[Else]),
+		    throw({error, "rpc_response"})
 	    end;
-	Else ->
-	    ?elog("r_samr_open_domain failed: ~p~n",[Else]),
-	    throw({error, "rpc_response"})
+	{true, _Ecode, Emsg} ->
+	    throw({error, Emsg})
     end.
 
 
@@ -442,20 +483,26 @@ rpc_samr_open_domain(S, Pdu, IpStr, CtxHandle, Domain) ->
 %%%
 rpc_samr_lookup_names(S, Pdu, IpStr, CtxHandle, Names) ->
     SamrPDU = e_rpc_samr_lookup_names(Pdu, CtxHandle, Names),
-    {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
-    case catch d_rpc_response(S, Pdu2, RpcRes) of
-	{Pdu3, Resp1} when record(Resp1, rpc_response) ->
-	    case d_rpc_samr_lookup_names(Resp1) of
-		{ok, Rid, Type}   -> {ok, Rid, Type, Pdu3};
-		{error, Rc} = Err -> throw(Err);
+    Pdu2 = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
+    case esmb:error_p(Pdu2) of
+	false ->
+	    case catch d_rpc_response(S, Pdu2, Pdu2#smbpdu.data) of
+		{Pdu3, Resp1} when record(Resp1, rpc_response) ->
+		    case d_rpc_samr_lookup_names(Resp1) of
+			{ok, Rid, Type}   -> {ok, Rid, Type, Pdu3};
+			{error, Rc} = Err -> throw(Err);
+			Else ->
+			    ?elog("d_samr_lookup_names failed: ~p~n",[Else]),
+			    throw({error, "samr_lookup_names"})
+		    end;
 		Else ->
-		    ?elog("d_samr_lookup_names failed: ~p~n",[Else]),
-		    throw({error, "samr_lookup_names"})
+		    ?elog("r_samr_lookup_names failed: ~p~n",[Else]),
+		    throw({error, "rpc_response"})
 	    end;
-	Else ->
-	    ?elog("r_samr_lookup_names failed: ~p~n",[Else]),
-	    throw({error, "rpc_response"})
+	{true, _Ecode, Emsg} ->
+	    throw({error, Emsg})
     end.
+
 
 
 %%%
@@ -484,19 +531,24 @@ rpc_samr_open_user(S, Pdu, IpStr, CtxHandle, Name, Rid) ->
 %%%
 rpc_samr_open_user(S, Pdu, IpStr, CtxHandle, User) ->
     SamrPDU = e_rpc_samr_open_user(CtxHandle, User),
-    {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
-    case catch d_rpc_response(S, Pdu2, RpcRes) of
-	{Pdu3, Resp1} when record(Resp1, rpc_response) ->
-	    case d_rpc_samr_open_user(Resp1) of
-		{ok, CtxHandle2}  -> {ok,CtxHandle2,Pdu3};
-		{error, Rc} = Err -> throw(Err);
+    Pdu2 = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
+    case esmb:error_p(Pdu2) of
+	false ->
+	    case catch d_rpc_response(S, Pdu2, Pdu2#smbpdu.data) of
+		{Pdu3, Resp1} when record(Resp1, rpc_response) ->
+		    case d_rpc_samr_open_user(Resp1) of
+			{ok, CtxHandle2}  -> {ok,CtxHandle2,Pdu3};
+			{error, Rc} = Err -> throw(Err);
+			Else ->
+			    ?elog("d_samr_open_user failed: ~p~n",[Else]),
+			    throw({error, "samr_open_user"})
+		    end;
 		Else ->
-		    ?elog("d_samr_open_user failed: ~p~n",[Else]),
-		    throw({error, "samr_open_user"})
+		    ?elog("r_samr_open_user failed: ~p~n",[Else]),
+		    throw({error, "rpc_response"})
 	    end;
-	Else ->
-	    ?elog("r_samr_open_user failed: ~p~n",[Else]),
-	    throw({error, "rpc_response"})
+	{true, _Ecode, Emsg} ->
+	    throw({error, Emsg})
     end.
 
 
@@ -512,20 +564,26 @@ rpc_samr_open_user(S, Pdu, IpStr, CtxHandle, User) ->
 %%%
 rpc_samr_user_groups(S, Pdu, IpStr, CtxHandle) ->
     SamrPDU = e_rpc_samr_user_groups(CtxHandle),
-    {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
-    case catch d_rpc_response(S, Pdu2, RpcRes) of
-	{Pdu3, Resp1} when record(Resp1, rpc_response) ->
-	    case d_rpc_samr_user_groups(Resp1) of
-		{ok, RidList}     -> {ok,RidList,Pdu3};
-		{error, Rc} = Err -> throw(Err);
+    Pdu2 = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
+    case esmb:error_p(Pdu2) of
+	false ->
+	    case catch d_rpc_response(S, Pdu2, Pdu2#smbpdu.data) of
+		{Pdu3, Resp1} when record(Resp1, rpc_response) ->
+		    case d_rpc_samr_user_groups(Resp1) of
+			{ok, RidList}     -> {ok,RidList,Pdu3};
+			{error, Rc} = Err -> throw(Err);
+			Else ->
+			    ?elog("d_samr_user_groups failed: ~p~n",[Else]),
+			    throw({error, "samr_open_user"})
+		    end;
 		Else ->
-		    ?elog("d_samr_user_groups failed: ~p~n",[Else]),
-		    throw({error, "samr_open_user"})
+		    ?elog("r_samr_user_groups failed: ~p~n",[Else]),
+		    throw({error, "rpc_response"})
 	    end;
-	Else ->
-	    ?elog("r_samr_user_groups failed: ~p~n",[Else]),
-	    throw({error, "rpc_response"})
+	{true, _Ecode, Emsg} ->
+	    throw({error, Emsg})
     end.
+
 
 
 %%%
@@ -541,20 +599,26 @@ rpc_samr_user_groups(S, Pdu, IpStr, CtxHandle) ->
 %%%
 rpc_samr_lookup_rids(S, Pdu, IpStr, CtxHandle, Ns0) ->
     SamrPDU = e_rpc_samr_lookup_rids(CtxHandle, Ns0),
-    {ok,RpcRes,Pdu2} = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
-    case catch d_rpc_response(S, Pdu2, RpcRes) of
-	{Pdu3, Resp1} when record(Resp1, rpc_response) ->
-	    case d_rpc_samr_lookup_rids(unicode_p(Pdu), Resp1, Ns0) of
-		{ok, Ns}          -> {ok,Ns,Pdu3};
-		{error, Rc} = Err -> throw(Err);
+    Pdu2 = esmb:named_pipe_transaction(S, Pdu, SamrPDU),
+    case esmb:error_p(Pdu2) of
+	false ->
+	    case catch d_rpc_response(S, Pdu2, Pdu2#smbpdu.data) of
+		{Pdu3, Resp1} when record(Resp1, rpc_response) ->
+		    case d_rpc_samr_lookup_rids(unicode_p(Pdu), Resp1, Ns0) of
+			{ok, Ns}          -> {ok,Ns,Pdu3};
+			{error, Rc} = Err -> throw(Err);
+			Else ->
+			    ?elog("d_samr_lookup_rids failed: ~p~n",[Else]),
+			    throw({error, "samr_lookup_rids"})
+		    end;
 		Else ->
-		    ?elog("d_samr_lookup_rids failed: ~p~n",[Else]),
-		    throw({error, "samr_lookup_rids"})
+		    ?elog("r_samr_lookup_rids failed: ~p~n",[Else]),
+		    throw({error, "rpc_response"})
 	    end;
-	Else ->
-	    ?elog("r_samr_lookup_rids failed: ~p~n",[Else]),
-	    throw({error, "rpc_response"})
+	{true, _Ecode, Emsg} ->
+	    throw({error, Emsg})
     end.
+
 
 
 
@@ -1173,12 +1237,14 @@ frag_handler(S, Pdu, R, Ahint, Dlen, Acc)
 
 read_frag(S, Pdu, Finfo) ->
     {Pdu1, Bin} = esmb:smb_read_andx_pdu(Pdu, Finfo),
-    case esmb:decode_smb_response(Pdu1, esmb:nbss_session_service(S, Bin)) of
-	{ok, Pdu2, Packet} -> 
+    case catch esmb:decode_smb_response(Pdu1, esmb_netbios:nbss_session_service(S, Bin)) of
+	?IS_OK(Pdu2) -> 
+	    Packet = Pdu2#smbpdu.data,
 	    {Pdu2, Packet};
+	?IS_ERROR(Pdu2) ->
+	    throw(Pdu2);
 	_ ->
-	    throw({error, Pdu1#smbpdu{eclass = ?INTERNAL, 
-				      emsg   = "read_frag/3"}})
+	    throw(Pdu1#smbpdu{eclass = ?INTERNAL, emsg = "read_frag/3"})
     end.
 
 trim_binary(Bin, Size) when size(Bin) > Size -> 

@@ -12,19 +12,12 @@
 -define(log(T,X,Y), ?lmsg("TC(~w) ~p(~p): " X,
 		 	  [T, ?MODULE, ?LINE | Y])).
 
--define(error(Pdu), Pdu when Pdu#smbpdu.eclass =/= ?SUCCESS; 
-                             Pdu#smbpdu.eclass == ?ERRNT, 
-                             Pdu#smbpdu.ecode =/= ?SUCCESS ).
-
--define(emsg(Pdu), esmb:emsg(Pdu#smbpdu.eclass, Pdu#smbpdu.ecode, "")).
-
--define(TC(N,Str), i2l(N)++" "++Str).
-
+-define(TC(N,Str), "TC("++i2l(N)++") "++Str).
 
 -define(SZ_10K, 10000).
 
 %%%
-%%% Example: start("smb://tobbe@pungmes/tobbe")
+%%% Example: esmb_test:start("smb://tobbe@pungmes/tobbe")
 %%%
 start(Uri) ->
     Passwd = get_passwd(),
@@ -80,27 +73,21 @@ tc(1, info) ->
 tc(1 = N, U) ->
     case esmb:connect(U#user.host) of
 	{ok,S,Neg} ->
-	    case catch esmb:user_logon(S, Neg, U) of
-		{'EXIT', Reason} ->
-		    ?log(N, "Login failed, reason: ~p~n", [Reason]),
-		    {error, Reason};
-		?error(Pdu0) ->
-		    Emsg = ?emsg(Pdu0),
+	    case esmb:user_logon(S, Neg, U) of
+		?IS_ERROR(Pdu0) ->
+		    Emsg = ?EMSG(Pdu0),
 		    ?log(N, "Login error: ~p~n", [Emsg]),
 		    esmb:close(S),
 		    {error, Emsg};
-		Pdu0 ->
+		?IS_OK(Pdu0) ->
 		    Path = mk_path(U, Pdu0),
-		    case catch esmb:tree_connect(S, Pdu0#smbpdu.neg, Pdu0, Path) of
-			{'EXIT', Reason} ->
-			    ?log(N, "Login failed, reason: ~p~n", [Reason]),
-			    {error, Reason};
-			?error(Pdu1) ->
-			    Emsg1 = ?emsg(Pdu1),
+		    case esmb:tree_connect(S, Pdu0#smbpdu.neg, Pdu0, Path) of
+			?IS_ERROR(Pdu1) ->
+			    Emsg1 = ?EMSG(Pdu1),
 			    ?log(N, "Login error: ~p~n", [Emsg1]),
 			    esmb:close(S),
 			    {error, Emsg1};
-			Pdu1 ->
+			?IS_OK(Pdu1) ->
 			    esmb:close(S),
 			    ok
 		    end
@@ -116,17 +103,14 @@ tc(2, info) ->
     "TC(2) delete dir: esmb_test";
 tc(2 = N, U) ->
     {S, Pdu} = setup(U),
-    case catch esmb:rmdir(S, Pdu, to_ucs2(Pdu, "\\esmb_test")) of
-	{'EXIT', Reason} ->
-	    ?log(N, "rmdir failed, reason: ~p~n", [Reason]),
-	    {error, Reason};
-	?error(Pdu1) ->
-	    Emsg = ?emsg(Pdu1),
+    case esmb:rmdir(S, Pdu, to_ucs2(Pdu, "\\esmb_test")) of
+	?IS_ERROR(Pdu1) ->
+	    Emsg = ?EMSG(Pdu1),
 	    ?log(N, "rmdir error (eclass=~p, ecode=~p): ~p~n", 
 		 [Pdu1#smbpdu.eclass, Pdu1#smbpdu.ecode, Emsg]),
 	    esmb:close(S),
 	    {error, Emsg};
-	Pdu1 ->
+	?IS_OK(Pdu1) ->
 	    esmb:close(S),
 	    ok
     end;
@@ -137,17 +121,14 @@ tc(3, info) ->
     "TC(3) delete non-existing dir: esmb_test";
 tc(3 = N, U) ->
     {S, Pdu} = setup(U),
-    case catch esmb:rmdir(S, Pdu, to_ucs2(Pdu, "\\esmb_test")) of
-	{'EXIT', Reason} ->
-	    ?log(N, "rmdir failed, reason: ~p~n", [Reason]),
-	    {error, Reason};
-	?error(Pdu1) ->
-	    Emsg = ?emsg(Pdu1),
+    case esmb:rmdir(S, Pdu, to_ucs2(Pdu, "\\esmb_test")) of
+	?IS_ERROR(Pdu1) ->
+	    Emsg = ?EMSG(Pdu1),
 	    ?log(N, "rmdir error (eclass=~p, ecode=~p): ~p~n", 
 		 [Pdu1#smbpdu.eclass, Pdu1#smbpdu.ecode, Emsg]),
 	    esmb:close(S),
 	    {error, Emsg};
-	Pdu1 ->
+	?IS_OK(Pdu1) ->
 	    esmb:close(S),
 	    ok
     end;
@@ -158,12 +139,9 @@ tc(4, info) ->
     "TC(4) create dir: esmb_test";
 tc(4 = N, U) ->
     {S, Pdu} = setup(U),
-    case catch esmb:mkdir(S, Pdu, to_ucs2(Pdu, "\\esmb_test")) of
-	{'EXIT', Reason} ->
-	    ?log(N, "mkdir failed, reason: ~p~n", [Reason]),
-	    {error, Reason};
-	?error(Pdu1) ->
-	    Emsg = ?emsg(Pdu1),
+    case esmb:mkdir(S, Pdu, to_ucs2(Pdu, "\\esmb_test")) of
+	?IS_ERROR(Pdu1) ->
+	    Emsg = ?EMSG(Pdu1),
 	    ?log(N, "mkdir error: ~p~n", [Emsg]),
 	    esmb:close(S),
 	    {error, Emsg};
@@ -179,12 +157,9 @@ tc(5, info) ->
     "TC(5) create existing dir: esmb_test";
 tc(5 = N, U) ->
     {S, Pdu} = setup(U),
-    case catch esmb:mkdir(S, Pdu, to_ucs2(Pdu, "\\esmb_test")) of
-	{'EXIT', Reason} ->
-	    ?log(N, "mkdir failed, reason: ~p~n", [Reason]),
-	    {error, Reason};
-	?error(Pdu1) ->
-	    Emsg = ?emsg(Pdu1),
+    case esmb:mkdir(S, Pdu, to_ucs2(Pdu, "\\esmb_test")) of
+	?IS_ERROR(Pdu1) ->
+	    Emsg = ?EMSG(Pdu1),
 	    ?log(N, "mkdir error: ~p~n", [Emsg]),
 	    esmb:close(S),
 	    {error, Emsg};
@@ -201,12 +176,9 @@ tc(6, info) ->
 tc(6 = N, U) ->
     {S, Pdu} = setup(U),
     Fname = to_ucs2(Pdu, "\\esmb_test\\10k.file"),
-    case catch esmb:open_file_rw(S, Pdu, Fname) of
-	{'EXIT', Reason} ->
-	    ?log(N, "open_file_rw failed, reason: ~p~n", [Reason]),
-	    {error, Reason};
-	?error(Pdu1) ->
-	    Emsg = ?emsg(Pdu1),
+    case esmb:open_file_rw(S, Pdu, Fname) of
+	?IS_ERROR(Pdu1) ->
+	    Emsg = ?EMSG(Pdu1),
 	    ?log(N, "open_file_rw error(eclass=~p, ecode=~p): ~p~n", 
 		 [Pdu1#smbpdu.eclass, Pdu1#smbpdu.ecode, Emsg]),
 	    esmb:close(S),
@@ -214,12 +186,9 @@ tc(6 = N, U) ->
 	Pdu1 ->
 	    Bin = mk_bin(?SZ_10K),
 	    Finfo = #file_info{name = Fname, data = [Bin]},
-	    case catch esmb:write_file(S, Pdu1, Finfo) of
-		{'EXIT', Reason} ->
-		    ?log(N, "write_file failed, reason: ~p~n", [Reason]),
-		    {error, Reason};
-		{ok, Wrote, Pdu2} ->
-		    ?log(N, "write_file wrote: ~p bytes~n", [Wrote]),
+	    case esmb:write_file(S, Pdu1, Finfo) of
+		?IS_OK(Pdu2) ->
+		    ?log(N, "write_file wrote: ~p bytes~n", [?WRITTEN(Pdu2)]),
 		    esmb:close_file(S, Pdu1, Pdu1#smbpdu.fid),
 		    esmb:close(S),
 		    ok;
@@ -244,12 +213,9 @@ tc(8, info) ->
 tc(8 = N, U) ->
     {S, Pdu} = setup(U),
     Fname = to_ucs2(Pdu, "\\esmb_test\\10k.file"),
-    case catch esmb:delete_file(S, Pdu, Fname) of
-	{'EXIT', Reason} ->
-	    ?log(N, "open_file_rw failed, reason: ~p~n", [Reason]),
-	    {error, Reason};
-	?error(Pdu1) ->
-	    Emsg = ?emsg(Pdu1),
+    case esmb:delete_file(S, Pdu, Fname) of
+	?IS_ERROR(Pdu1) ->
+	    Emsg = ?EMSG(Pdu1),
 	    ?log(N, "open_file_rw error(eclass=~p, ecode=~p): ~p~n", 
 		 [Pdu1#smbpdu.eclass, Pdu1#smbpdu.ecode, Emsg]),
 	    esmb:close(S),
@@ -267,27 +233,21 @@ tc(9 = N, U0) ->
     U = U0#user{share = U0#user.share ++ "JUNK"},
     case esmb:connect(U#user.host) of
 	{ok,S,Neg} ->
-	    case catch esmb:user_logon(S, Neg, U) of
-		{'EXIT', Reason} ->
-		    ?log(N, "Login failed, reason: ~p~n", [Reason]),
-		    {error, Reason};
-		?error(Pdu0) ->
-		    Emsg = ?emsg(Pdu0),
+	    case esmb:user_logon(S, Neg, U) of
+		?IS_ERROR(Pdu0) ->
+		    Emsg = ?EMSG(Pdu0),
 		    ?log(N, "Login error: ~p~n", [Emsg]),
 		    esmb:close(S),
 		    {error, Emsg};
-		Pdu0 ->
+		?IS_OK(Pdu0) ->
 		    Path = mk_path(U, Pdu0),
-		    case catch esmb:tree_connect(S, Pdu0#smbpdu.neg, Pdu0, Path) of
-			{'EXIT', Reason} ->
-			    ?log(N, "Login failed, reason: ~p~n", [Reason]),
-			    {error, Reason};
-			?error(Pdu1) ->
-			    Emsg1 = ?emsg(Pdu1),
+		    case esmb:tree_connect(S, Pdu0#smbpdu.neg, Pdu0, Path) of
+			?IS_ERROR(Pdu1) ->
+			    Emsg1 = ?EMSG(Pdu1),
 			    ?log(N, "Login error: ~p~n", [Emsg1]),
 			    esmb:close(S),
 			    {error, Emsg1};
-			Pdu1 ->
+			?IS_OK(Pdu1) ->
 			    esmb:close(S),
 			    ok
 		    end
@@ -298,13 +258,11 @@ tc(9 = N, U0) ->
     end.
 
 
-
 mk_bin(Size) when Size > 0 ->
     l2b(mk_list(1, Size)).
 
 mk_list(Stop, Stop)                    -> [0];
 mk_list(Start, Stop) when Start < Stop -> [0|mk_list(Start + 1, Stop)].
-
 
 
 setup(U) ->
@@ -314,8 +272,8 @@ setup(U) ->
 		{'EXIT', Reason} ->
 		    ?elog("Login failed, reason: ~p~n", [Reason]),
 		    {error, Reason};
-		?error(Pdu0) ->
-		    Emsg = ?emsg(Pdu0),
+		?IS_ERROR(Pdu0) ->
+		    Emsg = ?EMSG(Pdu0),
 		    ?elog("Login error: ~p~n", [Emsg]),
 		    esmb:close(S),
 		    {error, Emsg};
@@ -325,8 +283,8 @@ setup(U) ->
 			{'EXIT', Reason} ->
 			    ?elog("Tree-Connect failed, reason: ~p~n", [Reason]),
 			    {error, Reason};
-			?error(Pdu1) ->
-			    Emsg1 = ?emsg(Pdu1),
+			?IS_ERROR(Pdu1) ->
+			    Emsg1 = ?EMSG(Pdu1),
 			    ?elog("Tree-Connect error: ~p~n", [Emsg1]),
 			    esmb:close(S),
 			    {error, Emsg1};

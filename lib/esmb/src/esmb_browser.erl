@@ -10,7 +10,8 @@
 -behaviour(gen_server).
 
 %% External exports
--export([start/0, start_link/0, get_backup_list/0]).
+-export([start/0, start_link/0, get_workgroups/0, get_backup_list/0,
+	 get_members/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, 
@@ -75,7 +76,7 @@
 	  workgroup,      % The workgroup name, string() , Ets-Key !!
 	  ip,             % Local Master Browser, ip()
 	  name,           % Local Master Browser name, string()
-	  comment,        % Local Master Browser comment, string()
+	  comment="",     % Local Master Browser comment, string()
 	  members=[],     % Workgroup members, list(#browse_member{})
 	  backup_srvs=[], % A list of backup servers
 	  dmb=false       % Domain Master, bool()
@@ -101,6 +102,28 @@ start() ->
 
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+
+get_workgroups() ->
+    F = fun(B,Acc) -> [B#browse_list.workgroup | Acc] end,
+    ets:foldl(F, [], ?TAB).
+
+get_members(Workgroup) ->
+    case ets:lookup(?TAB, Workgroup) of
+	[] -> 
+	    [];
+	[Bl] ->
+	    Ms = [{M#browse_member.name, 
+		   M#browse_member.ip, 
+		   M#browse_member.comment} || 
+		     M <- Bl#browse_list.members],
+	    case {Bl#browse_list.name,Bl#browse_list.ip,Bl#browse_list.comment} of
+		{Name, Ip, _} when Name == undefined ; Ip == undefined ->
+		    Ms;
+		{Name, Ip, Comment} = E -> 
+		    uadd(E, Ms)
+	    end
+    end.
+
 
 get_backup_list() ->
     gen_server:cast(?SERVER, get_backup_list).
@@ -421,7 +444,7 @@ dec_mailslot_browse(<<_:17/binary,          % \MAILSLOT\BROWSE<0>
     {#browse_msg{cmd       = ?DMB_ANNOUNCEMENT, 
 		 name      = bin2nulstr(MasterBrowser),
 		 ip        = Dgm#netbios_dgm.src_ip,
-		 workgroup = Workgroup},
+		 workgroup = bin2nulstr(Workgroup)},
      Dgm};
 dec_mailslot_browse(Bin, Dgm, Ns) ->
     ?elog("dec_mailsot_browse: unable to decode: ~p~n",[Bin]),
@@ -475,10 +498,9 @@ set_option(Fd,Option) ->
     end.
 
 
-
-
-
-
+uadd(H, [H|T] = L) -> L;
+uadd(E, [H|T])     -> [H | uadd(E,T)];
+uadd(E, [])        -> [E].
 
 
 

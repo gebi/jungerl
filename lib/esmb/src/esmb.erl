@@ -82,7 +82,7 @@
 -module(esmb).
 -export([ucase/1, lcase/1, check_dir/3, bin2ip/1,
 	 connect/1, connect/2, connect/3, close/1, error_p/1,
-	 user_logon/3, user_logon/4, emsg/3, get_user_groups/4,
+	 user_logon/3, user_logon/4, emsg/3, emsg/1, get_user_groups/4,
 	 tree_connect/4, tree_connect_ipc/4, tree_connect/5, 
 	 list_dir/3, called/1, negotiate/1, sign_p/1, ssn/1,
 	 open_file_ro/3, open_file_rw/3, stream_read_file/3,
@@ -90,12 +90,13 @@
 	 astart/0, istart/0, ustart/0, start/0, to_ucs2_and_null/2,
 	 client/2, aclient/2, iclient/2, uclient/2, to_ucs2/2,
 	 close_file/2, close_file/3, write_file/4, write_file/3, 
-	 hexprint/1, b2l/1, do_ls/3, mailslot_browse_transaction/2,
+	 b2l/1, do_ls/3, mailslot_browse_transaction/2,
 	 delete_file/3, caller/0, named_pipe_transaction/4,
 	 named_pipe_transaction/3, ucs2_to_ascii/1, ip2bin/1,
 	 exit_if_error/2, list_shares/3, list_shares/5, 
 	 dec_transaction_req/2, list_server_rap/3,
 	 list_shares_old/3, list_shares_old/5, l/3, parse_uri/1,
+	 hexprint/1, hexprint/2,
 	 smb_read_andx_pdu/2, decode_smb_response/2]).
 
 -export([b2l/1, ip2bin/1, ip2str/1, lcase/1, sizeof/1]).
@@ -314,6 +315,7 @@ list_shares(Host, User, Passwd) ->
 list_shares(Host0, User, Passwd, Workgroup, SockOpts) ->
     case catch list_shares0(Host0, User, Passwd, Workgroup, SockOpts) of
 	{'EXIT', Reason} -> 
+	    ?elog("<CRASH> list_shares: ~p~n", [Reason]), 
 	    {error, "list_shares internal"};
 	Else -> 
 	    Else
@@ -697,7 +699,7 @@ bf_mailslot_browse(PipeName) ->
 %%% 
 %%%
 %%% @spec named_pipe_transaction(S::socket(), InReq::pdu(), RPC::binary()) -> 
-%%%                  {ok, binary(), pdu()} | exception()
+%%%                  pdu()
 %%%
 %%% @doc This function takes an DCE/RPC packet (<em>RPC</em>), which
 %%%      conforms to the <em>Win32 TransactNamedPipe()</em> protocol
@@ -705,13 +707,19 @@ bf_mailslot_browse(PipeName) ->
 %%% @end
 %%%
 named_pipe_transaction(S, InReq, Rpc) when binary(Rpc) ->
+    catch c_named_pipe_transaction(S, InReq, Rpc).
+
+c_named_pipe_transaction(S, InReq, Rpc) when binary(Rpc) ->
     Pipe = "\\PIPE\\",
     Path = to_ucs2_and_null(unicode_p(InReq), Pipe),
     named_pipe_transaction(S, InReq, Rpc, Path).
 
 %%% @private
-named_pipe_transaction(S, InReq, Rpc, PipeName) 
+named_pipe_transaction(S, InReq, Rpc, PipeName)
   when binary(PipeName), binary(Rpc) ->
+    catch c_named_pipe_transaction(S, InReq, Rpc, PipeName).
+
+c_named_pipe_transaction(S, InReq, Rpc, PipeName) ->
     {Req, Pdu} = smb_named_pipe_transaction(InReq, PipeName, Rpc),
     decode_smb_response(Req, nbss_session_service(S, Pdu)).
 
@@ -904,7 +912,7 @@ connect(Host, SockOpts, Port) ->
     Opts = [binary, {packet, 0}|SockOpts],
     case gen_tcp:connect(Host, Port, Opts) of
 	{ok,S} ->
-	    case nbss_session_request(S, "*SMBSERVER", caller()) of
+    case nbss_session_request(S, "*SMBSERVER", caller()) of
 		{ok,_} ->
 		    {ok, S, negotiate(S)};
 		_ ->
@@ -928,16 +936,19 @@ close(S) ->
 %%%
 %%% @spec write_file(S::socket(), N::neg(), 
 %%%                  P::pdu(), I::finfo()) ->
-%%%                   {ok, Written::integer(), pdu()} | {error, pdu()}
+%%%                   pdu()
 %%%
 %%% @doc Writes a file, which has already been opened with
 %%%      {@link open_file_rw/3}. Returns the number of bytes written.
 %%% @end
 %%%
 write_file(S, InReq, Finfo) ->
-    write_file(S, InReq#smbpdu.neg, InReq, Finfo).
+    catch c_write_file(S, InReq#smbpdu.neg, InReq, Finfo).
 
 write_file(S, Neg, InReq, Finfo) ->
+    catch c_write_file(S, Neg, InReq, Finfo).
+
+c_write_file(S, Neg, InReq, Finfo) ->
     write_file(S, Neg, InReq, Finfo, list_to_binary(Finfo#file_info.data), 0).
 
 -define(LT_BUFSIZE(Neg, Bin), 
@@ -945,17 +956,17 @@ write_file(S, Neg, InReq, Finfo) ->
 
 write_file(S, Neg, InReq, Finfo, Bin, Written) when ?LT_BUFSIZE(Neg,Bin) -> 
     {Req1, Pdu} = smb_write_andx_pdu(InReq, Finfo, Bin, Written),
-    case decode_smb_response(Req1, nbss_session_service(S, Pdu)) of
-	{ok, Wrote, Req2} ->
-	    {ok, Wrote + Written, Req2};
+    case catch decode_smb_response(Req1, nbss_session_service(S, Pdu)) of
+	Req2 ->
+	    Req2#smbpdu{written = ?WRITTEN(Req2) + Written};
 	_ ->
-	    {error, Req1#smbpdu{eclass = ?INTERNAL, emsg = "write_file"}}
+	    throw(Req1#smbpdu{eclass = ?INTERNAL, emsg = "write_file"})
     end;
 write_file(S, Neg, InReq, Finfo, Bin, Written) ->
     {B1,B2} = split_binary(Bin, Neg#smb_negotiate_res.max_buffer_size - ?HEADER_SIZE),
     case write_file(S, Neg, InReq, Finfo, B1, Written) of
-	{ok, Wrote, Res} ->
-	    write_file(S, Neg, Res, Finfo, B2, Wrote + Written);
+	?IS_OK(Res) ->
+	    write_file(S, Neg, Res, Finfo, B2, ?WRITTEN(Res) + Written);
 	Else ->
 	    Else
     end.
@@ -966,7 +977,7 @@ write_file(S, Neg, InReq, Finfo, Bin, Written) ->
 
 %%%
 %%% @spec stream_read_file(S::socket(), InReq::pdu(), I::finfo()) ->
-%%%           {ok, binary(), pdu()} | {more, binary(), pdu()} | {error, string()}
+%%%           {ok, pdu()} | {more, pdu()} | {error, string()}
 %%%
 %%% @doc A streaming version of {@link read_file/3}. It returns
 %%%      a received chunk of data + a continuation if more data
@@ -975,30 +986,43 @@ write_file(S, Neg, InReq, Finfo, Bin, Written) ->
 %%% @end
 %%%
 stream_read_file(S, InReq, Finfo) ->
-    read_file(S, InReq, Finfo, ?STREAM_READ, []).
+    catch read_file(S, InReq, Finfo, ?STREAM_READ, []).
 
 %%%
 %%% @spec read_file(S::socket(), InReq::pdu(), I::finfo()) ->
-%%%                   {ok, binary(), pdu()} | {error, pdu()}
+%%%                   pdu() | {more, pdu()}
 %%%
 %%% @doc Reads a file, which has already been opened with
 %%%      {@link open_file_ro/3}. Returns the content if the
-%%%      file as a binary. The file and the amount of data to
-%%%      read are specified with a finfo() record. In case of 
-%%%      error, you can obtain the error code and error message
+%%%      file as a binary, which can be accessed as ?SMB_DATA(Pdu). 
+%%%      The file and the amount of data to read are specified 
+%%%      with a finfo() record. In case of error, you can 
+%%%      obtain the error code and error message
 %%%      using the {@link error_p/1} function.
 %%% <br/>Example:
 %%% ```
 %%%  ...
-%%%  Pdu1 = esmb:open_file_ro(S, Pdu0, Fname),
-%%%  Finfo = #file_info{name = Fname, size = Pdu1#smbpdu.file_size},
-%%%  {ok, Bin, Pdu2} = esmb:read_file(S, Pdu1, Finfo),
+%%%  case esmb:open_file_ro(S, Pdu0, Fname) of
+%%%     Pdu1 when ?IS_OK(Pdu1) ->
+%%%        Finfo = #file_info{name = Fname, size = Pdu1#smbpdu.file_size},
+%%%        case esmb:read_file(S, Pdu1, Finfo) of
+%%%           Pdu2 when ?IS_OK(Pdu2) ->
+%%%              Data = ?SMB_DATA(Pdu2),
+%%%              ...
+%%%           {more, Pdu2} ->
+%%%              ...
+%%%           Pdu2 when ?IS_ERROR(Pdu2) ->
+%%%              Emsg = ?EMSG(Pdu2),
+%%%              ...
+%%%        end;
+%%%     ...
+%%%  end
 %%%  ...
 %%% '''
 %%% @end
 %%%
 read_file(S, InReq, Finfo) ->
-    read_file(S, InReq, Finfo, ?READ_ALL, []).
+    catch read_file(S, InReq, Finfo, ?READ_ALL, []).
 
 -define(READ_ENOUGH(F), (F#file_info.size =< F#file_info.data_len)).
 -define(MORE_TO_READ(F), (F#file_info.size > F#file_info.data_len)).
@@ -1006,26 +1030,23 @@ read_file(S, InReq, Finfo) ->
 read_file(S, InReq, Finfo, ?STREAM_READ, Acc) when ?READ_ENOUGH(Finfo) ->
     Data = trim_binary(concat_binary(lists:reverse(Acc)), 
 		       Finfo#file_info.data_len - Finfo#file_info.size),
-    {ok, Data, InReq};
+    InReq#smbpdu{data = Data};
 read_file(S, InReq, Finfo, ?READ_ALL, Acc) when ?READ_ENOUGH(Finfo) ->
     Data = trim_binary(concat_binary(lists:reverse(Acc)), 
 		       Finfo#file_info.size),
-    {ok, Data, InReq};
+    InReq#smbpdu{data = Data};
 read_file(S, InReq, Finfo, Rtype, Acc) when ?MORE_TO_READ(Finfo) ->
     {Req, Pdu} = smb_read_andx_pdu(InReq, Finfo),
-    case decode_smb_response(Req, nbss_session_service(S, Pdu)) of
-	{ok, Res, Data} -> 
+    case catch decode_smb_response(Req, nbss_session_service(S, Pdu)) of
+	?IS_OK(Res) -> 
+	    Data = ?SMB_DATA(Res),
 	    Dlen = Finfo#file_info.data_len + size(Data),
 	    NewFinfo = Finfo#file_info{data_len = Dlen},
 	    if (Rtype == ?STREAM_READ) ->
 		    Cont = fun() ->
-				   read_file(S, 
-					     Res, 
-					     NewFinfo,
-					     Rtype,
-					     Acc)
+				   read_file(S, Res, NewFinfo, Rtype, Acc)
 			   end,
-		    {more, Data, Res#smbpdu{cont = Cont}};
+		    {more, Res#smbpdu{cont = Cont, data = Data}};
 	        true ->
 		    read_file(S, 
 			      Res, 
@@ -1033,8 +1054,10 @@ read_file(S, InReq, Finfo, Rtype, Acc) when ?MORE_TO_READ(Finfo) ->
 			      Rtype,
 			      [Data | Acc])
 	    end;
+	Res when record(Res, smbpdu) ->
+	    throw(Res);
 	_ ->
-	    {error, Req#smbpdu{eclass = ?INTERNAL, emsg = "decoding_read_andx"}}
+	    throw(Req#smbpdu{eclass = ?INTERNAL, emsg = "decoding_read_andx"})
     end.
 
 trim_binary(Bin, Size) when size(Bin) > Size -> 
@@ -1052,8 +1075,10 @@ trim_binary(Bin, _) ->
 %%% @end
 %%%
 open_file_ro(S, InReq, Path) ->
-    {Req, Pdu} = smb_open_file_ro_pdu(InReq, Path),
-    decode_smb_response(Req, nbss_session_service(S, Pdu)).
+    catch begin
+	      {Req, Pdu} = smb_open_file_ro_pdu(InReq, Path),
+	      decode_smb_response(Req, nbss_session_service(S, Pdu))
+	  end.
 	
 
 %%%
@@ -1065,6 +1090,9 @@ open_file_ro(S, InReq, Path) ->
 %%% @end
 %%%
 open_file_rw(S, InReq, Path) ->
+    catch c_open_file_rw(S, InReq, Path).
+
+c_open_file_rw(S, InReq, Path) ->
     {Req, Pdu} = smb_open_file_rw_pdu(InReq, Path),
     decode_smb_response(Req, nbss_session_service(S, Pdu)).
 
@@ -1105,6 +1133,9 @@ close_file(S, Pdu) ->
 %%% @end
 %%%
 close_file(S, InReq, Fid) ->
+    catch c_close_file(S, InReq, Fid).
+
+c_close_file(S, InReq, Fid) ->
     {Req, Pdu} = smb_close_file_pdu(InReq),
     decode_smb_response(Req#smbpdu{fid=undefined}, nbss_session_service(S,Pdu)).
 
@@ -1118,6 +1149,9 @@ close_file(S, InReq, Fid) ->
 %%% @end
 %%%
 mkdir(S, InReq, Path) ->
+    catch c_mkdir(S, InReq, Path).
+
+c_mkdir(S, InReq, Path) ->
     {Req, Pdu} = smb_open_dir_pdu(InReq, Path),
     decode_smb_response(Req, nbss_session_service(S, Pdu)).
 
@@ -1129,6 +1163,9 @@ mkdir(S, InReq, Path) ->
 %%% @end
 %%%
 rmdir(S, InReq, Path) ->
+    catch c_rmdir(S, InReq, Path).
+
+c_rmdir(S, InReq, Path) ->
     {Req, Pdu} = smb_delete_dir_pdu(InReq, Path),
     decode_smb_response(Req, nbss_session_service(S, Pdu)).
     
@@ -1140,6 +1177,9 @@ rmdir(S, InReq, Path) ->
 %%% @end
 %%%
 delete_file(S, InReq, Path) ->
+    catch c_delete_file(S, InReq, Path).
+
+c_delete_file(S, InReq, Path) ->
     {Req, Pdu} = smb_delete_file_pdu(InReq, Path),
     decode_smb_response(Req, nbss_session_service(S, Pdu)).
     
@@ -1155,6 +1195,9 @@ delete_file(S, InReq, Path) ->
 %%% @end
 %%%
 list_dir(S, InReq, Path) ->
+    catch c_list_dir(S, InReq, Path).
+
+c_list_dir(S, InReq, Path) ->
     {Req, Pdu} = smb_trans2_find_first2_pdu(InReq, Path),
     case decode_smb_response(Req, nbss_session_service(S, Pdu)) of
 	{Req2, X} when X#find_result.eos == true -> 
@@ -1183,6 +1226,9 @@ list_dir_cont(S, InReq, Path, Sid, Finfo) ->
 %%% @end
 %%%
 check_dir(S, InReq, Path) ->
+    c_check_dir(S, InReq, Path).
+
+c_check_dir(S, InReq, Path) ->
     {Req, Pdu} = smb_check_directory_pdu(InReq, Path),
     decode_smb_response(Req, nbss_session_service(S, Pdu)).
 
@@ -1210,6 +1256,9 @@ tree_connect(S, Neg, InReq, Path) ->
 %%% @end
 %%%
 tree_connect(S, Neg, InReq, Path, Service) ->
+    catch c_tree_connect(S, Neg, InReq, Path, Service).
+
+c_tree_connect(S, Neg, InReq, Path, Service) ->
     {Req, Pdu} = smb_tree_connect_andx_pdu(Neg, InReq, Path, Service),
     decode_smb_response(Req, nbss_session_service(S, Pdu)).
 
@@ -1238,6 +1287,9 @@ tree_connect_ipc(S, Neg, InReq, Path) ->
 %%% @end
 %%%
 negotiate(S) ->
+    catch c_negotiate(S).
+
+c_negotiate(S) ->
     {Req, Pdu} = smb_negotiate_pdu(),
     decode_smb_response(Req, nbss_session_service(S, Pdu)).
 
@@ -1257,6 +1309,9 @@ user_logon(S, Neg, User, Passwd) ->
 
 %%% @private
 user_logon(S, Neg, U) ->
+    catch c_user_logon(S, Neg, U).
+
+c_user_logon(S, Neg, U) ->
     {Req, Pdu} = smb_session_setup_andx_pdu(Neg, U),
     decode_smb_response(Req#smbpdu{neg = Neg}, nbss_session_service(S, Pdu)).
 
@@ -1386,7 +1441,7 @@ dec_write_andx(Req, Pdu) ->
      _:2/binary,                % Remaining (reserved)
      _:4/binary,                % reserved
      _/binary>> = Res#smbpdu.wp,
-    {ok, Count, Res}.
+    Res#smbpdu{written = Count}.
     
 
 %%% ---
@@ -1405,7 +1460,7 @@ dec_read_andx(Req, Pdu) ->
 				% CAP_LARGE_READEX; else zero
      _/binary>> = Res#smbpdu.wp,
     <<_:DataOffset/binary,Data:DataLength/binary, _/binary>> = Pdu,
-    {ok, Res, Data}.
+    Res#smbpdu{data = Data}.
     
 
 %%% ---
@@ -1479,10 +1534,9 @@ dec_nt_create_andx(Req, Pdu) ->
 %%% @private
 dec_transaction(Req, Pdu) ->
     Res = safe_dec_smb(Req, Pdu),  % NB: may throw(Pdu)
-    ?elog("%%%%%%%%%% Wp = ~p~n", [Res#smbpdu.wp]),
     <<TotParamCount:16/little,
      TotDataCount:16/little,
-     _:16/little,                % reserved
+     _:16/little,                  % reserved
      ParamCount:16/little,
      ParamOffset:16/little,
      ParamDisplacement:16/little,
@@ -1516,7 +1570,7 @@ dec_transaction(Req, Pdu) ->
 	      true ->
 		   B1
 	   end,
-    {ok, Data, Res}.
+    Res#smbpdu{data = Data}.
 
 %%%    
 %%% This is the decoding of a transaction request.
@@ -1799,21 +1853,21 @@ large_integer(<<LowPart:32/little, HiPart:32/little>>) ->
     if (HiPart == 0) -> LowPart;
        true          -> (HiPart * 16#100000000) + LowPart
     end.
-
-
-    
 	
 %%% ---    
 
-
+%%%
+%%% Lets guard ourself from the possibilty of
+%%% that the decoding crashes.
+%%%
 safe_dec_smb(Req, Pdu) ->
     case catch dec_smb(Req, Pdu) of
-	R when R#smbpdu.eclass == ?ERRNT, R#smbpdu.ecode == ?SUCCESS -> R;
-	R when R#smbpdu.eclass == ?SUCCESS -> R;
-	R when record(R,smbpdu)            -> throw(R);
-	Else                               -> throw({error,{dec_smb,Else}})
+	?IS_OK(R)    -> R;
+	?IS_ERROR(R) -> throw(R);
+	Else -> 
+	    throw(Pdu#smbpdu{eclass = ?INTERNAL,
+			     emsg = lists:flatten(io_lib:format("~p",[Else]))})
     end.
-
 
 %%%
 %%% NB: It is important that we maintain the Input-Req record
@@ -1853,7 +1907,7 @@ dec_smb(Req,
 	       flags2 = Flags2,
 	       tid    = Tid,
 	       pid    = Pid,
-	       uid    = Uid,
+	       uid    = set_uid(Req#smbpdu.uid, Uid),
 	       mid    = Mid,
 	       sign_seqno = SSN + 1,
 	       wc     = Wc,
@@ -1861,6 +1915,14 @@ dec_smb(Req,
 	       bc     = Bc,
 	       bf     = Bf}.
     
+
+%%% The Uid is a reference number that is assigned by the server
+%%% after authentication has been done. It needs to be maintained
+%%% so we need to be careful not to overwrite it with a new 'zero' value.
+%%% The question is: should a new Uid value overwrite an old one?
+%%% We assume this for now...
+set_uid(_OldUid, NewUid) when NewUid > 0 -> NewUid;
+set_uid(OldUid, _)                       -> OldUid.
 	
 %%% --------------------------------------------------------------------
 %%% SMB encode routines
@@ -2795,6 +2857,11 @@ to_bool(0) -> false;
 to_bool(_) -> true.
 
 %%% @private
+hexprint(Msg, X) ->
+    io:format("~s: ", [Msg]),
+    hexprint(X).
+
+%%% @private
 hexprint(B) when binary(B) -> hexprint(b2l(B));
 hexprint(L) ->
     F = fun(H, Acc) ->
@@ -2867,10 +2934,22 @@ emsg(?ERRSRV, ?ERRSinvtid)     -> "Invalid TID (Transaction ID)";
 emsg(?ERRSRV, ?ERRSinvnetname) -> "Invalid network name in tree connect";
 emsg(?ERRNT,  ?ERRNTfileisdir) -> "File is directory".
 
+%%%
+emsg(Pdu) when record(Pdu, smbpdu) ->
+    emsg(Pdu#smbpdu.eclass, Pdu#smbpdu.ecode, "unknown error msg").
+
+
 %%% @private
 caller() ->
-    {ok, Host} = inet:gethostname(),
-    ucase(Host).
+    case inet:gethostname() of
+	{ok, Host} when length(Host) > 15 ->
+	    %% Disgusting!! We must get rid of the NetBIOS carrier and
+	    %% run SMB straight over TCP !!
+	    ?elog("<WARNING> Hostname longer than 15 characters, truncated~n",[]),
+	    ucase(string:substr(Host, 1, 15));
+	{ok, Host} when length(Host) =< 15 ->
+	    ucase(Host)
+    end.
 
 %%% @private
 called({A,B,C,D}) ->
@@ -2912,9 +2991,11 @@ error_p(Pdu)
   when Pdu#smbpdu.eclass == ?ERRNT, Pdu#smbpdu.ecode == ?SUCCESS -> false;
 error_p(Pdu) when Pdu#smbpdu.eclass == ?INTERNAL ->
     {true, ?INTERNAL, Pdu#smbpdu.emsg};
-error_p(Pdu) ->
+error_p(Pdu) when record(Pdu, smbpdu) ->
     Emsg = emsg(Pdu#smbpdu.eclass, Pdu#smbpdu.ecode, ""),
-    {true, Pdu#smbpdu.ecode, Emsg}.
+    {true, Pdu#smbpdu.ecode, Emsg};
+error_p(NoPdu) ->
+    {true, ?INTERNAL, lists:flatten(io_lib:format("~p",[NoPdu]))}.
 
 
 %%%

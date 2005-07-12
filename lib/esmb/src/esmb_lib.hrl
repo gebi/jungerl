@@ -158,6 +158,19 @@
 
 -define(SIGN_SMB(Pdu), (Pdu#smbpdu.signatures == true)).
 
+-define(OK_TEST(Pdu), ((Pdu#smbpdu.eclass == ?SUCCESS) or 
+		       ((Pdu#smbpdu.eclass == ?ERRNT) and
+			(Pdu#smbpdu.ecode == ?SUCCESS)))).
+
+-define(IS_OK(Pdu), Pdu when ?OK_TEST(Pdu)).
+
+-define(IS_ERROR(Pdu), Pdu when not ?OK_TEST(Pdu)).
+
+-define(EMSG(Pdu), esmb:emsg(Pdu#smbpdu.eclass, Pdu#smbpdu.ecode, "")).
+
+-define(SMB_DATA(Pdu), Pdu#smbpdu.data).
+-define(WRITTEN(Pdu),  Pdu#smbpdu.written).
+
 %%% NB: Multi-byte values must be sent sent with the LSB first !!
 -record(smbpdu, {
 	  cmd,               % SMB command , 1 byte
@@ -185,7 +198,9 @@
 	  cont,              % Continuation: F()
 	  samba2=false,      % Samba 2 == Old list share method
 	  netware=false,     % NetWare == Old list share method
-	  neg                % The #smb_negotiate_res{} record
+	  neg,               % The #smb_negotiate_res{} record
+	  data,              % Data, e.g as a result of a TRANSACTION op.
+	  written=0          % Number of bytes written
 	 }).
 
 %%% Buffer value-tags

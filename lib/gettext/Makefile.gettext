@@ -1,0 +1,55 @@
+##
+## Add the directories here that should be gettext'ified
+##
+TXT_DIRS = ../esmb  # ../eldap
+
+##
+## Set this to a directory where we have write access.
+## This directory will hold all po-files and the dets DB file.
+##
+GETTEXT_DIR=/tmp/gettext_example
+
+##
+## Set the language code of the default language, i.e the
+## language you are using in the string arguments to the
+## ?TXT macros.
+##
+GETTEXT_DEF_LANG=en
+
+##
+## Set this to an arbitrary name (or leave it as is :-)
+## It will create a subdirectory to $(GETTEXT_DIR) where
+## the intermediary files of this example will end up.
+##
+GETTEXT_TMP_NAME=tmp
+
+
+##
+## We setup some dependencies here so that we only
+## perform any processing iff anything has changed.
+##
+DEP_FILES1=$(TXT_DIRS:%=%/priv/docroot/*.{yaws,js})
+DEP_FILES2=$(TXT_DIRS:%=%/src/*.{erl,hrl})
+DEP_FILES=$(shell grep -s -l TXT $(DEP_FILES1) $(DEP_FILES2))
+
+
+gettext_example: $(GETTEXT_DIR)/lang/$(GETTEXT_TMP_NAME)/epot.dets 
+
+$(GETTEXT_DIR)/lang/$(GETTEXT_TMP_NAME)/epot.dets: $(DEP_FILES)
+	@(export gettext_tmp_name=$(GETTEXT_TMP_NAME); \
+	  export gettext_dir=$(GETTEXT_DIR); \
+	  export gettext_def_lang=$(GETTEXT_DEF_LANG); \
+	  export ERL_COMPILER_OPTIONS="[gettext]"; \
+	  rm -f $(GETTEXT_DIR)/lang/$(GETTEXT_TMP_NAME)/epot.dets; \
+	  for xdir in $(TXT_DIRS); do \
+		( cd $$xdir; $(MAKE) gettext ) \
+	  done; \
+	  erl -noshell -pa ./ebin -s gettext_compile epot2po; \
+	  install -D $(GETTEXT_DIR)/lang/$(GETTEXT_TMP_NAME)/$(GETTEXT_DEF_LANG)/gettext.po $(GETTEXT_DIR)/lang/default/$(GETTEXT_DEF_LANG)/gettext.po; \
+	  rm -rf $(GETTEXT_DIR)/lang/$(GETTEXT_TMP_NAME))
+
+gettext_clean:
+	@(for xdir in $(TXT_DIRS); do \
+		( cd $$xdir; $(MAKE) gettext_clean ) \
+	  done)
+

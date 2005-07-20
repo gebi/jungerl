@@ -155,8 +155,13 @@ handle_call({lang2cset, Lang}, _From, State) ->
 %%
 handle_call({store_pofile, Lang, File}, _From, State) ->
     GettextDir = State#state.gettext_dir,
-    NewCache = do_store_pofile(Lang, File, GettextDir, State#state.cache),
-    {reply, ok, State#state{cache = NewCache}}.
+    case do_store_pofile(Lang, File, GettextDir, State#state.cache) of
+	{ok, NewCache} ->
+	    {reply, ok, State#state{cache = NewCache}};
+	Else ->
+	    {reply, Else, State}
+    end.
+	    
 
 %%--------------------------------------------------------------------
 %% Function: handle_cast/2
@@ -210,7 +215,7 @@ do_store_pofile(Lang, File, GettextDir, Cache) ->
 		false -> false
 	    end,
 	    insert_po_file(Lang, Fname),
-	    {ok, set_charset(#cache{language = Lang})};
+	    {ok, [set_charset(#cache{language = Lang}) | Cache]};
 	_ ->
 	    {error, "failed to write PO file to disk"}
     end.

@@ -10,7 +10,7 @@ DOCDIR=`pwd`
 
 ERL=erl
 ERLC=erlc
-ERLC_FLAGS=-W $(DEBUG)
+ERLC_FLAGS+=-W $(DEBUG)
 EMULATOR=beam
 
 
@@ -21,7 +21,8 @@ MODULES = esmb \
 	  esmb_netbios \
 	  esmb_test \
 	  md4 \
-	  iconv
+	  iconv \
+	  esmb_gettext
 
 EBIN = ../ebin
 EBIN_FILES = $(MODULES:%=$(EBIN)/%.$(EMULATOR)) $(EBIN)/esmb.app

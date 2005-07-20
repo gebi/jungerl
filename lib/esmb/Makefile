@@ -13,3 +13,9 @@ release: clean appfile
 
 appfile:
 	(cd src;$(MAKE) ../ebin/esmb.app)
+
+
+# Target for the gettext example
+gettext:
+	rm -f ebin/*.beam
+	(cd src; $(MAKE))

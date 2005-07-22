@@ -1,2 +1,2 @@
-First attempt at writing a PostgreSQL frontend. Connects by plain tcp
+Second attempt at writing a PostgreSQL frontend. Connects by plain tcp
 and should be able to perform simple SQL commands.

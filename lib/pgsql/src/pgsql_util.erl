@@ -7,7 +7,7 @@
 -module(pgsql_util).
 
 %% Key-Value handling
--export([lookup/3]).
+-export([option/2]).
 
 %% Networking
 -export([socket/1]).
@@ -15,20 +15,23 @@
 -export([recv_msg/2, recv_msg/1, recv_byte/2, recv_byte/1]).
 
 %% Protocol packing
--export([make_pair/2, split_pair/1]).
+-export([string/1, make_pair/2, split_pair/1]).
 -export([count_string/1, to_string/1]).
--export([coldescs/2, datacoldescs/3]).
+-export([oids/2, coldescs/2, datacoldescs/3]).
+-export([decode_row/2, decode_descs/1]).
 -export([errordesc/1]).
 
 -export([zip/2]).
 
-%% Cosmetics on proplists interfaces.
-lookup(Plist, Key, Default) ->
+%% Lookup key in a plist stored in process dictionary under 'options'.
+%% Default is returned if there is no value for Key in the plist.
+option(Key, Default) ->
+    Plist = get(options),
     case proplists:get_value(Key, Plist, Default) of
-	{Key, Value} ->
-	    Value;
-	Else ->
-	    Default
+	Default ->
+	    Default;
+	Value ->
+	    Value
     end.
 
 
@@ -61,14 +64,6 @@ recv_msg(Sock, Timeout) ->
 recv_msg(Sock) ->
     recv_msg(Sock, infinity).
 
-recv_int(Sock) ->
-    case gen_tcp:recv(Sock, 4) of
-	{ok, Package} ->
-	    <<Int:4/integer-unit:8>> = Package,
-	    {ok, Int};
-	{error, Reason} ->
-	    throw({error, Reason})
-    end.
 
 recv_byte(Sock) ->
     recv_byte(Sock, infinity).
@@ -80,7 +75,11 @@ recv_byte(Sock, Timeout) ->
 	    throw(E)
     end.
 
+string(String) ->
+    Bin = list_to_binary(String),
+    <<Bin/binary, 0/integer>>.
 
+%%% Two zero terminated strings.
 make_pair(Key, Value) when atom(Key) ->
     make_pair(atom_to_list(Key), Value);
 make_pair(Key, Value) when atom(Value) ->
@@ -118,6 +117,11 @@ to_string(Bin) when binary(Bin) ->
     {Count, _} = count_string(Bin, 0),
     <<String:Count/binary, _/binary>> = Bin,
     {binary_to_list(String), Count}.
+
+oids(<<>>, Oids) ->
+    lists:reverse(Oids);
+oids(<<Oid:32/integer, Rest/binary>>, Oids) ->
+    oids(Rest, [Oid|Oids]).
     
 coldescs(<<>>, Descs) ->
     lists:reverse(Descs);
@@ -143,9 +147,37 @@ coldescs(Bin, Descs) ->
 datacoldescs(N, 
 	     <<Len:32/integer, Data:Len/binary, Rest/binary>>, 
 	     Descs) when N >= 0 ->
-    datacoldescs(N-1, Rest, [binary_to_list(Data)| Descs]);
+    datacoldescs(N-1, Rest, [Data|Descs]);
 datacoldescs(N, _, Descs) ->
     lists:reverse(Descs).
+
+decode_descs(Cols) ->
+    decode_descs(Cols, []).
+decode_descs([], Descs) ->
+    {ok, lists:reverse(Descs)};
+decode_descs([Col|ColTail], Descs) ->
+    OidMap = get(oidmap),
+    {Name, Format, ColNumber, Oid, _, _, _} = Col,
+    OidName = dict:fetch(Oid, OidMap),
+    decode_descs(ColTail, [{Name, Format, ColNumber, OidName, [], [], []}|Descs]).
+
+decode_row(Types, Values) ->
+    decode_row(Types, Values, []).
+decode_row([], [], Out) ->
+    {ok, lists:reverse(Out)};
+decode_row([Type|TypeTail], [Value|ValueTail], Out0) ->
+    Out1 = decode_col(Type, Value),
+    decode_row(TypeTail, ValueTail, [Out1|Out0]).
+
+decode_col({_, text, _, _, _, _, _}, Value) ->
+    binary_to_list(Value);
+decode_col({_Name, _Format, _ColNumber, varchar, _Size, _Modifier, _TableOID}, Value) ->
+    binary_to_list(Value);
+decode_col({_Name, _Format, _ColNumber, int4, _Size, _Modifier, _TableOID}, Value) ->
+    <<Int4:32/integer>> = Value,
+    Int4;
+decode_col({_Name, _Format, _ColNumber, Oid, _Size, _Modifier, _TableOID}, Value) ->
+    {Oid, Value}.
 
 errordesc(Bin) ->
     errordesc(Bin, []).

@@ -1,14 +1,86 @@
-The interface is a bit lacking at the moment, but should be sufficient
-for some tasks.
 
-Here is an example:
+Some serious factorizing has been done on the interface, and it will
+continue to leave the lib in a state of flux for unforseeable
+future, since I have more feature ideas and the error handling
+is absolutely horrible.
 
-1> {ok, Db} = pgsql:connect("template1", "localhost", "cos").
+This is an example of what you can do:
+
+1> {ok, Db} = pgsql:connect("localhost", "erlang_example", "cos", "").
+Params: [{secret,{3597,1886714857}},
+         {{parameter,"TimeZone"},"Europe/Stockholm"},
+         {{parameter,"session_authorization"},"cos"},
+         {{parameter,"server_version"},"8.0.2"},
+         {{parameter,"server_encoding"},"LATIN1"},
+         {{parameter,"is_superuser"},"on"},
+         {{parameter,"integer_datetimes"},"off"},
+         {{parameter,"DateStyle"},"ISO, MDY"},
+         {{parameter,"client_encoding"},"LATIN1"}]
 {ok,<0.31.0>}
-2> pgsql:exec(Db, "SELECT * FROM example;").
-{ok,{select,[[{id,"1",int4},{name,"alfa",varchar}],
-             [{id,"2",int4},{name,"beta",varchar}],
-             [{id,"3",int4},{name,"gamma",varchar}]]}}
-3> pgsql:close(Db).
-close
+
+The "Params:" printed contain information that could be interesting for
+debugging purposes. You can comment it out in pgsql:connect
+
+2> pgsql:squery(Db, "SELECT * FROM example"). 
+{ok,[{"SELECT",
+      [{"id",text,1,23,4,-1,17232},{"name",text,2,1043,-1,-1,17232}],
+      [["1","alfa"],["2","beta"],["3","gamma"]]}]}
+
+The column description is a bit worthless, but the result set is
+in a useable state. All data will be using text encoding.
+
+3> pgsql:pquery(Db, "SELECT * FROM example WHERE id = $1", [2]).
+{ok,"SELECT",idle,[{"id",int4},{"name",varchar}],[[2,"beta"]]}
+
+The parametric query is what you should use rather than piecing
+together strings for an squery. Then you're not vulnerable to
+SQL-injections.
+
+4> pgsql:prepare(Db, add_example, "INSERT INTO example (id, name) VALUES ($1::int4, $2::varchar)").
+{ok,idle,[int4,varchar],[]}
+
+Prepares a statement by the name add_example for this db session. The 
+result contains a description of the types required for the params.
+
+5> pgsql:execute(Db, add_example, [4, "epsilon"]).
+{ok,{'INSERT',1}}
+6> pgsql:execute(Db, add_example, [20, "omega"]).  
+{ok,{'INSERT',1}}
+
+Use a prepare statement with params.
+
+7> pgsql:squery(Db, "SELECT * FROM example").                                   {ok,[{"SELECT",    
+      [{"id",text,1,23,4,-1,17232},{"name",text,2,1043,-1,-1,17232}],
+      [["1","alfa"],["2","beta"],["3","gamma"],["4","epsilon"],["20","omega"]]}]}
+
+See, the prepared statement did store the new records!
+
+
+Future plans:
+
+* Make the API more symmetric. Right now requests return similar
+data in different ways for no good reason.
+
+* Support asynchronous events caused by postgresql's NOTIFY and LISTEN,
+they will be redirected to a special process.
+
+* Make it possible to lock the process in a transaction state
+where it will only accept requests from one pid, and leave
+the idle state open for requests from any pid.
+
+* Work out a better encoding/decoding of params and result set values.
+I just need to see how things works in practise now too feel what
+I am missing.
+
+* Implement SSL support, so adding unix domain socket support later will
+be easier.
+
+* Understand how other requests than SELECT, INSERT, UPDATE and DELETE
+add new requirements to the various requests. COPY has a subprotocol
+that probably confuse all my API calls, there are probably more things
+that confuse it.
+
+* Oh, more well defined error handling. I havent decided on a policy when
+the postgres driver should crash, and when it should simply return an
+error description.
 

@@ -1,4 +1,4 @@
-{application,esmb,
+{application,ysql,
  [{description,"Yaws SQL Browser"},
   {vsn,"%VSN%"},
   {modules,[%MODULES%]},

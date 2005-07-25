@@ -28,11 +28,15 @@ or install it from jungerl.
 
 Then modify your yaws.conf file:
 
-1. Add the ebin and include directories to your yaws.conf file.
+1. If you installed with erlmerge, add the include directory.
    Example:
 
-   ebin_dir = /home/tobbe/jungerl/lib/ysql/ebin
-   include_dir = /home/tobbe/jungerl/lib/ysql/include
+     include_dir = /usr/local/lib/erlang/lib/ysql-0.1/include
+
+   If you run from jungerl, add also the ebin directory:
+
+     ebin_dir = /home/tobbe/jungerl/lib/ysql/ebin
+     include_dir = /home/tobbe/jungerl/lib/ysql/include
 
 2. Create a server entry. 
    Example:

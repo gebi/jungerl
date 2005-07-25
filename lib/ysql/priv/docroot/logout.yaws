@@ -1,0 +1,30 @@
+
+<erl>
+
+-include("ysql.hrl").
+
+out(A) ->
+    H = A#arg.headers,
+    C = H#headers.cookie,
+    case yaws_api:find_cookie_val("ysql", C) of
+	[] ->
+	    {redirect_local, {rel_path, "error.yaws?emsg="++
+			      yaws_api:url_encode("No cookie info found!")}};
+	Cookie ->
+	    {ok, Y} = yaws_api:cookieval_to_opaque(Cookie),
+	    case ysql:logout(Y) of
+		ok ->
+		    yaws_api:delete_cookie_session(Cookie),
+		    {redirect_local, {rel_path, "index.yaws"}};
+		Else ->
+		    ?elog("logout.yaws: ~p~n", [Else]),
+		    {redirect_local, {rel_path, "error.yaws?emsg="++
+				      yaws_api:url_encode("Internal error: logout.yaws!")}}
+	    end
+    end.
+
+
+</erl>
+
+</body>
+</html>

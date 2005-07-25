@@ -1,0 +1,23 @@
+<html>
+<head>
+
+</head>
+<body>
+
+<h1>ERROR !!</h1>
+
+<erl>
+out(A) ->
+    case queryvar(A, emsg) of
+	{ok, Val} -> {html, nl2br(yaws_api:url_decode(Val))};
+	_         -> {html, "No error message found!"}
+    end.
+
+nl2br([$\n|T]) -> [$<,$b,$r,$>|nl2br(T)];
+nl2br([H|T])   -> [H|nl2br(T)];
+nl2br([])      -> [].
+
+</erl>
+
+</body>
+</html>

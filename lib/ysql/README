@@ -1,0 +1,54 @@
+
+Yaws SQL Browser
+================
+
+This is a simple Yaws application that makes it possible
+to do various operations towards a SQL database.
+
+So far it has only been tested towards MySQL (4.0.24).
+
+Installation
+------------
+
+YSQL uses the ODBC Erlang interface so you may have to
+read up on how to get that working. A description can
+be found at: 
+
+ http://www.trapexit.org/docs/howto/odbc_howto.html
+
+Basically, on Gentoo, I needed to do:
+
+ emerge mysql unixODBC myodbc
+
+To install YSQL (using erlmerge) do:
+
+ erlmerge ysql
+
+or install it from jungerl.
+
+Then modify your yaws.conf file:
+
+1. Add the ebin and include directories to your yaws.conf file.
+   Example:
+
+   ebin_dir = /home/tobbe/jungerl/lib/ysql/ebin
+   include_dir = /home/tobbe/jungerl/lib/ysql/include
+
+2. Create a server entry. 
+   Example:
+
+   <server mysql>
+	port = 8080
+	listen = 0.0.0.0
+	docroot = /home/tobbe/jungerl/lib/ysql/priv/docroot
+   </server>
+
+
+Start YSQL
+----------
+
+Example:  yaws -i -c yaws.conf -r ysql
+
+
+Good luck, Tobbe
+

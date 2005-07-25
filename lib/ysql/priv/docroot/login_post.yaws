@@ -1,0 +1,23 @@
+
+<erl>
+-include("ysql.hrl").
+
+out(A) ->
+    L      = yaws_api:parse_post(A),
+    ?elog("HERE 1: ~p~n", [L]),
+    User   = ysql:lk("user", L), 
+    Passwd = ysql:lk("password", L), 
+    Dsn    = ysql:lk("dsn", L),
+    case ysql:odbc_connect(User, Passwd, Dsn) of
+	{ok, Odbc} ->
+	    Y = #ysql{odbc = Odbc},
+	    Cookie = yaws_api:new_cookie_session(Y),
+	    [yaws_api:setcookie("ysql", Cookie, "/"),
+	     {redirect_local, {rel_path, "top.yaws"}}];
+	{error, Emsg} ->
+	    {redirect_local, {rel_path, "error.yaws?emsg="++
+			      yaws_api:url_encode(Emsg)}}
+    end.
+
+
+</erl>

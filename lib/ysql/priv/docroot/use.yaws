@@ -1,0 +1,42 @@
+
+<erl>
+
+-include("ysql.hrl").
+
+out(A) ->
+    H = A#arg.headers,
+    C = H#headers.cookie,
+    case yaws_api:find_cookie_val("ysql", C) of
+	[] ->
+	    {redirect_local, {rel_path, "error.yaws?emsg="++
+			      yaws_api:url_encode("No cookie info found!")}};
+	Cookie ->
+	    {ok, Y} = yaws_api:cookieval_to_opaque(Cookie),
+	    case queryvar(A, "db") of
+		{ok, Db} ->
+		    case ysql:use(Y, Db) of
+			{ok, Y2, Res} ->
+			    yaws_api:replace_cookie_session(Cookie, Y2),
+			    [{ssi, "head.inc", "%%", [{"DATE", ysql:date()},
+						      {"DB", ysql:db(Y2)},
+						      {"TABLES", "use.yaws?db="++Db},
+						      {"DTABLE", ""},
+						      {"DTABLE_LNK", ""}]},
+			     Res,
+			     {ssi, "tail.inc", "%%", []}];
+			Else ->
+			    ?elog("use.yaws: ~p~n", [Else]),
+			    {redirect_local, {rel_path, "error.yaws?emsg="++
+					      yaws_api:url_encode("Internal error: use.yaws!")}}
+		    end;
+		undefined ->
+		    {redirect_local, {rel_path, "error.yaws?emsg="++
+				      yaws_api:url_encode("No Database selected!")}}
+	    end
+    end.
+
+
+</erl>
+
+</body>
+</html>

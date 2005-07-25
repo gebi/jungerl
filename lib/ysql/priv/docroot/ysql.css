@@ -1,0 +1,97 @@
+*.login_table {
+	position: relative;
+	top: 5em;
+	left: 30%;
+}
+
+*.databases {
+	position: relative;
+	top: 5em;
+	left: 30%;
+}
+
+*.databases_title {
+	position: relative;
+	top: 4em;
+	float: top;
+	left: 30%;
+	font-size: larger;
+	color: blue;
+}
+
+*.current_database {
+	font-size: smaller;
+	color: blue;
+}
+
+*.current_database_txt {
+	font-size: smaller;
+}
+
+*.tables {
+	position: relative;
+	top: 5em;
+	left: 5%;
+}
+
+*.desc_table {
+	position: relative;
+	top: 5em;
+	left: 5%;
+}
+
+*.sql_table {
+	position: relative;
+	top: 5em;
+	left: 5%;
+}
+
+*.sql_table_name {
+	position: relative;
+	top: 4em;
+	float: top;
+	left: 5%;
+	font-size: larger;
+	color: blue;
+}
+
+*.sql_query {
+	position: relative;
+	top: 3em;
+	float: top;
+	left: 1%;
+	font-size: smaller;
+	font-style: italic;
+	color: blue;
+}
+
+*.sql_table_submit {
+	position: relative;
+	top: 4em;
+	float: top;
+	left: 5%;
+}
+
+*.result_table {
+	border-collapse: collapse;
+	border: solid black;
+}
+	
+*.result_table td { 
+	border: 1px solid red;  
+	padding: 5px;
+}
+
+*.table_head {
+	font-weight: bold;
+}
+
+*.logo {
+	font-size: larger;
+	color: blue;
+}
+
+*.date {
+	color: red;
+}
+

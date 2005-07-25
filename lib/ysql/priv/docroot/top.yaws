@@ -1,0 +1,36 @@
+
+<erl>
+
+-include("ysql.hrl").
+
+out(A) ->
+    H = A#arg.headers,
+    C = H#headers.cookie,
+    case yaws_api:find_cookie_val("ysql", C) of
+	[] ->
+	    {redirect_local, {rel_path, "error.yaws?emsg="++
+			      yaws_api:url_encode("No cookie info found!")}};
+	Cookie ->
+	    {ok, Y} = yaws_api:cookieval_to_opaque(Cookie),
+	    case ysql:top(Y) of
+		{ok, Y2, Res} ->
+		    yaws_api:replace_cookie_session(Cookie, Y2),
+		    [{ssi, "head.inc", "%%", [{"DATE", ysql:date()},
+					      {"DB", ysql:db(Y2)},
+					      {"DTABLE", ""},
+					      {"DTABLE_LNK", ""}
+					     ]},
+		     Res,
+		     {ssi, "tail.inc", "%%", []}];
+		Else ->
+		    ?elog("top.yaws: ~p~n", [Else]),
+		    {redirect_local, {rel_path, "error.yaws?emsg="++
+				      yaws_api:url_encode("Internal error: top.yaws!")}}
+	    end
+    end.
+
+
+</erl>
+
+</body>
+</html>

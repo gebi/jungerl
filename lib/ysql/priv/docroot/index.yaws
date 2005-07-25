@@ -1,0 +1,43 @@
+<html>
+<head>
+<title>Yaws SQL Browser</title>
+ <link rel="STYLESHEET" type="text/css" href="ysql.css">
+</head>
+<body>
+
+<erl>
+out(A) ->
+    {ehtml, 
+     [{form, [{method, post},
+	      {action, "login_post.yaws"}],
+       [{table,[{cellspacing, "5"}, 
+		{class, "login_table"}],  
+	 [{tr, [],
+	   [{td, [{colspan, "2"}], 
+	     {p, [{class, "logo"}], "Yaws SQL Browser"}}]},
+	  {tr, [],
+	   [{td, [], {p, [], "Username:"}},
+	    {td, [], {input, [{name, user},
+			      {type, text},
+			      {size, "20"}]}}]},
+	  {tr, [],
+	   [{td, [], {p, [], "Password:"}},
+	    {td, [], {input, [{name, password},
+			      {type, password},
+			      {size, "20"}]}}]},
+	  {tr, [],
+	   [{td, [], {p, [], "ODBC DSN:"}},  % DSN = Data Source Name
+	    {td, [], {input, [{name, dsn}, 
+			      {type, text},
+			      {value, "myodbc3"},
+			      {size, "20"}]}}]},
+	  {tr, [],
+	   [{td, [], {p, [], ""}},	
+	    {td, [], {input, [{type, submit}, 
+			      {value, "Login"}]}}]}]}]}]}.
+
+
+</erl>
+
+</body>
+</html>

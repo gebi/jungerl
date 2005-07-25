@@ -29,6 +29,7 @@
    <td class="headerLinks" align="right">
     <a href="/top.yaws" class="headerLinks" title="Show all Databases">Databases</a> |
     <a href="/%%TABLES%%" title="Show all tables" class="headerLinks">Tables</a> |
+    <a href="/sql_query.yaws" class="headerLinks" title="Submit an SQL query">Query</a> |
     <a href="/logout.yaws" class="headerLinks" title="Logout from YSQL">Logout</a>
    </td>
   </tr>

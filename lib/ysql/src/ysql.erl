@@ -259,13 +259,23 @@ add_and([A,B|T]) ->
 describe_table(Y, Table) ->
     case odbc:describe_table(Y#ysql.odbc, Table) of
 	{ok, L} ->
-	    mk_sql_tab(Table, t2l(L));
+	    mk_sql_tab(Y, Table, t2l(L));
 	Else ->
 	    ?elog("describe_table: cmd failed: ~p~n", [Else]),
 	    {html, []}
     end.
 
-mk_sql_tab(Table, Rows) ->
+show_create_table(Y, Table) ->
+    case odbc:sql_query(Y#ysql.odbc, "SHOW CREATE TABLE "++Table++";") of
+	{selected, _, [{_,Cmd}]} ->
+	    Cmd;
+	Else ->
+	    ?elog("show_create_table: cmd failed: ~p~n", [Else]),
+	    []
+    end.
+
+mk_sql_tab(Y, Table, Rows) ->
+    Cmd = show_create_table(Y, Table),
     Headers = ["Name", "Type"],
     {ehtml,
      [{form, [{method, post},
@@ -299,7 +309,14 @@ mk_sql_tab(Table, Rows) ->
 					   {type, radio},
 					   {value, "o_"++hd(Row)}]}}]
 			      }
-		      end, Rows)]}]}]}]}.
+		      end, Rows)]}]},
+	{'div', [{class, "table_create_cmd"}],
+	 {pre_html, nl2br(Cmd)}}
+       ]}]}.
+
+nl2br([$\n|T]) -> [$<,$b,$r,$>|nl2br(T)];
+nl2br([H|T])   -> [H|nl2br(T)];
+nl2br([])      -> [].
 
 cond_select(Field) ->
     [{td, [],

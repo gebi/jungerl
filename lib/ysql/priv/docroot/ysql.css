@@ -28,6 +28,12 @@
 	font-size: smaller;
 }
 
+*.sql_query_text {
+	position: relative;
+	left: 1%;
+	width: 65%;
+}
+
 *.tables {
 	position: relative;
 	top: 5em;
@@ -42,16 +48,32 @@
 
 *.sql_table {
 	position: relative;
-	top: 5em;
+	top: 4em;
 	left: 5%;
 }
 
 *.sql_table_name {
 	position: relative;
-	top: 4em;
+	top: 3em;
 	float: top;
 	left: 5%;
 	font-size: larger;
+	color: blue;
+}
+
+*.sql_table_submit {
+	position: relative;
+	top: 3em;
+	float: top;
+	left: 5%;
+}
+
+*.table_create_cmd {
+	position: relative;
+	top: 6em;
+	left: 5%;
+	font-size: smaller;
+	font-style: italic;
 	color: blue;
 }
 
@@ -63,13 +85,6 @@
 	font-size: smaller;
 	font-style: italic;
 	color: blue;
-}
-
-*.sql_table_submit {
-	position: relative;
-	top: 4em;
-	float: top;
-	left: 5%;
 }
 
 *.result_table {

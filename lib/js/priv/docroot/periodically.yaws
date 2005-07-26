@@ -1,0 +1,9 @@
+<erl>
+out(A) ->
+    {H,M,S} = time(),
+    {html, [integer_to_list(H), ":",
+	    integer_to_list(M), ":",
+	    integer_to_list(S)
+	   ]}.
+
+</erl>

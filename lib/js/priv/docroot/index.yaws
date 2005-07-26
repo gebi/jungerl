@@ -1,0 +1,50 @@
+<html>
+<head>
+<script type="text/javascript" src="/js/prototype-1.2.0.js"></script>
+<script type="text/javascript" src="/js/fd2qs.js"></script>
+</head>
+<body>
+
+<h1>Clock</h1>
+<p>
+<div id="the_clock"></div>
+<erl>
+out(A) ->
+    {ehtml, js:periodically_call_remote([{update, "the_clock"}, 
+					 {frequency, "1"},
+					 {url, "/periodically.yaws" }])}.
+</erl>
+
+<h1>Search</h1>
+<p>
+<form id="myform">
+<label for="searchtext">Live Search:</label>
+<input type="text" id="searchtext" name="searchtext" value="" size="15" />
+</form>
+<erl>
+out(A) ->
+    {ehtml, js:observe_field("searchtext",
+			     [{frequency, "0.25"},
+			      {update, "search_hits"},
+			      {with, " fd2qs( document.getElementById(\"myform\") )"},
+			      {url, "/observe.yaws"}])}.
+</erl>
+<p><div id="search_hits">Search Results:</div>
+</p>
+
+<h1>What time is it?</h1>
+    <div id="time_div">
+      I don't have the time, but
+<erl>
+out(A) ->
+    {ehtml, js:link_to_remote( "click here",
+			       [{update, "time_div"}, 
+				{type, asynchronous},
+				{position, "after"}, 
+				{url, "/say_when.yaws" }])}.
+</erl>
+      and I will look it up.
+    </div>
+
+</body>
+</html>

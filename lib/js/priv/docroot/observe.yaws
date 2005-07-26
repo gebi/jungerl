@@ -1,0 +1,12 @@
+<erl>
+out(A) ->
+    io:format("Args: ~p~n", [yaws_api:parse_post(A)]),
+    Reply = mumsa(yaws_api:parse_post(A)),
+    {html, ["Search Results: " ++ Reply]}.
+
+mumsa([{"searchtext","coolt"}|T]) -> "<b><blink>Tjena Johan!</blink></b>";
+mumsa([{"searchtext",Mums}|T])    -> Mums;
+mumsa([_|T])                      -> mumsa(T);
+mumsa([])                         -> "".
+
+</erl>

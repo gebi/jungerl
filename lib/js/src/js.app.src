@@ -1,0 +1,13 @@
+{application,js,
+ [{description,"The Erlang Javascript support library."},
+  {vsn,"%VSN%"},
+  {modules,[%MODULES%]},
+  {registered,[]},
+  {env, []},
+  {mod, {js_app, []}},
+  {applications,[kernel,stdlib,sasl]},
+  {dependencies,
+   [{kernel, "2.9.6"},
+    {stdlib, "1.12.7"},
+    {sasl,"1.10.1"}]}]}.
+

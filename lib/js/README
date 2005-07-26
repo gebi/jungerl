@@ -1,0 +1,20 @@
+
+This is an embryo to a Javascript support library for Erlang
+and Yaws programming. The inspiration for this library is the
+impressive "Ruby on Rails" system and its support for Javascript,
+which are using the "Prototype" Javascript library.
+
+So far, the focus has been around the AJAX functionality.
+
+To test it do, start yaws as:
+
+   yaws -i -c ./priv/yaws.conf -pa ./ebin
+
+and browse: 
+
+  http://localhost:4080/
+
+
+--Tobbe
+
+

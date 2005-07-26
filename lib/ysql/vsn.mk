@@ -1,1 +1,1 @@
-YSQL_VSN=0.1
+YSQL_VSN=0.2

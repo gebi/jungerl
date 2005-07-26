@@ -7,6 +7,13 @@ to do various operations towards a SQL database.
 
 So far it has only been tested towards MySQL (4.0.24).
 
+Initially, the idea was to learn more about how to
+work towards MySQL from Erlang and Yaws. But from
+version 0.2 we have also started to explore how we
+can use the Javascript support in the the 'js'
+application.
+
+
 Installation
 ------------
 
@@ -28,10 +35,11 @@ or install it from jungerl.
 
 Then modify your yaws.conf file:
 
-1. If you run from jungerl, then add the ebin directory to
-   your yaws.conf file:
+1. If you run from jungerl, then add the ebin directories
+   to 'ysql' and 'js' in your yaws.conf file:
 
      ebin_dir = /home/tobbe/jungerl/lib/ysql/ebin
+     ebin_dir = /home/tobbe/jungerl/lib/js/ebin
 
 2. Create a server entry and point out the docroot.
    Example:

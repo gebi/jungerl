@@ -17,7 +17,7 @@
 %% External exports
 -export([start_link/0, start/0, odbc_connect/3, top/1, lk/2, lk/3, date/0,
 	 use/2, desc_table/2, selected/1, where/1, select/3, select/4,
-	 db/1, table/1, logout/1, sql_query/2]).
+	 db/1, table/1, logout/1, sql_query/2, clock/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -29,6 +29,11 @@
 %%====================================================================
 %% External functions
 %%====================================================================
+
+clock() ->
+    js:periodically_call_remote_S([{update, "the_clock"}, 
+				   {frequency, "1"},
+				   {url, "/clock.yaws" }]).
 
 selected(L) ->
     F = fun({"x_"++Selected, "on"}, Acc) -> [Selected | Acc];

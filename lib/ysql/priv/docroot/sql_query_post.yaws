@@ -1,8 +1,8 @@
 
 <erl>
 
--include("ysql.hrl").
-
+-define(elog(X,Y), error_logger:info_msg("*elog ~p:~p: " X,
+                                        [?MODULE, ?LINE | Y])).
 out(A) ->
     H = A#arg.headers,
     C = H#headers.cookie,
@@ -12,21 +12,26 @@ out(A) ->
 			      yaws_api:url_encode("No cookie info found!")}};
 	Cookie ->
 	    {ok, Y} = yaws_api:cookieval_to_opaque(Cookie),
-	    case queryvar(A, "table") of
-		{ok, Table} ->
-		    case ysql:sql_query(Y, Table) of
+	    ?elog("sql_query_post: L=~p~n", [yaws_api:parse_post(A)]),
+	    case postvar(A, "query") of
+		{ok, Query} ->
+		    case ysql:sql_query(Y, Query) of
 			{ok, Y2, Res} ->
 			    yaws_api:replace_cookie_session(Cookie, Y2),
 			    [{ssi, "head.inc", "%%", [{"DATE", ysql:date()},
 						      {"DB", ysql:db(Y2)},
-						      {"TABLES", "use.yaws?db="++Y#ysql.db},
-						      {"DTABLE", Table},
-						      {"DTABLE_LNK", "desc_table.yaws?table="++Table}	
+						      {"TABLES", "use.yaws?db="++ysql:db(Y)},
+						      {"DTABLE", ysql:table(Y)},
+						      {"DTABLE_LNK", "desc_table.yaws?table="++ysql:table(Y)}	
 						     ]},
 			     Res,
 			     {ssi, "tail.inc", "%%", []}];
+			{error, Emsg} ->
+			    ?elog("sql_query_post.yaws 1: ~p~n", [Emsg]),
+			    {redirect_local, {rel_path, "error.yaws?emsg="++
+					      yaws_api:url_encode(Emsg)}};
 			Else ->
-			    ?elog("sql_query_post.yaws: ~p~n", [Else]),
+			    ?elog("sql_query_post.yaws 2: ~p~n", [Else]),
 			    {redirect_local, {rel_path, "error.yaws?emsg="++
 					      yaws_api:url_encode("Internal error: sql_query_post.yaws!")}}
 		    end;

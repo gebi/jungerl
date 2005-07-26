@@ -9,8 +9,14 @@
 <erl>
 out(A) ->
     case queryvar(A, emsg) of
-	{ok, Val} -> {html, nl2br(yaws_api:url_decode(Val))};
+	{ok, Val} -> {html, nl2br(safe_url_decode(Val))};
 	_         -> {html, "No error message found!"}
+    end.
+
+safe_url_decode(Val) ->
+    case catch yaws_api:url_decode(Val) of
+	{'EXIT', _} -> Val;
+	Else        -> Else
     end.
 
 nl2br([$\n|T]) -> [$<,$b,$r,$>|nl2br(T)];

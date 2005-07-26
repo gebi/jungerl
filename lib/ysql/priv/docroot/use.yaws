@@ -1,8 +1,6 @@
 
 <erl>
 
--include("ysql.hrl").
-
 out(A) ->
     H = A#arg.headers,
     C = H#headers.cookie,
@@ -25,7 +23,6 @@ out(A) ->
 			     Res,
 			     {ssi, "tail.inc", "%%", []}];
 			Else ->
-			    ?elog("use.yaws: ~p~n", [Else]),
 			    {redirect_local, {rel_path, "error.yaws?emsg="++
 					      yaws_api:url_encode("Internal error: use.yaws!")}}
 		    end;

@@ -17,7 +17,7 @@
 %% External exports
 -export([start_link/0, start/0, odbc_connect/3, top/1, lk/2, lk/3, date/0,
 	 use/2, desc_table/2, selected/1, where/1, select/3, select/4,
-	 db/1, logout/1]).
+	 db/1, table/1, logout/1, sql_query/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -47,6 +47,9 @@ where(L) ->
 
 db(Y) when Y#ysql.db == undefined -> "-";
 db(Y)                             -> Y#ysql.db.
+
+table(Y) when Y#ysql.table == undefined -> "-";
+table(Y)                                -> Y#ysql.table.
 
 get_condtion(Field, L) ->
     lk("c_"++Field, L, "=").
@@ -101,6 +104,9 @@ use(Y, Db) ->
 desc_table(Y, Table) ->
     gen_server:call(?SERVER, {desc_table, Y, Table}, infinity).
 
+sql_query(Y, Query) ->
+    gen_server:call(?SERVER, {sql_query, Y, Query}, infinity).
+
 select(Y, Selected, Where) ->
     select(Y, Selected, Where, "").
 
@@ -139,7 +145,7 @@ init([]) ->
 handle_call({odbc_connect, User, Passwd, Dsn}, _From, State) ->
     ConnStr = "DSN="++Dsn++";UID="++User++";PWD="++Passwd,
     Reply = case odbc:connect(ConnStr, []) of
-		{ok,Ref} -> {ok, Ref};
+		{ok,Ref} -> {ok, #ysql{odbc = Ref}};
 		Else ->
 		    ?elog("ysql: odbc_connect failed: ~p~n", [Else]),
 		    {error, "odbc_connect failed"}
@@ -162,6 +168,14 @@ handle_call({desc_table, Y, Table}, _From, State) ->
 handle_call({select, Y, Selected, Where, OrderBy}, _From, State) ->
     Reply = (catch select_table(Y, Selected, Where, OrderBy, Y#ysql.table)),
     {reply, {ok, Y, Reply}, State};
+%%
+handle_call({sql_query, Y, Query}, _From, State) ->
+    case catch do_sql_query(Y, Query) of
+	{ok, Reply} ->
+	    {reply, {ok, Y, Reply}, State};
+	Else ->
+	    {reply, Else, State}
+    end;
 %%
 handle_call({logout, Y}, _From, State) ->
     odbc:disconnect(Y#ysql.odbc),
@@ -206,6 +220,21 @@ code_change(OldVsn, State, Extra) ->
 %%--------------------------------------------------------------------
 %% Internal functions
 %%--------------------------------------------------------------------
+
+do_sql_query(Y, Query) ->
+    ?elog("do_sql_query: ~p~n", [Query]),
+    case odbc:sql_query(Y#ysql.odbc, Query++";") of
+	{selected, Headers, Tables} ->
+	    {ok, {ehtml, mk_tab("tables", "", Headers, t2l(Tables))}};
+	{updated, _} ->
+	    {ok, {html, []} };
+	Else ->
+	    ?elog("do_sql_query: cmd failed: ~p~n", [Else]),
+	    Else
+    end.
+
+
+
 
 select_table(Y, Selected, Where, OrderBy, Table) ->
     Q = mk_query(Selected, Where, OrderBy, Table),

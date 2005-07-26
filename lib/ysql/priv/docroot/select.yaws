@@ -1,8 +1,6 @@
 
 <erl>
 
--include("ysql.hrl").
-
 out(A) ->
     H = A#arg.headers,
     C = H#headers.cookie,
@@ -16,21 +14,18 @@ out(A) ->
 	    Selected = ysql:selected(L),
 	    Where = ysql:where(L),
 	    OrderBy = ysql:lk("orderby", L, ""),
-	    ?elog("select: selected=~p , where=~p orderby=~p~n", 
-		  [Selected, Where, OrderBy]),
 	    case ysql:select(Y, Selected, Where, OrderBy) of
 		{ok, Y2, Res} ->
 		    yaws_api:replace_cookie_session(Cookie, Y2),
 		    [{ssi, "head.inc", "%%", [{"DATE", ysql:date()},
 					      {"DB", ysql:db(Y2)},
-					      {"TABLES", "use.yaws?db="++Y#ysql.db},
-					      {"DTABLE", Y#ysql.table},
-					      {"DTABLE_LNK", "desc_table.yaws?table="++Y#ysql.table}
+					      {"TABLES", "use.yaws?db="++ysql:db(Y)},
+					      {"DTABLE", ysql:table(Y)},
+					      {"DTABLE_LNK", "desc_table.yaws?table="++ysql:table(Y)}
 					     ]},
 		     Res,
 		     {ssi, "tail.inc", "%%", []}];
 		Else ->
-		    ?elog("desc_table.yaws: ~p~n", [Else]),
 		    {redirect_local, {rel_path, "error.yaws?emsg="++
 				      yaws_api:url_encode("Internal error: desc_table.yaws!")}}
 	    end

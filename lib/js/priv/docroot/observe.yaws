@@ -4,9 +4,9 @@ out(A) ->
     Reply = mumsa(yaws_api:parse_post(A)),
     {html, ["Search Results: " ++ Reply]}.
 
-mumsa([{"searchtext","coolt"}|T]) -> "<b><blink>Tjena Johan!</blink></b>";
-mumsa([{"searchtext",Mums}|T])    -> Mums;
-mumsa([_|T])                      -> mumsa(T);
-mumsa([])                         -> "".
+mumsa([{"searchtext","cool"}|T]) -> "<b><blink>Yes, this is indeed cool stuff!</blink></b>";
+mumsa([{"searchtext",Mums}|T])   -> Mums;
+mumsa([_|T])                     -> mumsa(T);
+mumsa([])                        -> "".
 
 </erl>

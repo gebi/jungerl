@@ -6,7 +6,8 @@
 -export([link_to_function/2, link_to_function/3,
 	 link_to_remote/2, link_to_remote/3,
 	 observe_field/2, observe_form/2,
-	 periodically_call_remote/1, form_remote_tag/1,
+	 periodically_call_remote/1, periodically_call_remote_S/1, 
+	 form_remote_tag/1,
 	 prototype_js/0, fd2qs_js/0]).
 
 -import(lists,[flatten/1, member/2]).
@@ -18,7 +19,7 @@
 %%%
 %%% <script type="text/javascript" src="/prototype.yaws"></script>
 %%%
-%%% In the file prototype.yaws we call js:prototype_js/0
+%%% In the file prototype.yaws, we call: js:prototype_js/0
 %%%
 %%%
 prototype_js() ->
@@ -107,10 +108,15 @@ link_to_remote(Name, Opts, HtmlOpts) ->
 %%% with :url and defining callbacks is the same as link_to_remote.
 %%% ================================================================
 periodically_call_remote(Opts) ->
+    Code = periodically_call_remote_S(Opts),
+    content_tag(script, {pre_html, Code}, x_get(html_options, Opts, [])).
+
+%%% Return only the string.
+periodically_call_remote_S(Opts) ->
     Frequency = x_get(frequency, Opts, "10"),
-    Code = "new PeriodicalExecuter(function() {"++
-	remote_function(Opts)++"}, "++Frequency++")",
-    {pre_html, content_tag(script, Code, x_get(html_options, Opts, []))}.
+    "new PeriodicalExecuter(function() {"++
+	remote_function(Opts)++"}, "++Frequency++")".
+
     
 %%% ================================================================
 %%% Returns a form tag that will submit using XMLHttpRequest in the 
@@ -125,7 +131,7 @@ form_remote_tag(Opts0) ->
     Opts = x_set(form, Opts0, "true"),
     HtmlOpts = x_set(onsubmit, x_get(html, Opts, []), 
 		     remote_function(Opts)++"; return false;"),
-    {pre_html, tag(form, x_set(html, Opts, HtmlOpts), true)}.
+    tag(form, x_set(html, Opts, HtmlOpts), true).
 
 %%% ================================================================
 %%% Returns a link that'll trigger a javascript +function+ using the 
@@ -140,11 +146,10 @@ link_to_function(Name, Function) ->
     link_to_function(Name, Function, []).
 
 link_to_function(Name, Function, HtmlOpts) ->
-    {pre_html, content_tag(a, 
-			   Name,
-			   [{href, "#"},
-			    {onclick, Function++"; return false;"} |
-			    HtmlOpts])}.
+    content_tag(a, Name,
+		[{href, "#"},
+		 {onclick, Function++"; return false;"} |
+		 HtmlOpts]).
 
 
 %%% ================================================================
@@ -170,7 +175,12 @@ link_to_function(Name, Function, HtmlOpts) ->
 %%% +link_to_remote.
 %%% ================================================================
 observe_field(FieldId, Opts) ->
-    {pre_html, build_observer("Form.Element.Observer", FieldId, Opts)}.
+    content_tag(script, 
+		{pre_html, observe_field_S(FieldId, Opts)},
+		[{type, "text/javascript"}]).
+
+observe_field_S(FieldId, Opts) ->
+    build_observer("Form.Element.Observer", FieldId, Opts).
 
 
 %%% ================================================================
@@ -180,7 +190,12 @@ observe_field(FieldId, Opts) ->
 %%% serialized (request string) value of the form.
 %%% ================================================================
 observe_form(FormId, Opts) ->
-    {pre_html, build_observer("Form.Observer", FormId, Opts)}.
+    content_tag(script, 
+		{pre_html, observe_form_S(FormId, Opts)},
+		[{type, "text/javascript"}]).
+
+observe_form_S(FormId, Opts) ->
+    build_observer("Form.Observer", FormId, Opts).
 
 
 %%% ================================================================
@@ -331,7 +346,7 @@ random_upload_id() ->
 url_append_qs(Url, Qs) -> 
     url_append_qs(Url, Qs, true).
 
-url_append_qs([$?|T], Qs, First) -> [$?|url_append_qs(T, Qs, false)];
+url_append_qs([$?|T], Qs, _)     -> [$?|url_append_qs(T, Qs, false)];
 url_append_qs([H|T], Qs, First)  -> [H|url_append_qs(T, Qs, First)];
 url_append_qs([], Qs, true)      -> "?"++Qs;
 url_append_qs([], Qs, false)     -> "&"++Qs.
@@ -364,9 +379,12 @@ content_tag(Tag, Content, Opts) ->
 tag(Tag, Opts) ->
     tag(Tag, Opts, false).
 
-tag(Tag, Opts, Bool) when Bool==true; Bool==false ->
-    "<"++a2l(Tag)++" "++tag_options(Opts)++
-	if (Bool) -> ">"; true -> "/>" end.
+tag(Tag, Opts, true)  -> {Tag, Opts};
+tag(Tag, Opts, false) -> {Tag, Opts, []}.
+
+%%tag(Tag, Opts, Bool) when Bool==true; Bool==false ->
+%%    "<"++a2l(Tag)++" "++tag_options(Opts)++
+%%	if (Bool) -> ">"; true -> "/>" end.
 
 tag_options(Opts) ->
     lists:foldr(fun({K,V}, Acc) ->
@@ -440,14 +458,14 @@ x_set(Key, [H|T], Val)       -> [H|x_set(Key, T, Val)];
 x_set(Key, [], Val)          -> [{Key,Val}].
 
 %%% Set option iff it don't exist.
-x_default(Key, [{Key,Val} = H|T], _) -> [H|T];
-x_default(Key, [H|T], Val)           -> [H|x_default(Key, T, Val)];
-x_default(Key, [], Val)              -> [{Key,Val}].
+x_default(Key, [{Key,_} = H|T], _) -> [H|T];
+x_default(Key, [H|T], Val)         -> [H|x_default(Key, T, Val)];
+x_default(Key, [], Val)            -> [{Key,Val}].
 
 %%% Swap singleton option
 x_swap1(H, [H|T], E) -> [E|T];
 x_swap1(X, [H|T], E) -> [H|x_swap1(X, T, E)];
-x_swap1(X, [], E)    -> [].
+x_swap1(_, [], _)    -> [].
 
 %%% Delete option.
 x_del(Key, [{Key,_}|T]) -> T;
@@ -510,10 +528,9 @@ build_observer(Klass, Name, Opts) ->
 	    end,
     Callback = remote_function(Opts2),
     Frequency = x_get(frequency, Opts2, "10"),
-    "<script type=\"text/javascript\">"++
-	"new "++a2l(Klass)++"('"++a2l(Name)++"', "++
+    "new "++a2l(Klass)++"('"++a2l(Name)++"', "++
 	Frequency++", function(element, value) {"++
-	Callback++"})</script>".
+	Callback++"})".
 
 
 %%% Take a list [{complete, "undoRequestCompleted(request)"},...]

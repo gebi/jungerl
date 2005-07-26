@@ -1,0 +1,467 @@
+
+<erl>
+
+out(A) ->
+    H = A#arg.headers,
+    C = H#headers.cookie,
+    case yaws_api:find_cookie_val("ysql", C) of
+	[] ->
+	    {redirect_local, {rel_path, "error.yaws?emsg="++
+			      yaws_api:url_encode("No cookie info found!")}};
+	Cookie ->
+	    {ok, Y} = yaws_api:cookieval_to_opaque(Cookie),
+	    [{ssi, "head.inc", "%%", [{"CLOCK", ysql:clock()},
+				      {"DB", ysql:db(Y)},
+				      {"TABLES", "use.yaws?db="++ysql:db(Y)},
+				      {"DTABLE", ""},
+				      {"DTABLE_LNK", ""}]},
+	     query_part(Y)]
+    end.
+
+query_part(Y) ->
+    {ehtml, 
+     [{form, [{method, post},
+	      {action, "sql_query_post.yaws"}],
+       [{table,[{cellspacing, "5"}, 
+		{class, "do_sql_query"}],  
+	 [{tr, [],
+	   [{td, [], {p, [], "SQL Query:"}},
+	    {td, [], {input, [{name, "query"},
+			      {type, text},
+			      {size, "50"}]}}]},
+	  {tr, [],
+	   [{td, [], {input, [{type, submit}, 
+			      {value, "Submit"}]}}]}]}]}]}.
+
+
+
+</erl>
+
+<div class="sql_query_text">
+
+<h3>Short SQL tutorial</h3>
+<p>
+Example on how to create a table:
+
+<pre>
+CREATE TABLE pet (name VARCHAR(20), owner VARCHAR(20),
+              species VARCHAR(20), sex CHAR(1), birth DATE, death DATE);
+</pre>
+
+<p>
+For testing it can be useful to use the 'TEMPORARY' directive.
+This will create a table that only will live during the active
+session. 
+
+<pre>
+CREATE TEMPORARY TABLE pet (name VARCHAR(20), owner VARCHAR(20),
+              species VARCHAR(20), sex CHAR(1), birth DATE, death DATE);
+</pre>
+
+
+<p>
+After creating your table, you need to populate it. The LOAD DATA and INSERT  statements are useful for this.
+
+<p>
+You could create a text file pet.txt  containing one record per line, with values separated by tabs, and given in the order in which the columns were listed in the CREATE TABLE statement.
+For missing values (such as unknown sexes or death dates for animals that are still living), you can use NULL values. To represent these in your text file, use \N  (backslash, capital-N). 
+
+<pre>
+LOAD DATA LOCAL INFILE '/path/pet.txt' INTO TABLE pet;
+</pre>
+
+<p>
+ When you want to add new records one at a time, the INSERT statement is useful. 
+
+<pre>
+INSERT INTO pet
+    VALUES ('Puffball','Diane','hamster','f','1999-03-30',NULL);
+</pre>
+
+<p>
+The simplest form of SELECT retrieves everything from a table:
+
+<pre>
+SELECT * FROM pet;
+</pre>
+
+<p>
+You can select only particular rows from your table. 
+
+<pre>
+SELECT * FROM pet WHERE name = 'Bowser';
+
+SELECT * FROM pet WHERE birth >= '1998-1-1';
+
+SELECT * FROM pet WHERE species = 'dog' AND sex = 'f';
+
+SELECT * FROM pet WHERE species = 'snake' OR species = 'bird';
+
+SELECT name, birth FROM pet;
+</pre>
+
+<p>
+To find out who owns pets, use this query:
+
+<pre>
+SELECT owner FROM pet;
+</pre>
+
+<p>
+However, notice that the query simply retrieves the owner field from each record, and some of them appear more than once. 
+To minimize the output, retrieve each unique output record just once by adding the keyword DISTINCT:
+
+<pre>
+SELECT DISTINCT owner FROM pet;
+</pre>
+
+<p>
+Here are animal birthdays, sorted by date:
+</p>
+
+<pre>
+SELECT name, birth FROM pet ORDER BY birth;
+</pre>
+
+<p>
+You can force a case-sensitive sort for a column by using the BINARY cast: ORDER BY BINARY col_name.
+<p>
+The default sort order is ascending, with smallest values first. To sort in reverse (descending) order, add the DESC keyword to the name of the column you are sorting by:
+
+<pre>
+SELECT name, birth FROM pet ORDER BY birth DESC;
+</pre>
+
+<p>
+You can sort on multiple columns, and you can sort columns in different directions. For example, to sort by type of animal in ascending order, then by birth date within animal type in descending order (youngest animals first), use the following query:
+
+<pre>
+SELECT name, species, birth FROM pet
+       ORDER BY species, birth DESC;
+</pre>
+
+<p>
+To determine how many years old each of your pets is, compute the difference in the year part of the current date and the birth date, then subtract one if the current date occurs earlier in the calendar year than the birth date. The following query shows, for each pet, the birth date, the current date, and the age in years.
+
+<pre>
+SELECT name, birth, CURDATE(),
+    (YEAR(CURDATE())-YEAR(birth))
+       - (RIGHT(CURDATE(),5)<RIGHT(birth,5))
+    AS age
+    FROM pet;
+</pre>
+
+<p>
+Here, YEAR() pulls out the year part of a date and RIGHT() pulls off the rightmost five characters that represent the MM-DD  (calendar year) part of the date. The part of the expression that compares the MM-DD values evaluates to 1 or 0, which adjusts the year difference down a year if CURDATE() occurs earlier in the year than birth. The full expression is somewhat ungainly, so an alias (age) is used to make the output column label more meaningful.
+
+<p>
+The query works, but the result could be scanned more easily if the rows were presented in some order. This can be done by adding an ORDER BY name clause to sort the output by name:
+
+<pre>
+SELECT name, birth, CURDATE(),
+    (YEAR(CURDATE())-YEAR(birth))
+       - (RIGHT(CURDATE(),5)<RIGHT(birth,5))
+    AS age
+    FROM pet ORDER BY name;
+</pre>
+
+<p>
+To sort the output by age rather than name, just use a different ORDER BY clause:
+
+<pre>
+SELECT name, birth, CURDATE(),
+    (YEAR(CURDATE())-YEAR(birth))
+       - (RIGHT(CURDATE(),5)<RIGHT(birth,5))
+    AS age
+    FROM pet ORDER BY age;
+</pre>
+
+<p>
+A similar query can be used to determine age at death for animals that have died. You determine which animals these are by checking whether the death value is NULL. Then, for those with non-NULL values, compute the difference between the death and birth values:
+
+<pre>
+SELECT name, birth, death,
+    (YEAR(death)-YEAR(birth)) - (RIGHT(death,5)<RIGHT(birth,5))
+    AS age
+    FROM pet WHERE death IS NOT NULL ORDER BY age;
+</pre>
+
+<p>
+The query uses death IS NOT NULL rather than death <> NULL because NULL is a special value that cannot be compared using the usual comparison operators. 
+
+<p>
+Finding animals with birthdays in the upcoming month is easy, too. Suppose that the current month is April. Then the month value is 4 and you look for animals born in May (month 5) like this:
+
+<pre>
+SELECT name, birth FROM pet WHERE MONTH(birth) = 5;
+</pre>
+
+<p>
+You can even write the query so that it works no matter what the current month is. That way you don't have to use a particular month number in the query. DATE_ADD() allows you to add a time interval to a given date. If you add a month to the value of CURDATE(), then extract the month part with MONTH(), the result produces the month in which to look for birthdays:
+
+<pre>
+SELECT name, birth FROM pet
+    WHERE MONTH(birth) = MONTH(DATE_ADD(CURDATE(),INTERVAL 1 MONTH));
+</pre>
+
+<p>
+A different way to accomplish the same task is to add 1 to get the next month after the current one (after using the modulo function (MOD) to wrap around the month value to 0 if it is currently 12):
+</p>
+
+<pre>
+SELECT name, birth FROM pet
+    WHERE MONTH(birth) = MOD(MONTH(CURDATE()), 12) + 1;
+</pre>
+
+<p>
+Note that MONTH returns a number between 1 and 12. And MOD(something,12) returns a number between 0 and 11. So the addition has to be after the MOD(), otherwise we would go from November (11) to January (1). 
+<p>
+Use the IS NULL and IS NOT NULL operators instead:
+
+<pre>
+SELECT 1 IS NULL, 1 IS NOT NULL;
+</pre>
+
+<p>
+Note that in MySQL, 0 or NULL means false and anything else means true. The default truth value from a boolean operation is 1.
+
+<p>
+ SQL pattern matching allows you to use '_' to match any single character and '%' to match an arbitrary number of characters (including zero characters). In MySQL, SQL patterns are case-insensitive by default. Some examples are shown here. Note that you do not use = or <> when you use SQL patterns; use the LIKE or NOT LIKE comparison operators instead.
+
+<p>
+To find names beginning with 'b':
+
+<pre>
+SELECT * FROM pet WHERE name LIKE 'b%';
+</pre>
+
+<p>
+To find names ending with 'fy':
+
+<pre>
+SELECT * FROM pet WHERE name LIKE '%fy';
+</pre>
+
+<p>
+To find names containing a 'w':
+
+<pre>
+SELECT * FROM pet WHERE name LIKE '%w%';
+</pre>
+
+<p>
+To find names containing exactly five characters, use five instances of the '_' pattern character:
+
+<pre>
+SELECT * FROM pet WHERE name LIKE '_____';
+</pre>
+
+<p>
+The other type of pattern matching provided by MySQL uses extended regular expressions. When you test for a match for this type of pattern, use the REGEXP and NOT REGEXP operators (or RLIKE and NOT RLIKE, which are synonyms).
+
+<p>
+To demonstrate how extended regular expressions work, the LIKE queries shown previously are rewritten here to use REGEXP.
+
+<p>
+To find names beginning with 'b', use '^' to match the beginning of the name:
+
+<pre>
+SELECT * FROM pet WHERE name REGEXP '^b';
+</pre>
+
+<p>
+To find names ending with 'fy', use '$' to match the end of the name:
+
+<pre>
+SELECT * FROM pet WHERE name REGEXP 'fy$';
+</pre>
+
+<p>
+To find names containing a 'w', use this query:
+
+<pre>
+SELECT * FROM pet WHERE name REGEXP 'w';
+</pre>
+
+<p>
+To find names containing exactly five characters, use '^' and '$' to match the beginning and end of the name, and five instances of '.' in between:
+
+<pre>
+SELECT * FROM pet WHERE name REGEXP '^.....$';
+</pre>
+
+<p>
+You could also write the previous query using the '{n}' ``repeat-n-times'' operator:
+
+<pre>
+SELECT * FROM pet WHERE name REGEXP '^.{5}$';
+</pre>
+
+<p>
+You can also store pattern in you database fields and use syntax like this:
+
+<pre>
+SELECT country FROM ip_list WHERE '127.0.0.1' like ip
+</pre>
+
+where ip is the field name with patterns.
+
+<p>
+Counting the total number of animals you have is the same question as ``How many rows are in the pet  table?'' because there is one record per pet. COUNT(*) counts the number of rows, so the query to count your animals looks like this:
+
+<pre>
+SELECT COUNT(*) FROM pet;
+</pre>
+
+<p>
+Earlier, you retrieved the names of the people who owned pets. You can use COUNT() if you want to find out how many pets each owner has:
+
+<pre>
+SELECT owner, COUNT(*) FROM pet GROUP BY owner;
+</pre>
+
+<p>
+Note the use of GROUP BY to group together all records for each owner. 
+
+<p>
+COUNT() and GROUP BY are useful for characterizing your data in various ways. The following examples show different ways to perform animal census operations.
+
+<p>
+Number of animals per species:
+
+<pre>
+SELECT species, COUNT(*) FROM pet GROUP BY species;
+</pre>
+
+<p>
+Number of animals per sex:
+
+<pre>
+SELECT sex, COUNT(*) FROM pet GROUP BY sex;
+</pre>
+
+<p>
+Number of animals per combination of species and sex:
+
+<pre>
+SELECT species, sex, COUNT(*) FROM pet GROUP BY species, sex;
+</pre>
+
+<p>
+You need not retrieve an entire table when you use COUNT(). For example, the previous query, when performed just on dogs and cats, looks like this:
+
+<pre>
+SELECT species, sex, COUNT(*) FROM pet
+    WHERE species = 'dog' OR species = 'cat'
+    GROUP BY species, sex;
+</pre>
+
+<p>
+Or, if you wanted the number of animals per sex only for known-sex animals:
+
+<pre>
+SELECT species, sex, COUNT(*) FROM pet
+    WHERE sex IS NOT NULL
+    GROUP BY species, sex;
+</pre>
+
+<p>
+the CREATE TABLE statement for the event  table might look like this:
+
+<pre>
+CREATE TABLE event (name VARCHAR(20), date DATE,
+    type VARCHAR(15), remark VARCHAR(255));
+</pre>
+
+<p>
+Suppose that you want to find out the ages at which each pet had its litters. We saw earlier how to calculate ages from two dates. The litter date of the mother is in the event table, but to calculate her age on that date you need her birth date, which is stored in the pet table. This means the query requires both tables:
+
+<pre>
+SELECT pet.name,
+    (YEAR(date)-YEAR(birth)) - (RIGHT(date,5)<RIGHT(birth,5)) AS age,
+      remark
+    FROM pet, event
+    WHERE pet.name = event.name AND type = 'litter';
+</pre>
+
+<p>
+Sometimes it is useful to join a table to itself, if you want to compare records in a table to other records in that same table. For example, to find breeding pairs among your pets, you can join the pet table with itself to produce candidate pairs of males and females of like species:
+
+<pre>
+SELECT p1.name, p1.sex, p2.name, p2.sex, p1.species
+    FROM pet AS p1, pet AS p2
+    WHERE p1.species = p2.species AND p1.sex = 'f' AND p2.sex = 'm';
+</pre>
+
+<p>
+In this query, we specify aliases for the table name in order to refer to the columns and keep straight which instance of the table each column reference is associated with. 
+
+<h4>Getting Information About Databases and Tables</h4>
+<p>
+What if you forget the name of a database or table, or what the structure of a given table is (for example, what its columns are called)? MySQL addresses this problem through several statements that provide information about the databases and tables it supports.
+<p>
+You have previously seen SHOW DATABASES, which lists the databases managed by the server. To find out which database is currently selected, use the DATABASE() function:
+
+<pre>
+SELECT DATABASE();
+</pre>
+
+<p>
+If you haven't selected any database yet, the result is NULL (or the empty string before MySQL 4.1.1).
+<p>
+To find out what tables the current database contains (for example, when you're not sure about the name of a table), use this command:
+
+<pre>
+SHOW TABLES;
+</pre>
+
+<p>
+If you want to find out about the structure of a table, the DESCRIBE command is useful; it displays information about each of a table's columns:
+
+<pre>
+DESCRIBE pet;
+</pre>
+
+<p>
+Field indicates the column name, Type is the data type for the column, NULL indicates whether the column can contain NULL values, Key indicates whether the column is indexed, and Default specifies the column's default value.
+
+<p>
+If you have indexes on a table, SHOW INDEX FROM tbl_name produces information about them. 
+
+<h4>User administration</h4>
+
+<p>
+Set up a user that can only view data. The user is
+<i>bill</i> and the password is <i>smith</i>.
+
+<pre>
+GRANT SELECT ON *.* TO bill IDENTIFIED BY 'smith'
+</pre>
+
+<p>
+To give a user all privileges, replace <i>SELECT</i> with <i>ALL</i>.
+In the example below, we give user <i>bill</i> all basic privileges,
+but only for the <i>db1</i> database.
+
+<pre>
+GRANT ALL ON db1.* TO bill IDENTIFIED BY 'smith'
+</pre>
+
+<p>
+To delete the anonymous user do:
+
+<pre>
+DELETE FROM mysql.user WHERE User = ''
+DELETE FROM mysql.db WHERE User = ''
+FLUSH PRIVILEGES
+</pre>
+
+</div>
+
+<erl>
+out(A) ->
+    [{ssi, "tail.inc", "%%", []}].
+</erl>
+
+</body>
+</html>

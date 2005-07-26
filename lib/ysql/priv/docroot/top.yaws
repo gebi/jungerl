@@ -13,8 +13,9 @@ out(A) ->
 	    case ysql:top(Y) of
 		{ok, Y2, Res} ->
 		    yaws_api:replace_cookie_session(Cookie, Y2),
-		    [{ssi, "head.inc", "%%", [{"DATE", ysql:date()},
+		    [{ssi, "head.inc", "%%", [
 					      {"DB", ysql:db(Y2)},
+					      {"CLOCK", ysql:clock()},
 					      {"DTABLE", ""},
 					      {"DTABLE_LNK", ""}
 					     ]},

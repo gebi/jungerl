@@ -2,8 +2,10 @@
 <head>
 <title>Yaws SQL Browser</title>
  
- <link rel="STYLESHEET" type="text/css" href="ysql.css">
- <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<link rel="STYLESHEET" type="text/css" href="ysql.css">
+<script type="text/javascript" src="prototype.yaws"></script>
+<script type="text/javascript" src="fd2qs.yaws"></script>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
 </head>
 <body class="body"> 
 <table border="0" cellpadding="0" cellspacing="0" width="99%">
@@ -11,7 +13,7 @@
    <tr>
    <td class=logo>Yaws SQL Browser</td>
    <td ><span class="current_database_txt">(current database is:</span> <span class="current_database">%%DB%%</span><span class="current_database_txt">)</span></td>
-   <td align="right" valign="bottom" class="date">%%DATE%%</td>
+   <td align="right" valign="bottom" class="date"><div id="the_clock"></div></td>
    </tr>
    <tr>
    </tr>
@@ -35,3 +37,6 @@
   </tr>
  </tbody>
 </table>
+<script>
+%%CLOCK%%
+</script>

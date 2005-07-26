@@ -6,13 +6,18 @@ which are using the "Prototype" Javascript library.
 
 So far, the focus has been around the AJAX functionality.
 
-To test it do, start yaws as:
+To test it do:
 
-   yaws -i -c ./priv/yaws.conf -pa ./ebin
+1. Modify the ./priv/yaws.conf file
+   Change the docroot path accordingly
 
-and browse: 
+2. Start Yaws as:
 
-  http://localhost:4080/
+     yaws -i -c ./priv/yaws.conf -pa ./ebin
+
+   and browse: 
+
+     http://localhost:4080/
 
 
 --Tobbe

@@ -17,6 +17,7 @@ out(A) ->
 
 <h1>Search</h1>
 <p>
+Write the word: <i>cool</i> , in the text field below.
 <form id="myform">
 <label for="searchtext">Live Search:</label>
 <input type="text" id="searchtext" name="searchtext" value="" size="15" />

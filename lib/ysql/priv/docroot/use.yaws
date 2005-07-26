@@ -15,7 +15,7 @@ out(A) ->
 		    case ysql:use(Y, Db) of
 			{ok, Y2, Res} ->
 			    yaws_api:replace_cookie_session(Cookie, Y2),
-			    [{ssi, "head.inc", "%%", [{"DATE", ysql:date()},
+			    [{ssi, "head.inc", "%%", [{"CLOCK", ysql:clock()},
 						      {"DB", ysql:db(Y2)},
 						      {"TABLES", "use.yaws?db="++Db},
 						      {"DTABLE", ""},

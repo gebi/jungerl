@@ -1,0 +1,16 @@
+<erl>
+out(A) ->
+    {H,M,S} = time(),
+    {html, [ysql:date(), " (",
+	    i2l(H), ":",
+	    i2l(M), ":",
+	    i2l(S), ")"
+	   ]}.
+
+i2l(I) ->
+    case integer_to_list(I) of
+	[X] -> [$0,X];
+	L   -> L
+    end.
+
+</erl>

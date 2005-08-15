@@ -1,0 +1,23 @@
+SNMP_BIN_TARGET_DIR=../priv
+SNMP_HRL_TARGET_DIR=../include
+
+MIB_FILES := $(wildcard *MIB.mib)
+
+BIN_TARGETS= $(MIB_FILES:%.mib=$(SNMP_BIN_TARGET_DIR)/%.bin)
+HRL_TARGETS= $(MIB_FILES:%.mib=$(SNMP_HRL_TARGET_DIR)/%.hrl)
+
+TARGET_FILES= $(BIN_TARGETS) $(HRL_TARGETS)
+
+#SNMP_FLAGS = +'{group_check, false}' -I $(SNMP_BIN_TARGET_DIR)
+SNMP_FLAGS = -I $(SNMP_BIN_TARGET_DIR)
+
+all: $(TARGET_FILES)
+
+clean:
+	rm -f $(TARGET_FILES)
+
+$(SNMP_BIN_TARGET_DIR)/%.bin: %.mib %.funcs
+	erlc $(SNMP_FLAGS) -o $(SNMP_BIN_TARGET_DIR) $<
+
+$(SNMP_HRL_TARGET_DIR)/%.hrl: $(SNMP_BIN_TARGET_DIR)/%.bin
+	erlc $(SNMP_FLAGS) -o $(SNMP_HRL_TARGET_DIR) $<

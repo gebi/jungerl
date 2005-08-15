@@ -1,0 +1,36 @@
+% Persistent control variables
+{mteResourceSampleMinimum,
+ {event_mib, mte_variable, [mteResourceSampleMinimum]}}.
+{mteResourceSampleInstanceMaximum,
+ {event_mib, mte_variable, [mteResourceSampleInstanceMaximum]}}.
+ 
+% Volatile statistics variables
+{mteResourceSampleInstances,
+ {event_mib, mte_stat_variables, [instances]}}.
+{mteResourceSampleInstancesHigh,
+ {event_mib, mte_stat_variables, [instancesHigh]}}.
+{mteResourceSampleInstanceLacks,
+ {event_mib, mte_stat_variables, [instanceLacks]}}.
+{mteTriggerFailures,
+ {event_mib, mte_stat_variables, [failures]}}.
+
+% Persistent tables
+{mteTriggerTable,
+ {event_mib, mteTriggerTable, []}}.
+{mteTriggerDeltaTable,
+ {event_mib, table_func, [mteTriggerDeltaTable]}}.
+{mteTriggerExistenceTable,
+ {event_mib, table_func, [mteTriggerExistenceTable]}}.
+{mteTriggerBooleanTable,
+ {event_mib, table_func, [mteTriggerBooleanTable]}}.
+{mteTriggerThresholdTable,
+ {event_mib, table_func, [mteTriggerThresholdTable]}}.
+{mteObjectsTable,
+ {event_mib, table_func, [mteObjectsTable]}}.
+{mteEventTable,
+ {event_mib, mteEventTable, []}}.
+{mteEventNotificationTable,
+ {event_mib, table_func, [mteEventNotificationTable]}}.
+{mteEventSetTable,
+ {event_mib, unimplemented_table, []}}.
+

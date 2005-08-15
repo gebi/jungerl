@@ -29,6 +29,7 @@ stop_handler(Reason, State) ->
 get_file(F,Args) ->
     case file:read_file("." ++ F) of
 	{ok, Bin} ->
+	    io:format("found ~s\n", ["." ++ F]),
 	    case classify(F) of
 		html ->
 		    [header(html),Bin];
@@ -36,10 +37,13 @@ get_file(F,Args) ->
 		    [header(jpg),Bin];
 		gif ->
 		    [header(jpg),Bin];
+		text ->
+		    [header(text),body("white"),"<pre>",Bin,"</pre>"];
 		_ ->
-		    [header(text),body("white"),"<pre>",Bin,"</pre>"]
+		    [header(binary),Bin]
 	    end;
 	_ ->
+	    io:format("did not find ~s\n", ["." ++ F]),
 	    show({no_such_file,F,args,Args,cwd,file:get_cwd()})
     end.
 

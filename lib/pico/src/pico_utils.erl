@@ -98,6 +98,8 @@ header(jpg)  ->
     ["HTTP/1.0 200 Ok\r\n", powered_by(), content_type("image/jpeg"),"\r\n"];
 header(gif)  -> 
     ["HTTP/1.0 200 Ok\r\n", powered_by(), content_type("image/gif"),"\r\n"];
+header(binary)  -> 
+    ["HTTP/1.0 200 Ok\r\n", powered_by(), "\r\n"];
 header({redirect,To}) ->
     ["HTTP/1.0 302 Come and get it!\r\n",
      powered_by(), "Location: " ++ To ++ "\r\n\r\n"].
@@ -130,7 +132,9 @@ classify(FileName) ->
 	".html" -> html;
 	".HTM" -> html;
 	".htm" -> html;
-	Other -> text
+	".txt" -> text;
+	".TXT" -> text;
+	Other -> binary
     end.
 
 content_length([{"content-length",Str}|T]) ->

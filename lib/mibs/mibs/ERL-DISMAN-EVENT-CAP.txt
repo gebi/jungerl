@@ -1,0 +1,73 @@
+ERL-DISMAN-EVENTCAP DEFINITIONS ::= BEGIN
+
+--
+-- This is just an example of how a capability mib could look.
+-- A real implementation should copy the SUPPORTS clause from
+-- this file and put it into a real capability mib.
+-- 
+
+IMPORTS
+    AGENT-CAPABILITIES
+	FROM SNMPv2-CONF
+    MODULE-IDENTITY
+	FROM SNMPv2-SMI
+    ;
+    
+erlDismanEventCapModule MODULE-IDENTITY
+    LAST-UPDATED "0505231000Z"
+    ORGANIZATION "jungerl"
+    CONTACT-INFO
+	"Contact:  Martin Bjorklund
+	
+          E-mail: mbj@bluetail.com"
+    DESCRIPTION
+	"Dummy MIB Module for DISMAN-EVENT-MIBL"
+
+    REVISION     "0505231000Z"
+    DESCRIPTION
+	"The initial revision of this module."
+    ::= { XX }
+
+erlDismanEventCaps AGENT-CAPABILITIES
+    PRODUCT-RELEASE      ""
+    STATUS               current
+    DESCRIPTION          ""
+
+    --
+    -- Copy from here into your own capability mib.
+    --
+
+    SUPPORTS             DISMAN-EVENT-MIB
+	INCLUDES         { dismanEventResourceGroup,
+	                   dismanEventTriggerGroup,
+			   dismanEventObjectsGroup,
+			   dismanEventEventGroup,
+			   dismanEventNotificationObjectGroup,
+			   dismanEventNotificationGroup }
+
+        VARIATION        mteTriggerTargetTag	
+	   ACCESS	 read-only
+	   DESCRIPTION   "Write is not supported. This implementation monitors
+	                 the local systom only."
+
+	VARIATION        mteEventActions
+           SYNTAX        BITS { notification(0) }
+           DESCRIPTION   "The bit set(1) is not supported, since the
+	                 implementation monitors the local system only."
+
+	VARIATION        mteHotTargetName
+	    DESCRIPTION  "This object will always be the empty string."
+
+	VARIATION        mteHotValue
+	    DESCRIPTION  "For existance triggers, this object will have the
+                         value zero (0).  The reason for this is that you
+			 might monitor any object, not only integer values."
+
+        VARIATION        mteTriggerFailure
+	    DESCRIPTION  "This notification is not implemented.  It is not
+	                 clear from the rfc how a network manager can
+                         control the generation of this notification."
+
+END
+
+   

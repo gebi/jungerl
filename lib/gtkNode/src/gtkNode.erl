@@ -60,7 +60,7 @@ start_gtkNode(Name) ->
     open_port({spawn,make_cmd(Name)},[stderr_to_stdout,exit_status]).
 
 make_cmd(Name) ->
-    Exe = join([dirname(dirname(code:which(?MODULE))),bin,gtkNode]),
+    Exe = join([dirname(dirname(code:which(?MODULE))),priv,bin,gtkNode]),
     [Node,Host] = string:tokens(atom_to_list(node()),"@"),
     Cookie = atom_to_list(erlang:get_cookie()),
     string_join([Exe,Node,Host,atom_to_list(Name),Cookie]," ").

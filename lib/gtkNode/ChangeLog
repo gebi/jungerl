@@ -1,0 +1,288 @@
+2005-08-12  Mats Cronqvist  <mats.cronqvist@ericsson.com>
+
+	* everything: moved into jungerl. not in CVS yet though. code
+	generating stuff is not yet migrated, and broken becuse of changed
+	paths.
+
+	* src/gtkNode_internal.c (GN_widget_get_attr): should be fixed to
+	return list of tagged tuples. good thing it's still alpha :>
+
+	* examples/simple/*: created
+
+	* README: created
+
+	* src/gtkNode_cnode.c: changed the message formats :> for
+	consistency and to support bulking
+
+	* allOverThePlace: fixed and rearranged
+	
+2005-01-18  Mats Cronqvist  <mats.cronqvist@ericsson.com>
+
+	* src/gtkNodeTest.erl (Repository): cosmetic
+
+	* src/gtkNode.erl (Repository): cosmetic
+
+2005-01-06  Mats Cronqvist  <qthmacr@mwux005>
+
+	* src/gtkNodeTest.erl (Repository): cosmetic
+
+2005-01-05  Mats Cronqvist  <qthmacr@mwux005>
+
+	* src/gdk.defs (Repository): drawable stuff
+
+	* inc/gtkNode.h (Repository): added get_arg_int
+
+	* src/gtkNode_structs.c (Repository): drawable stuff
+
+	* src/gtkNode_marshal.c (Repository): added get_arg_int
+
+	* src/gtkNode_internal.c (Repository): drawable stuff. 
+	GN_drawingarea_get_window is necessary
+
+	* src/gtkNodeTest.erl (Repository): drawable stuff
+
+	* src/gtkNode.erl (Repository): drawable stuff
+
+	* src/gdk_white.txt (Repository): drawable stuff
+
+	* src/Makefile (Repository): better dependencies (still sucky though)
+
+2005-01-03  Mats Cronqvist  <mats.cronqvist@ericsson.com>
+
+	* src/gtkNode_cnode.c (Repository): passing regname of erlang node 
+	process to cnode as command line parameter
+
+	* src/gtkNode.erl (Repository): passing regname of erlang node process
+	to cnode as command line parameter 
+
+	* src/gtkNode.c (Repository): passing regname of erlang node process
+	to cnode as command line parameter 
+
+	* src/Makefile (Repository): linux generalizations
+
+2004-12-10  Mats Cronqvist  <qthmacr@mwux005>
+
+	* src/gtkNodeTest.erl (Module): branch on selection test... loop is 
+	external call
+
+2004-12-09  Mats Cronqvist  <qthmacr@mwux005>
+
+	* src/gtkNode_structs.c (Module): GtkTreePath
+
+	* src/gtkNodeTest.erl (Module): selections
+
+	* src/gtkNode_structs.c (Module): using g_new0 instead of g_new (zero-
+	fills).
+
+	* src/gtkNode_marshal.c (Module): GType stuff. tries to init the type 
+	if getting the GType by name doesn't work. gint64 support. 
+	get_arg_list (only for GType*). better(?) error codes.
+
+	* src/gtkNode_internal.c (Module): the GN_new_gvalue function.
+
+	* src/gtkNode_glade.c (Module): GType stuff
+
+	* src/gtkNodeTest.erl (Module): the treeview/list stuff
+
+	* src/gtkNode.erl (Module): handshaking at startup. the new_gvalue 
+	function.
+
+	* src/generate.erl (Module): lists (onlt for GType*).get structs by 
+	grepping in gtkNode_structs.c :<
+
+	* src/Makefile (Module): added boatloads of stuff. still doesn't work 
+	properly after make clean
+
+	* inc/gtkNode.h (Module): added gn_get_arg_gint64 and gn_get_arg_list. 
+	more GType stuff
+
+2004-11-25  Mats Cronqvist  <qthmacr@mwux005>
+
+	* : release gtkNode-0_11
+
+	* src/gtkNode_glade.c (Module): gn_sighandler can now deal with a 
+	non-glade widget (i.e. a GObject) sending a signal
+
+	* src/gtkNodeTest.erl (Module): works now
+
+	* src/gtkNode.erl (Module): improved prrocess handling a bit
+
+2004-11-24  Mats Cronqvist  <qthmacr@mwux005>
+
+	*  first working version!! released gtkNode-0_1
+
+	* src/gtkNode_marshal.c (Module): changed pid handling. wraps all 
+	messages in {OwnPid,...}
+
+	* src/gtkNode_internal.c (Module): rewrite
+
+	* src/gtkNode_glade.c (Module): fixed error handling
+
+	* src/gtkNode_cnode.c (Module): refactored... objects are no longer 
+	special. removed printf's. changed pid handling, link erl process to 
+	gtkNode. handle exit from erlang by exiting gtkNode
+	
+	* src/gtkNode.erl (Module): working version.
+
+	* src/gtkNode.c (Module): details in pid handling. removed printf's
+
+	* src/generate.erl (Module): refactored... objects are no longer special
+	removed hardcoded qthmacr stuff
+
+	* inc/gtkNode.h (Module): removed some crap. added a forgotten prototype
+
+2004-11-22  Mats Cronqvist  <qthmacr@mwux005>
+
+	* src/generate.erl (Module): gtk_generated.hrl added
+
+	* src/Makefile (Module): gtk_generated.hrl added
+
+2004-11-19  Mats Cronqvist  <qthmacr@mwux005>
+
+	* src/gtkNode_marshal.c (Module): implemented hash table storage of 
+	references to structs and non-named objects. the erlang node sees these
+	as atoms, the hash table maps atoms to pointers.
+
+	* src/gtkNode_cnode.c (Module): GModule stuff external
+
+	* src/gtkNode.c (Module): global definetions of hash table and GModule
+
+	* src/generate.erl (Module): forgotten some unstar's. some new structs 
+	included. also added code to generate gtk.erl.
+
+	* inc/gtkNode.h (Module): cosmetic
+
+2004-11-16  Mats Cronqvist  <qthmacr@mwux005>
+
+	* src/gtkNode_marshal.c (Module): refactored again... 
+	coded a prototype of the struct handling. the real one should use 
+	malloc and a hash table. there's no need to free, since on the erlang 
+	side the structs are id'd with atoms.
+	maybe we should send an extra arg, a label (i.e. atom), to every 
+	function that returns a pointer?
+	
+	* src/gtkNode_internal.c (Module): effects of latest refactoring
+
+	* src/gtkNode_cnode.c (Module): separate atom and string decode
+
+	* src/generate.erl (Module): unstarred some types
+
+	* inc/gtkNode.h (Module): refactored prototypes
+
+2004-11-12  Mats Cronqvist  <qthmacr@mwux005>
+
+	* src/gtkNode_marshal.c (Module): refactoring for struct handling
+
+	* src/gtkNode_internal.c (Module): affected by refactoring
+
+	* src/gtkNode_glade.c (Module): fixed misplaced functionality
+
+	* src/gtkNode_cnode.c (Module): refactoring for struct handling
+
+	* src/generate.erl (Module): refactoring for struct handling
+
+	* src/Makefile (Module):  fixed defs dependencies
+
+	* inc/gtkNode.h (Module): refactoring...
+
+2004-11-10  Mats Cronqvist  <qthmacr@mwux005>
+
+	* src/gtk_black.txt (Module): added many deprecated functions 
+
+	* src/gtkNode_marshal.c (Module): fixed the gn_put_* functions
+
+	* src/gtkNode_internal.c (Module): all ints are longlong 
+
+	* src/generate.erl (Module): casting bugs
+
+2004-11-09  Mats Cronqvist  <qthmacr@mwux005>
+
+	* src/gtkNode_marshal.c (Module): doc. there's a bunch of stuff 
+	missing in this version...
+
+	* src/gtkNode_glade.c (Module): pointer bug
+
+	* src/generate.erl (Module): uses src/*.txt files to generate .defs
+
+	* src/Makefile (Module): .defs handling. we generate ../defs/*.defs
+
+2004-11-05  Mats Cronqvist  <qthmacr@mwux005>
+
+	* src/gtkNode_gtk.c (Module): cosmetic
+
+	* src/gtkNode_cnode.c (Module): doc
+
+	* src/generate.erl (Module): rewrite
+
+2004-11-04  Mats Cronqvist  <qthmacr@mwux005>
+
+	* src/generate.erl (Module): modified to use .defs files from pygtk
+
+	* src/gtkNode_log.c (Module): removed
+
+	* src/gtknode.glade (Module): button signal handler fixed
+
+	* src/gtkNode_marshal.c (Module): final(?) refactoring + bugs galore
+
+	* src/gtkNode_internal.c (Module): final(?) refactoring
+
+	* src/gtkNode_glade.c (Module): final(?) refactoring + signals
+
+	* src/gtkNode_cnode.c (Module): final(?) refactoring
+
+	* src/gtkNode.c (Module): final(?) refactoring
+
+	* src/Makefile (Module): TAGS file
+
+	* inc/gtkNode.h (Module): final(?) refactoring
+
+2004-10-27  Mats Cronqvist  <qthmacr@mwux005>
+
+	* src/gtkNode_log.c (Module): Glib'd. it's not used anymore...
+
+	* src/gtkNode_internal.c (Module): prettified
+
+	* src/gtkNode_gtk.c (Module): stuff -> gtkNode_marshal
+
+	* src/gtkNode_glade.c (Module): GLib'd error handling
+
+	* src/gtkNode_cnode.c (Module): GLib'd error handling
+
+	* inc/gtkNode.h (Module): marshalling
+
+2004-10-26  Mats Cronqvist  <qthmacr@mwux005>
+
+	* src/gtkNode_cnode.c (Module): passing widgets back and forth,
+	by name or by reference, seemingly works
+
+	* src/gtkNode.c (Module): scoping error
+
+	* inc/gtkNode.h (Module): scoping error
+
+2004-10-18  Mats Cronqvist  <qthmacr@mwux005>
+
+	* src/gtkNode_glade.c (Module): signals work...
+
+	* src/gtkNode_cnode.c (Module): signals work...
+
+	* src/gtkNode.c (Module): drudgery
+
+	* inc/gtkNode.h (Module): drudgery
+
+2004-10-11  Mats Cronqvist  <qthmacr@mwux005>
+
+	* src/gtknode.glade (Module): drudgery
+
+	* src/gtkNode_log.c (Module): refactoring
+
+	* src/gtkNode_glade.c (Module): drudgery
+
+	* src/gtkNode_cnode.c (Module): drudgery
+
+	* src/gtkNode.c (Module): drudgery
+
+	* src/Makefile (Module): drudgery
+
+	* inc/gtkNode.h (Module): drudgery
+
+2004-10-01  Mats Cronqvist  <qthmacr@mwux005>

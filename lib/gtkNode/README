@@ -1,0 +1,141 @@
+  Yet Another GUI framework for Erlang - gtkNode
+
+  DESIGN GOALS
+
+* GUI separated from application by message passing
+* distributed (application and GUI can run on different machines)
+* centered around a GUI builder
+* small volume of (hand-written) code
+* pre-documented
+
+  ARCHITECTURE
+
+  a c-node (a daemon that implements the Erlang distribution protocol)
+that instantiates the GUI from a configuration file. the c-node sends
+messages to the Erlang node when the user interacts with the GUI; the
+Erlang application changes the state of the GUI by sending messages to
+widgets in the c-node. the widgets should look like Erlang processes
+with registered names. the protocol should look something like this.
+
+CnodePid ! {aWidget,dosomething,Args}       % erlang->cNode
+ApplicationPid ! {reply, Val}               % cNode->Erlang
+ApplicationPid ! {signal,aWidget,eventType} % cNode->erlang
+
+  in this example aWidget is the name given to a widget in the
+configration file. it can also be thought of as the registered name of
+the process implementing the widget in the c-node.
+  the c-node is responsible for garbage-collecting all temporary data.
+
+  IMPLEMENTATION
+
+  i chose GTK2 (www.gtk.org) as the framework. there were several reasons;
+
+* it has an eminent GUI builder, Glade (glade.gnome.org)
+* it has facilities for instantiating the GUI from the Glade (XML) files
+* it has good documentation 
+* it supports run-time type checking
+* its object orientation maps well to Erlang (Obj.meth(Arg) -> Obj!{meth,[Arg]})
+* the Python binding provides useful tools for code generation
+* seems to be the Future (tm) in the *nix world, and runs on Windows too.
+
+  there's three parts to the gtkNode. a main loop, some support
+functions for object storage and marshalling, and a whole bunch of
+generated wrapper functions.
+  The main loop is a pretty generic c-node that simple-mindedly
+receives lists of 2-tuples; 
+
+{atom('Func'), list(boolean()|integer()|float()|atom()|string())}
+
+  it checks that there exists a function Func and calls it, passing a
+pointer to the argument list. the Func's are wrapper functions
+generated from the GTK header files, and unmarshalls and type checks
+the arguments before the actual GTK functions are called.
+  the return value of the GTK function is sent back to the Erlang node.
+
+  a different kind of message is sent if there is an interesting event
+in the GUI (e.g. a button is pressed), where "interesting" means specified
+in the Glade file.
+
+  REFERENCE
+
+  the c-node is started thus;
+gtkNode node host regname cookie
+
+  when started, gtkNode will connect to it's application by sending a
+handshake message to {node@host, regname}.
+  the messsage looks like this;
+{{GtkPid,handshake}, []}
+
+  the Erlang application sends messages to the gtkNode using
+GtkPid. messages look like this;
+
+list({'Gtk_function', [Args]})
+
+  E.g., if we have a GtkButton widget, named b1, and we want to use
+these functions;
+
+const gchar* gtk_button_get_label (GtkButton *button);
+void         gtk_button_set_label (GtkButton *button, const gchar *label);
+
+  we could send this;
+
+GtkPid ! [{'Gtk_button_set_label',[b1,"foo"]},{'Gtk_button_get_label',[b1]}].
+
+  and we would receive this;
+
+{{GtkPid,reply}, [{ok,void},{ok,"foo"}]}
+
+  signals are sent from gtkNode if the signal handler for a specified
+signal-widget combination is set to gn_sighandler. the signals look
+like this;
+
+{{GtkPid, signal}, {atom(WidgetName),atom(SignalName)}}
+
+  E.g., if we delete the GtkWindow named window1 we'll get this signal
+
+{{GtkPid, signal},{window1,'GDK_DELETE'}}
+
+  given that we've requested it, of course.
+
+  EXAMPLES
+
+  the file src/gtkNode.erl implements a controller/middleman for the
+gtkNode, it's quite instructive. it is recommended to use this instead of working directly against the c-node.
+  the file examples/simple/simple.erl implements the Erlang side of a
+GUI for a simple 'top' application. the GUI is specified in
+examples/simple/simple.glade
+
+  GETTING IT
+
+jungerl/lib/gtkNode
+
+  see www.trapexit.org or sourceforge.net
+
+  BUILDING
+
+  i can't see why the should be any real problems to get this to work
+on Windows (if it can be said that anything works on Windows); alas, i
+have no real wish to try it myself... 
+  look here for more info;
+www.gimp.org/~tml/gimp/win32
+www.mingw.org
+
+  i myself run on solaris 8 and linux (debian).
+
+cd jungerl/lib/gtkNode ; make 
+
+  should work, if;
+
+* OTP_ROOT is sane
+* there is a sane GTK environment
+
+  if this;
+
+pkg-config --cflags libglade-2.0
+
+ works, i.e. returns a bunch of c-flags, you should be OK.
+
+  STATUS
+
+  early beta. no major interface changes in the works, but (probably)
+lost of bugs.

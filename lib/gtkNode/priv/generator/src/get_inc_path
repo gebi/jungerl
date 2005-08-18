@@ -1,0 +1,14 @@
+#!/bin/tcsh
+
+if ( $#argv != 2 ) exit
+set pkg = $1
+set pk = $2
+
+set cflags = `pkg-config --cflags $pkg`
+set pth = ""
+foreach f ($cflags)
+  if ( `echo "$f" | grep "include/$pk"` != "" ) then
+    set pth = `echo $f | cut -c3-`
+  endif
+end
+echo $pth

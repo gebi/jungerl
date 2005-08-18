@@ -1,0 +1,5 @@
+gdk/gdkcolor.h
+gdk/gdkgc.h
+gdk/gdkdrawable.h
+gdk/gdkpixmap.h
+gdk/gdkwindow.h

@@ -1,0 +1,2 @@
+gobject/gvalue.h
+gobject/gvaluetypes.h

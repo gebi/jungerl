@@ -1,0 +1,12 @@
+(define-object Window
+  (in-module "Gdk")
+  (parent "GObject")
+  (c-name "GdkWindow")
+  (gtype-id "GDK_TYPE_WINDOW")
+)
+(define-object Pixmap
+  (in-module "Gdk")
+  (parent "GdkDrawable")
+  (c-name "GdkPixmap")
+  (gtype-id "GDK_TYPE_PIXMAP")
+)

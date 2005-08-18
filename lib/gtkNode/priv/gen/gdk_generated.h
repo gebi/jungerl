@@ -432,30 +432,6 @@ void Gdk_draw_rectangle(int ARI, ei_x_buff *XBUF, char *B, int *I){
   gn_put_void(XBUF);
 }
 /*******************************/
-void Gdk_draw_rectangle_alpha_libgtk_only(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GdkDrawable* drawable;
-  gint x;
-  gint y;
-  gint width;
-  gint height;
-  GdkColor* color;
-  guint16 alpha;
-
-  gboolean R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 7, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GDK_TYPE_DRAWABLE, (GObject**)&drawable) ) return;
-  if ( ! gn_get_arg_gint(XBUF, B, I, &x) ) return;
-  if ( ! gn_get_arg_gint(XBUF, B, I, &y) ) return;
-  if ( ! gn_get_arg_gint(XBUF, B, I, &width) ) return;
-  if ( ! gn_get_arg_gint(XBUF, B, I, &height) ) return;
-  if ( ! gn_get_arg_struct(XBUF, B, I, "GdkColor", (void**)&color) ) return;
-  if ( ! gn_get_arg_guint16(XBUF, B, I, &alpha) ) return;
-  R = gdk_draw_rectangle_alpha_libgtk_only(drawable, x, y, width, height, color, alpha);
-  gn_put_boolean(XBUF,(int)R);
-}
-/*******************************/
 void Gdk_drawable_copy_to_image(int ARI, ei_x_buff *XBUF, char *B, int *I){
 
   GdkDrawable* object;
@@ -1072,18 +1048,6 @@ void Gdk_window_clear_area_e(int ARI, ei_x_buff *XBUF, char *B, int *I){
   gn_put_void(XBUF);
 }
 /*******************************/
-void Gdk_window_configure_finished(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GdkWindow* object;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GDK_TYPE_WINDOW, (GObject**)&object) ) return;
-  gdk_window_configure_finished(object);
-  gn_put_void(XBUF);
-}
-/*******************************/
 void Gdk_window_deiconify(int ARI, ei_x_buff *XBUF, char *B, int *I){
 
   GdkWindow* object;
@@ -1105,18 +1069,6 @@ void Gdk_window_destroy(int ARI, ei_x_buff *XBUF, char *B, int *I){
   if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
   if ( ! gn_get_arg_object(XBUF, B, I, GDK_TYPE_WINDOW, (GObject**)&object) ) return;
   gdk_window_destroy(object);
-  gn_put_void(XBUF);
-}
-/*******************************/
-void Gdk_window_enable_synchronized_configure(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GdkWindow* object;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GDK_TYPE_WINDOW, (GObject**)&object) ) return;
-  gdk_window_enable_synchronized_configure(object);
   gn_put_void(XBUF);
 }
 /*******************************/
@@ -1583,20 +1535,6 @@ void Gdk_window_set_events(int ARI, ei_x_buff *XBUF, char *B, int *I){
   if ( ! gn_get_arg_object(XBUF, B, I, GDK_TYPE_WINDOW, (GObject**)&object) ) return;
   if ( ! gn_get_arg_flags(XBUF, B, I, "GdkEventMask", (gint*)&event_mask) ) return;
   gdk_window_set_events(object, event_mask);
-  gn_put_void(XBUF);
-}
-/*******************************/
-void Gdk_window_set_focus_on_map(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GdkWindow* object;
-  gboolean focus_on_map;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GDK_TYPE_WINDOW, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_gboolean(XBUF, B, I, &focus_on_map) ) return;
-  gdk_window_set_focus_on_map(object, focus_on_map);
   gn_put_void(XBUF);
 }
 /*******************************/

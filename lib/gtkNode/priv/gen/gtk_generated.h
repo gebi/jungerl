@@ -247,20 +247,6 @@ void Gtk_accelerator_get_default_mod_mask(int ARI, ei_x_buff *XBUF, char *B, int
   gn_put_ulonglong(XBUF,(unsigned long long)R);
 }
 /*******************************/
-void Gtk_accelerator_get_label(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  guint accelerator_key;
-  GdkModifierType accelerator_mods;
-
-  gchar* R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_guint(XBUF, B, I, &accelerator_key) ) return;
-  if ( ! gn_get_arg_flags(XBUF, B, I, "GdkModifierType", (gint*)&accelerator_mods) ) return;
-  R = gtk_accelerator_get_label(accelerator_key, accelerator_mods);
-  gn_put_string(XBUF,(char*)R);
-}
-/*******************************/
 void Gtk_accelerator_name(int ARI, ei_x_buff *XBUF, char *B, int *I){
 
   guint accelerator_key;
@@ -415,18 +401,6 @@ void Gtk_action_disconnect_proxy(int ARI, ei_x_buff *XBUF, char *B, int *I){
   if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_WIDGET, (GObject**)&proxy) ) return;
   gtk_action_disconnect_proxy(object, proxy);
   gn_put_void(XBUF);
-}
-/*******************************/
-void Gtk_action_get_accel_path(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkAction* object;
-
-  const gchar* R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_ACTION, (GObject**)&object) ) return;
-  R = gtk_action_get_accel_path(object);
-  gn_put_string(XBUF,(char*)R);
 }
 /*******************************/
 void Gtk_action_get_name(int ARI, ei_x_buff *XBUF, char *B, int *I){
@@ -617,21 +591,6 @@ void Gtk_action_group_set_visible(int ARI, ei_x_buff *XBUF, char *B, int *I){
   gn_put_void(XBUF);
 }
 /*******************************/
-void Gtk_action_group_translate_string(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkActionGroup* object;
-  gchar* string;
-
-  const gchar* R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_ACTION_GROUP, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_gchar(XBUF, B, I, &string) ) return;
-  R = gtk_action_group_translate_string(object, string);
-  free(string);
-  gn_put_string(XBUF,(char*)R);
-}
-/*******************************/
 void Gtk_action_is_sensitive(int ARI, ei_x_buff *XBUF, char *B, int *I){
 
   GtkAction* object;
@@ -704,34 +663,6 @@ void Gtk_action_set_accel_path(int ARI, ei_x_buff *XBUF, char *B, int *I){
   if ( ! gn_get_arg_gchar(XBUF, B, I, &accel_path) ) return;
   gtk_action_set_accel_path(object, accel_path);
   free(accel_path);
-  gn_put_void(XBUF);
-}
-/*******************************/
-void Gtk_action_set_sensitive(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkAction* object;
-  gboolean sensitive;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_ACTION, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_gboolean(XBUF, B, I, &sensitive) ) return;
-  gtk_action_set_sensitive(object, sensitive);
-  gn_put_void(XBUF);
-}
-/*******************************/
-void Gtk_action_set_visible(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkAction* object;
-  gboolean visible;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_ACTION, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_gboolean(XBUF, B, I, &visible) ) return;
-  gtk_action_set_visible(object, visible);
   gn_put_void(XBUF);
 }
 /*******************************/
@@ -893,18 +824,6 @@ void Gtk_alignment_set_padding(int ARI, ei_x_buff *XBUF, char *B, int *I){
   if ( ! gn_get_arg_guint(XBUF, B, I, &padding_right) ) return;
   gtk_alignment_set_padding(object, padding_top, padding_bottom, padding_left, padding_right);
   gn_put_void(XBUF);
-}
-/*******************************/
-void Gtk_alternative_dialog_button_order(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GdkScreen* screen;
-
-  gboolean R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GDK_TYPE_SCREEN, (GObject**)&screen) ) return;
-  R = gtk_alternative_dialog_button_order(screen);
-  gn_put_boolean(XBUF,(int)R);
 }
 /*******************************/
 void Gtk_arrow_new(int ARI, ei_x_buff *XBUF, char *B, int *I){
@@ -1256,18 +1175,6 @@ void Gtk_button_get_focus_on_click(int ARI, ei_x_buff *XBUF, char *B, int *I){
   gn_put_boolean(XBUF,(int)R);
 }
 /*******************************/
-void Gtk_button_get_image(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkButton* object;
-
-  GObject* R;
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_BUTTON, (GObject**)&object) ) return;
-  R = (GObject*)gtk_button_get_image(object);
-  gn_put_object(XBUF,R);
-}
-/*******************************/
 void Gtk_button_get_label(int ARI, ei_x_buff *XBUF, char *B, int *I){
 
   GtkButton* object;
@@ -1428,20 +1335,6 @@ void Gtk_button_set_focus_on_click(int ARI, ei_x_buff *XBUF, char *B, int *I){
   if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_BUTTON, (GObject**)&object) ) return;
   if ( ! gn_get_arg_gboolean(XBUF, B, I, &focus_on_click) ) return;
   gtk_button_set_focus_on_click(object, focus_on_click);
-  gn_put_void(XBUF);
-}
-/*******************************/
-void Gtk_button_set_image(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkButton* object;
-  GtkWidget* image;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_BUTTON, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_WIDGET, (GObject**)&image) ) return;
-  gtk_button_set_image(object, image);
   gn_put_void(XBUF);
 }
 /*******************************/
@@ -1808,20 +1701,6 @@ void Gtk_cell_renderer_set_fixed_size(int ARI, ei_x_buff *XBUF, char *B, int *I)
   if ( ! gn_get_arg_gint(XBUF, B, I, &width) ) return;
   if ( ! gn_get_arg_gint(XBUF, B, I, &height) ) return;
   gtk_cell_renderer_set_fixed_size(object, width, height);
-  gn_put_void(XBUF);
-}
-/*******************************/
-void Gtk_cell_renderer_stop_editing(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkCellRenderer* object;
-  gboolean canceled;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_CELL_RENDERER, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_gboolean(XBUF, B, I, &canceled) ) return;
-  gtk_cell_renderer_stop_editing(object, canceled);
   gn_put_void(XBUF);
 }
 /*******************************/
@@ -2512,54 +2391,6 @@ void Gtk_combo_box_get_active_iter(int ARI, ei_x_buff *XBUF, char *B, int *I){
   gn_put_boolean(XBUF,(int)R);
 }
 /*******************************/
-void Gtk_combo_box_get_active_text(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkComboBox* object;
-
-  gchar* R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_COMBO_BOX, (GObject**)&object) ) return;
-  R = gtk_combo_box_get_active_text(object);
-  gn_put_string(XBUF,(char*)R);
-}
-/*******************************/
-void Gtk_combo_box_get_add_tearoffs(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkComboBox* object;
-
-  gboolean R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_COMBO_BOX, (GObject**)&object) ) return;
-  R = gtk_combo_box_get_add_tearoffs(object);
-  gn_put_boolean(XBUF,(int)R);
-}
-/*******************************/
-void Gtk_combo_box_get_column_span_column(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkComboBox* object;
-
-  gint R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_COMBO_BOX, (GObject**)&object) ) return;
-  R = gtk_combo_box_get_column_span_column(object);
-  gn_put_longlong(XBUF,(long long)R);
-}
-/*******************************/
-void Gtk_combo_box_get_focus_on_click(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkComboBox* object;
-
-  gboolean R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_COMBO_BOX, (GObject**)&object) ) return;
-  R = gtk_combo_box_get_focus_on_click(object);
-  gn_put_boolean(XBUF,(int)R);
-}
-/*******************************/
 void Gtk_combo_box_get_model(int ARI, ei_x_buff *XBUF, char *B, int *I){
 
   GtkComboBox* object;
@@ -2570,30 +2401,6 @@ void Gtk_combo_box_get_model(int ARI, ei_x_buff *XBUF, char *B, int *I){
   if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_COMBO_BOX, (GObject**)&object) ) return;
   R = (GObject*)gtk_combo_box_get_model(object);
   gn_put_object(XBUF,R);
-}
-/*******************************/
-void Gtk_combo_box_get_row_span_column(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkComboBox* object;
-
-  gint R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_COMBO_BOX, (GObject**)&object) ) return;
-  R = gtk_combo_box_get_row_span_column(object);
-  gn_put_longlong(XBUF,(long long)R);
-}
-/*******************************/
-void Gtk_combo_box_get_wrap_width(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkComboBox* object;
-
-  gint R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_COMBO_BOX, (GObject**)&object) ) return;
-  R = gtk_combo_box_get_wrap_width(object);
-  gn_put_longlong(XBUF,(long long)R);
 }
 /*******************************/
 void Gtk_combo_box_insert_text(int ARI, ei_x_buff *XBUF, char *B, int *I){
@@ -2726,20 +2533,6 @@ void Gtk_combo_box_set_active_iter(int ARI, ei_x_buff *XBUF, char *B, int *I){
   gn_put_void(XBUF);
 }
 /*******************************/
-void Gtk_combo_box_set_add_tearoffs(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkComboBox* object;
-  gboolean add_tearoffs;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_COMBO_BOX, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_gboolean(XBUF, B, I, &add_tearoffs) ) return;
-  gtk_combo_box_set_add_tearoffs(object, add_tearoffs);
-  gn_put_void(XBUF);
-}
-/*******************************/
 void Gtk_combo_box_set_column_span_column(int ARI, ei_x_buff *XBUF, char *B, int *I){
 
   GtkComboBox* object;
@@ -2751,20 +2544,6 @@ void Gtk_combo_box_set_column_span_column(int ARI, ei_x_buff *XBUF, char *B, int
   if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_COMBO_BOX, (GObject**)&object) ) return;
   if ( ! gn_get_arg_gint(XBUF, B, I, &column_span) ) return;
   gtk_combo_box_set_column_span_column(object, column_span);
-  gn_put_void(XBUF);
-}
-/*******************************/
-void Gtk_combo_box_set_focus_on_click(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkComboBox* object;
-  gboolean focus_on_click;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_COMBO_BOX, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_gboolean(XBUF, B, I, &focus_on_click) ) return;
-  gtk_combo_box_set_focus_on_click(object, focus_on_click);
   gn_put_void(XBUF);
 }
 /*******************************/
@@ -3189,42 +2968,6 @@ void Gtk_drag_check_threshold(int ARI, ei_x_buff *XBUF, char *B, int *I){
   gn_put_boolean(XBUF,(int)R);
 }
 /*******************************/
-void Gtk_drag_dest_add_image_targets(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkWidget* widget;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_WIDGET, (GObject**)&widget) ) return;
-  gtk_drag_dest_add_image_targets(widget);
-  gn_put_void(XBUF);
-}
-/*******************************/
-void Gtk_drag_dest_add_text_targets(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkWidget* widget;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_WIDGET, (GObject**)&widget) ) return;
-  gtk_drag_dest_add_text_targets(widget);
-  gn_put_void(XBUF);
-}
-/*******************************/
-void Gtk_drag_dest_add_uri_targets(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkWidget* widget;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_WIDGET, (GObject**)&widget) ) return;
-  gtk_drag_dest_add_uri_targets(widget);
-  gn_put_void(XBUF);
-}
-/*******************************/
 void Gtk_drag_dest_set_proxy(int ARI, ei_x_buff *XBUF, char *B, int *I){
 
   GtkWidget* widget;
@@ -3343,42 +3086,6 @@ void Gtk_drag_set_icon_widget(int ARI, ei_x_buff *XBUF, char *B, int *I){
   if ( ! gn_get_arg_gint(XBUF, B, I, &hot_x) ) return;
   if ( ! gn_get_arg_gint(XBUF, B, I, &hot_y) ) return;
   gtk_drag_set_icon_widget(context, widget, hot_x, hot_y);
-  gn_put_void(XBUF);
-}
-/*******************************/
-void Gtk_drag_source_add_image_targets(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkWidget* widget;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_WIDGET, (GObject**)&widget) ) return;
-  gtk_drag_source_add_image_targets(widget);
-  gn_put_void(XBUF);
-}
-/*******************************/
-void Gtk_drag_source_add_text_targets(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkWidget* widget;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_WIDGET, (GObject**)&widget) ) return;
-  gtk_drag_source_add_text_targets(widget);
-  gn_put_void(XBUF);
-}
-/*******************************/
-void Gtk_drag_source_add_uri_targets(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkWidget* widget;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_WIDGET, (GObject**)&widget) ) return;
-  gtk_drag_source_add_uri_targets(widget);
   gn_put_void(XBUF);
 }
 /*******************************/
@@ -3641,18 +3348,6 @@ void Gtk_entry_completion_get_entry(int ARI, ei_x_buff *XBUF, char *B, int *I){
   gn_put_object(XBUF,R);
 }
 /*******************************/
-void Gtk_entry_completion_get_inline_completion(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkEntryCompletion* object;
-
-  gboolean R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_ENTRY_COMPLETION, (GObject**)&object) ) return;
-  R = gtk_entry_completion_get_inline_completion(object);
-  gn_put_boolean(XBUF,(int)R);
-}
-/*******************************/
 void Gtk_entry_completion_get_minimum_key_length(int ARI, ei_x_buff *XBUF, char *B, int *I){
 
   GtkEntryCompletion* object;
@@ -3675,30 +3370,6 @@ void Gtk_entry_completion_get_model(int ARI, ei_x_buff *XBUF, char *B, int *I){
   if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_ENTRY_COMPLETION, (GObject**)&object) ) return;
   R = (GObject*)gtk_entry_completion_get_model(object);
   gn_put_object(XBUF,R);
-}
-/*******************************/
-void Gtk_entry_completion_get_popup_completion(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkEntryCompletion* object;
-
-  gboolean R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_ENTRY_COMPLETION, (GObject**)&object) ) return;
-  R = gtk_entry_completion_get_popup_completion(object);
-  gn_put_boolean(XBUF,(int)R);
-}
-/*******************************/
-void Gtk_entry_completion_get_text_column(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkEntryCompletion* object;
-
-  gint R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_ENTRY_COMPLETION, (GObject**)&object) ) return;
-  R = gtk_entry_completion_get_text_column(object);
-  gn_put_longlong(XBUF,(long long)R);
 }
 /*******************************/
 void Gtk_entry_completion_insert_action_markup(int ARI, ei_x_buff *XBUF, char *B, int *I){
@@ -3735,18 +3406,6 @@ void Gtk_entry_completion_insert_action_text(int ARI, ei_x_buff *XBUF, char *B, 
   gn_put_void(XBUF);
 }
 /*******************************/
-void Gtk_entry_completion_insert_prefix(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkEntryCompletion* object;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_ENTRY_COMPLETION, (GObject**)&object) ) return;
-  gtk_entry_completion_insert_prefix(object);
-  gn_put_void(XBUF);
-}
-/*******************************/
 void Gtk_entry_completion_new(int ARI, ei_x_buff *XBUF, char *B, int *I){
 
 
@@ -3755,20 +3414,6 @@ void Gtk_entry_completion_new(int ARI, ei_x_buff *XBUF, char *B, int *I){
   if ( ! gn_check_arity(XBUF, 0, ARI) ) return;
   R = (GObject*)gtk_entry_completion_new();
   gn_put_object(XBUF,R);
-}
-/*******************************/
-void Gtk_entry_completion_set_inline_completion(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkEntryCompletion* object;
-  gboolean inline_completion;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_ENTRY_COMPLETION, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_gboolean(XBUF, B, I, &inline_completion) ) return;
-  gtk_entry_completion_set_inline_completion(object, inline_completion);
-  gn_put_void(XBUF);
 }
 /*******************************/
 void Gtk_entry_completion_set_minimum_key_length(int ARI, ei_x_buff *XBUF, char *B, int *I){
@@ -3796,20 +3441,6 @@ void Gtk_entry_completion_set_model(int ARI, ei_x_buff *XBUF, char *B, int *I){
   if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_ENTRY_COMPLETION, (GObject**)&object) ) return;
   if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_TREE_MODEL, (GObject**)&model) ) return;
   gtk_entry_completion_set_model(object, model);
-  gn_put_void(XBUF);
-}
-/*******************************/
-void Gtk_entry_completion_set_popup_completion(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkEntryCompletion* object;
-  gboolean popup_completion;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_ENTRY_COMPLETION, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_gboolean(XBUF, B, I, &popup_completion) ) return;
-  gtk_entry_completion_set_popup_completion(object, popup_completion);
   gn_put_void(XBUF);
 }
 /*******************************/
@@ -3920,20 +3551,6 @@ void Gtk_entry_get_width_chars(int ARI, ei_x_buff *XBUF, char *B, int *I){
   if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
   if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_ENTRY, (GObject**)&object) ) return;
   R = gtk_entry_get_width_chars(object);
-  gn_put_longlong(XBUF,(long long)R);
-}
-/*******************************/
-void Gtk_entry_layout_index_to_text_index(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkEntry* object;
-  gint layout_index;
-
-  gint R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_ENTRY, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_gint(XBUF, B, I, &layout_index) ) return;
-  R = gtk_entry_layout_index_to_text_index(object, layout_index);
   gn_put_longlong(XBUF,(long long)R);
 }
 /*******************************/
@@ -4058,20 +3675,6 @@ void Gtk_entry_set_width_chars(int ARI, ei_x_buff *XBUF, char *B, int *I){
   if ( ! gn_get_arg_gint(XBUF, B, I, &n_chars) ) return;
   gtk_entry_set_width_chars(object, n_chars);
   gn_put_void(XBUF);
-}
-/*******************************/
-void Gtk_entry_text_index_to_layout_index(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkEntry* object;
-  gint text_index;
-
-  gint R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_ENTRY, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_gint(XBUF, B, I, &text_index) ) return;
-  R = gtk_entry_text_index_to_layout_index(object, text_index);
-  gn_put_longlong(XBUF,(long long)R);
 }
 /*******************************/
 void Gtk_event_box_get_above_child(int ARI, ei_x_buff *XBUF, char *B, int *I){
@@ -5372,18 +4975,6 @@ void Gtk_image_get_animation(int ARI, ei_x_buff *XBUF, char *B, int *I){
   gn_put_object(XBUF,R);
 }
 /*******************************/
-void Gtk_image_get_pixel_size(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkImage* object;
-
-  gint R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_IMAGE, (GObject**)&object) ) return;
-  R = gtk_image_get_pixel_size(object);
-  gn_put_longlong(XBUF,(long long)R);
-}
-/*******************************/
 void Gtk_image_get_storage_type(int ARI, ei_x_buff *XBUF, char *B, int *I){
 
   GtkImage* object;
@@ -5508,21 +5099,6 @@ void Gtk_image_new_from_file(int ARI, ei_x_buff *XBUF, char *B, int *I){
   gn_put_object(XBUF,R);
 }
 /*******************************/
-void Gtk_image_new_from_icon_name(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  gchar* icon_name;
-  GtkIconSize size;
-
-  GObject* R;
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_gchar(XBUF, B, I, &icon_name) ) return;
-  if ( ! gn_get_arg_enum(XBUF, B, I, "GtkIconSize", (gint*)&size) ) return;
-  R = (GObject*)gtk_image_new_from_icon_name(icon_name, size);
-  free(icon_name);
-  gn_put_object(XBUF,R);
-}
-/*******************************/
 void Gtk_image_new_from_stock(int ARI, ei_x_buff *XBUF, char *B, int *I){
 
   gchar* stock_id;
@@ -5567,23 +5143,6 @@ void Gtk_image_set_from_file(int ARI, ei_x_buff *XBUF, char *B, int *I){
   gn_put_void(XBUF);
 }
 /*******************************/
-void Gtk_image_set_from_icon_name(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkImage* object;
-  gchar* icon_name;
-  GtkIconSize size;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 3, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_IMAGE, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_gchar(XBUF, B, I, &icon_name) ) return;
-  if ( ! gn_get_arg_enum(XBUF, B, I, "GtkIconSize", (gint*)&size) ) return;
-  gtk_image_set_from_icon_name(object, icon_name, size);
-  free(icon_name);
-  gn_put_void(XBUF);
-}
-/*******************************/
 void Gtk_image_set_from_stock(int ARI, ei_x_buff *XBUF, char *B, int *I){
 
   GtkImage* object;
@@ -5598,20 +5157,6 @@ void Gtk_image_set_from_stock(int ARI, ei_x_buff *XBUF, char *B, int *I){
   if ( ! gn_get_arg_enum(XBUF, B, I, "GtkIconSize", (gint*)&size) ) return;
   gtk_image_set_from_stock(object, stock_id, size);
   free(stock_id);
-  gn_put_void(XBUF);
-}
-/*******************************/
-void Gtk_image_set_pixel_size(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkImage* object;
-  gint pixel_size;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_IMAGE, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_gint(XBUF, B, I, &pixel_size) ) return;
-  gtk_image_set_pixel_size(object, pixel_size);
   gn_put_void(XBUF);
 }
 /*******************************/
@@ -5709,18 +5254,6 @@ void Gtk_item_toggle(int ARI, ei_x_buff *XBUF, char *B, int *I){
   gn_put_void(XBUF);
 }
 /*******************************/
-void Gtk_label_get_angle(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkLabel* object;
-
-  gdouble R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_LABEL, (GObject**)&object) ) return;
-  R = gtk_label_get_angle(object);
-  gn_put_double(XBUF,(double)R);
-}
-/*******************************/
 void Gtk_label_get_justify(int ARI, ei_x_buff *XBUF, char *B, int *I){
 
   GtkLabel* object;
@@ -5755,18 +5288,6 @@ void Gtk_label_get_line_wrap(int ARI, ei_x_buff *XBUF, char *B, int *I){
   if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_LABEL, (GObject**)&object) ) return;
   R = gtk_label_get_line_wrap(object);
   gn_put_boolean(XBUF,(int)R);
-}
-/*******************************/
-void Gtk_label_get_max_width_chars(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkLabel* object;
-
-  gint R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_LABEL, (GObject**)&object) ) return;
-  R = gtk_label_get_max_width_chars(object);
-  gn_put_longlong(XBUF,(long long)R);
 }
 /*******************************/
 void Gtk_label_get_mnemonic_keyval(int ARI, ei_x_buff *XBUF, char *B, int *I){
@@ -5805,18 +5326,6 @@ void Gtk_label_get_selectable(int ARI, ei_x_buff *XBUF, char *B, int *I){
   gn_put_boolean(XBUF,(int)R);
 }
 /*******************************/
-void Gtk_label_get_single_line_mode(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkLabel* object;
-
-  gboolean R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_LABEL, (GObject**)&object) ) return;
-  R = gtk_label_get_single_line_mode(object);
-  gn_put_boolean(XBUF,(int)R);
-}
-/*******************************/
 void Gtk_label_get_text(int ARI, ei_x_buff *XBUF, char *B, int *I){
 
   GtkLabel* object;
@@ -5851,18 +5360,6 @@ void Gtk_label_get_use_underline(int ARI, ei_x_buff *XBUF, char *B, int *I){
   if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_LABEL, (GObject**)&object) ) return;
   R = gtk_label_get_use_underline(object);
   gn_put_boolean(XBUF,(int)R);
-}
-/*******************************/
-void Gtk_label_get_width_chars(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkLabel* object;
-
-  gint R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_LABEL, (GObject**)&object) ) return;
-  R = gtk_label_get_width_chars(object);
-  gn_put_longlong(XBUF,(long long)R);
 }
 /*******************************/
 void Gtk_label_new(int ARI, ei_x_buff *XBUF, char *B, int *I){
@@ -5904,20 +5401,6 @@ void Gtk_label_select_region(int ARI, ei_x_buff *XBUF, char *B, int *I){
   if ( ! gn_get_arg_gint(XBUF, B, I, &start_offset) ) return;
   if ( ! gn_get_arg_gint(XBUF, B, I, &end_offset) ) return;
   gtk_label_select_region(object, start_offset, end_offset);
-  gn_put_void(XBUF);
-}
-/*******************************/
-void Gtk_label_set_angle(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkLabel* object;
-  gdouble angle;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_LABEL, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_gdouble(XBUF, B, I, &angle) ) return;
-  gtk_label_set_angle(object, angle);
   gn_put_void(XBUF);
 }
 /*******************************/
@@ -5994,20 +5477,6 @@ void Gtk_label_set_markup_with_mnemonic(int ARI, ei_x_buff *XBUF, char *B, int *
   gn_put_void(XBUF);
 }
 /*******************************/
-void Gtk_label_set_max_width_chars(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkLabel* object;
-  gint n_chars;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_LABEL, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_gint(XBUF, B, I, &n_chars) ) return;
-  gtk_label_set_max_width_chars(object, n_chars);
-  gn_put_void(XBUF);
-}
-/*******************************/
 void Gtk_label_set_mnemonic_widget(int ARI, ei_x_buff *XBUF, char *B, int *I){
 
   GtkLabel* object;
@@ -6048,20 +5517,6 @@ void Gtk_label_set_selectable(int ARI, ei_x_buff *XBUF, char *B, int *I){
   if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_LABEL, (GObject**)&object) ) return;
   if ( ! gn_get_arg_gboolean(XBUF, B, I, &setting) ) return;
   gtk_label_set_selectable(object, setting);
-  gn_put_void(XBUF);
-}
-/*******************************/
-void Gtk_label_set_single_line_mode(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkLabel* object;
-  gboolean single_line_mode;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_LABEL, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_gboolean(XBUF, B, I, &single_line_mode) ) return;
-  gtk_label_set_single_line_mode(object, single_line_mode);
   gn_put_void(XBUF);
 }
 /*******************************/
@@ -6120,20 +5575,6 @@ void Gtk_label_set_use_underline(int ARI, ei_x_buff *XBUF, char *B, int *I){
   if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_LABEL, (GObject**)&object) ) return;
   if ( ! gn_get_arg_gboolean(XBUF, B, I, &setting) ) return;
   gtk_label_set_use_underline(object, setting);
-  gn_put_void(XBUF);
-}
-/*******************************/
-void Gtk_label_set_width_chars(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkLabel* object;
-  gint n_chars;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_LABEL, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_gint(XBUF, B, I, &n_chars) ) return;
-  gtk_label_set_width_chars(object, n_chars);
   gn_put_void(XBUF);
 }
 /*******************************/
@@ -10206,24 +9647,6 @@ void Gtk_text_buffer_apply_tag_by_name(int ARI, ei_x_buff *XBUF, char *B, int *I
   gn_put_void(XBUF);
 }
 /*******************************/
-void Gtk_text_buffer_backspace(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkTextBuffer* object;
-  GtkTextIter* iter;
-  gboolean interactive;
-  gboolean default_editable;
-
-  gboolean R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 4, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_TEXT_BUFFER, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_struct(XBUF, B, I, "GtkTextIter", (void**)&iter) ) return;
-  if ( ! gn_get_arg_gboolean(XBUF, B, I, &interactive) ) return;
-  if ( ! gn_get_arg_gboolean(XBUF, B, I, &default_editable) ) return;
-  R = gtk_text_buffer_backspace(object, iter, interactive, default_editable);
-  gn_put_boolean(XBUF,(int)R);
-}
-/*******************************/
 void Gtk_text_buffer_begin_user_action(int ARI, ei_x_buff *XBUF, char *B, int *I){
 
   GtkTextBuffer* object;
@@ -13396,18 +12819,6 @@ void Gtk_tool_item_new(int ARI, ei_x_buff *XBUF, char *B, int *I){
   gn_put_object(XBUF,R);
 }
 /*******************************/
-void Gtk_tool_item_rebuild_menu(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkToolItem* object;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_TOOL_ITEM, (GObject**)&object) ) return;
-  gtk_tool_item_rebuild_menu(object);
-  gn_put_void(XBUF);
-}
-/*******************************/
 void Gtk_tool_item_retrieve_proxy_menu_item(int ARI, ei_x_buff *XBUF, char *B, int *I){
 
   GtkToolItem* object;
@@ -15766,18 +15177,6 @@ void Gtk_tree_view_get_expander_column(int ARI, ei_x_buff *XBUF, char *B, int *I
   gn_put_object(XBUF,R);
 }
 /*******************************/
-void Gtk_tree_view_get_fixed_height_mode(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkTreeView* object;
-
-  gboolean R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_TREE_VIEW, (GObject**)&object) ) return;
-  R = gtk_tree_view_get_fixed_height_mode(object);
-  gn_put_boolean(XBUF,(int)R);
-}
-/*******************************/
 void Gtk_tree_view_get_hadjustment(int ARI, ei_x_buff *XBUF, char *B, int *I){
 
   GtkTreeView* object;
@@ -15799,30 +15198,6 @@ void Gtk_tree_view_get_headers_visible(int ARI, ei_x_buff *XBUF, char *B, int *I
   if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
   if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_TREE_VIEW, (GObject**)&object) ) return;
   R = gtk_tree_view_get_headers_visible(object);
-  gn_put_boolean(XBUF,(int)R);
-}
-/*******************************/
-void Gtk_tree_view_get_hover_expand(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkTreeView* object;
-
-  gboolean R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_TREE_VIEW, (GObject**)&object) ) return;
-  R = gtk_tree_view_get_hover_expand(object);
-  gn_put_boolean(XBUF,(int)R);
-}
-/*******************************/
-void Gtk_tree_view_get_hover_selection(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkTreeView* object;
-
-  gboolean R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_TREE_VIEW, (GObject**)&object) ) return;
-  R = gtk_tree_view_get_hover_selection(object);
   gn_put_boolean(XBUF,(int)R);
 }
 /*******************************/
@@ -16130,20 +15505,6 @@ void Gtk_tree_view_set_expander_column(int ARI, ei_x_buff *XBUF, char *B, int *I
   gn_put_void(XBUF);
 }
 /*******************************/
-void Gtk_tree_view_set_fixed_height_mode(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkTreeView* object;
-  gboolean enable;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_TREE_VIEW, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_gboolean(XBUF, B, I, &enable) ) return;
-  gtk_tree_view_set_fixed_height_mode(object, enable);
-  gn_put_void(XBUF);
-}
-/*******************************/
 void Gtk_tree_view_set_hadjustment(int ARI, ei_x_buff *XBUF, char *B, int *I){
 
   GtkTreeView* object;
@@ -16183,34 +15544,6 @@ void Gtk_tree_view_set_headers_visible(int ARI, ei_x_buff *XBUF, char *B, int *I
   if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_TREE_VIEW, (GObject**)&object) ) return;
   if ( ! gn_get_arg_gboolean(XBUF, B, I, &headers_visible) ) return;
   gtk_tree_view_set_headers_visible(object, headers_visible);
-  gn_put_void(XBUF);
-}
-/*******************************/
-void Gtk_tree_view_set_hover_expand(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkTreeView* object;
-  gboolean expand;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_TREE_VIEW, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_gboolean(XBUF, B, I, &expand) ) return;
-  gtk_tree_view_set_hover_expand(object, expand);
-  gn_put_void(XBUF);
-}
-/*******************************/
-void Gtk_tree_view_set_hover_selection(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkTreeView* object;
-  gboolean hover;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_TREE_VIEW, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_gboolean(XBUF, B, I, &hover) ) return;
-  gtk_tree_view_set_hover_selection(object, hover);
   gn_put_void(XBUF);
 }
 /*******************************/
@@ -18059,18 +17392,6 @@ void Gtk_window_get_focus(int ARI, ei_x_buff *XBUF, char *B, int *I){
   gn_put_object(XBUF,R);
 }
 /*******************************/
-void Gtk_window_get_focus_on_map(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkWindow* object;
-
-  gboolean R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_WINDOW, (GObject**)&object) ) return;
-  R = gtk_window_get_focus_on_map(object);
-  gn_put_boolean(XBUF,(int)R);
-}
-/*******************************/
 void Gtk_window_get_gravity(int ARI, ei_x_buff *XBUF, char *B, int *I){
 
   GtkWindow* object;
@@ -18093,18 +17414,6 @@ void Gtk_window_get_has_frame(int ARI, ei_x_buff *XBUF, char *B, int *I){
   if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_WINDOW, (GObject**)&object) ) return;
   R = gtk_window_get_has_frame(object);
   gn_put_boolean(XBUF,(int)R);
-}
-/*******************************/
-void Gtk_window_get_icon_name(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkWindow* object;
-
-  const gchar* R; /* return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_WINDOW, (GObject**)&object) ) return;
-  R = gtk_window_get_icon_name(object);
-  gn_put_string(XBUF,(char*)R);
 }
 /*******************************/
 void Gtk_window_get_mnemonic_modifier(int ARI, ei_x_buff *XBUF, char *B, int *I){
@@ -18498,19 +17807,6 @@ void Gtk_window_set_default(int ARI, ei_x_buff *XBUF, char *B, int *I){
   gn_put_void(XBUF);
 }
 /*******************************/
-void Gtk_window_set_default_icon_name(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  gchar* name;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 1, ARI) ) return;
-  if ( ! gn_get_arg_gchar(XBUF, B, I, &name) ) return;
-  gtk_window_set_default_icon_name(name);
-  free(name);
-  gn_put_void(XBUF);
-}
-/*******************************/
 void Gtk_window_set_default_size(int ARI, ei_x_buff *XBUF, char *B, int *I){
 
   GtkWindow* object;
@@ -18552,20 +17848,6 @@ void Gtk_window_set_focus(int ARI, ei_x_buff *XBUF, char *B, int *I){
   if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_WINDOW, (GObject**)&object) ) return;
   if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_WIDGET, (GObject**)&focus) ) return;
   gtk_window_set_focus(object, focus);
-  gn_put_void(XBUF);
-}
-/*******************************/
-void Gtk_window_set_focus_on_map(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkWindow* object;
-  gboolean setting;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_WINDOW, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_gboolean(XBUF, B, I, &setting) ) return;
-  gtk_window_set_focus_on_map(object, setting);
   gn_put_void(XBUF);
 }
 /*******************************/
@@ -18614,21 +17896,6 @@ void Gtk_window_set_has_frame(int ARI, ei_x_buff *XBUF, char *B, int *I){
   if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_WINDOW, (GObject**)&object) ) return;
   if ( ! gn_get_arg_gboolean(XBUF, B, I, &setting) ) return;
   gtk_window_set_has_frame(object, setting);
-  gn_put_void(XBUF);
-}
-/*******************************/
-void Gtk_window_set_icon_name(int ARI, ei_x_buff *XBUF, char *B, int *I){
-
-  GtkWindow* object;
-  gchar* name;
-
-  /* no return value */
-
-  if ( ! gn_check_arity(XBUF, 2, ARI) ) return;
-  if ( ! gn_get_arg_object(XBUF, B, I, GTK_TYPE_WINDOW, (GObject**)&object) ) return;
-  if ( ! gn_get_arg_gchar(XBUF, B, I, &name) ) return;
-  gtk_window_set_icon_name(object, name);
-  free(name);
   gn_put_void(XBUF);
 }
 /*******************************/

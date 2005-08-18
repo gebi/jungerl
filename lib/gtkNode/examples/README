@@ -1,0 +1,9 @@
+start an erlang node like this;
+
+cd gtkNode/examples
+erl -pa [a-z]* -pa ../ebin -sname foo
+
+ examples;
+
+simple - a simple top-application
+         started with simple:start().

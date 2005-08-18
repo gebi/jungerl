@@ -1,3 +1,11 @@
+2005-08-18  Mats Cronqvist  <locmacr@mwlx084>
+
+	* priv/gen/gtk_generated.h (Module): GTK 2.4
+
+	* priv/gen/gdk_generated.h (Module): GTK 2.4
+
+	* Makefile (generate): target to re-generate gtk wrappers
+
 2005-08-12  Mats Cronqvist  <mats.cronqvist@ericsson.com>
 
 	* everything: moved into jungerl. not in CVS yet though. code

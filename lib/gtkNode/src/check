@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# this ought to be a lot cleverer; e.g. check in g*_generated.h
+
+vsn=`pkg-config --modversion gtk+-2.0`
+if [[ $vsn < "2" ]]; then 
+    echo "seems there's something wrong with your gtk2-installation..."
+    exit 1
+else
+    echo "you have GTK version "$vsn". be happy."
+fi

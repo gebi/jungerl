@@ -1,0 +1,55 @@
+  yet another gui framework for Erlang
+
+  as usual, there's much talk about GUI stuff for Erlang. here's my attempt to add to the confusion.
+
+  i've found that it is difficult to get people to use non-GUI tools,
+no matter how good they might be. also, it is immensely boring and
+time-consuming to create GUIs in code (not to mention creating your
+own widgets).
+  i tried all the Erlang GUI frameworks i could find, and the one i
+liked the best was erlgtk. chiefly because one could use glade, GTK's
+eminent GUI builder tool. also, GTK looks good and is well
+documented. however, erlgtk is no longer maintained.
+  so maybe i could write my own with reasonable effort. i wanted these
+features;
+
+* GUI separated from application by message passing
+* distributed (application and GUI can run on different machines)
+* centered around a GUI builder
+* small volume of (hand-written) code
+* pre-documented
+
+  the result, gtkNode, is a c-node that expects messages in the form;
+[{F,Args}..]
+  where F is the name of a C function, and Args is an argument
+list. (the point of making this a list is to allow for bulking of
+messages). if there is a function F linked inte the c-node, it will be
+called with a pointer to Args. F must unpack Args (which is in the
+external format) and verify the number and types of the
+arguments. after finishing, F writes a return value in the external
+format to the return message from the c-node. the marshalling and
+type-checking is done by calls to library functions using ei (Erlangs
+external interface library) and GLib (a general-purpose libarary used
+be e.g. GTK). the return message looks like this;
+{{GtkPid,reply},[{ok|error,Value}...]}.
+  the c-node can also send signals;
+{{GtkPid,signal},Signal}
+
+  the point of all this is that was quite simple to auto-generate
+wrapper functions for most GTK functions (from the header files). it
+was also simple to get the c-node to instantite a GUI from a glade
+file.
+  so one can design the interface i glade; ione can easily create
+a very complicated one in a few hours. all the widgets are named, the
+names are available on the Erlang side as atoms. one also specifies
+which events should result in signals.
+  after the c-node is started and the glade file is loaded, it's just
+a matter of writing an Erlang program that receives signals and send
+actions.
+
+  for example, if the user selects a menu item named 'connect', the
+Erlang program receives this;
+{{GtkPid,signal},{connect,'GDK_BUTTON_RELEASE'}}
+
+  if the Erlang program wants to grey out that menu item, it sends this;
+[{'Gtk_widget_set_sensitive',[connect,false]}]

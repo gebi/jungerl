@@ -25,8 +25,8 @@ in(FN, Fun, Acc, Bfun) ->
             R;
         {error,R} -> exit({open_error, R, FN})
     end.
-in(FD, eof, Fun, Bfun, {Cont, [], Acc}) -> Acc;
-in(FD, eof, Fun, Bfun, {Cont, O, Acc}) -> 
+in(_FD, eof, _Fun, _Bfun, {_Cont, [], Acc}) -> Acc;
+in(_FD, eof, Fun, Bfun, {Cont, O, Acc}) -> 
     case Bfun(Cont, O) of
         {ok, Term} -> Fun(Term, Acc);
         {cont, NCont} -> exit({incomplete_input, NCont})
@@ -34,7 +34,7 @@ in(FD, eof, Fun, Bfun, {Cont, O, Acc}) ->
 in(FD, {ok, List}, Fun, Bfun, State) ->
     in(FD, file:read(FD, ?BLOCK), Fun, Bfun, do(List, Fun, Bfun, State)).
 
-do([], Fun, Bfun, State) -> State;
+do([], _Fun, _Bfun, State) -> State;
 do([13,10|R], Fun, Bfun, {Cont, O, Acc}) ->	%dos...
     do([10|R], Fun, Bfun, {Cont, O, Acc});
 do([10|R], Fun, Bfun, {Cont, O, Acc}) ->

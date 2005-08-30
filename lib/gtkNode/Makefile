@@ -1,13 +1,22 @@
+.PHONY: default all clean generate tarfile
+
 default: all
 
 all: 
-	$(MAKE) -k -C src
-	$(MAKE) -k -C examples
+	$(MAKE) -C src
+	$(MAKE) -C examples
 
 clean: 
-	rm examples/*/*.beam
-	rm ebin/*.beam
-	rm priv/obj/*.o
+	$(MAKE) -C src clean
+	$(MAKE) -C examples clean
+
+realclean: clean
+	$(MAKE) -C priv/generator clean
 
 generate:
-	$(MAKE) -k -C priv/generator/src
+	$(MAKE) -C priv/generator
+
+tarfile:
+	tar -czf gtkNode.tgz -C .. -P \
+	--exclude="*~" --exclude="CVS" --exclude=".cvs*" --exclude=gtkNode.tgz \
+	gtkNode

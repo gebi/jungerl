@@ -60,10 +60,17 @@ start_gtkNode(Name) ->
     open_port({spawn,make_cmd(Name)},[stderr_to_stdout,exit_status]).
 
 make_cmd(Name) ->
-    Exe = join([dirname(dirname(code:which(?MODULE))),priv,bin,gtkNode]),
-    [Node,Host] = string:tokens(atom_to_list(node()),"@"),
-    Cookie = atom_to_list(erlang:get_cookie()),
-    string_join([Exe,Node,Host,atom_to_list(Name),Cookie]," ").
+    {_,OS} = os:type(),
+    Path = join([dirname(dirname(code:which(?MODULE))),priv,bin]),
+    Bin = "gtkNode-"++atom_to_list(OS),
+    case os:find_executable(Bin,Path) of
+	false -> erlang:error({executable_no_found,Bin});
+	Exe -> 
+	    [Node,Host] = string:tokens(atom_to_list(node()),"@"),
+	    Cookie = atom_to_list(erlang:get_cookie()),
+	    NN = atom_to_list(?MODULE)++"_"++atom_to_list(Name),
+	    string_join([Exe,Node,Host,atom_to_list(Name),Cookie,NN]," ")
+    end.
 
 string_join([Pref|Toks], Sep) ->
     lists:foldl(fun(Tok,O) -> O++Sep++Tok end, Pref, Toks).
@@ -135,11 +142,8 @@ bored(State,St) ->
     io:fwrite("~w - bored - ~p~n~p~n~p~n", 
 	      [?MODULE, State, St, process_info(self(),messages)]),
     St.
-die(#st{gtk_port=Port,client_pid=CPid,handler_pid=HPid}) ->
-    [ P ! quit || P <- [CPid,HPid], is_pid(P)],
-    case Port of 
-	[] -> ok;
-	_ -> erlang:port_close(Port)
-    end,
-    io:fwrite("~w - terminating~n", [?MODULE]).
 
+die(_St) ->
+    io:fwrite("~w - terminating~n", [?MODULE]),
+    process_flag(trap_exit,false),     
+    exit(dying).

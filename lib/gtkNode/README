@@ -59,8 +59,8 @@ in the Glade file.
   REFERENCE
 
   the c-node is started thus;
-gtkNode node host regname cookie
-
+gtkNode node host regname cookie cnode-name
+ 
   when started, gtkNode will connect to it's application by sending a
 handshake message to {node@host, regname}.
   the messsage looks like this;

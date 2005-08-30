@@ -16,6 +16,7 @@ static void start_gtk(int argc, char **argv, int ErlFd){
   /* initialise libraries */
   gtk_init(&argc, &argv);
 
+
   channel = g_io_channel_unix_new(ErlFd);
   g_io_add_watch(channel, condition, func, user_data); 
 
@@ -25,11 +26,13 @@ static void start_gtk(int argc, char **argv, int ErlFd){
 int main(int argc, char **argv){
   int fd;
 
-  if ( argc != 5 ){
-    g_print("Usage: %s node host erlang_regname cookie\n", argv[0]);
+  if ( argc != 6 ){
+    g_print("Usage: %s node host erlang_regname cookie node_name\n", argv[0]);
     return 1;
   }
   
+  g_log_set_always_fatal(G_LOG_LEVEL_CRITICAL);/* exit on g_critical */
+
   fd = gn_start_cnode(argv);
   start_gtk(argc, argv, fd);
 

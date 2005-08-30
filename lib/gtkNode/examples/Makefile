@@ -5,7 +5,7 @@ SUBDIRS = $(wildcard [a-z]*)
 default: $(SUBDIRS)
 
 clean: 
-	rm */*.beam
+	-rm -f */*.beam
 
 $(SUBDIRS): 
 	$(MAKE) -k -C $@

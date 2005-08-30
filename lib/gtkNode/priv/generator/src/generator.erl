@@ -5,7 +5,6 @@
 %%%               each function marshals args and calls one gtk function.
 %%%               reads the .defs files from h2def.py
 %%%
-%%%
 %%% Created : 27 Oct 2004 by Mats Cronqvist <qthmacr@mwux005>
 %%%-------------------------------------------------------------------
 -module(generator).
@@ -20,30 +19,44 @@
 
 go() -> go(dirname(dirname(code:which(?MODULE)))).
 go(Dir) ->
+    Vsn = vsn(),
     ets_new(types),
     ets_new(funcs),
     ets_new(bogus,[{keypos,1}]),
-    FNs = [join([Dir,gen,F]) || F<-["gtk","gdk","g"]],
+    FNs = [gname(Dir,F,"",Vsn,"defs") || F<-["gtk","gdk","g"]],
     foreach(fun do_types/1, FNs),	    %populate  the types table
     lists(Dir),
     structs(Dir),
     basic_types(),
-    R = [gen(F,Dir) || F<-["gtk","gdk","g"]],
+    R = [gen(F,Dir,Vsn) || F<-["gtk","gdk","g"]],
     io:fwrite("~w ~p~n~n", [?MODULE, R]).
 
-gen(Pref, Dir) ->
-    do_funcs(join([Dir,gen,Pref++"_white"])), %populate the funcs table
+gen(Pref, Dir, Vsn) ->
+    do_funcs(gname(Dir,Pref,"_white",Vsn,"defs")), %populate the funcs table
     do_black(join([Dir,src,Pref++"_black.txt"])), %de-populate the funcs table
-    {ok,FDc} = file:open(join([Dir,gen,Pref++"_generated.h"]),[write]),
-    {ok,FDerl} = file:open(join([Dir,gen,Pref++"generated_ok"]),[write]),
-    {ok,FDcrap} = file:open(join([Dir,gen,Pref++"generated_crap"]),[write]),
-    {ok,FDtypes} = file:open(join([Dir,gen,Pref++"_types_crap"]),[write]),
+    {ok,FDc} = file:open(gname(Dir,Pref,"_generated",Vsn,"h"),[write]),
+    {ok,FDok} = file:open(gname(Dir,Pref,"_funcs",Vsn,"txt"),[write]),
+    {ok,FDcrap} = file:open(gname(Dir,Pref,"_crap_funcs",Vsn,"txt"),[write]),
+    {ok,FDtypes} = file:open(gname(Dir,Pref,"_crap_types",Vsn,"txt"),[write]),
+    vsn(Vsn,[FDc,FDok,FDcrap,FDtypes]),
     FRWAs = ets:match(funcs,{func,no,'$1',Pref,'$2','$3','$4'}), 
-    foreach(fun(FRWA)-> gen_one(FDc, FDcrap, FDerl,Pref,FRWA) end, FRWAs),
+    foreach(fun(FRWA)-> gen_one(FDc, FDcrap, FDok,Pref,FRWA) end, FRWAs),
     log_types(FDtypes),
     {Pref, length(FRWAs), ets:lookup(bogus,good),ets:lookup(bogus,bad)}.
 
-gen_one(FDc, FDcrap, FDerl, Pref, [Func,Ret,Const,Args]) ->
+vsn() ->
+    case os:cmd("pkg-config --modversion gtk+-2.0") of
+	"sh:"++_ -> exit({not_found, 'pkg-config'});
+	"Package "++_ -> exit({not_found,'gtk+-2.0'});
+	Vsn -> reverse(tl(reverse(Vsn)))
+    end.
+
+vsn(_, []) -> ok;
+vsn(Vsn, [FD|FDs]) -> 
+    io:fwrite(FD, "/* GTK version: ~s */~n", [Vsn]),
+    vsn(Vsn,FDs).
+
+gen_one(FDc, FDcrap, FDok, Pref, [Func,Ret,Const,Args]) ->
     unstick(),
     emit_head(Pref, Func),
     emit_argdefs(Args),
@@ -54,12 +67,12 @@ gen_one(FDc, FDcrap, FDerl, Pref, [Func,Ret,Const,Args]) ->
     emit_free(Args),
     emit_return(Ret),
     emit_final(),
-    unstick(FDc,FDcrap,FDerl).
+    unstick(FDc,FDcrap,FDok).
 
 emit_head(Pref, Func) ->
     estick({UFunc = upcase_1st(Func), rem_pref(Func, Pref)}),
     stick("/*******************************/~n"
-	  "void ~s(int ARI, ei_x_buff *XBUF, char *B, int *I){~n~n", [UFunc]).
+	  "gboolean ~s(int ARI, ei_x_buff *XBUF, char *B, int *I){~n~n", [UFunc]).
 
 emit_argdefs([]) -> stick("~n",[]);
 emit_argdefs([{Typ,Name,_Doc}|Args]) ->
@@ -69,14 +82,12 @@ emit_argdefs([{Typ,Name,_Doc}|Args]) ->
 emit_retdef(Ret,Const) ->
     case what_group(Ret) of
 	object -> stick("  GObject* R;~n~n",[]);
+	struct -> stick("  ~s R;~n~n", [Ret]); 
 	none -> stick("  /* no return value */~n~n",[]);
 	crap -> stick("  ~s R;~n~n", ["CRAP_"++Ret]);
 	list -> 
-	    mark_as_crap("struct_"++Ret),
+	    mark_as_crap("list_"++Ret),
 	    stick("  ~s R;~n~n", ["CRAP_list_"++Ret]);
-	struct ->
-	    mark_as_crap("struct_"++Ret),
-	    stick("  ~s R;~n~n", ["CRAP_struct_"++Ret]);
 	_ -> 
 	    case Const of
 		yes -> stick("  const ~s R; /* return value */~n~n", [Ret]);
@@ -85,32 +96,40 @@ emit_retdef(Ret,Const) ->
     end.
 
 emit_ari_chk(Args) ->
-    stick("  if ( ! gn_check_arity(XBUF, ~p, ARI) ) return;~n", [length(Args)]).
+    stick("  if ( ! gn_check_arity(XBUF, ~p, ARI) )"
+		  " return FALSE;~n", [length(Args)]).
 
 emit_arg_chk([]) -> ok;
 emit_arg_chk([{Typ,Name,_Doc}|Args]) ->
     estick(Name),
     case Kind = what_group(Typ) of
 	crap -> 
-	    stick("  if ( ! gn_get_arg_CRAP(XBUF, B, I, ~p, &~s) ) return;~n",
+	    stick("  if ( ! gn_get_arg_CRAP(XBUF, B, I, ~p, &~s) )"
+		  " return FALSE;~n",
 		  [Typ,Name]);
 	list ->
-	    stick("  if ( ! gn_get_arg_~s(XBUF, B, I, ~p, ~s&~s) ) return;~n",
+	    stick("  if ( ! gn_get_arg_~s(XBUF, B, I, ~p, ~s&~s) )"
+		  " return FALSE;~n",
 		  [Kind,unstar(Typ),"(void**)",Name]);
 	struct -> 
-	    stick("  if ( ! gn_get_arg_~s(XBUF, B, I, ~p, ~s&~s) ) return;~n",
+	    stick("  if ( ! gn_get_arg_~s(XBUF, B, I, ~p, ~s&~s) )"
+		  " return FALSE;~n",
 		  [Kind,unstar(Typ),"(void**)",Name]);
 	basic ->
-	    stick("  if ( ! gn_get_arg_~s(XBUF, B, I, &~s) ) return;~n",
+	    stick("  if ( ! gn_get_arg_~s(XBUF, B, I, &~s) )"
+		  " return FALSE;~n",
 		  [unstar(Typ),Name]);
 	flags ->
-	    stick("  if ( ! gn_get_arg_~s(XBUF, B, I, ~p, ~s&~s) ) return;~n", 
+	    stick("  if ( ! gn_get_arg_~s(XBUF, B, I, ~p, ~s&~s) )"
+		  " return FALSE;~n", 
 		  [Kind,unstar(Typ),"(gint*)",Name]);
 	enum ->
-	    stick("  if ( ! gn_get_arg_~s(XBUF, B, I, ~p, ~s&~s) ) return;~n", 
+	    stick("  if ( ! gn_get_arg_~s(XBUF, B, I, ~p, ~s&~s) )"
+		  " return FALSE;~n", 
 		  [Kind,unstar(Typ),"(gint*)",Name]);
 	object ->
-	    stick("  if ( ! gn_get_arg_~w(XBUF, B, I, ~s, ~s&~s) ) return;~n", 
+	    stick("  if ( ! gn_get_arg_~w(XBUF, B, I, ~s, ~s&~s) )"
+		  " return FALSE;~n", 
 		  [Kind,what_gtype(unstar(Typ)),"(GObject**)",Name])
     end,
     emit_arg_chk(Args).
@@ -150,12 +169,13 @@ emit_return(Ret) ->
 	    stick("  gn_put_~w(XBUF,(~s)R);~n", [ET,Cast]);
 	none -> stick("  gn_put_void(XBUF);~n", []);
 	object -> stick("  gn_put_object(XBUF,R);~n", []);
+	struct -> stick("  gn_put_struct(XBUF,~p,(void*)R);~n", [unstar(Ret)]);
 	crap -> stick("  gn_put_CRAP(XBUF,~p,R);~n", [Ret]);
 	Kind -> stick("  gn_put_~w(XBUF,~p,R);~n", [Kind, Ret])
     end.
 
 emit_final() ->
-    stick("}~n",[]).
+    stick("  return TRUE;~n}~n",[]).
 
 what_gtype(This) ->
     [#type{what=object,gtype=Type}] = ets:lookup(types,This),
@@ -198,22 +218,22 @@ stick(Form, Args) ->
     end.
 
 unstick() -> erase(cfunc), erase(efunc), erase(crap).
-unstick(FD1,FD2,FDerl) ->
+unstick(FD1,FD2,FDok) ->
     case get(crap) of
 	crap -> ets_upd(bogus,bad),cunstick(FD2);
-	_ -> ets_upd(bogus,good),cunstick(FD1), eunstick(FDerl)
+	_ -> ets_upd(bogus,good),cunstick(FD1), eunstick(FDok)
     end,
     unstick().
 
 cunstick(FD) -> io:fwrite(FD, "~s", [lists:flatten(get(cfunc))]).
 
 eunstick(FD) ->
-    {{Cname,Ename},As} = get(efunc),
-    io:fwrite(FD, "~s(",[Ename]),
+    {{Cname,_Ename},As} = get(efunc),
+    io:fwrite(FD, "~s(",[Cname]),
     eunstick_args(FD,As),
-    io:fwrite(FD, ").~n",[]).
+    io:fwrite(FD, ")~n",[]).
 
-eunstick_args(FD,[]) -> ok;
+eunstick_args(_FD,[]) -> ok;
 eunstick_args(FD,As) ->
     [A1|AT] = reverse(As),
     io:fwrite(FD,"~s",[upcase_1st(A1)]),
@@ -223,15 +243,17 @@ eunstick_args(FD,As) ->
 do_black(FN) ->
     bio:string(FN, fun do_black/2, nil).
 
-do_black(Str,State) ->
+do_black(Str,_State) ->
     case ets:lookup(funcs,Str) of
 	[] -> ok;
 	[Rec] -> ets:insert(funcs, Rec#func{black=yes})
     end.
 
+gname(Dir,Pref,Mid,Vsn,Ext) -> 
+    join([Dir,gen,Pref++Mid++"-"++Vsn++"."++Ext]).
 
-do_funcs(F) ->
-    io:fwrite("~p~n", [FN = F++".defs"]),
+do_funcs(FN) ->
+    io:fwrite("~p~n", [FN]),
     bio:string(FN, fun do_funcl/2, nil).
 
 do_funcl("",State) ->
@@ -260,9 +282,9 @@ do_funcl("  )", {para, {Flag, Func}}) ->
 do_funcl(Str, {para, {Flag, Func}}) ->
     OP = Func#func.paras,
     case string:tokens(Str,"'()\" ") of
-	["const-"++Para, Name|Doc] ->
+	["const-"++Para, Name|_Doc] ->
 	    {para, {Flag, Func#func{paras=OP++[{Para,Name,const}]}}};
-	[Para, Name|Doc] ->
+	[Para, Name|_Doc] ->
 	    {para, {Flag, Func#func{paras=OP++[{Para,Name,no}]}}}
     end;
 do_funcl("  (c-name \""++C, {Flag,Func}) ->
@@ -279,7 +301,7 @@ do_funcl(_,State) ->
     State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-lists(Dir) ->
+lists(_Dir) ->
     Lists = ["GType*"],
     foreach(fun ins_list/1, Lists).
 
@@ -311,8 +333,8 @@ ins_basic({ET,Cast,Bs}) ->
 ins_basic(B,ET,Cast) ->
     ets:insert(types,#type{what=basic,cname=B,etype=ET,cast=Cast}).
 
-do_types(F) ->
-    io:fwrite("~p~n", [FN = F++".defs"]),
+do_types(FN) ->
+    io:fwrite("~p~n", [FN]),
     bio:string(FN, fun do_typel/2, nil).
 
 do_typel("",State) ->
@@ -356,9 +378,6 @@ unstar(Str) ->
 	"*"++X -> reverse(X);
 	_ -> Str
     end.
-
-last("") -> "";
-last(Str) -> [hd(reverse(Str))].
 
 trnc(N,C) -> lists:sublist(C, length(C)-N).
 

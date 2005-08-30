@@ -6,29 +6,28 @@
 #define REMHOST argv[2]
 #define REMREG argv[3]
 #define COOKIE argv[4]
+#define NODE_NAME argv[5]
 
 static int fd;			/* fd to remote Erlang node */
 static gchar* rem_regname;    /* process name on remote Erlang node */
 
 int gn_start_cnode(char **argv) { 
   extern ei_cnode ec;
-  char node_name[MAXATOMLEN] = "gtk_"; /* our node name */
   char rem_node_name[MAXATOMLEN] = "";	/* other node name */
   ei_x_buff xbuf;
   erlang_pid *self = ei_self(&ec);
 
-  strcat(node_name,REMNODE);
   strcat(rem_node_name,REMNODE);
   strcat(rem_node_name,"@");
   strcat(rem_node_name,REMHOST);
   rem_regname = g_strdup(REMREG);
-  g_print("I am %s, you are %s\n", node_name, rem_node_name);
+  g_print("I am %s, you are %s\n", NODE_NAME, rem_node_name);
 
-  if ( ei_connect_init(&ec, node_name, COOKIE, CREATION) < 0 )
+  if ( ei_connect_init(&ec, NODE_NAME, COOKIE, CREATION) < 0 )
     g_critical("ei_connect_init");
 
   if ( (fd = ei_connect(&ec, rem_node_name)) < 0 )
-    g_critical("ei_connect");
+    g_critical("ei_connect failed.\nwrong cookie? erl-dist version mismatch?");
   
   self->num = fd;		/* bug?? in ei_reg_send_tmo */
 
@@ -51,69 +50,52 @@ void gn_send(ei_x_buff *xbuf) {
 static gboolean get_fpointer(char *cmd, ei_x_buff *xbuf, gpointer* poi) {
   extern GModule* gmod;
   
-  if ( ! g_module_supported() ) g_error("gtkNode requires working gmodule");
+  if ( ! g_module_supported() ) g_critical("gtkNode requires working gmodule");
   
   if ( ! gmod ) gmod = g_module_open(NULL,0); /* "gtkNode_gtk.so" */
   
-  g_module_symbol(gmod, cmd, poi);
-  if ( ! poi ) {
-    g_warning("could not find '%s'.", cmd);
-    gn_enc_2_error(xbuf, "no_such_function");
-    ei_x_encode_atom(xbuf, cmd);
-    return FALSE;
-  }
-  return TRUE;
+  if ( g_module_symbol(gmod, cmd, poi) ) return TRUE;
+  
+  g_warning("could not find '%s'.", cmd);
+  gn_enc_2_error(xbuf, "no_such_function");
+  ei_x_encode_atom(xbuf, cmd);
+  return FALSE;
 }
 
-static void call_fpointer(char *cmd, char *buff, int *index, 
-			  int length, ei_x_buff *xbuf) {
-  
-  void (*funcp)(int, ei_x_buff *, char *, int *);
-  
-  if ( get_fpointer(cmd, xbuf, (gpointer *)&funcp) )
-    (*funcp)(length, xbuf, buff, index);
-}
-
-static void make_reply(ei_x_buff *xbuf, char *buff, int *index) {
-  
+static gboolean make_reply(ei_x_buff *xbuf, char *buff, int *index) {
+  int k;
   gint arity;
   gchar cmd[MAXATOMLEN+1];
+  gboolean (*funcp)(int, ei_x_buff *, char *, int *);
   
-  if ( ! ((arity = gn_get_tuple(xbuf, buff, index)) > -1) ) 
-    return;
-
-  if ( ! gn_check_arity(xbuf,2,arity) )
-    return;
+  if ( ! ((arity = gn_get_tuple(xbuf, buff, index)) > -1) ||
+       ! gn_check_arity(xbuf,2,arity)  ||
+       ! gn_get_arg_gchar_fix(xbuf, buff, index, cmd) ||
+       ! ((arity = gn_get_list(xbuf, buff, index)) > -1) )
+    return FALSE;
   
-  if ( ! gn_get_arg_gchar_fix(xbuf, buff, index, cmd) )
-    return;
-  
-  if ( ! ((arity = gn_get_list(xbuf, buff, index)) > -1) ){
-    free(cmd);
-    return;
+  if ( get_fpointer(cmd, xbuf, (gpointer *)&funcp) &&
+       (*funcp)(arity, xbuf, buff, index) ) {
+    g_assert( ei_decode_list_header(buff,index,&k) == 0 );
+    g_assert( k == 0 );
+    return TRUE;
   }
   
-  call_fpointer(cmd, buff, index, arity, xbuf);
-}
-
-static void remove_list_tail(char *buff, int *index) {
-  int k;
-  g_assert( ei_decode_list_header(buff,index,&k) == 0 );
-  g_assert( k == 0 );
+  return FALSE;
 }
 
 static void make_reply_list(ei_x_buff *xbuf, char *buff, int *index) {
   
   gint arity, i;
-
+  
   if ( ! ((arity = gn_get_list(xbuf, buff, index)) > -1) )
     return;
   
   gn_wrap_ans("reply",xbuf);
-  ei_x_encode_list_header(xbuf, arity);
   for (i = 0; i < arity; i++) {
-    make_reply(xbuf, buff, index);
-    remove_list_tail(buff, index);
+    ei_x_encode_list_header(xbuf, 1);
+    if ( ! make_reply(xbuf, buff, index) ) 
+      break;
   }
   ei_x_encode_empty_list(xbuf);
 }

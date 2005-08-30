@@ -127,12 +127,9 @@ void gn_put_double(ei_x_buff *xbuf, double d) {
   g_assert( ! ei_x_encode_double(xbuf, d) );
 }
 
-void gn_enc_longlong(ei_x_buff *xbuf, long long l) {
-  g_assert( ! ei_x_encode_longlong(xbuf, l) );
-}
 void gn_put_longlong(ei_x_buff *xbuf, long long l) {
   gn_wrap_reply("ok", xbuf);
-  gn_enc_longlong(xbuf, l);
+  g_assert( ! ei_x_encode_longlong(xbuf, l) );
 }
 
 void gn_put_ulonglong(ei_x_buff *xbuf, unsigned long long l) {
@@ -145,16 +142,36 @@ void gn_put_string(ei_x_buff *xbuf, char *p) {
   g_assert( ! ei_x_encode_string(xbuf, p) );
 }
 
-gn_enc_object(ei_x_buff *xbuf, GObject *w){
+void gn_put_object(ei_x_buff *xbuf, GObject *w) {
   gchar bf[24];
+
   g_assert( (sprintf(bf,"%d", (long)w) < sizeof(bf)) ); 
   hash_insert(bf, (void*)w);
+  gn_wrap_reply("ok", xbuf);
   g_assert( ! ei_x_encode_atom(xbuf, bf));
 }
-void gn_put_object(ei_x_buff *xbuf, GObject *w) {
+
+
+/* if GLib decides to free a struct we're hosed */
+/* i think one could rig up some freeing callback and */
+/*remove the pointer from the hash, but i'm not sure how */
+void gn_put_struct(ei_x_buff *xbuf, char *type, void *struct_p) {
+  gchar key[200];
+  gchar name[24];
+
+  g_assert( (sprintf(name,"%d", (long)struct_p) < sizeof(name)) ); 
+  g_assert( (strlen(type)+sizeof(name)+4) < sizeof(key) );
+  memcpy(key, type, strlen(type)+1);
+  strcat(key, "-");
+  strcat(key, name);
+
+  g_assert( hash_lookup(key) == NULL );
+  hash_insert(key, struct_p);
+
   gn_wrap_reply("ok", xbuf);
-  gn_enc_object(xbuf, w);
+  g_assert( ! ei_x_encode_atom(xbuf, name));
 }
+
 
 void gn_put_enum(ei_x_buff *xbuf, char* type_name, gint enum_val) {
   char buf[100];

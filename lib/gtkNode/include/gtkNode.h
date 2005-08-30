@@ -2,6 +2,7 @@
 #include <gtk/gtk.h>
 #include <gmodule.h>
 #include <glade/glade.h>
+#include <pango/pango.h>
 
 /* starts the cnode, returns file descriptor*/
 int gn_start_cnode(char **argv);

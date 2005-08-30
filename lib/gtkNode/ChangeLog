@@ -1,3 +1,50 @@
+2005-08-30  Mats Cronqvist  <locmacr@mwlx084>
+
+	* src/gtkNode_marshal.c (Module): added get_arg_struct
+
+	* src/gtkNode_cnode.c (Module): error handling didnt work with
+	bulking. cnode number of args changed.
+
+	* src/gtkNode.erl (Module): error termination fixed. cnode number
+	of args changed.
+
+	* src/gtkNode.c (Module): the cnode needed its own node name as
+	argument
+
+	* priv/generator/src/generator.erl (Module): wrappers must return
+	boolean in order to get error handling to work with bulking
+
+2005-08-26  Mats Cronqvist  <locmacr@mwlx084>
+
+	* src/gtkNode_structs.c: added struct constructors
+	gn_construct_PangoLayout and gn_construct_PangoContext. we must
+	also be able to return struct handles to erlang (with
+	gn_put_struct)
+
+	* src/gtkNode_internal.c (Module): added GN_widget_get_attr.
+	removed old crap, i.e. everything except GN_glade_init and
+	GN_new_gvalue
+
+	* src/check (Module): intended to check that the generated gtkNode
+	headers are compatible with the installed gtk (tjena uffe)
+
+	* src/Makefile (Module): os name in name of binary
+
+	* priv/generator/src/generator.erl (Module): in order to get pango
+	to work, we need to be able to return structs to erlang.  also
+	changed the filenames of generated names to include the gtk
+	version number.
+
+	* priv/generator/src/bio.erl (Module): unused_vars warnings in R10
+
+	* priv/generator/src/Makefile (Module): cleaned up deps
+
+	* include/gtkNode.h (Module): pango stuff added
+
+	* examples/Makefile (clean): -rm
+
+	* Makefile (Module): new targets; generate, clean, realclean, tarfile
+
 2005-08-18  Mats Cronqvist  <locmacr@mwlx084>
 
 	* priv/gen/gtk_generated.h (Module): GTK 2.4

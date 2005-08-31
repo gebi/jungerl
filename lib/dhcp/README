@@ -1,0 +1,130 @@
+# $Id$
+
+
+Introduction
+============
+
+This is a DHCP client implementation.
+
+In fact it is somewhat more than just a DHCP client.
+The module dhcp_cli_srv.erl implements a multi-client,
+i.e it is possible to plug it into your system and have
+it allocating as many IP addresses as you would like.
+
+To keep it independent of the surrounding system (so                                       
+that it can be plugged in and reused somewhere else),                                      
+it provides some hooks. First it need a directory at                                        
+startup where it can store the dets-DB that holds                                        
+the lease information. Then, when allocating an IP                                         
+address, two callbacks exist. One for implementing a                                       
+trace function and one for informing the surrounding                                       
+system that an allocated IP address can't be renewed                                       
+and thus has to be released. 
+
+The dets-DB keeps the lease information which makes
+it possible to recover from a crashing system. Since,
+at startup, dhcp_cli_srv will release any lease that
+is still stored in the dets-DB.
+
+To be able to open the priveleged ports 67 and 68,
+we are making use of the fd_server package.
+(install it as: erlmerge -i fd_server)
+
+
+Usage
+=====
+
+Check out the dhcp_test.erl file which is a little
+test program. In the comments you can see how you can
+setup your dhcpd.conf file to send you tailor made
+options. Note that we have set the 'giaddr' which
+tells the DHCP server which subnet to allocate from.
+If this network differs from your own, then you have
+to setup an alias on your machine. For example:
+
+sudo ifconfig eth0:1 192.168.32.1 netmask 255.255.255.0  
+
+Below follows a test run of a dhcp_test session.
+Comments are inlined with '%' as usual.
+
+
+[tobbe@orre]dhcp > erl           
+Erlang (BEAM) emulator version 5.4.6 [source] [hipe]                                                      
+Eshell V5.4.6  (abort with ^G)
+1> dhcp_test:start().   
+dets: file "/tmp/dhcp_leases.dets" not properly closed, repairing ...
+
+%%% At startup we try to free any existing leases,
+
+=INFO REPORT==== 31-Aug-2005::18:51:48 ===
+*elog dhcp_cli_srv:246: deleting old DHCP lease DB
+{ok,<0.39.0>}
+
+%%% Now lets allocate one IP address.
+
+2> {D, ClientIp, Opts} = dhcp_test:alloc().
+
+=INFO REPORT==== 31-Aug-2005::18:52:23 ===
+sending DHCPDISCOVER to server: 192.168.128.1 , giaddr: 192.168.32.1
+
+=INFO REPORT==== 31-Aug-2005::18:52:24 ===
+got DHCPOFFER from server: 192.168.128.1, in SELECTING state
+
+=INFO REPORT==== 31-Aug-2005::18:52:24 ===
+sending DHCPREQUEST to server: 192.168.128.1
+
+=INFO REPORT==== 31-Aug-2005::18:52:24 ===
+got DHCPACK from server: 192.168.128.1, in REQUESTING state
+
+{{dhcp_alloc,[{192,168,128,1}],{192,168,32,1},dhcp_test,none,"Tobbe Ltd.",[]},
+ {192,168,32,48},
+ [{vendor_opts,[{2,
+                 <<0,0,2,88>>},
+                {3,
+                 <<192,168,128,1>>},
+                {4,
+                 <<72,101,108,108,111,32,87,111,114,108,100>>}]},
+  {domain_name,"bluetail.com"},
+  {dns,[{192,168,128,1}]},
+  {routers,[{192,168,32,1}]},
+  {netmask,{255,255,255,0}}]}
+
+3> 
+
+%%% We have setup a lease time of only 60 seconds on the server
+%%% so that we can show the handling of lease renewal.
+
+=INFO REPORT==== 31-Aug-2005::18:52:54 ===
+timer T1 expired for 192.168.32.48, in BOUND state
+
+=INFO REPORT==== 31-Aug-2005::18:52:54 ===
+got DHCPACK from server: 192.168.128.1, in RENEWING state
+
+3> dhcp_test:free(D, ClientIp).
+
+%%% Now let us release the allocated IP address.
+
+=INFO REPORT==== 31-Aug-2005::18:53:16 ===
+de-allocating IP address: 192.168.32.48
+
+=INFO REPORT==== 31-Aug-2005::18:53:16 ===
+*elog dhcp_cli_srv:432: DHCP de-allocating IP address: 192.168.32.48
+
+4> ClientIp.
+{192,168,32,48}
+
+5> Opts.
+[{vendor_opts,[{2,
+                <<0,0,2,88>>},
+               {3,
+                <<192,168,128,1>>},
+               {4,
+                <<72,101,108,108,111,32,87,111,114,108,100>>}]},
+ {domain_name,"bluetail.com"},
+ {dns,[{192,168,128,1}]},
+ {routers,[{192,168,32,1}]},
+ {netmask,{255,255,255,0}}]
+
+
+
+Enjoy, Tobbe

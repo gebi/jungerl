@@ -1,0 +1,89 @@
+###-*-makefile-*-   ; force emacs to enter makefile-mode
+
+INSTALLPREFIX      = @prefix@
+ETCDIR             = @sysconfdir@
+VARDIR             = @localstatedir@
+
+ERL=@ERL@
+ERLC=@ERLC@
+EMULATOR=beam
+
+ifdef debug
+  ERLC_FLAGS+=-Ddebug
+endif
+
+ifdef trace
+  ERLC_FLAGS=+trace
+endif
+
+ifdef export_all
+  ERLC_FLAGS+=-Dexport_all
+endif
+
+CC=@CC@
+CFLAGS=@CFLAGS@
+LINKER=@LINKER@
+LDFLAGS=@LDFLAGS@
+WIN32=@WIN32@
+BSDI=@BSDI@
+EXE=@EXE@
+DLL=@DLL@
+OBJ=@OBJ@
+OUT=@OUT@
+FPIC=@FPIC@
+STRIP=@STRIP@
+LIBS=@LIBS@
+
+
+
+ERLDIR=@ERLDIR@
+ERL_INTERFACE_LIB=@ERL_INTERFACE_LIB@
+ERL_INTERFACE_LIBS=@ERL_INTERFACE_LIBS@
+ERL_INTERFACE_INCLUDE=@ERL_INTERFACE_INCLUDE@
+
+ERL_C_INCLUDE_DIR=$(ERLDIR)/usr/include
+
+LD_SHARED=@LD_SHARED@
+
+LDFLAGS +=-L$(ERL_INTERFACE_LIB)
+
+INSTALL=@INSTALL@
+INSTALL_DATA=@INSTALL_DATA@
+
+EMULATOR=beam
+ifdef debug
+  ERLC_FLAGS+=-Ddebug
+endif
+
+ifdef trace
+  ERLC_FLAGS=+trace
+endif
+
+ifdef export_all
+  ERLC_FLAGS+=-Dexport_all
+endif
+
+
+INSTALL=install -c
+INSTALL_DATA=${INSTALL} -m 644
+
+
+# Hmm, don't know if you are supposed to like this better... ;-)
+APPSCRIPT = '$$vsn=shift; $$mods=""; while(@ARGV){ $$_=shift; s/^([A-Z].*)$$/\'\''$$1\'\''/; $$mods.=", " if $$mods; $$mods .= $$_; } while(<>) { s/%VSN%/$$vsn/; s/%MODULES%/$$mods/; print; }'
+
+# Targets
+
+../ebin/%.app: %.app.src ../vsn.mk Makefile
+	perl -e $(APPSCRIPT) "$(VSN)" $(MODULES) < $< > $@
+
+../ebin/%.appup: %.appup 
+	cp $< $@
+
+../ebin/%.$(EMULATOR): %.erl
+	$(ERLC) -b $(EMULATOR) $(ERLC_FLAGS) -o ../ebin $<
+
+%.$(EMULATOR): %.erl
+	$(ERLC) -b $(EMULATOR) $(ERLC_FLAGS) $<
+
+
+

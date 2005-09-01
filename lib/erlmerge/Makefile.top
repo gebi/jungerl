@@ -1,0 +1,47 @@
+
+include vsn.mk
+include config/include.mk
+
+APPLICATION=erlmerge
+ERLMERGE=$(INSTALLPREFIX)/bin/$(APPLICATION)
+ERL_LIB_DIR=$(ERLDIR)/lib
+VERSION = $(ERLMERGE_VSN)
+TARGETDIR=$(INSTALLPREFIX)/lib/$(APPLICATION)-$(VERSION)
+
+
+
+all: script
+	(cd lib; $(MAKE) $@)
+
+script: bin/erlmerge
+	@(cd bin; \
+	  cp ../config/erlmerge.sh erlmerge; \
+	  echo 'ERL_LIB_DIR='$(ERL_LIB_DIR) >> erlmerge; \
+	  echo 'export ERL_LIB_DIR' >> erlmerge; \
+	  echo "ERL="$(ERL) >> erlmerge; \
+	  echo '${ERL} -noshell -pa' $(TARGETDIR)/ebin '-s erlmerge run' >> erlmerge; \
+	  echo 'if [ "$${EM_SUICIDE}" = "y" ]; then rm -f `which erlmerge`; fi' >> erlmerge)
+
+bin/erlmerge: config/erlmerge.sh
+
+clean:
+	(cd lib; $(MAKE) $@)
+
+install:
+	-rm $(INSTALLPREFIX)/support 
+	-rm -rf $(INSTALLPREFIX)/erlmerge_DB
+	install -d $(TARGETDIR)/priv
+	install -d $(TARGETDIR)/ebin
+	install -d $(TARGETDIR)/src
+	install -d $(TARGETDIR)/include
+	install -d $(INSTALLPREFIX)/erlmerge_DB
+	install -d $(INSTALLPREFIX)/erlmerge_DB/distfiles
+	ln -s $(INSTALLPREFIX)/erlmerge_DB $(INSTALLPREFIX)/support 
+	install  config/include.mk $(INSTALLPREFIX)/erlmerge_DB
+	install  lib/src/*.erl $(TARGETDIR)/src
+	install  lib/ebin/*.beam $(TARGETDIR)/ebin
+	install -d `dirname $(ERLMERGE)`
+	install  ./bin/erlmerge $(ERLMERGE)
+	chmod 755 $(ERLMERGE)
+	ln -s $(ERLMERGE) ${ERL}merge
+	$(ERLMERGE) setup

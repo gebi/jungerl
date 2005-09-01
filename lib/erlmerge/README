@@ -1,0 +1,56 @@
+
+For developers (as of 14 Apr 2005)
+----------------------------------
+
+Install it as:
+
+make
+make install  (as root if 'erl' is installed as root) 
+
+This will create a directory and a DB:
+
+ ..../erlmerge_DB/erlmerge.dets
+
+The DB will be filled with info about the existing apps.
+List them with the command:
+
+ erlmerge search
+ erlmerge search mnesia
+
+Check the 'Installed' info, it should be 'true'
+
+Now sync the DB with the latest stuff from trapexit.org:
+
+erlmerge sync   (again as root if necessary)
+
+This will store the sync info in:
+
+ ..../erlmerge_DB/sync.erlmerge
+
+List the DB again and look for 'eldap' and 'eradius'
+They should not be installed.
+
+Now, to install an application do as in this example:
+
+ erlmerge -i esmb
+
+or for a dryrun:
+
+ erlmerge -p -i esmb
+
+The '-i' (or 'install') switch will retrieve the application
+and all its dependencies, unpack them and compile them
+under your $(ERLANG)/lib directory. So, for example, the
+application esmb may end up as a directory:
+
+ /usr/local/lib/erlang/lib/esmb-1.0/
+
+Which will make it available when you start your
+Erlang node/shell.
+
+
+
+
+
+
+

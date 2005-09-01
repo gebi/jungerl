@@ -1,0 +1,13 @@
+{application,erlmerge,
+ [{description,"Erlang Packet Handler"},
+  {vsn,"%VSN%"},
+  {modules,[%MODULES%]},
+  {registered,[]},
+  {env, []},
+  {mod, {erlmerge_app, []}},
+  {applications,[kernel,stdlib,sasl]},
+  {dependencies,
+   [{kernel, "2.9.6"},
+    {stdlib, "1.12.7"},
+    {sasl,"1.10.1"}]}]}.
+

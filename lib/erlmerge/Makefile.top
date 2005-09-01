@@ -11,7 +11,7 @@ TARGETDIR=$(INSTALLPREFIX)/lib/$(APPLICATION)-$(VERSION)
 
 
 all: script
-	(cd lib; $(MAKE) $@)
+	(cd src; $(MAKE) $@)
 
 script: bin/erlmerge
 	@(cd bin; \
@@ -25,7 +25,7 @@ script: bin/erlmerge
 bin/erlmerge: config/erlmerge.sh
 
 clean:
-	(cd lib; $(MAKE) $@)
+	(cd src; $(MAKE) $@)
 
 install:
 	-rm $(INSTALLPREFIX)/support 
@@ -38,8 +38,8 @@ install:
 	install -d $(INSTALLPREFIX)/erlmerge_DB/distfiles
 	ln -s $(INSTALLPREFIX)/erlmerge_DB $(INSTALLPREFIX)/support 
 	install  config/include.mk $(INSTALLPREFIX)/erlmerge_DB
-	install  lib/src/*.erl $(TARGETDIR)/src
-	install  lib/ebin/*.beam $(TARGETDIR)/ebin
+	install  src/*.erl $(TARGETDIR)/src
+	install  ebin/*.beam $(TARGETDIR)/ebin
 	install -d `dirname $(ERLMERGE)`
 	install  ./bin/erlmerge $(ERLMERGE)
 	chmod 755 $(ERLMERGE)

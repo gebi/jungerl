@@ -686,7 +686,8 @@ do_alloc(_State, X0, D0) ->
 	    dets:insert(?DB, X1);
 
 	{error, Emsg} ->
-	    ?DHCP_TRACEFUN(X0,"failed to send DHCPDISCOVER, reason: ~s", [Emsg])
+	    ?DHCP_TRACEFUN(X0,"failed to send DHCPDISCOVER, reason: ~s",[Emsg]),
+	    gen_server:reply(X0#lease.from, {error, Emsg})
     end.
 
 get_fd(X) ->

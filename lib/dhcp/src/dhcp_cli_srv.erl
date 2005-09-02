@@ -110,7 +110,8 @@
 	  s_pdu,                % last sent PDU (#dhcp{})
 	  r_pdu,                % last received PDU (#dhcp{})
 	  resend_cnt = 0,       % resend counter, must be zero initially !!
-	  inuse_checking = false % is 'true' if we currently are doing inuse test
+	  inuse_checking = false,% is 'true' if we currently are doing inuse test
+	  requested_ops = []    % requested option codes
 	  }).
 
 %%% Port mapper entry
@@ -156,8 +157,7 @@ free(Da, CliIp) when ?CHECK_DA(Da) ->
 alloc(Da) ->
     alloc(Da, self()).
 
-alloc(Da, Owner) when ?CHECK_DA(Da),
-		      pid(Owner) ->
+alloc(Da, Owner) when ?CHECK_DA(Da), pid(Owner) ->
     x_alloc(#dhcp{}, da2lease(Da), Owner).
 
 da2lease(Da) ->
@@ -171,7 +171,8 @@ da2lease(Da) ->
 	   cb_mod    = CbMod,
 	   cb_data   = Da#dhcp_alloc.cb_data,
 	   v_class   = v_class(Da),
-	   sock_opts = Da#dhcp_alloc.sock_opts}.
+	   sock_opts = Da#dhcp_alloc.sock_opts,
+	   requested_ops = Da#dhcp_alloc.requested_ops}.
 
 %%% Return Vendor-Class info or default value
 v_class(Da) ->
@@ -482,7 +483,8 @@ free_lease(Lease) ->
 	      ciaddr   = Lease#lease.cli_ip,
 	      giaddr   = Lease#lease.giaddr,
 	      chaddr   = Lease#lease.chaddr,
-	      options  = [{?DHCP_OP_CLIENT_ID, Xid} |
+	      options  = [{?DHCP_OP_CLIENT_ID, Xid},
+			  {?DHCP_OP_REQ_PARAMS, Lease#lease.requested_ops}|
 			  add_vendor_class(Lease)]},
     Pdu = dhcp_lib:enc(D),
     udp_send(Lease, Pdu, Lease#lease.srv_ip),
@@ -512,7 +514,8 @@ do_renew(_State, Xid, T1) ->
 		      ciaddr   = X#lease.cli_ip,
 		      giaddr   = X#lease.giaddr,
 		      chaddr   = X#lease.chaddr,
-		      options  = [{?DHCP_OP_CLIENT_ID, Xid}|
+		      options  = [{?DHCP_OP_CLIENT_ID, Xid},
+				  {?DHCP_OP_REQ_PARAMS, X#lease.requested_ops}|
 				  add_vendor_class(X)]},
 	    Pdu = dhcp_lib:enc(D),
 	    udp_send(X, Pdu, X#lease.srv_ip),
@@ -590,7 +593,8 @@ address_not_ok(X, D) when X#lease.inuse_checking == true ->
     ?DHCP_TRACEFUN(X,"got DHCPACK from server: ~s, address is in use already", 
 		   [dhcp_lib:ip2str(SrvId)]),
     D1 = D#dhcp{msg_type = ?DHCPDECLINE,
-		options  = [{?DHCP_OP_CLIENT_ID, X#lease.xid}|
+		options  = [{?DHCP_OP_CLIENT_ID, X#lease.xid},
+			    {?DHCP_OP_REQ_PARAMS, X#lease.requested_ops}|
 			    add_vendor_class(X)]},
     Pdu = dhcp_lib:enc(D1),
     ?DHCP_TRACEFUN(X,"sending DHCPDECLINE to server: ~s", 
@@ -626,7 +630,8 @@ machine(_S,X,D) when ?IS_SELECTING(X), ?IS_DHCPOFFER(D) ->
 		       chaddr   = X#lease.chaddr,
 		       options  = [{?DHCP_OP_SRV_ID, SrvId},
 				   {?DHCP_OP_CLIENT_ID, D#dhcp.xid},
-				   {?DHCP_OP_REQUESTED_IP, D#dhcp.yiaddr}|
+				   {?DHCP_OP_REQUESTED_IP, D#dhcp.yiaddr},
+				   {?DHCP_OP_REQ_PARAMS, X#lease.requested_ops}|
 				   add_vendor_class(X)]},
 	    Pdu = dhcp_lib:enc(D1),
 	    ?DHCP_TRACEFUN(X,"sending DHCPREQUEST to server: ~s", 
@@ -757,7 +762,8 @@ do_alloc2(X0, D0) ->
 	    D = D0#dhcp{giaddr  = OurIp},
 	    Opts = D#dhcp.options,
 	    Pdu = dhcp_lib:enc(D#dhcp{msg_type = ?DHCPDISCOVER,
-				      options  = [{?DHCP_OP_CLIENT_ID, X0#lease.xid}|
+				      options  = [{?DHCP_OP_CLIENT_ID, X#lease.xid},
+						  {?DHCP_OP_REQ_PARAMS, X#lease.requested_ops}|
 						  add_vendor_class(X)++Opts]}),
 	    
 	    ?DHCP_TRACEFUN(X,"sending DHCPDISCOVER to server: ~s , giaddr: ~s",

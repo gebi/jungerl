@@ -28,6 +28,7 @@
 -define(DHCP_OP_LEASE_TIME,      51).
 -define(DHCP_OP_MSGTYPE,         53).
 -define(DHCP_OP_SRV_ID,          54).
+-define(DHCP_OP_REQ_PARAMS,      55).
 -define(DHCP_OP_RENEWAL_TIME,    58).
 -define(DHCP_OP_REBINDING_TIME,  59).
 -define(DHCP_OP_VENDOR_CLASS,    60).
@@ -65,7 +66,8 @@
 	  cb_mod,           % Callback module (for trace and release)
 	  cb_data,          % Opaque callback data
 	  v_class = "",     % Vendor class string
-	  sock_opts = []    % List of socket options
+	  sock_opts = [],   % List of socket options
+	  requested_ops = [] % List of requestes option codes
 	 }).
 
 -endif.

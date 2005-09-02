@@ -170,16 +170,27 @@ enc_opts([]) ->
 
 enc_opt({?DHCP_OP_MSGTYPE, X}) -> 
     [?DHCP_OP_MSGTYPE, 1, X];
+%%%
 enc_opt({?DHCP_OP_SRV_ID, X}) -> 
     [?DHCP_OP_SRV_ID, 4, ip2bin(X)];
+%%%
 enc_opt({?DHCP_OP_VENDOR_CLASS, X}) -> 
     Len = sizeof(X),
     [?DHCP_OP_VENDOR_CLASS, Len, l2b(X)];
+%%%
 enc_opt({?DHCP_OP_CLIENT_ID, X}) -> 
     B = i2b(X),
     [?DHCP_OP_CLIENT_ID, 5, <<0, B/binary>>];
+%%%
 enc_opt({?DHCP_OP_REQUESTED_IP, X}) -> 
     [?DHCP_OP_REQUESTED_IP, 4, ip2bin(X)];
+%%%
+enc_opt({?DHCP_OP_REQ_PARAMS, []}) -> 
+    [];
+%%%
+enc_opt({?DHCP_OP_REQ_PARAMS, L}) when length(L)>0 -> 
+    [?DHCP_OP_REQ_PARAMS, length(L), l2b(L)];
+%%%
 enc_opt({Option, X}) when binary(X);list(X) ->
     [Option, sizeof(X), X].
 

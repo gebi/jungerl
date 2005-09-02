@@ -1,1 +1,1 @@
-DHCP_VSN=1.0
+DHCP_VSN=1.1

@@ -30,9 +30,9 @@
 
 %%--------------------------------------------------------------------
 %% External exports
--export([start/1, start_link/1, alloc/1, free/2]).
-%% Null callback functions
--export([trace_info/3, release/2]).
+-export([start/1, start_link/1, alloc/1, alloc/2, free/2]).
+%% Default callback functions
+-export([trace_info/3, release/2, is_address_inuse/2]).
 %% debug
 -export([test/0, figure_out_our_ipaddr/2]).
 
@@ -65,6 +65,7 @@
 
 
 -define(SELECT_TIMER,        30*1000).  % Timeout in SELECTING state (30 sec)
+-define(INUSE_TIMEOUT,       3000).     % Timeout for 'addr_inuse' test.
 
 %%% Calling the trace fun
 -define(DHCP_TRACEFUN(X, Str, Args), 
@@ -74,6 +75,9 @@
 -define(DHCP_RELEASE_CLIENT(X), 
 	spawn( fun() -> (X#lease.cb_mod):release(X#lease.cb_data, 
 						 X#lease.cli_ip) end)).
+%%% Calling the release fun
+-define(DHCP_IS_ADDR_INUSE(X,IP), 
+	(X#lease.cb_mod):is_address_inuse(X#lease.cb_data, IP)).
 
 %%% NOTE: We use one table to store two kinds of entries.
 %%% The lease entries and the UDP portmap entries.
@@ -104,7 +108,9 @@
 	  sock_opts = [],       % List of socket options
 	  v_class = "",
 	  s_pdu,                % last sent PDU (#dhcp{})
-	  r_pdu                 % last received PDU (#dhcp{})
+	  r_pdu,                % last received PDU (#dhcp{})
+	  resend_cnt = 0,       % resend counter, must be zero initially !!
+	  inuse_checking = false % is 'true' if we currently are doing inuse test
 	  }).
 
 %%% Port mapper entry
@@ -120,7 +126,8 @@
 %%% State record
 -record(s, {
 	  xid = 1,         % DHCP packet Id
-	  db_dir           % Database directory
+	  db_dir,          % Database directory
+	  mpids = []       % Monitored processes, [{Pid,Ref},...]
 	 }).
 
 %%====================================================================
@@ -146,9 +153,12 @@ free(Da, CliIp) when ?CHECK_DA(Da) ->
     gen_server:call(?SERVER, {free, Da, CliIp}, infinity).
 
 
+alloc(Da) ->
+    alloc(Da, self()).
 
-alloc(Da) when ?CHECK_DA(Da) ->
-    x_alloc(#dhcp{}, da2lease(Da)).
+alloc(Da, Owner) when ?CHECK_DA(Da),
+		      pid(Owner) ->
+    x_alloc(#dhcp{}, da2lease(Da), Owner).
 
 da2lease(Da) ->
     CbMod = if (Da#dhcp_alloc.cb_mod == #dhcp_alloc.cb_mod) ->
@@ -171,19 +181,27 @@ v_class(Da) ->
 	{Vc, _}  -> Vc
     end.
 
-x_alloc(D, X) ->
-    gen_server:call(?SERVER, {alloc, D, X, self()}, infinity).
+x_alloc(D, X, Owner) ->
+    gen_server:call(?SERVER, {alloc, D, X, Owner}, infinity).
 
-%%% Null trace function
+%%% Default trace function
 trace_info(_CbData, _Str, _Args) ->
-    %% true.
-    error_logger:info_msg(_Str, _Args).  % FIXME for debugging
+    error_logger:info_msg(_Str, _Args).
 
-%%% Null trace function
+%%% Default release function
 release(_CbData, ClientIp) ->
-    %% true.
-    error_logger:info_msg("Should release: ~p here!~n", [ClientIp]).  % FIXME for debugging
+    error_logger:info_msg("Should release: ~p here!~n", [ClientIp]).
 
+%%% Default is_address_inuse/2 function.
+%%% Returns 'true' if address already is in use, 'false' otherwise.
+%%% Note: we are waiting for an answer, no longer than 2 seconds.
+is_address_inuse(_CbData, {IP1,IP2,IP3,IP4}) ->
+    Cmd = io_lib:format("ping -w 2 -c 1 ~p.~p.~p.~p >/dev/null 2>&1 "
+			"&& echo true", [IP1, IP2, IP3, IP4]),
+    case lists:suffix("true\n", os:cmd(Cmd)) of
+	true -> false;
+	_    -> true
+    end.
 
 
 test() ->
@@ -244,7 +262,7 @@ open_dets_file(DbDir) ->
 	    free_leases(Leases),
 	    dets:close(?DB),
 	    ?elog("deleting old DHCP lease DB~n", []),
-	    ok = file:delete(Fname);
+	    file:delete(Fname);
 	false ->
 	    ok
     end,
@@ -265,8 +283,8 @@ lease_fname(DbDir) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
-handle_call({alloc, D, X, Pid}, From, State) ->
-    Ref = erlang:monitor(process, Pid),
+handle_call({alloc, D, X, Pid}, From, State0) ->
+    {State, Ref} = monitor_process(State0, Pid),
     Xid = ?XID(State#s.xid),
     Lease = X#lease{xid  = Xid, 
 		    ref  = Ref, 
@@ -288,6 +306,15 @@ handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
 
+
+%%% Just monitor a process once.
+monitor_process(State, Pid) ->
+    case lists:keysearch(Pid, 1, State#s.mpids) of
+	{value, {_,Ref}} -> {State, Ref};
+	_ ->
+	    Ref = erlang:monitor(process, Pid),
+	    {State#s{mpids = [{Pid,Ref} | State#s.mpids]}, Ref}
+    end.
 
 %%--------------------------------------------------------------------
 %% Function: handle_cast/2
@@ -322,10 +349,26 @@ handle_info({udp, _Sock, _Ip, ?DHCP_CLI_PORT, Pdu}, State) ->
     call_machine(State, D),
     {noreply, State};
 %%
-handle_info({'DOWN', _Ref, _Type, Pid, _Reason}, State) ->
+handle_info({addr_not_inuse, Xid, D}, State) ->
+    case dets:lookup(?DB, Xid) of
+	[X] -> address_ok(X, D);
+	_   -> false
+    end,
+    {noreply, State};
+%%
+handle_info({addr_is_inuse, Xid, D}, State) ->
+    case dets:lookup(?DB, Xid) of
+	[X] -> address_not_ok(X, D);
+	_   -> false
+    end,
+    {noreply, State};
+%%
+handle_info({'DOWN', Ref, _Type, Pid, _Reason}, State) ->
     %%?elog("cli_srv got DOWN msg: ~p~n", [_Reason]),
     release_leases(Pid),
-    {noreply, State};
+    Mpids = lists:keydelete(Pid, 1, State#s.mpids),
+    erlang:demonitor(Ref),
+    {noreply, State#s{mpids = Mpids}};
 %%
 handle_info({renew, Xid, T1}, State) ->
     %%?elog("cli_srv got RENEW: Xid=~p~n", [Xid]),
@@ -339,7 +382,10 @@ handle_info({rebind, Xid, T2}, State) ->
 %%
 handle_info({select_timer, Xid}, State) ->
     %%?elog("cli_srv got SelectTimer, Xid=: ~p~n", [Xid]),
-    select_another_srv(State, Xid),
+    case dets:lookup(?DB, Xid) of
+	[X] -> do_alloc(State, X, X#lease.s_pdu);
+	_   -> false
+    end,
     {noreply, State};
 %%
 handle_info(Info, State) ->
@@ -353,8 +399,7 @@ handle_info(Info, State) ->
 release_leases(Pid) when pid(Pid) ->
     Pattern = ets:fun2ms(fun(X = #lease{pid = C}) when C == Pid -> X end),
     F = fun(Lease) ->
-		free_lease(Lease),
-		dets:delete_object(?DB, Lease)
+		free_lease(Lease)
 	end,
     lists:foreach(F, dets:select(?DB, Pattern)).
 
@@ -451,21 +496,6 @@ add_vendor_class(X) ->
 	{Vc, _}  -> [{?DHCP_OP_VENDOR_CLASS, Vc}]
     end.
 
-%%% 
-%%% We have not got any reply from our earlier DHCPDISCOVER.
-%%% Let us try another server if possible, else fail.
-%%%
-select_another_srv(State, Xid) ->
-    case dets:lookup(?DB, Xid) of
-	[X] when ?IS_SELECTING(X), length(X#lease.srv_ips)>0 -> 
-	    do_alloc(State, X, X#lease.s_pdu);
-	[X] when ?IS_SELECTING(X), record(X, lease) ->
-	    dets:delete(?DB, Xid),
-	    gen_server:reply(X#lease.from, {error, "no contact with server(s)"});
-	_ ->
-	    false
-    end.
-
     
 do_renew(_State, Xid, T1) ->
     %% The client moves to RENEWING state and sends (via unicast)
@@ -526,6 +556,56 @@ call_machine(State, D) ->
     end.
 
 
+
+%%%
+%%% We end up here after we have done the 'is_addr_inuse' check.
+%%%
+address_ok(X, D) when X#lease.inuse_checking == true ->
+    ?DHCP_TRACEFUN(X,"got DHCPACK from server: ~s, in REQUESTING state",
+		   [dhcp_lib:ip2str(X#lease.srv_ip)]),
+    Opts = D#dhcp.options,
+    {T1, T2} = get_t1_t2(Opts),
+    %% Reply to client
+    Yiaddr = D#dhcp.yiaddr,
+    gen_server:reply(X#lease.from, {ok, Yiaddr, Opts}),
+    %%?elog("machine: enter state BOUND , Xid=~p, Ip=~p, T1=~p~n", 
+    %%  [X#lease.xid, Yiaddr, T1]),
+    
+    %% Set the Renewal timer
+    {ok, R1} = timer:send_after(T1 * 1000, ?SERVER, {renew, X#lease.xid, T1}),
+    
+    dets:insert(?DB, X#lease{state  = ?ST_BOUND,
+			     t1 = R1, t2 = T2 - T1,
+			     inuse_checking = false,
+			     r_pdu  = D});
+address_ok(_X, _) ->
+    ?elog("address_ok ignoring X=~p~n", [_X]),
+    false. % ignore timeout message...
+
+
+address_not_ok(X, D) when X#lease.inuse_checking == true ->
+    %% If the network address appears to be in use, the client 
+    %% MUST send a DHCPDECLINE message to the server. 
+    SrvId = X#lease.srv_ip,
+    ?DHCP_TRACEFUN(X,"got DHCPACK from server: ~s, address is in use already", 
+		   [dhcp_lib:ip2str(SrvId)]),
+    D1 = D#dhcp{msg_type = ?DHCPDECLINE,
+		options  = [{?DHCP_OP_CLIENT_ID, X#lease.xid}|
+			    add_vendor_class(X)]},
+    Pdu = dhcp_lib:enc(D1),
+    ?DHCP_TRACEFUN(X,"sending DHCPDECLINE to server: ~s", 
+		   [dhcp_lib:ip2str(SrvId)]),
+    udp_send(X, Pdu),
+    dets:insert(?DB, X#lease{state = ?ST_REQUESTING,
+			     inuse_checking = false,
+			     r_pdu = D, 
+			     s_pdu = D1});
+address_not_ok(_X, _) ->
+    ?elog("address_not_ok ignoring X=~p~n", [_X]),
+    false.  % ignore message, shouldn't happend...
+
+
+
 %%%--------------------------------------------------------------------
 %%%                T H E  S T A T E  M A C H I N E
 %%%
@@ -568,41 +648,7 @@ machine(_S,X,D) when ?IS_REQUESTING(X), ?IS_DHCPACK(D) ->
     %% the client is initialized and moves to BOUND state.
     %% The client SHOULD perform a check on the suggested 
     %% address to ensure that the address is not already in use.    
-    case is_addr_inuse(D) of
-	false ->
-	    ?DHCP_TRACEFUN(X,"got DHCPACK from server: ~s, in REQUESTING state",
-			   [dhcp_lib:ip2str(X#lease.srv_ip)]),
-	    Opts = D#dhcp.options,
-	    {T1, T2} = get_t1_t2(Opts),
-	    %% Reply to client
-	    Yiaddr = D#dhcp.yiaddr,
-	    gen_server:reply(X#lease.from, {ok, Yiaddr, Opts}),
-	    %%?elog("machine: enter state BOUND , Xid=~p, Ip=~p, T1=~p~n", 
-	    %%  [X#lease.xid, Yiaddr, T1]),
-
-	    %% Set the Renewal timer
-	    {ok, R1} = timer:send_after(T1 * 1000, ?SERVER, {renew, X#lease.xid, T1}),
-
-	    dets:insert(?DB, X#lease{state  = ?ST_BOUND,
-				     t1 = R1, t2 = T2 - T1,
-				     r_pdu  = D});
-	true ->
-	    %% If the network address appears to be in use, the client 
-	    %% MUST send a DHCPDECLINE message to the server. 
-	    SrvId = X#lease.srv_ip,
-	    ?DHCP_TRACEFUN(X,"got DHCPACK from server: ~s, address is in use already", 
-			   [dhcp_lib:ip2str(SrvId)]),
-	    D1 = D#dhcp{msg_type = ?DHCPDECLINE,
-			options  = [{?DHCP_OP_CLIENT_ID, X#lease.xid}|
-				    add_vendor_class(X)]},
-	    Pdu = dhcp_lib:enc(D1),
-	    ?DHCP_TRACEFUN(X,"sending DHCPDECLINE to server: ~s", 
-			   [dhcp_lib:ip2str(SrvId)]),
-	    udp_send(X, Pdu),
-	    dets:insert(?DB, X#lease{state = ?ST_REQUESTING,
-				     r_pdu = D, 
-				     s_pdu = D1})
-    end;
+    do_addr_inuse_test(X, D);
 %%
 machine(_S,X,D) when ?IS_RENEWING(X), ?IS_DHCPACK(D) ->
     %% Cancel Rebind timer
@@ -623,6 +669,7 @@ machine(_,_X,_D) ->
     %% FIXME , ignore this.
     %% We also have to use a timer here to do GC.
     ?elog("machine: In State=~p got Message=~p~n",[_X#lease.state, _D#dhcp.msg_type]),
+    ?elog("machine: X=~p +++ D=~p~n",[_X, _D]),
     false.
 
 get_t1_t2(Opts) ->
@@ -641,12 +688,35 @@ get_t2(Opts, T1) ->
 	_        -> {T1, trunc(T1 * 1.5)}
     end.
 
-%%% When broadcasting an ARP request for the suggested address,
-%%% the client must fill in its own hardware address as the sender's
-%%% hardware address, and 0 as the sender's IP address, to avoid
-%%% confusing ARP caches in other hosts on the same subnet.
-is_addr_inuse(_D) ->
-    false.                                   % FIXME
+%%%
+%%% Check if the IP address already is in use.
+%%%
+do_addr_inuse_test(X, D) ->
+    spawn_link(fun() -> check_if_addr_is_inuse(X, D) end),
+    timer:send_after(?INUSE_TIMEOUT, ?SERVER, {addr_not_inuse, X, D}),
+    dets:insert(?DB, X#lease{inuse_checking = true}).
+
+
+%%% With a hook here it is possible for the surrounding system
+%%% to do its own tailor made tests.
+%%% 
+%%% Note: This function must execute in a separate process so
+%%%       that is doesn't block the DHCP client-server.
+%%%
+check_if_addr_is_inuse(X, D) ->
+    Yiaddr = D#dhcp.yiaddr,
+    ?DHCP_TRACEFUN(X,"checking if IP address: ~s is in use", 
+		   [dhcp_lib:ip2str(Yiaddr)]),
+    case ?DHCP_IS_ADDR_INUSE(X, Yiaddr) of
+	false -> 
+	    ?DHCP_TRACEFUN(X,"IP address: ~s is NOT in use -- good", 
+			   [dhcp_lib:ip2str(Yiaddr)]),
+	    ?SERVER ! {addr_not_inuse, X#lease.xid, D};
+	_     -> 
+	    ?DHCP_TRACEFUN(X,"IP address: ~s IS in use -- bad", 
+			   [dhcp_lib:ip2str(Yiaddr)]),
+	    ?SERVER ! {addr_is_inuse, X#lease.xid, D}
+    end.
 
 get_bound_leases() ->
     F = fun(X, Acc) when X#lease.state == ?ST_BOUND ->
@@ -656,20 +726,42 @@ get_bound_leases() ->
 	end,
     dets:foldl(F, [], ?DB).
 
+%%%
+%%% Resend strategy: try every server three times.
+%%%
+get_srv_ip(X) when X#lease.srv_ips == [], X#lease.resend_cnt == 0 ->
+    {error, "no more DHCP servers to try"};
+get_srv_ip(X) when X#lease.resend_cnt == 0 ->
+    [SrvIp | SrvIps] = X#lease.srv_ips,
+    {ok, X#lease{resend_cnt = 3,
+		 srv_ip     = SrvIp,
+		 srv_ips    = SrvIps}};
+get_srv_ip(X) when X#lease.resend_cnt > 0 ->
+    {ok, X#lease{resend_cnt = X#lease.resend_cnt - 1}}.
 
-do_alloc(_State, X0, D0) ->
-    SrvIps = X0#lease.srv_ips,
-    SrvIp = hd(SrvIps),          % FIXME take care of all servers
+
+do_alloc(_State, X0, D) ->
+    case get_srv_ip(X0) of
+	{ok, X} ->
+	    do_alloc2(X, D);
+	{error, Emsg} ->
+	    ?DHCP_TRACEFUN(X0,"failed to send DHCPDISCOVER, reason: ~s",[Emsg]),
+	    gen_server:reply(X0#lease.from, {error, Emsg})
+    end.
+
+do_alloc2(X0, D0) -> 
+    SrvIp = X0#lease.srv_ip,
     case figure_out_our_ipaddr(SrvIp, X0) of
 	{ok, OurIp} ->
 	    X = X0#lease{giaddr = OurIp},
 	    D = D0#dhcp{giaddr  = OurIp},
 	    Opts = D#dhcp.options,
 	    Pdu = dhcp_lib:enc(D#dhcp{msg_type = ?DHCPDISCOVER,
-			      options  = [{?DHCP_OP_CLIENT_ID, X0#lease.xid}|
-					  add_vendor_class(X)++Opts]}),
+				      options  = [{?DHCP_OP_CLIENT_ID, X0#lease.xid}|
+						  add_vendor_class(X)++Opts]}),
+	    
 	    ?DHCP_TRACEFUN(X,"sending DHCPDISCOVER to server: ~s , giaddr: ~s",
-		   [dhcp_lib:ip2str(SrvIp), dhcp_lib:ip2str(OurIp)]),
+			   [dhcp_lib:ip2str(SrvIp), dhcp_lib:ip2str(OurIp)]),
 	    udp_send(X, Pdu, SrvIp),
 	    
 	    %% Set a timer here so that we won't end up hanging 
@@ -680,8 +772,6 @@ do_alloc(_State, X0, D0) ->
 	    X1 = X#lease{state   = ?ST_SELECTING, 
 			 t1      = R1,
 			 chaddr  = D#dhcp.chaddr,
-			 srv_ip  = SrvIp,
-			 srv_ips = tl(SrvIps),
 			 itime   = erlang:now()}, 
 	    dets:insert(?DB, X1);
 
@@ -689,6 +779,7 @@ do_alloc(_State, X0, D0) ->
 	    ?DHCP_TRACEFUN(X0,"failed to send DHCPDISCOVER, reason: ~s",[Emsg]),
 	    gen_server:reply(X0#lease.from, {error, Emsg})
     end.
+
 
 get_fd(X) ->
     SockOpts = X#lease.sock_opts,
@@ -746,7 +837,7 @@ figure_out_our_ipaddr(_ServIp, X) ->
 
 
 udp_send(X, Pdu) ->
-    udp_send(X, Pdu, hd(X#lease.srv_ips)).  % FIXME, should try all IPs !!
+    udp_send(X, Pdu, X#lease.srv_ip).
 
 udp_send(X, Pdu, SrvIp) ->
     gen_udp:send(X#lease.fd,

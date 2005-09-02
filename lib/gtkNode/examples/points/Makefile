@@ -1,4 +1,5 @@
 ERLC = erlc
+ERL_FLAGS = +debug_info
 ERLS = $(wildcard *.erl)
 BEAMS = $(patsubst %.erl, %.beam, $(ERLS))
 
@@ -11,4 +12,4 @@ clean:
 	rm *.beam
 
 %.beam : %.erl
-	$(ERLC) $<
+	$(ERLC) $(ERL_FLAGS) $<

@@ -1,11 +1,51 @@
 #!/bin/bash
 
-# this ought to be a lot cleverer; e.g. check in g*_generated.h
+# we choose the wrappers that have the highest minor version that is
+# less or equal to the minor version of our GTK
+# major version number must be 2
+# micro version number ignored
 
 vsn=`pkg-config --modversion gtk+-2.0`
-if [[ $vsn < "2" ]]; then 
+major=`echo $vsn|cut -f1 -d"."`
+minor=`echo $vsn|cut -f2 -d"."`
+
+if [[ $major != "2" ]]; then 
     echo "seems there's something wrong with your gtk2-installation..."
     exit 1
 else
-    echo "you have GTK version "$vsn". be happy."
+    echo "you have GTK version "$vsn
+    for v in ../priv/gen/g_generated-$major.*.h; do 
+	if [ -f $v ]; then
+	    tmin=`echo $v|cut -f4 -d"."`
+	    tmic=`echo $v|cut -f5 -d"."`
+	    echo -n "found wrappers for "$major.$tmin.$tmic
+	    if [ $tmin -le $minor ]; then
+		echo " ...ok"
+		min=$tmin; mic=$tmic
+	    else
+		echo " ...bad"
+	    fi
+	fi
+    done
 fi
+if [ -z $mic ]; then
+    echo "couldn't find any fitting gtkNode wrappers. try 'make generate'"
+    exit 2
+else
+    echo "using gtkNode wrappers from GTK-"$major.$min.$mic
+    for g in g gdk gtk; do 
+	f=../priv/gen/${g}_generated-$major.$min.$mic.h
+	if [ -f $f ]; then
+	    targ=../priv/gen/${g}_generated.h
+	    if ( ! diff -q $f $targ >/dev/null ); then
+		echo "updating "`basename $targ`" from "$major.$min.$mic
+		rm -f $targ
+		cp $f $targ
+	    fi
+	else
+	    echo "missing file "$f
+	    exit 3
+	fi
+    done
+fi
+exit 0

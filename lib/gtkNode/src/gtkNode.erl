@@ -64,7 +64,7 @@ make_cmd(Name) ->
     Path = join([dirname(dirname(code:which(?MODULE))),priv,bin]),
     Bin = "gtkNode-"++atom_to_list(OS),
     case os:find_executable(Bin,Path) of
-	false -> erlang:error({executable_no_found,Bin});
+	false -> erlang:fault({executable_no_found,Bin});
 	Exe -> 
 	    [Node,Host] = string:tokens(atom_to_list(node()),"@"),
 	    Cookie = atom_to_list(erlang:get_cookie()),

@@ -31,10 +31,10 @@ init() ->
 
 loop(LD) ->
     receive
+	{?MODULE,{signal,{drawingarea,'GDK_EXPOSE'}}} -> loop(redraw(LD));
 	{?MODULE,{signal,{button_red,_}}} ->   loop(point(LD,red));
 	{?MODULE,{signal,{button_green,_}}} -> loop(point(LD,green));
 	{?MODULE,{signal,{button_blue,_}}} ->  loop(point(LD,blue));
-	{?MODULE,{signal,{drawingarea,'GDK_EXPOSE'}}} -> loop(redraw(LD));
 	{?MODULE,{signal,{button_quit,_}}} ->quit();
 	{?MODULE,{signal,{window,'GDK_DELETE'}}} -> quit();
 	quit -> quit();
@@ -63,6 +63,7 @@ init_gui() -> %% init
     g(Pixmap,'Gdk_draw_rectangle', [GC, true, 0, 0, -1, -1]),
     redraw(#ld{win=Win,gc=GC,pixmap=Pixmap}),
     #ld{win=Win,gc=GC,pixmap=Pixmap}.
+
 alloc_colors(GC,Cols) ->
     ColorMap = g(GC,'Gdk_gc_get_colormap',[]),
     lists:foreach(fun(Col) -> alloc_color(ColorMap,Col) end, Cols).

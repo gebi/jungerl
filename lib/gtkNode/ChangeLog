@@ -1,4 +1,17 @@
+2005-09-02  Mats Cronqvist  <locmacr@mwlx084>
+
+	* src/check (Module): smarter. compares version of GTK with
+	versions of wrappers, copies the best wrappers to priv/gen/*.h
+
+2005-08-31  Mats Cronqvist  <locmacr@mwlx084>
+
+	* examples/points/Makefile (Module): +debug_info
+
+	* src/gtkNode.erl (make_cmd/1): changed call error/1 to fault1/
+
 2005-08-30  Mats Cronqvist  <locmacr@mwlx084>
+
+	* :> Committed
 
 	* src/gtkNode_marshal.c (Module): added get_arg_struct
 

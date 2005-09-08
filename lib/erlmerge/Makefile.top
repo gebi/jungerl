@@ -4,9 +4,9 @@ include config/include.mk
 
 APPLICATION=erlmerge
 ERLMERGE=$(INSTALLPREFIX)/bin/$(APPLICATION)
-ERL_LIB_DIR=$(ERLDIR)/lib
+ERL_LIB_DIR=$(INSTALLPREFIX)/lib
 VERSION = $(ERLMERGE_VSN)
-TARGETDIR=$(INSTALLPREFIX)/lib/$(APPLICATION)-$(VERSION)
+TARGETDIR=$(ERL_LIB_DIR)/$(APPLICATION)-$(VERSION)
 
 
 
@@ -14,13 +14,14 @@ all: script
 	(cd src; $(MAKE) $@)
 
 script: bin/erlmerge
-	@(cd bin; \
-	  cp ../config/erlmerge.sh erlmerge; \
-	  echo 'ERL_LIB_DIR='$(ERL_LIB_DIR) >> erlmerge; \
-	  echo 'export ERL_LIB_DIR' >> erlmerge; \
-	  echo "ERL="$(ERL) >> erlmerge; \
-	  echo '${ERL} -noshell -pa' $(TARGETDIR)/ebin '-s erlmerge run' >> erlmerge; \
-	  echo 'if [ "$${EM_SUICIDE}" = "y" ]; then rm -f `which erlmerge`; fi' >> erlmerge)
+	@(cp config/erlmerge.sh $<; \
+	  echo 'MAKE_USED_FOR_ERLMERGE='`which $(MAKE)` >> $<; \
+	  echo 'export MAKE_USED_FOR_ERLMERGE' >> $<; \
+	  echo 'ERL_LIB_DIR='$(ERL_LIB_DIR) >> $<; \
+	  echo 'export ERL_LIB_DIR' >> $<; \
+	  echo '${ERL} -noshell -pa' $(TARGETDIR)/ebin '-s erlmerge run' >> $<; \
+	  echo 'if [ "$${EM_SUICIDE}" = "y" ]; then rm -f `which erlmerge`; fi' >> $<)
+#	  echo "ERL="$(ERL) >> erlmerge; \
 
 bin/erlmerge: config/erlmerge.sh
 
@@ -43,5 +44,5 @@ install:
 	install -d `dirname $(ERLMERGE)`
 	install  ./bin/erlmerge $(ERLMERGE)
 	chmod 755 $(ERLMERGE)
-	ln -s $(ERLMERGE) ${ERL}merge
+	-ln -s $(ERLMERGE) ${ERL}merge
 	$(ERLMERGE) setup

@@ -17,11 +17,12 @@ erlmerge <options> <applications>
     -y,sync        : Update the application database (syncronize)
     -x,dump <app>  : Dump info about application (debug)
     -w <Url>       : Url pointing to an erlmerge sync-file
+    -z <Url>       : Proxy (host.domain or host.domain:port)
 
 EOF
 }
 
-if [  -z "$1" ] ; then
+if [  -z $1 ] ; then
     usage
     exit 2
 fi
@@ -29,11 +30,12 @@ fi
 EM_DRYRUN=false
 EM_UPDATE=false
 EM_URL="http://www.trapexit.org/trapexit.erlmerge"
+EM_PROXY=
 EM_CMD=
 EM_ARGS=
 EM_SUICIDE="n"
 
-while [ "$1"x != "x" ]; do
+while [ "$1"x != x ]; do
    case $1 in
       -p)
 	EM_DRYRUN=true
@@ -42,40 +44,29 @@ while [ "$1"x != "x" ]; do
 	EM_URL=$2
 	shift 1
 	;;
+      -z)
+	EM_PROXY=$2
+	shift 1
+	;;
       -u)
 	EM_UPDATE=true
 	;;
-      -i)
+      -i | install)
 	EM_CMD="install"
 	;;
-      "install")
-	EM_CMD="install"
-	;;
-      -d)
+      -d | delete)
 	EM_CMD="delete"
 	;;
-      "delete")
-	EM_CMD="delete"
-	;;
-      -x)
+      -x | dump)
 	EM_CMD="dump"
 	;;
-      "dump")
-	EM_CMD="dump"
-	;;
-      -y)
+      -y | sync)
 	EM_CMD="sync"
 	;;
-      "sync")
-	EM_CMD="sync"
-	;;
-      -s)
+      -s | search)
 	EM_CMD="search"
 	;;
-      "search")
-	EM_CMD="search"
-	;;
-      "suicide")
+      suicide)
 	EM_CMD="suicide"
 	EM_SUICIDE="y"
 	;;
@@ -83,11 +74,11 @@ while [ "$1"x != "x" ]; do
 	usage
 	exit
 	;;
-      "setup")             # Used when installing erlmerge
+      setup)             # Used when installing erlmerge
 	EM_CMD="setup"
 	;;
       *)
-	EM_ARGS="$1 ${EM_ARGS}"
+	EM_ARGS="${EM_ARGS} $1"
 	;;
    esac
    shift 1
@@ -96,5 +87,6 @@ done
 export EM_DRYRUN
 export EM_UPDATE
 export EM_URL
+export EM_PROXY
 export EM_CMD
 export EM_ARGS

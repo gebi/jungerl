@@ -32,7 +32,7 @@
 %% External exports
 -export([start/1, start_link/1, alloc/1, alloc/2, free/2]).
 %% Default callback functions
--export([trace_info/3, release/2, is_address_inuse/2]).
+-export([trace_info/3, release/2, is_address_inuse/3]).
 %% debug
 -export([test/0, figure_out_our_ipaddr/2]).
 
@@ -77,7 +77,8 @@
 						 X#lease.cli_ip) end)).
 %%% Calling the release fun
 -define(DHCP_IS_ADDR_INUSE(X,IP), 
-	(X#lease.cb_mod):is_address_inuse(X#lease.cb_data, IP)).
+	(X#lease.cb_mod):is_address_inuse(X#lease.cb_data, IP,
+					  X#lease.sock_opts)).
 
 %%% NOTE: We use one table to store two kinds of entries.
 %%% The lease entries and the UDP portmap entries.
@@ -120,7 +121,7 @@
 	  fd}).
 
 
--define(MAX_XID,   9753135).  % FIXME , should be 2**31 -1  ?
+-define(MAX_XID, 2147483647).   % 2**31 -1 
 
 -define(XID(I), ((I) rem ?MAX_XID)).
 
@@ -196,7 +197,7 @@ release(_CbData, ClientIp) ->
 %%% Default is_address_inuse/2 function.
 %%% Returns 'true' if address already is in use, 'false' otherwise.
 %%% Note: we are waiting for an answer, no longer than 2 seconds.
-is_address_inuse(_CbData, {IP1,IP2,IP3,IP4}) ->
+is_address_inuse(_CbData, {IP1,IP2,IP3,IP4}, _SockOpts) ->
     Cmd = io_lib:format("ping -w 2 -c 1 ~p.~p.~p.~p >/dev/null 2>&1 "
 			"&& echo true", [IP1, IP2, IP3, IP4]),
     case lists:suffix("true\n", os:cmd(Cmd)) of
@@ -475,20 +476,23 @@ free_leases(Leases) ->
 free_lease(Lease) ->
     ?DHCP_TRACEFUN(Lease,"de-allocating IP address: ~s", 
 		   [dhcp_lib:ip2str(Lease#lease.cli_ip)]),
-    ?elog("DHCP de-allocating IP address: ~s~n", 
-	  [dhcp_lib:ip2str(Lease#lease.cli_ip)]),
+%%    ?elog("DHCP de-allocating IP address: ~s~n", 
+%%	  [dhcp_lib:ip2str(Lease#lease.cli_ip)]),
     Xid = Lease#lease.xid,
     D = #dhcp{xid      = Xid,
 	      msg_type = ?DHCPRELEASE,
 	      ciaddr   = Lease#lease.cli_ip,
 	      giaddr   = Lease#lease.giaddr,
 	      chaddr   = Lease#lease.chaddr,
-	      options  = [{?DHCP_OP_CLIENT_ID, Xid},
+	      options  = [{?DHCP_OP_CLIENT_ID, client_id(Xid)},
 			  {?DHCP_OP_REQ_PARAMS, Lease#lease.requested_ops}|
 			  add_vendor_class(Lease)]},
     Pdu = dhcp_lib:enc(D),
     udp_send(Lease, Pdu, Lease#lease.srv_ip),
     dets:delete_object(?DB, Lease).
+
+client_id(Xid) ->
+    list_to_binary(integer_to_list(Xid)++":"++atom_to_list(node())).
 
 
 add_vendor_class(X) ->
@@ -514,7 +518,7 @@ do_renew(_State, Xid, T1) ->
 		      ciaddr   = X#lease.cli_ip,
 		      giaddr   = X#lease.giaddr,
 		      chaddr   = X#lease.chaddr,
-		      options  = [{?DHCP_OP_CLIENT_ID, Xid},
+		      options  = [{?DHCP_OP_CLIENT_ID, client_id(Xid)},
 				  {?DHCP_OP_REQ_PARAMS, X#lease.requested_ops}|
 				  add_vendor_class(X)]},
 	    Pdu = dhcp_lib:enc(D),
@@ -593,7 +597,7 @@ address_not_ok(X, D) when X#lease.inuse_checking == true ->
     ?DHCP_TRACEFUN(X,"got DHCPACK from server: ~s, address is in use already", 
 		   [dhcp_lib:ip2str(SrvId)]),
     D1 = D#dhcp{msg_type = ?DHCPDECLINE,
-		options  = [{?DHCP_OP_CLIENT_ID, X#lease.xid},
+		options  = [{?DHCP_OP_CLIENT_ID, client_id(X#lease.xid)},
 			    {?DHCP_OP_REQ_PARAMS, X#lease.requested_ops}|
 			    add_vendor_class(X)]},
     Pdu = dhcp_lib:enc(D1),
@@ -629,7 +633,7 @@ machine(_S,X,D) when ?IS_SELECTING(X), ?IS_DHCPOFFER(D) ->
 		       giaddr   = X#lease.giaddr,
 		       chaddr   = X#lease.chaddr,
 		       options  = [{?DHCP_OP_SRV_ID, SrvId},
-				   {?DHCP_OP_CLIENT_ID, D#dhcp.xid},
+				   {?DHCP_OP_CLIENT_ID, client_id(D#dhcp.xid)},
 				   {?DHCP_OP_REQUESTED_IP, D#dhcp.yiaddr},
 				   {?DHCP_OP_REQ_PARAMS, X#lease.requested_ops}|
 				   add_vendor_class(X)]},
@@ -762,7 +766,7 @@ do_alloc2(X0, D0) ->
 	    D = D0#dhcp{giaddr  = OurIp},
 	    Opts = D#dhcp.options,
 	    Pdu = dhcp_lib:enc(D#dhcp{msg_type = ?DHCPDISCOVER,
-				      options  = [{?DHCP_OP_CLIENT_ID, X#lease.xid},
+				      options  = [{?DHCP_OP_CLIENT_ID, client_id(X#lease.xid)},
 						  {?DHCP_OP_REQ_PARAMS, X#lease.requested_ops}|
 						  add_vendor_class(X)++Opts]}),
 	    

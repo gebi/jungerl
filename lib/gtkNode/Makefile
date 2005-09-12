@@ -1,4 +1,4 @@
-.PHONY: default all clean generate tarfile
+.PHONY: default all clean realclean generate
 
 default: all
 
@@ -15,8 +15,3 @@ realclean: clean
 
 generate:
 	$(MAKE) -C priv/generator
-
-tarfile:
-	tar -czf gtkNode.tgz -C .. -P \
-	--exclude="*~" --exclude="CVS" --exclude=".cvs*" --exclude=gtkNode.tgz \
-	gtkNode

@@ -262,7 +262,12 @@ open_dets_file(DbDir) ->
 	    dets:open_file(?DB, [{file, Fname}, {keypos, 2}]), 
 	    Leases = get_bound_leases(),
 	    free_leases(Leases),
+	    maybe_release_leases(Leases),
 	    dets:close(?DB),
+	    lists:foreach(fun(X) ->
+				  ?elog("DHCP de-allocating IP address: ~s~n", 
+					[dhcp_lib:ip2str(X#lease.cli_ip)])
+			  end, Leases),
 	    ?elog("deleting old DHCP lease DB~n", []),
 	    file:delete(Fname);
 	false ->
@@ -274,6 +279,16 @@ open_dets_file(DbDir) ->
 lease_fname(DbDir) ->
     filename:join([DbDir, ?DHCP_LEASES_FNAME]).
 
+maybe_release_leases(Leases) ->
+    case init:get_status() of
+	{started, started} ->
+	    %% This is due to a restart of the dhcp_cli_src process
+	    lists:foreach(fun(X) -> ?DHCP_RELEASE_CLIENT(X) end,
+			  Leases);
+	_ ->
+	    %% Cold start
+	    ok
+    end.
 
 %%--------------------------------------------------------------------
 %% Function: handle_call/3
@@ -742,7 +757,7 @@ get_srv_ip(X) when X#lease.srv_ips == [], X#lease.resend_cnt == 0 ->
     {error, "no more DHCP servers to try"};
 get_srv_ip(X) when X#lease.resend_cnt == 0 ->
     [SrvIp | SrvIps] = X#lease.srv_ips,
-    {ok, X#lease{resend_cnt = 3,
+    {ok, X#lease{resend_cnt = 2,
 		 srv_ip     = SrvIp,
 		 srv_ips    = SrvIps}};
 get_srv_ip(X) when X#lease.resend_cnt > 0 ->
@@ -770,8 +785,11 @@ do_alloc2(X0, D0) ->
 						  {?DHCP_OP_REQ_PARAMS, X#lease.requested_ops}|
 						  add_vendor_class(X)++Opts]}),
 	    
-	    ?DHCP_TRACEFUN(X,"sending DHCPDISCOVER to server: ~s , giaddr: ~s",
-			   [dhcp_lib:ip2str(SrvIp), dhcp_lib:ip2str(OurIp)]),
+	    ?DHCP_TRACEFUN(X,
+			   "~ssending DHCPDISCOVER to server: ~s "
+			   ", giaddr: ~s",
+			   [resend_str(X#lease.resend_cnt),
+			    dhcp_lib:ip2str(SrvIp), dhcp_lib:ip2str(OurIp)]),
 	    udp_send(X, Pdu, SrvIp),
 	    
 	    %% Set a timer here so that we won't end up hanging 
@@ -782,6 +800,7 @@ do_alloc2(X0, D0) ->
 	    X1 = X#lease{state   = ?ST_SELECTING, 
 			 t1      = R1,
 			 chaddr  = D#dhcp.chaddr,
+			 s_pdu   = D,
 			 itime   = erlang:now()}, 
 	    dets:insert(?DB, X1);
 
@@ -790,6 +809,8 @@ do_alloc2(X0, D0) ->
 	    gen_server:reply(X0#lease.from, {error, Emsg})
     end.
 
+resend_str(2) -> "";
+resend_str(_) -> "re-".
 
 get_fd(X) ->
     SockOpts = X#lease.sock_opts,

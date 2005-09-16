@@ -60,7 +60,7 @@
 
 %% internal exports
 -export([control/2]).
--export([auth/2]).
+-export([auth/2, event/1]).
 
 -import(lists, [reverse/1, map/2, append/1, foreach/2, foldl/3]).
 
@@ -110,7 +110,10 @@
 	  state = undefined,           %% state to be remembered between cmds
 	  iconv_cd_to_utf8,
 	  iconv_cd_from_utf8,
-	  use_utf8 = true
+	  use_utf8 = true,
+	  sys_ops = 0,                 %% allowed operations, default=none !!
+	  jail = true,                 %% do not allow '..' in RETR path
+	  event_mod                    %% call <event_mod>:event(Event) sometimes...
 	 }).
 
 -define(HAS_ICONV(St), ((St)#cstate.iconv_cd_from_utf8 /= undefined)).
@@ -178,6 +181,16 @@ options([Opt | Opts], S) ->
 	    options(Opts, S#sconf { use_utf8_by_default = Bool });
 	{greeting_file, File} ->
 	    options(Opts, S#sconf { greeting_file = File });
+	{use_fd_srv, Bool} when Bool==true ; Bool==false ->
+	    options(Opts, S#sconf { use_fd_srv = Bool });
+	{event_mod, Mod} when atom(Mod) ->
+	    options(Opts, S#sconf{event_mod = Mod});
+	{auth_mod, Mod} when atom(Mod) ->
+	    options(Opts, S#sconf{auth_mod = Mod});
+	{jail, Bool} when Bool==true ; Bool==false ->
+	    options(Opts, S#sconf{jail = Bool});
+	{sys_ops, SysOps} when integer(SysOps) ->
+	    options(Opts, S#sconf{sys_ops = SysOps});
 	_ ->
 	    {error, {bad_option, Opt}}
     end;
@@ -205,7 +218,7 @@ mk_acl_flags(ACL) ->
 init([SConf]) ->
     TcpOpts = [{active,false},{nodelay,true},
 	       {reuseaddr,true},{ip,SConf#sconf.ip}],
-    case gen_tcp:listen(SConf#sconf.port, TcpOpts) of
+    case listen_socket(SConf#sconf.port, TcpOpts, SConf#sconf.use_fd_srv) of
 	{ok,Listen} ->
 	    process_flag(trap_exit, true),
 	    St = #state{sconf = SConf, listen = Listen},
@@ -226,6 +239,19 @@ init([SConf]) ->
 	{error, Error} -> 
 	    {stop, Error}
     end.
+
+listen_socket(Port, Opts, true) ->
+    case fdsrv:bind_socket(tcp, Port) of
+	{ok, Fd} ->
+	    gen_tcp:listen(Port, [{fd, Fd} | Opts]);
+	Error ->
+	    error_logger:info_msg("Couldn't open socket, port=~p: ~p~n",
+				  [Port, Error]),
+	    {error, "fdsrv:bind_socket/2 failed"}
+    end;
+listen_socket(Port, Opts, false) ->
+    gen_tcp:listen(Port, Opts).
+
 
 handle_call({is_allowed, Addr, _Port}, _From, St) ->
     ?dbg("ftpd: is_allowed ? ~p:~p~n", [Addr,_Port]),
@@ -273,6 +299,12 @@ auth(_User, _Pass) ->
     false.
 
 %%
+%% Default event module callbacks
+%%
+event(_Event) ->
+    false.
+
+%%
 %% Control channel setup
 %%
 control(Srv, Listen) ->
@@ -304,7 +336,7 @@ control_init(Ctl) ->
 
 ctl_loop_init(Ctl, {ClientIP, _Port} = DefaultDataPort) ->
     rsend(Ctl,220, [call({getcfg, #sconf.servername}),
-		    " Erlang Ftp server " ?FTPD_VSN " ready."]),
+		    " Ftp server ready."]),
     ctl_loop(Ctl,#cstate{rootwd = call({getcfg, #sconf.rootdir}),
 			 idle_timeout = call({getcfg, #sconf.idle_timeout}),
 			 use_utf8 = call({getcfg, #sconf.use_utf8_by_default}),
@@ -314,7 +346,11 @@ ctl_loop_init(Ctl, {ClientIP, _Port} = DefaultDataPort) ->
 						    #state.iconv_cd_from_utf8}),
 			 client_ip = ClientIP,
 			 data_port = DefaultDataPort,
-			 def_data_port = DefaultDataPort }, []).
+			 def_data_port = DefaultDataPort,
+			 sys_ops = call({getcfg, #sconf.sys_ops}),
+			 jail = call({getcfg, #sconf.jail}),
+			 event_mod = call({getcfg, #sconf.event_mod})
+			}, []).
 
 -ifdef(debug).
 -define(dbg_save_line(Line), put(line, Line)).
@@ -484,10 +520,18 @@ pass(Password, Ctl, St) ->
 	    St;
 	UserName ->
 	    AuthMod = call({getcfg, #sconf.auth_mod}),
-	    case AuthMod:auth(St#cstate.user, Password) of
+	    case AuthMod:auth(UserName, Password) of
 		true ->
 		    rsend(Ctl, 230, ["User ", UserName, " logged in, proceed"]),
 		    St#cstate{ust = valid};
+		{true, Root, DirAccess} ->
+		    ?dbg("Auth successful, DirAccess=~p~n", [DirAccess]),
+		    Access = [{Dir, mk_acl_flags(ACL)} || {Dir, ACL} <- DirAccess],
+		    ?dbg("Access=~p , UserName=~p~n", [Access, UserName]),
+		    U2 = #user{name = UserName, access = Access},
+		    ?dbg("U2=~p~n", [U2]),
+		    rsend(Ctl, 230, ["User ", UserName, " logged in, proceed"]),
+		    St#cstate{ust = valid, rootwd = Root, user = U2};
 		false ->
 		    rsend(Ctl, 530, "Login incorrect"),
 		    St
@@ -498,6 +542,7 @@ pass(Password, Ctl, St) ->
 %% so that symbolic links are transparent).
 cwd(Arg, Ctl, St) ->
     assert_valid(Ctl, St),
+    auth_op(Ctl, ?OP_CWD, St),
     Dir = rel_name(Arg, St#cstate.wd),
     assert_exists(Ctl, St#cstate.rootwd, Dir, directory),
     rsend(Ctl, 250, ["new directory \"", abs_name(Dir), "\""]),
@@ -506,6 +551,7 @@ cwd(Arg, Ctl, St) ->
 %% Change to parent directory
 cdup(_Arg, Ctl, St) ->
     assert_valid(Ctl, St),
+    auth_op(Ctl, ?OP_CDUP, St),
     DirR = rel_name("..", St#cstate.wd),
     DirA = abs_name(DirR),
     assert_exists(Ctl, St#cstate.rootwd, DirR, directory),
@@ -514,6 +560,7 @@ cdup(_Arg, Ctl, St) ->
 
 pwd(_Arg, Ctl, St) ->
     assert_valid(Ctl, St),
+    auth_op(Ctl, ?OP_PWD, St),
     rsend(Ctl, 257, ["\"", abs_name(St#cstate.wd), "\""]),
     St.
 
@@ -528,6 +575,7 @@ rein(_, _Ctl, St) ->
 
 clnt(Arg, Ctl, St) ->
     assert_valid(Ctl, St),
+    auth_op(Ctl, ?OP_CLNT, St),
     rsend(Ctl, 200),
     St#cstate{client = Arg}.
 
@@ -537,6 +585,7 @@ clnt(Arg, Ctl, St) ->
 port(Arg, Ctl, St) ->
     assert_valid(Ctl, St),
     assert_arg(Ctl, Arg),
+    auth_op(Ctl, ?OP_PORT, St),
     St1 = close_listen(St),
     case parse_address(Arg) of
 	{ok, {Addr, Port} = AddrPort} when Addr == St#cstate.client_ip,
@@ -579,6 +628,7 @@ type(Arg, Ctl, St) ->
 stru(Arg, Ctl, St) ->    
     assert_valid(Ctl, St),
     assert_arg(Ctl, Arg),
+    auth_op(Ctl, ?OP_STRU, St),
     case alpha(hd(Arg)) of
 	$f ->
 	    rsend(Ctl, 200, ["new file structure ", [hd(Arg)]]);
@@ -611,8 +661,9 @@ mode(Arg, Ctl, St) ->
 retr(Arg, Ctl, St) ->
     assert_valid(Ctl, St),
     assert_arg(Ctl, Arg),
+    auth_op(Ctl, ?OP_RETR, St),
     NameR = rel_name(from_utf8(Arg,St), St#cstate.wd),
-    Name = filename:join(St#cstate.rootwd, NameR),
+    Name = jail(Ctl, filename:join(St#cstate.rootwd, NameR), St),
     authorize(?AUTH_READ, abs_name(NameR), Ctl, St),
     case file:open(Name, [read | file_mode(St)]) of
 	{ok,Fd} ->
@@ -640,11 +691,29 @@ retr(Arg, Ctl, St) ->
 	    end,
 	    gen_tcp:close(Data),
 	    file:close(Fd),
+	    catch (St#cstate.event_mod):event({retr, Name}),
 	    St1;
 	{error,Err} ->
 	    rsend(Ctl,550, ["error ", erl_posix_msg:message(Err)]),
 	    St
     end.
+
+%%%
+%%% If jail=true then deny any '..' in the path.
+%%% Else, return <name>
+%%%
+jail(Ctl, Name, St) when St#cstate.jail == true ->
+    case string:str(Name, "..") of
+	I when I > 0 ->
+	    rsend(Ctl, 450, "'..' not allowed in path"),
+	    throw(failed);
+	0 ->
+	    Name
+    end;
+jail(_Ctl, Name, _St) ->
+    Name.
+	    
+    
 
 %%
 %% store file from data connection onto file given by Arg
@@ -652,24 +721,27 @@ retr(Arg, Ctl, St) ->
 stor(Arg, Ctl, St) ->
     assert_valid(Ctl, St),
     assert_arg(Ctl, Arg),
+    auth_op(Ctl, ?OP_STOR, St),
     NameR = rel_name(from_utf8(Arg,St), St#cstate.wd),
     authorize(?AUTH_WRITE, abs_name(NameR), Ctl, St),
-    Name = filename:join(St#cstate.rootwd, NameR),
+    Name = jail(Ctl, filename:join(St#cstate.rootwd, NameR), St),
     do_store(Name, Ctl, St, stor).
 
 stou(_Arg, Ctl, St) ->
     assert_valid(Ctl, St),
+    auth_op(Ctl, ?OP_STOU, St),
     authorize(?AUTH_WRITE, St#cstate.wd, Ctl, St),
-    Dir = filename:join(St#cstate.rootwd, St#cstate.wd),
+    Dir = jail(Ctl, filename:join(St#cstate.rootwd, St#cstate.wd), St),
     Fd = generate_unique(call({getcfg, #sconf.unique_prefix}), Dir, Ctl, St),
     do_store_fd(Fd, Ctl, St).
 
 appe(Arg, Ctl, St) ->
     assert_valid(Ctl, St),
     assert_arg(Ctl, Arg),
+    auth_op(Ctl, ?OP_APPE, St),
     NameR = rel_name(from_utf8(Arg,St), St#cstate.wd),
     authorize(?AUTH_WRITE, abs_name(NameR), Ctl, St),
-    Name = filename:join(St#cstate.rootwd, NameR),
+    Name = jail(Ctl, filename:join(St#cstate.rootwd, NameR), St),
     do_store(Name, Ctl, St, appe).
     
 do_store(Name, Ctl, St, Cmd) ->
@@ -689,6 +761,7 @@ do_store(Name, Ctl, St, Cmd) ->
 		_ ->
 		    ok
 	    end,
+	    put(name, Name),
 	    do_store_fd(Fd, Ctl, St);
 	{error,Err} ->
 	    rsend(Ctl,550, ["error ", erl_posix_msg:message(Err)]),
@@ -700,7 +773,9 @@ do_store_fd(Fd, Ctl, St) ->
     case recv_file(Data, 1024, 0, Fd) of
 	{ok,Count} ->
 	    rsend(Ctl,226, ["closing data connection, received ",
-			    integer_to_list(Count), " bytes"]);
+			    integer_to_list(Count), " bytes"]),
+	    %% ugly...
+	    catch (St#cstate.event_mod):event({store, get(name), St#cstate.rootwd});
 	{error,Err} ->
 	    rsend(Ctl,226, "closing data connection, aborted"),
 	    rsend(Ctl,550, ["error ", erl_posix_msg:message(Err)])
@@ -717,6 +792,7 @@ allo(_Arg, Ctl, St) ->
 rest(Arg, Ctl, St) -> 
     assert_valid(Ctl, St),
     assert_arg(Ctl, Arg),
+    auth_op(Ctl, ?OP_REST, St),
     case type(St) of
 	ascii ->
 	    rsend(Ctl, 501, "REST not allowed in ASCII mode"),
@@ -733,9 +809,10 @@ rest(Arg, Ctl, St) ->
 rnfr(Arg, Ctl, St) ->
     assert_valid(Ctl, St),
     assert_arg(Ctl, Arg),
+    auth_op(Ctl, ?OP_RFNR, St),
     NameR = rel_name(from_utf8(Arg,St), St#cstate.wd),
     authorize(?AUTH_DELETE, abs_name(NameR), Ctl, St),
-    Name = filename:join(St#cstate.rootwd, NameR),
+    Name = jail(Ctl, filename:join(St#cstate.rootwd, NameR), St),
     case file:read_file_info(Name) of
 	{ok, _} ->
 	    rsend(Ctl, 350, "File ok, send RNTO to rename"),
@@ -748,9 +825,10 @@ rnfr(Arg, Ctl, St) ->
 rnto(Arg, Ctl, St) ->
     assert_valid(Ctl, St),
     assert_arg(Ctl, Arg),
+    auth_op(Ctl, ?OP_RNTO, St),
     NameR = rel_name(from_utf8(Arg,St), St#cstate.wd),
     authorize(?AUTH_WRITE, abs_name(NameR), Ctl, St),
-    Name = filename:join(St#cstate.rootwd, NameR),
+    Name = jail(Ctl, filename:join(St#cstate.rootwd, NameR), St),
     case St#cstate.state of
 	{rename_from, From} ->
 	    case file:rename(From, Name) of
@@ -777,11 +855,12 @@ rnto(Arg, Ctl, St) ->
 
 dele(Arg, Ctl, St) ->
     assert_valid(Ctl, St),
+    auth_op(Ctl, ?OP_DELE, St),
     assert_arg(Ctl, Arg),
     FileR = rel_name(from_utf8(Arg,St), St#cstate.wd),
     authorize(?AUTH_DELETE, abs_name(FileR), Ctl, St),
     FileA = abs_name(FileR),
-    File = filename:join(St#cstate.rootwd, FileR),
+    File = jail(Ctl, filename:join(St#cstate.rootwd, FileR), St),
     case file:delete(File) of
 	ok ->
 	    rsend(Ctl, 250, ["\"", FileA, "\" deleted"]);
@@ -792,11 +871,12 @@ dele(Arg, Ctl, St) ->
 
 rmd(Arg, Ctl, St) ->
     assert_valid(Ctl, St),
+    auth_op(Ctl, ?OP_RMD, St),
     assert_arg(Ctl, Arg),
     DirR = rel_name(from_utf8(Arg,St), St#cstate.wd),
     authorize(?AUTH_DELETE, abs_name(DirR), Ctl, St),
     DirA = abs_name(DirR),
-    Dir = filename:join(St#cstate.rootwd, DirR),
+    Dir = jail(Ctl, filename:join(St#cstate.rootwd, DirR), St),
     case file:del_dir(Dir) of
 	ok ->
 	    rsend(Ctl, 250, [" \"", DirA, "\" removed"]);
@@ -807,11 +887,12 @@ rmd(Arg, Ctl, St) ->
 
 mkd(Arg, Ctl, St) ->
     assert_valid(Ctl, St),
+    auth_op(Ctl, ?OP_MKD, St),
     assert_arg(Ctl, Arg),
     DirR = rel_name(from_utf8(Arg,St), St#cstate.wd),
     authorize(?AUTH_WRITE, abs_name(DirR), Ctl, St),
     DirA = abs_name(DirR),
-    Dir = filename:join(St#cstate.rootwd, DirR),
+    Dir = jail(Ctl, filename:join(St#cstate.rootwd, DirR), St),
     case file:make_dir(Dir) of
 	ok ->
 	    rsend(Ctl, 257, [" \"", DirA, "\" directory created"]);
@@ -825,10 +906,11 @@ mkd(Arg, Ctl, St) ->
 
 lst(Arg, Ctl, St) ->
     assert_valid(Ctl, St),
+    auth_op(Ctl, ?OP_LST, St),
     DirR = rel_name(from_utf8(Arg,St), St#cstate.wd),
     authorize(?AUTH_READ, abs_name(DirR), Ctl, St),
     assert_exists(Ctl, St#cstate.rootwd, DirR, directory),
-    Dir = filename:join(St#cstate.rootwd, DirR),
+    Dir = jail(Ctl, filename:join(St#cstate.rootwd, DirR), St),
     {Data,St1} = open_data(Ctl, St),
     dir_list(Ctl, Data, Dir, DirR, St, list),
     gen_tcp:close(Data),
@@ -837,10 +919,11 @@ lst(Arg, Ctl, St) ->
     
 nlst(Arg,Ctl,St) ->
     assert_valid(Ctl, St),
+    auth_op(Ctl, ?OP_NLST, St),
     DirR = rel_name(from_utf8(Arg,St), St#cstate.wd),
     authorize(?AUTH_READ, abs_name(DirR), Ctl, St),
     assert_exists(Ctl, St#cstate.rootwd, DirR, directory),
-    Dir = filename:join(St#cstate.rootwd, DirR),
+    Dir = jail(Ctl, filename:join(St#cstate.rootwd, DirR), St),
     {Data,St1} = open_data(Ctl, St),
     dir_list(Ctl, Data, Dir, DirR, St, nlst),
     gen_tcp:close(Data),
@@ -857,6 +940,7 @@ syst(_Arg, Ctl, St) ->
 
 stat(Arg, Ctl, St) ->
     assert_valid(Ctl, St),
+    auth_op(Ctl, ?OP_STAT, St),
     if Arg == [] ->
 	    rmsend(Ctl, 211,
 		   ["Status of ", call({getcfg, #sconf.servername})],
@@ -872,6 +956,7 @@ stat(Arg, Ctl, St) ->
 
 size(Arg, Ctl, St) ->
     assert_valid(Ctl, St),
+    auth_op(Ctl, ?OP_SIZE, St),
     assert_arg(Ctl, Arg),
     case type(St) of
 	ascii ->
@@ -879,7 +964,7 @@ size(Arg, Ctl, St) ->
 	image ->
 	    FileR = rel_name(from_utf8(Arg,St), St#cstate.wd),
 	    authorize(?AUTH_READ, abs_name(FileR), Ctl, St),
-	    File = filename:join(St#cstate.rootwd, FileR),
+	    File = jail(Ctl, filename:join(St#cstate.rootwd, FileR), St),
 	    case file:read_file_info(File) of
 		{ok, #file_info{type = regular, size = Size}} ->
 		    rsend(Ctl, 213, integer_to_list(Size));
@@ -895,10 +980,11 @@ size(Arg, Ctl, St) ->
 %% File Modification Time
 mdtm(Arg, Ctl, St) ->
     assert_valid(Ctl, St),
+    auth_op(Ctl, ?OP_MDTM, St),
     assert_arg(Ctl, Arg),
     FileR = rel_name(from_utf8(Arg,St), St#cstate.wd),
     authorize(?AUTH_READ, abs_name(FileR), Ctl, St),
-    File = filename:join(St#cstate.rootwd, FileR),
+    File = jail(Ctl, filename:join(St#cstate.rootwd, FileR), St),
     case file:read_file_info(File) of
 	{ok, #file_info{type = regular, mtime = MTime}} ->
 	    rsend(Ctl, 213, timeval(MTime));
@@ -925,6 +1011,7 @@ noop(_, Ctl, St) ->
     St.
 
 feat(_, Ctl, St) ->
+    auth_op(Ctl, ?OP_FEAT, St),
     rmsend(Ctl, 211,
 	   "Extensions supported:",
 	   ["  SIZE",
@@ -941,6 +1028,7 @@ feat(_, Ctl, St) ->
 
 %% opts must be implemented when feat is implemented.
 opts(Arg, Ctl, St) ->
+    auth_op(Ctl, ?OP_OPTS, St),
     case opts_parse(Arg) of
 	{OptFun, OptArgs} ->
 	    %% in case of a crash, we'll return 501
@@ -954,6 +1042,7 @@ opts(Arg, Ctl, St) ->
 %% idea: could implement the command: "help cmd" by calling the cmd fun like
 %% this: cmd_fun(help) -> [string()]
 help(_, Ctl, St) ->
+    auth_op(Ctl, ?OP_HELP, St),
     rmsend(Ctl, 214,
 	   "The following commands are recognized (* =>'s unimplemented).",
 	   ["  USER    PORT    STOR    RNTO    NLST    MKD     CDUP",
@@ -1041,6 +1130,19 @@ assert_arg(Ctl, "") ->
     throw(failed);
 assert_arg(_Ctl, _Arg) ->
     true.
+
+%%% 
+%%% Introducing some security here! Every operation has to
+%%% be checked if it is allowed to proceed.
+%%%
+auth_op(_Ctl, Op, St) when ?bit_is_set(St#cstate.sys_ops, Op) -> 
+    ?dbg("Operation <~w> IS allowed, Flags=~p~n", [Op, St#cstate.sys_ops]),
+    true;
+auth_op(Ctl, Op, St) -> 
+    ?dbg("Operation <~w> is NOT allowed, Flags=~p~n", [Op, St#cstate.sys_ops]),
+    rsend(Ctl, 550, "Permission denied"),
+    throw(failed).
+
 
 authorize(Op, FileName, Ctl, St) ->
     case St#cstate.user of

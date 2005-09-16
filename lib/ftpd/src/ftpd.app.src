@@ -1,0 +1,14 @@
+{application,ftpd,
+ [{description,"Erlang FTP daemon"},
+  {vsn,"%VSN%"},
+  {modules,[%MODULES%]},
+  {registered,[]},
+  {env, []},
+  {mod, {ftpd_app, []}},
+  {applications,[kernel,stdlib]},
+  {dependencies,
+   [{kernel, "2.9.6"},
+    {stdlib, "1.12.7"},
+    {iconv, "1.0"},
+    {fd_server, "2.3.0"}]}]}.
+

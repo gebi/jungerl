@@ -2,7 +2,7 @@ AC_INIT
 
 dnl work out who the cpu, vendor and OS are
 AC_CANONICAL_SYSTEM
-AC_DEFINE_UNQUOTED(CPU_VENDOR_OS, "$target")
+AC_DEFINE_UNQUOTED(CPU_VENDOR_OS, "$target", CPU_VENDOR_OS)
 
 JUNGERL_DIR=$(dirname `pwd`)
 AC_SUBST(JUNGERL_DIR)
@@ -50,15 +50,15 @@ case "$target_os" in
 	dnl fix this later
 	;;
       linux*)
-	AC_DEFINE(LINUX)
+	AC_DEFINE(LINUX,,LINUX)
 	LD_SHARED="ld -shared"
 	;;
       *bsd*)
-	AC_DEFINE(BSD)
+	AC_DEFINE(BSD,,BSD)
         LD_SHARED="ld -Bshareable"
 	;;
       *solaris*)
-        AC_DEFINE(SOLARIS)
+        AC_DEFINE(SOLARIS,,SOLARIS)
         LD_SHARED="ld -G"
 	;;
       *darwin*)

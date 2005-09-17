@@ -1,5 +1,9 @@
 include ../../../support/include.mk
 
+include ../vsn.mk
+VSN=$(FTPD_VSN)
+
+
 MODULES = ftpd \
 	  ftp_test
 

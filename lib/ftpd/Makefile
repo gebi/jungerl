@@ -5,7 +5,6 @@ all:
 
 clean:
 	(cd src;$(MAKE) clean)
-	-rm ./ebin/ftpd.app 
 
 release: clean appfile
 	sh ../../support/create_release.sh

@@ -1,1 +1,1 @@
-FTPD_VSN=1.2
+FTPD_VSN=1.3

@@ -6,7 +6,7 @@
 %%%-------------------------------------------------------------------
 -module(ftp_test).
 
--include("ftpd.hrl").
+-include("../include/ftpd.hrl").
 
 -export([start/0]).
 

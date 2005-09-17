@@ -20,6 +20,6 @@ debug:
 clean:
 	-rm $(ERL_OBJECTS)
 
-$(EBIN)/ftpd.beam: ftpd.hrl
-$(EBIN)/ftp_test.beam: ftpd.hrl
+$(EBIN)/ftpd.beam: ../include/ftpd.hrl
+$(EBIN)/ftp_test.beam: ../include/ftpd.hrl
 

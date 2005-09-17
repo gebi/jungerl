@@ -64,7 +64,7 @@
 
 -import(lists, [reverse/1, map/2, append/1, foreach/2, foldl/3]).
 
--include("ftpd.hrl").
+-include("../include/ftpd.hrl").
 -include_lib("kernel/include/file.hrl").
 
 -define(is_ip(X), size(X)==4, 

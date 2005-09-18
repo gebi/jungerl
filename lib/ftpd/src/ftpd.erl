@@ -12,14 +12,15 @@
 %%%
 %%%           Follows most recommendations at http://cr.yp.to/ftp.html
 %%%           
-
+%%%
 %%% Created : 29 Jan 1998 by  <tony@RIOJA>
-
+%%%
 %%% $Id$
-
+%%%
 %%% Updates by David N. Welton <davidw@eidetix.com> May 2004.
 %%% Updates by Martin Bjorklund <mbj@bluetail.com>  Dec 2004.
-
+%%% Updates by Torbjorn Tornkvist <tobbe@tornkvist.org>  Sep 2005.
+%%%
 %%% To support UTF-8, we use iconv.  In order to make use of this,
 %%% iconv must be started prior to starting ftpd.  iconv can (currently)
 %%% be found in esmb in jungerl.  If iconv is not started, ftpd will still
@@ -33,14 +34,31 @@
 %%%   ftpd:start([{root, "/tmp"}, {port, 2112},
 %%%               {users, [anonymous,
 %%%               {"test", "test", [{"/",[read,write,delete]}]}]}]).
-
-
+%%%
+%%% It is now possible to restrict which commands are permitted,
+%%% control the authentication, and act upon certain events.
+%%% Example: 
+%%%
+%%%   ftpd:start([{root, "/tmp"},
+%%%               {use_fd_srv, true},  % open priveleged port (21)
+%%%               {auth_mod, Module},  % Authenticate: Module:auth(User,Passw)
+%%%               {event_mod, Module}, % Event callback: Module:event(Event)
+%%%               {sys_ops, ?OPS_RESTRICTED}, % allow certain operations
+%%%               {jail, true}]).      % no '%%' in path
+%%%
+%%%   where:  Module:auth(User, Passwd) can return any of:
+%%%           
+%%%             true | {true, RootDir, [{HomeDir, Flags}, ...]} | false
+%%%
+%%%           Module:event(Event) , Event can be
+%%%
+%%%             {store, Name, Dir} : a file has been uploaded
+%%%             {retr, Name}       : a file has been downloaded
+%%%
+%%%
 %%% TODO
 %%%    o  implement max connections, reply w/ 421 greeting and close
-%%%    o  start as root, fork to different user after authenticaion (?)
-%%%       (configurable!)
 %%%    o  implement real ascii mode(?)
-%%%    o  implement logging (use common log format). could re-use yaws_log.
 %%%    o  add greeting file
 %%%    o  finish STAT command implementation
 
@@ -65,6 +83,7 @@
 -import(lists, [reverse/1, map/2, append/1, foreach/2, foldl/3]).
 
 -include("../include/ftpd.hrl").
+-include("ftpd_srv.hrl").
 -include_lib("kernel/include/file.hrl").
 
 -define(is_ip(X), size(X)==4, 
@@ -1138,8 +1157,8 @@ assert_arg(_Ctl, _Arg) ->
 auth_op(_Ctl, Op, St) when ?bit_is_set(St#cstate.sys_ops, Op) -> 
     ?dbg("Operation <~w> IS allowed, Flags=~p~n", [Op, St#cstate.sys_ops]),
     true;
-auth_op(Ctl, Op, St) -> 
-    ?dbg("Operation <~w> is NOT allowed, Flags=~p~n", [Op, St#cstate.sys_ops]),
+auth_op(Ctl, _Op, _St) -> 
+    ?dbg("Operation <~w> is NOT allowed, Flags=~p~n", [_Op, _St#cstate.sys_ops]),
     rsend(Ctl, 550, "Permission denied"),
     throw(failed).
 

@@ -1,1 +1,1 @@
-SSH_VSN = 1.0
+SSH_VSN = 1.1

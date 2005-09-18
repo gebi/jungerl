@@ -5,6 +5,10 @@
 
 -module(ssh).
 
+-vsn("$Revision$ ").
+
+-rcsid("$Id$\n").
+
 -compile(export_all).
 
 -include("../include/ssh.hrl").

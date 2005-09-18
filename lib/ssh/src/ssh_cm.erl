@@ -5,6 +5,11 @@
 
 -module(ssh_cm).
 
+-vsn("$Revision$ ").
+
+-rcsid("$Id$\n").
+
+
 -include("../include/ssh.hrl").
 -include("../include/ssh_connect.hrl").
 
@@ -92,6 +97,12 @@ start_link(Name, Host, Port, Opts) ->
 	    {error, Reason};
 	{Pid, Reply} ->
 	    erlang:demonitor(Ref),
+	    receive
+		{'DOWN', Ref, _, _, Reason} ->
+		    flush
+	    after 0 ->
+		    flush
+	    end,
 	    Reply
     end.
 %%
@@ -422,34 +433,74 @@ connect_messages() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% CM server 
-connect_init(User, Name, Link, Host, Port, Opts) ->
+connect_init(User, Name, Link, Host0, Port, Opts0) ->
     case connect_register(Name) of
 	ok ->
-	    case ssh_proto:connect(Host, Port, Opts) of
+	    {Host,Opts} =
+		if tuple(Host0) -> {Host0,Opts0};
+		   list(Host0) ->
+			case string:tokens(Host0, "@") of
+			    [UName, HName] -> {HName, [{user,UName}|Opts0]};
+			    [HName |_ ] -> {HName, Opts0}
+			end
+		end,
+	    case connect_auth(Host, Port, Opts) of
 		{ok, SSH} ->
-		    case user_auth(SSH,Opts) of
-			ok ->
-			    SSH ! {ssh_install, connect_messages()},
-			    process_flag(trap_exit, true),
-			    if Link == true ->
-				    link(User);
-			       true -> ok
-			    end,
-			    User ! {self(), {ok, self()}},
-			    add_user(User),  %% add inital user
-			    CTab = ets:new(cm_tab, 
-					   [set,{keypos,#channel.local_id}]),
-			    cm_loop(SSH, CTab);
-			Error ->
-			    ssh_proto:disconnect(SSH, ?SSH_DISCONNECT_BY_APPLICATION),
-			    User ! {self(), Error}
-		    end;
+		    SSH ! {ssh_install, connect_messages()},
+		    process_flag(trap_exit, true),
+		    if Link == true ->
+			    link(User);
+		       true -> ok
+		    end,
+		    User ! {self(), {ok, self()}},
+		    add_user(User),  %% add inital user
+		    CTab = ets:new(cm_tab, 
+				   [set,{keypos,#channel.local_id}]),
+		    cm_loop(SSH, CTab);
 		Error ->
 		    User ! {self(), Error}
 	    end;
 	Error ->
 	    User ! {self(), Error}
     end.
+
+connect_auth(Host, Port, Opts) ->
+    case ssh_proto:connect(Host, Port, Opts) of
+	{ok,SSH} ->
+	    case lists:keysearch(userauth, 1, Opts) of
+		{value,{_, AuthList}} ->
+		    case user_auth(SSH, Opts) of
+			ok -> {ok, SSH};
+			Error -> Error
+		    end;
+		false ->
+		    case user_auth(SSH, [{userauth,["none"]}|Opts]) of
+			ok -> {ok, SSH};
+			{error,#ssh_msg_disconnect { code=10 }} ->
+			    case ssh_proto:connect(Host,Port,Opts) of
+				{ok,SSH1} ->
+				    AOpt = {userauth,["publickey","password"]},
+				    case user_auth(SSH1,[AOpt|Opts]) of
+					ok -> {ok, SSH1};
+					Error -> Error
+				    end;
+				Error -> Error
+			    end;
+			Error -> Error
+		    end
+	    end;
+	Error -> Error
+    end.
+
+user_auth(SSH, Opts) ->
+    case ssh_proto:service_request(SSH, "ssh-userauth") of
+	ok ->
+	    ssh_userauth:auth(SSH, "ssh-connection", Opts);
+	Error ->
+	    ssh_proto:disconnect(SSH, ?SSH_DISCONNECT_BY_APPLICATION),
+	    Error
+    end.
+    
 
 %% Register the cm
 connect_register(undefined) ->
@@ -463,9 +514,6 @@ connect_register(Name) when atom(Name) ->
     end;
 connect_register(_) ->
     {error, einval}.
-
-
-    
 
 
 cm_loop(SSH, CTab) ->
@@ -856,13 +904,6 @@ update_sys(CTab, C, Type) ->
     end.
 
 
-user_auth(SSH, Opts) ->
-    case ssh_proto:service_request(SSH, "ssh-userauth") of
-	ok ->
-	    ssh_userauth:auth(SSH, "ssh-connection", Opts);
-	Error ->
-	    Error
-    end.
 
 
 %% Allocate channel ID 

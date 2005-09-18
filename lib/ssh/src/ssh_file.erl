@@ -5,6 +5,10 @@
 
 -module(ssh_file).
 
+-vsn("$Revision$ ").
+
+-rcsid("$Id$\n").
+
 -include("../include/ssh.hrl").
 -include("PKCS-1.hrl").
 -include("DSS.hrl").
@@ -13,8 +17,12 @@
 
 -export([public_host_dsa_key/1,private_host_dsa_key/1,
 	 public_host_rsa_key/1,private_host_rsa_key/1,
-	 public_host_key/1,private_host_key/1,
-	 lookup_host_key/1, add_host_key/2, del_host_key/1]).
+	 public_host_key/1,private_host_key/1]).
+
+-export([lookup_host_key/1, 
+	 add_host_key/2, 
+	 delete_host_key/1,
+	 update_host_key/2]).
 
 -import(lists, [reverse/1, append/1]).
 
@@ -72,16 +80,19 @@ add_host_key(Host, Key) ->
 	    Error
     end.
 
-del_host_key(Host) ->
+delete_host_key(Host) ->
     case file:open(filename:join(ssh_dir(user),"known_hosts"),[write,read]) of
 	{ok, Fd} ->
-	    Res = del_key_fd(Fd, Host),
+	    Res = delete_key_fd(Fd, Host),
 	    file:close(Fd),
 	    Res;
 	Error ->
 	    Error
     end.
 
+%% default ssh_file behaviour is to reject updates
+update_host_key(Host, Key) ->
+    {error, bad_public_key}.
 
 %%
 %% Utils
@@ -292,10 +303,10 @@ lookup_host_key_fd(Fd, Host) ->
 	    end
     end.
 
-del_key_fd(Fd, Host) ->
-    del_key_fd(Fd, Host, 0, 0).
+delete_key_fd(Fd, Host) ->
+    delete_key_fd(Fd, Host, 0, 0).
 
-del_key_fd(Fd, Host, ReadPos0, WritePos0) ->
+delete_key_fd(Fd, Host, ReadPos0, WritePos0) ->
     case io:get_line(Fd, '') of
 	eof ->
 	    if ReadPos0 == WritePos0 ->
@@ -309,25 +320,25 @@ del_key_fd(Fd, Host, ReadPos0, WritePos0) ->
 		[HostList, Type, KeyData] ->
 		    case lists:member(Host, string:tokens(HostList, ",")) of
 			true ->
-			    del_key_fd(Fd, Host, ReadPos1, WritePos0);
+			    delete_key_fd(Fd, Host, ReadPos1, WritePos0);
 			false ->
 			    if ReadPos0 == WritePos0 ->
-				    del_key_fd(Fd, Host, ReadPos1, ReadPos1);
+				    delete_key_fd(Fd, Host, ReadPos1, ReadPos1);
 			       true ->
 				    file:position(Fd, WritePos0),
 				    file:write(Fd, Line),
 				    {ok,WritePos1} = file:position(Fd,cur),
-				    del_key_fd(Fd, Host, ReadPos1, WritePos1)
+				    delete_key_fd(Fd, Host, ReadPos1, WritePos1)
 			    end
 		    end;
 		_ ->
 		    if ReadPos0 == WritePos0 ->
-			    del_key_fd(Fd, Host, ReadPos1, ReadPos1);
+			    delete_key_fd(Fd, Host, ReadPos1, ReadPos1);
 		       true ->
 			    file:position(Fd, WritePos0),
 			    file:write(Fd, Line),
 			    {ok,WritePos1} = file:position(Fd,cur),
-			    del_key_fd(Fd, Host, ReadPos1, WritePos1)
+			    delete_key_fd(Fd, Host, ReadPos1, WritePos1)
 		    end		    
 	    end
     end.

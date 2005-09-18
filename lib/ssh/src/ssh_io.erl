@@ -5,7 +5,13 @@
 
 -module(ssh_io).
 
--export([yes_no/1, read_password/1, read_line/1]).
+-vsn("$Revision$ ").
+
+-rcsid("$Id$\n").
+
+-export([read_password/1, read_line/1]).
+-export([verify_host/1]).
+-export([verification_error/3]).
 -import(lists, [reverse/1]).
 
 
@@ -29,6 +35,16 @@ yes_no(Prompt) ->
 	    yes_no(Prompt)
     end.
 
+%% Hook for handling verification error
+verification_error(Host,Key,Reason) ->
+    io:format("VERIFY FAILED: ~p\n", [Reason]),
+    {error, bad_signature}.
+
+verify_host(Host) ->
+    case yes_no("New Host "++Host++" accept") of
+	yes -> ok;
+	no  -> {error, rejected}
+    end.
 
 %% FIXME: no echo!
 read_password(Prompt) ->

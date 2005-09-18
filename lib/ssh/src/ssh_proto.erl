@@ -5,9 +5,13 @@
 
 -module(ssh_proto).
 
+-vsn("$Revision$ ").
+
+-rcsid("$Id$\n").
+
 -compile(export_all).
 
--import(lists, [reverse/1, map/2, foreach/2, foldl/3]).
+-import(lists, [reverse/1, map/2, foreach/2, foldl/3, member/2]).
 
 -include("../include/ssh.hrl").
 
@@ -18,16 +22,23 @@
 -export([disconnect/2, disconnect/3, disconnect/4]).
 
 -export([client_init/4, server_init/3]).
+-export([sign/3]).
 
 %% io wrappers
--export([yes_no/2, read_password/2, read_line/2]).
+-export([read_password/2, read_line/2]).
+-export([verify_host/2, verification_error/3]).
 
--define(DBG_ALG,     false).
--define(DBG_KEX,     true).
--define(DBG_CRYPTO,  false).
--define(DBG_PACKET,  false).
--define(DBG_MESSAGE, true).
--define(DBG_MAC,     false).
+-define(DBG_MISC,    misc).
+-define(DBG_ALG,     alg).
+-define(DBG_KEX,     kex).
+-define(DBG_CRYPTO,  crypto).
+-define(DBG_PACKET,  packet).
+-define(DBG_MESSAGE, message).
+-define(DBG_MAC,     mac).
+-define(DBG_COMP,    comp).
+-define(DBG_ALL,
+	[?DBG_MISC, ?DBG_ALG, ?DBG_KEX, ?DBG_CRYPTO, 
+	 ?DBG_PACKET, ?DBG_MESSAGE, ?DBG_MAC, ?DBG_COMP]).
 
 -record(alg,
 	{
@@ -93,16 +104,26 @@
 	  exchanged_hash,       %% H from key exchange
 	  session_id,           %% same as FIRST exchanged_hash
 	  
+	  debug=[],             %% alg,key,crypto,packet,message,mac
+
 	  opts = []
 	 }).
 
+-define(DBG(SSH,What,Fmt,As),
+	case ((SSH)#ssh.debug =/= []) andalso member((What),(SSH)#ssh.debug) of
+	    true ->
+		io:format("~s:~w:~w: "++(Fmt),[?MODULE,?LINE,(What)|(As)]);
+	    false ->
+		ok
+	end).
+	
 
 transport_messages() ->
     [ {ssh_msg_disconnect, ?SSH_MSG_DISCONNECT, 
        [uint32,string,string]},
       
       {ssh_msg_ignore, ?SSH_MSG_IGNORE,
-       [string]},
+       [binary]},
 
       {ssh_msg_unimplemented, ?SSH_MSG_UNIMPLEMENTED,
        [uint32]},
@@ -157,11 +178,11 @@ kex_dh_gex_messages() ->
        [binary, mping, binary]}
      ].
 
-yes_no(SSH, Prompt) when pid(SSH) ->
+verify_host(SSH, Host) when pid(SSH) ->
     {ok, CB} = call(SSH, {get_cb, io}),
-    CB:yes_no(Prompt);
-yes_no(SSH, Prompt) when record(SSH,ssh) ->
-    (SSH#ssh.io_cb):yes_no(Prompt).
+    CB:verify_host(Host);    
+verify_host(SSH, Host) when record(SSH,ssh) ->
+    (SSH#ssh.io_cb):verify_host(Host).
 
 read_password(SSH, Prompt) when pid(SSH) ->
     {ok, CB} = call(SSH, {get_cb, io}),
@@ -174,6 +195,10 @@ read_line(SSH, Prompt) when pid(SSH) ->
     CB:read_line(Prompt);
 read_line(SSH, Prompt) when record(SSH,ssh) ->
     (SSH#ssh.io_cb):read_line(Prompt).
+
+sign(SSH, Key, Data) when record(Key, ssh_key), pid(SSH) ->
+    call(SSH, {sign, Key, Data}).
+    
 
 call(SSH, Req) ->
     Ref = make_ref(),
@@ -295,6 +320,17 @@ server_sys(SSH) ->
 %% Initialize basic ssh system
 %%
 ssh_init(S, Role, Opts) ->
+    Debug  = case getopt(debug, Opts, []) of
+		 all -> ?DBG_ALL;
+		 D when atom(D) ->
+		     case member(D, ?DBG_ALL) of
+			 true -> [D];
+			 false -> []
+		     end;
+		 D when list(D) ->
+		     D1 = lists:usort(D),
+		     D1 -- (D1 -- ?DBG_ALL)
+	     end,
     ssh_bits:install_messages(transport_messages()),
     crypto:start(),
     {A,B,C} = erlang:now(),
@@ -311,6 +347,7 @@ ssh_init(S, Role, Opts) ->
 		   c_version=Version,
 		   key_cb = getopt(key_cb, Opts, ssh_file),
 		   io_cb = getopt(io_cb, Opts, ssh_io),
+		   debug = Debug,
 		   opts = Opts };
 	server  ->
 	    Vsn = getopt(vsn, Opts, {1,99}),
@@ -321,6 +358,7 @@ ssh_init(S, Role, Opts) ->
 		   s_version=Version,
 		   key_cb = getopt(key_cb, Opts, ssh_file),
 		   io_cb = getopt(io_cb, Opts, ssh_io),
+		   debug = Debug,
 		   opts = Opts  }
     end.
 
@@ -394,7 +432,7 @@ server_hello(S, User, SSH) ->
     receive
 	{tcp, S, V = "SSH-"++_} ->
 	    Version = trim_tail(V),
-	    ?dbg(true, "client version: ~p\n",[Version]),
+	    ?DBG(SSH, ?DBG_MISC, "client version: ~p\n",[Version]),
 	    case string:tokens(Version, "-") of
 		[_, "2.0" | _] ->
 		    negotiate(S, User, SSH#ssh { c_vsn = {2,0},
@@ -409,11 +447,11 @@ server_hello(S, User, SSH) ->
 		    exit(unknown_version)
 	    end;
 	{tcp, S, Line} ->
-	    ?dbg(true, "info: ~p\n", [Line]),
+	    ?DBG(SSH, ?DBG_MISC, "info: ~p\n", [Line]),
 	    inet:setopts(S, [{active, once}]),
 	    server_hello(S, User, SSH)
     after 5000 ->
-	    ?dbg(true, "timeout 5s\n", []),
+	    ?DBG(SSH, ?DBG_MISC, "timeout 5s\n", []),
 	    gen_tcp:close(S),
 	    {error, timeout}
     end.
@@ -422,7 +460,7 @@ client_hello(S, User, SSH) ->
     receive
 	{tcp, S, V = "SSH-"++_} ->
 	    Version = trim_tail(V),
-	    ?dbg(true, "server version: ~p\n",[Version]),
+	    ?DBG(SSH, ?DBG_MISC, "server version: ~p\n",[Version]),
 	    case string:tokens(Version, "-") of
 		[_, "2.0" | _] ->
 		    negotiate(S, User, SSH#ssh { s_vsn = {2,0},
@@ -440,11 +478,11 @@ client_hello(S, User, SSH) ->
 		    exit(unknown_version)
 	    end;
 	{tcp, S, Line} ->
-	    ?dbg(true, "info: ~p\n", [Line]),
+	    ?DBG(SSH, ?DBG_MISC, "info: ~p\n", [Line]),
 	    inet:setopts(S, [{active, once}]),
 	    client_hello(S, User, SSH)
     after 5000 ->
-	    ?dbg(true, "timeout 5s\n", []),
+	    ?DBG(SSH, ?DBG_MISC, "timeout 5s\n", []),
 	    gen_tcp:close(S),
 	    {error, timeout}
     end.
@@ -530,7 +568,7 @@ client_kex(S, SSH, 'diffie-hellman-group1-sha1') ->
     ssh_bits:install_messages(kexdh_messages()),
     {G,P} = dh_group1(),
     {Private, Public} = dh_gen_key(G,P,1024),
-    ?dbg(?DBG_KEX, "public: ~.16B\n", [Public]),
+    ?DBG(SSH, ?DBG_KEX, "public: ~.16B\n", [Public]),
     send_msg(S, SSH, #ssh_msg_kexdh_init { e = Public }),
     case recv_msg(S, SSH) of
 	{ok, R} when record(R, ssh_msg_kexdh_reply) ->
@@ -539,8 +577,8 @@ client_kex(S, SSH, 'diffie-hellman-group1-sha1') ->
 	    K = ssh_math:ipow(F, Private, P),
 	    H = kex_h(SSH, K_S, Public, F, K),
 	    H_SIG = R#ssh_msg_kexdh_reply.h_sig,
-	    ?dbg(?DBG_KEX, "shared_secret: ~s\n", [fmt_binary(K, 16, 4)]),
-	    ?dbg(?DBG_KEX, "hash: ~s\n", [fmt_binary(H, 16, 4)]),
+	    ?DBG(SSH, ?DBG_KEX, "shared_secret: ~s\n", [fmt_binary(K, 16, 4)]),
+	    ?DBG(SSH, ?DBG_KEX, "hash: ~s\n", [fmt_binary(H, 16, 4)]),
 	    case verify_host_key(S, SSH, K_S, H, H_SIG) of
 		ok ->
 		    {ok, SSH#ssh { shared_secret  = K,
@@ -567,7 +605,7 @@ client_kex(S, SSH, 'diffie-hellman-group-exchange-sha1') ->
 	    P = RG#ssh_msg_kex_dh_gex_group.p,
 	    G = RG#ssh_msg_kex_dh_gex_group.g,
 	    {Private, Public} = dh_gen_key(G,P, 1024),
-	    ?dbg(?DBG_KEX, "public: ~.16B\n", [Public]),
+	    ?DBG(SSH, ?DBG_KEX, "public: ~.16B\n", [Public]),
 	    send_msg(S, SSH, #ssh_msg_kex_dh_gex_init { e = Public }),
 	    case recv_msg(S, SSH) of
 		{ok, R} when record(R, ssh_msg_kex_dh_gex_reply) ->
@@ -576,9 +614,9 @@ client_kex(S, SSH, 'diffie-hellman-group-exchange-sha1') ->
 		    K = ssh_math:ipow(F, Private, P),
 		    H = kex_h(SSH, K_S, Min, NBits, Max, P, G, Public, F, K),
 		    H_SIG = R#ssh_msg_kex_dh_gex_reply.h_sig,
-		    ?dbg(?DBG_KEX, "shared_secret: ~s\n",
+		    ?DBG(SSH, ?DBG_KEX, "shared_secret: ~s\n",
 			 [fmt_binary(K, 16, 4)]),
-		    ?dbg(?DBG_KEX, "hash: ~s\n", 
+		    ?DBG(SSH,?DBG_KEX, "hash: ~s\n", 
 			 [fmt_binary(H, 16, 4)]),
 		    case verify_host_key(S, SSH, K_S, H, H_SIG) of
 			ok ->
@@ -606,7 +644,7 @@ server_kex(S, SSH, 'diffie-hellman-group1-sha1') ->
     ssh_bits:install_messages(kexdh_messages()),
     {G,P} = dh_group1(),
     {Private, Public} = dh_gen_key(G,P,1024),
-    ?dbg(?DBG_KEX, "public: ~.16B\n", [Public]),
+    ?DBG(SSH, ?DBG_KEX, "public: ~.16B\n", [Public]),
     case recv_msg(S, SSH) of
 	{ok, R} when record(R, ssh_msg_kexdh_init) ->
 	    E = R#ssh_msg_kexdh_init.e,
@@ -619,8 +657,8 @@ server_kex(S, SSH, 'diffie-hellman-group1-sha1') ->
 					    f = Public,
 					    h_sig = H_SIG
 					   }),
-	    ?dbg(?DBG_KEX, "shared_secret: ~s\n", [fmt_binary(K, 16, 4)]),
-	    ?dbg(?DBG_KEX, "hash: ~s\n", [fmt_binary(H, 16, 4)]),
+	    ?DBG(SSH,?DBG_KEX, "shared_secret: ~s\n", [fmt_binary(K, 16, 4)]),
+	    ?DBG(SSH,?DBG_KEX, "hash: ~s\n", [fmt_binary(H, 16, 4)]),
 	    {ok, SSH#ssh { shared_secret = K,
 			   exchanged_hash = H,
 			   session_id = H }};
@@ -638,7 +676,7 @@ server_kex(S, SSH, 'diffie-hellman-group-exchange-sha1') ->
     {G,P} = dh_group1(), %% FIX ME!!!
     send_msg(S, SSH, #ssh_msg_kex_dh_gex_group { p = P, g = G }),
     {Private, Public} = dh_gen_key(G,P,1024),
-    ?dbg(?DBG_KEX, "public: ~.16B\n", [Public]),
+    ?DBG(SSH,?DBG_KEX, "public: ~.16B\n", [Public]),
     case recv_msg(S, SSH) of
 	{ok, R} when record(R, ssh_msg_kex_dh_gex_init) ->
 	    E = R#ssh_msg_kex_dh_gex_init.e,
@@ -651,8 +689,8 @@ server_kex(S, SSH, 'diffie-hellman-group-exchange-sha1') ->
 						 f = Public,
 						 h_sig = H_SIG
 						}),
-	    ?dbg(?DBG_KEX, "shared_secret: ~s\n", [fmt_binary(K, 16, 4)]),
-	    ?dbg(?DBG_KEX, "hash: ~s\n", [fmt_binary(H, 16, 4)]),
+	    ?DBG(SSH,?DBG_KEX, "shared_secret: ~s\n", [fmt_binary(K, 16, 4)]),
+	    ?DBG(SSH,?DBG_KEX, "hash: ~s\n", [fmt_binary(H, 16, 4)]),
 	    {ok, SSH#ssh { shared_secret = K,
 			   exchanged_hash = H,
 			   session_id = H }};
@@ -670,17 +708,17 @@ ssh_main(S, User, SSH) ->
     receive
 	{tcp, S, Data} ->
 	    %% This is a lazy way of gettting events without block
-	    ?dbg(?DBG_PACKET, "UNRECEIVE: ~w BYTES\n", [size(Data)]),
+	    ?DBG(SSH,?DBG_PACKET, "UNRECEIVE: ~w BYTES\n", [size(Data)]),
 	    gen_tcp:unrecv(S, Data),
 	    case recv_msg(S, SSH) of
 		{ok, M} when record(M, ssh_msg_unimplemented) ->
-		    ?dbg(true, "UNIMPLEMENTED: ~p\n",
+		    ?DBG(SSH,?DBG_MISC, "UNIMPLEMENTED: ~p\n",
 			 [M#ssh_msg_unimplemented.sequence]),
 		    inet:setopts(S, [{active, once}]),
 		    ssh_main(S, User, SSH);
 		{ok,M} when record(M, ssh_msg_disconnect) ->
 		    User ! {ssh_msg, self(), M},
-		    ?dbg(true, "DISCONNECT: ~w ~s\n",
+		    ?DBG(SSH, ?DBG_MISC, "DISCONNECT: ~w ~s\n",
 			 [M#ssh_msg_disconnect.code,
 			  M#ssh_msg_disconnect.description]),
 		    gen_tcp:close(S);
@@ -699,9 +737,15 @@ ssh_main(S, User, SSH) ->
 		    inet:setopts(S, [{active, once}]),
 		    ssh_main(S, User, SSH);
 		{error, Other} ->
+		    
 		    inet:setopts(S, [{active, once}]),
 		    %% send disconnect!
-		    ssh_main(S, User, SSH)
+		    User ! {ssh_msg, self(),
+			    #ssh_msg_disconnect { code=?SSH_DISCONNECT_CONNECTION_LOST,
+						  description = "Connection closed",
+						  language = "" }},
+		    gen_tcp:close(S), %% CHECK ME, is this needed ?
+		    ok
 	    end;
 
 	{tcp_closed, S} ->
@@ -732,29 +776,32 @@ ssh_main(S, User, SSH) ->
 	    send_negotiate(S, User, ssh_setopts(Opts,SSH), UserAck);
 
 	{ssh_call, From, Req} ->
-	    ?dbg(true, "Call: ~p from ~p\n", [Req,From]),
+	    ?DBG(SSH, ?DBG_MISC, "Call: ~p from ~p\n", [Req,From]),
 	    SSH1 = handle_call(Req, From, SSH),
 	    ssh_main(S, User, SSH1);
 
 	Other ->
-	    ?dbg(true, "ssh_loop: got ~p\n", [Other]),
+	    ?DBG(SSH, ?DBG_MISC, "ssh_loop: got ~p\n", [Other]),
 	    ssh_main(S, User, SSH)
     end.
 %%
 %% Handle call's to ssh_proto
 %%
 handle_call({get_cb,io}, From, SSH) ->
-    reply(From, {ok, SSH#ssh.io_cb}),
+    reply(SSH, From, {ok, SSH#ssh.io_cb}),
     SSH;
 handle_call({get_cb,key}, From, SSH) ->
-    reply(From, {ok, SSH#ssh.key_cb}),
+    reply(SSH, From, {ok, SSH#ssh.key_cb}),
+    SSH;
+handle_call({sign,Key,Data}, From, SSH) ->
+    reply(SSH, From, {ok, sign_data(Key, Data, SSH)}),
     SSH;
 handle_call(Other, From, SSH) ->
-    reply(From, {error, bad_call}),
+    reply(SSH, From, {error, bad_call}),
     SSH.
 
-reply([Pid|Ref], Reply) ->
-    ?dbg(true, "Reply: ~p\n", [Reply]),
+reply(SSH, [Pid|Ref], Reply) ->
+    ?DBG(SSH, ?DBG_MISC, "Reply: ~p\n", [Reply]),
     Pid ! {Ref, Reply}.
 
 
@@ -786,6 +833,18 @@ get_host_key(SSH) ->
 	    exit({error, bad_key_type})
     end.
 
+sign_data(Key, Data, SSH) ->
+    SessionID = SSH#ssh.session_id,
+    case Key#ssh_key.type of
+	rsa -> 
+	    SIG = ssh_rsa:sign(Key, <<?STRING(SessionID),Data/binary>>),
+	    ssh_bits:encode(["ssh-rsa",SIG],[string,binary]);
+	dsa -> 
+	    SIG = ssh_dsa:sign(Key, <<?STRING(SessionID),Data/binary>>),
+	    ssh_bits:encode(["ssh-dss",SIG],[string,binary])
+    end.
+
+
 sign_host_key(S, SSH, Private, H) ->
     ALG = SSH#ssh.algorithms,
     case ALG#alg.hkey of
@@ -809,6 +868,8 @@ sign_host_key(S, SSH, Private, H) ->
 	    {error, bad_host_key_algorithm}
     end.    
 
+
+
 verify_host_key(S, SSH, K_S, H, H_SIG) ->
     ALG = SSH#ssh.algorithms,
     case ALG#alg.hkey of
@@ -819,8 +880,7 @@ verify_host_key(S, SSH, K_S, H, H_SIG) ->
 		    Public = #ssh_key { type=rsa, public={N,E} },
 		    case catch ssh_rsa:verify(Public, H, SIG) of
 			{'EXIT', Reason} ->
-			    io:format("VERIFY FAILED: ~p\n", [Reason]),
-			    {error, bad_signature};
+			    verification_error(SSH,Public,Reason);
 			ok ->
 			    known_host_key(SSH, Public)
 		    end;
@@ -834,8 +894,7 @@ verify_host_key(S, SSH, K_S, H, H_SIG) ->
 		    Public = #ssh_key { type=dsa, public={P,Q,G,Y} },
 		    case catch ssh_dsa:verify(Public, H, SIG) of
 			{'EXIT', Reason} ->
-			    io:format("VERIFY FAILED: ~p\n", [Reason]),
-			    {error, bad_signature};
+			    verification_error(SSH,Public,Reason);
 			ok ->
 			    known_host_key(SSH, Public)
 		    end;
@@ -851,38 +910,52 @@ known_host_key(SSH, Public) ->
 	{ok, Public} ->
 	    ok;
 	{ok, BadPublic} ->
-	    {error, bad_public_key};
+	    case (SSH#ssh.key_cb):update_host_key(SSH#ssh.peer,Public) of
+		{'EXIT',_} ->
+		    {error, bad_public_key};
+		Reply ->
+		    Reply
+	    end;
 	{error, not_found} ->
-	    case (SSH#ssh.io_cb):yes_no("New host "++SSH#ssh.peer++" accept") of
-		yes ->
-		    (SSH#ssh.key_cb):add_host_key(SSH#ssh.peer, Public),
-		    ok;
-		no ->
-		    {error, rejected}
-	    end
+	    case (SSH#ssh.io_cb):verify_host(SSH#ssh.peer) of
+		ok ->
+		    (SSH#ssh.key_cb):add_host_key(SSH#ssh.peer, Public);
+		Error ->
+		    Error
+	    end;
+	Error -> %% Allow lookup to fail with a cause
+	    Error
     end.
 
+verification_error(SSH, Public, Reason) ->
+    case catch (SSH#ssh.io_cb):verification_error(SSH#ssh.peer,Public,Reason) of
+	{'EXIT', _} ->
+	    io:format("VERIFY FAILED: ~p\n", [Reason]),
+	    {error, bad_signature};
+	_ ->
+	    {error, bad_signature}
+    end.
 
 	    
 send_algorithms(S, SSH, KexInit) ->
     Payload = ssh_bits:encode(KexInit),
-    ?dbg(?DBG_MESSAGE, "SEND_MSG: ~70p\n", [KexInit]),
+    ?DBG(SSH, ?DBG_MESSAGE, "SEND_MSG: ~70p\n", [KexInit]),
     Res = send_packet(S, SSH, Payload),
     {Res,Payload}.
 		       
 
 recv_algorithms(S, SSH) ->
-    case recv_packet(S, SSH) of
+    case recv_packet(S, SSH, infinity) of
 	{ok,Packet} ->
 	    case ssh_bits:decode(Packet) of
 		{ok, R} ->
-		    ?dbg(?DBG_MESSAGE, "RECV_MSG: ~70p\n", [R]),
+		    ?DBG(SSH, ?DBG_MESSAGE, "RECV_MSG: ~70p\n", [R]),
 		    {ok,{Packet, R}};
 		Error ->
 		    Error
 	    end;
 	Error ->
-	    ?dbg(?DBG_MESSAGE, "RECV_MSG: ~p\n", [Error]),
+	    ?DBG(SSH, ?DBG_MESSAGE, "RECV_MSG: ~p\n", [Error]),
 	    Error
     end.
 
@@ -895,28 +968,36 @@ recv_algorithms(S, SSH) ->
 
 select_algorithm(SSH, ALG, C, S) ->
     %% find out the selected algorithm
-    C_Enc = select(C#ssh_msg_kexinit.encryption_algorithms_client_to_server,
+    C_Enc = select(SSH,
+		   C#ssh_msg_kexinit.encryption_algorithms_client_to_server,
 		   S#ssh_msg_kexinit.encryption_algorithms_client_to_server),
 
-    C_Mac = select(C#ssh_msg_kexinit.mac_algorithms_client_to_server,
+    C_Mac = select(SSH,
+		   C#ssh_msg_kexinit.mac_algorithms_client_to_server,
 		   S#ssh_msg_kexinit.mac_algorithms_client_to_server),
 
-    C_Cmp = select(C#ssh_msg_kexinit.compression_algorithms_client_to_server,
+    C_Cmp = select(SSH,
+		   C#ssh_msg_kexinit.compression_algorithms_client_to_server,
 		   S#ssh_msg_kexinit.compression_algorithms_client_to_server),
 
-    C_Lng = select(C#ssh_msg_kexinit.languages_client_to_server,
+    C_Lng = select(SSH,
+		   C#ssh_msg_kexinit.languages_client_to_server,
 		   S#ssh_msg_kexinit.languages_client_to_server),
 
-    S_Enc = select(C#ssh_msg_kexinit.encryption_algorithms_server_to_client,
+    S_Enc = select(SSH,
+		   C#ssh_msg_kexinit.encryption_algorithms_server_to_client,
 		   S#ssh_msg_kexinit.encryption_algorithms_server_to_client),
 
-    S_Mac = select(C#ssh_msg_kexinit.mac_algorithms_server_to_client,
+    S_Mac = select(SSH,
+		   C#ssh_msg_kexinit.mac_algorithms_server_to_client,
 		   S#ssh_msg_kexinit.mac_algorithms_server_to_client),
 
-    S_Cmp = select(C#ssh_msg_kexinit.compression_algorithms_server_to_client,
+    S_Cmp = select(SSH,
+		   C#ssh_msg_kexinit.compression_algorithms_server_to_client,
 		   S#ssh_msg_kexinit.compression_algorithms_server_to_client),
 
-    S_Lng = select(C#ssh_msg_kexinit.languages_server_to_client,
+    S_Lng = select(SSH,
+		   C#ssh_msg_kexinit.languages_server_to_client,
 		   S#ssh_msg_kexinit.languages_server_to_client),
 
     HKey = select_all(C#ssh_msg_kexinit.server_host_key_algorithms,
@@ -927,7 +1008,8 @@ select_algorithm(SSH, ALG, C, S) ->
 	 end,
     %% Fixme verify Kex against HKey list and algorithms
     
-    Kex = select(C#ssh_msg_kexinit.kex_algorithms,
+    Kex = select(SSH,
+		 C#ssh_msg_kexinit.kex_algorithms,
 		 S#ssh_msg_kexinit.kex_algorithms),
 
     ALG1 = ALG#alg { kex = Kex, hkey = HK },
@@ -1011,7 +1093,7 @@ install_alg(SSH) ->
 
 alg_setup(SSH) ->
     ALG = SSH#ssh.algorithms,
-    ?dbg(?DBG_ALG, "ALG: setup ~p\n", [ALG]),
+    ?DBG(SSH,?DBG_ALG, "ALG: setup ~p\n", [ALG]),
     SSH#ssh { kex       = ALG#alg.kex,
 	      hkey      = ALG#alg.hkey,
 	      encrypt = ALG#alg.encrypt,
@@ -1028,7 +1110,7 @@ alg_setup(SSH) ->
 	      }.
 
 alg_init(SSH0) ->
-    ?dbg(?DBG_ALG, "ALG: init\n", []),
+    ?DBG(SSH0,?DBG_ALG, "ALG: init\n", []),
     {ok,SSH1} = send_mac_init(SSH0),
     {ok,SSH2} = recv_mac_init(SSH1),
     {ok,SSH3} = encrypt_init(SSH2),
@@ -1038,7 +1120,7 @@ alg_init(SSH0) ->
     SSH6.
 
 alg_final(SSH0) ->
-    ?dbg(?DBG_ALG, "ALG: final\n", []),
+    ?DBG(SSH0,?DBG_ALG, "ALG: final\n", []),
     {ok,SSH1} = send_mac_final(SSH0),
     {ok,SSH2} = recv_mac_final(SSH1),
     {ok,SSH3} = encrypt_final(SSH2),
@@ -1054,14 +1136,14 @@ select_all(CL, SL) ->
     %% algorithms used by client and server (client pref)
     map(fun(ALG) -> list_to_atom(ALG) end, (CL -- A)).
 
-select([], []) ->
+select(_SSH, [], []) ->
     none;
-select(CL, SL) ->
+select(SSH, CL, SL) ->
     C = case select_all(CL,SL) of
 	    [] -> undefined;
 	    [ALG|_] -> ALG
 	end,
-    ?dbg(?DBG_ALG, "ALG: select: ~p ~p = ~p\n", [CL, SL, C]),
+    ?DBG(SSH, ?DBG_ALG, "ALG: select: ~p ~p = ~p\n", [CL, SL, C]),
     C.
 	    
 send_version(S, Version) ->
@@ -1069,7 +1151,7 @@ send_version(S, Version) ->
 
 
 send_msg(S, SSH, Record) ->
-    ?dbg(?DBG_MESSAGE, "SEND_MSG: ~70p\n", [Record]),
+    ?DBG(SSH, ?DBG_MESSAGE, "SEND_MSG: ~70p\n", [Record]),
     Bin = ssh_bits:encode(Record),
     send_packet(S, SSH, Bin).
 
@@ -1092,47 +1174,45 @@ send_packet(S, SSH, Data0) when binary(Data0) ->
     EncPacket = encrypt(SSH, Packet),
     Seq = get(send_sequence),
     MAC = send_mac(SSH, Packet, Seq),
-    ?dbg(?DBG_PACKET, "SEND_PACKET:~w len=~p,payload=~p,padding=~p,mac=~p\n",
+    ?DBG(SSH, ?DBG_PACKET, "SEND_PACKET:~w len=~p,payload=~p,padding=~p,mac=~p\n",
 	 [Seq, PacketLen, size(Data), PaddingLen, MAC]),
     Res = gen_tcp:send(S, [EncPacket, MAC]),
     put(send_sequence, (Seq+1) band 16#ffffffff),
     Res.
 
-
 recv_msg(S, SSH) ->
-    case recv_packet(S, SSH) of
+    recv_msg(S, SSH, infinity).
+
+recv_msg(S, SSH, Tmo) ->
+    case recv_packet(S, SSH, Tmo) of
 	{ok, Packet} ->
 	    case ssh_bits:decode(Packet) of
 		{ok, M} when record(M, ssh_msg_debug) ->
 		    if M#ssh_msg_debug.always_display == true ->
-			    io:format("DEBUG: ~p\n",
-				      [M#ssh_msg_debug.message]);
+			    io:format("DEBUG: ~p\n",[M#ssh_msg_debug.message]);
 		       true ->
-			    ?dbg(true, "DEBUG: ~p\n",
-				 [M#ssh_msg_debug.message])
+			    ?DBG(SSH, ?DBG_MISC, "DEBUG: ~p\n",[M#ssh_msg_debug.message])
 		    end,
-		    inet:setopts(S, [{active, once}]),
-		    recv_msg(S, SSH);
+		    recv_msg(S, SSH, Tmo);
 		{ok, M} when record(M, ssh_msg_ignore) ->
-		    inet:setopts(S, [{active, once}]),
-		    recv_msg(S, SSH);
+		    recv_msg(S, SSH, Tmo);
 
 		{ok, Msg} ->
-		    ?dbg(?DBG_MESSAGE, "RECV_MSG: ~70p\n", [Msg]),
+		    ?DBG(SSH, ?DBG_MESSAGE, "RECV_MSG: ~70p\n", [Msg]),
 		    {ok, Msg};
 		Error ->
-		    %% Fixme (send disconnect...)
+		    ?DBG(SSH, ?DBG_MESSAGE, "RECV_MSG: ~70p\n", [Error]),
 		    Error
 	    end;
 	Error ->
-	    ?dbg(?DBG_MESSAGE, "RECV_MSG: ~70p\n", [Error]),
+	    ?DBG(SSH, ?DBG_MESSAGE, "RECV_MSG: ~70p\n", [Error]),
 	    Error
     end.
 
 %% receive ONE packet
-recv_packet(S, SSH) ->
+recv_packet(S, SSH, Tmo) ->
     BlockSize = SSH#ssh.decrypt_block_size,
-    case gen_tcp:recv(S, BlockSize) of
+    case gen_tcp:recv(S, BlockSize, Tmo) of
 	{ok, EncData0} ->
 	    Data0 = decrypt(SSH, EncData0),
 	    <<?UINT32(PacketLen), _/binary>> = Data0,
@@ -1145,7 +1225,7 @@ recv_packet(S, SSH) ->
 			{ok, EncData1} ->
 			    Data1 = decrypt(SSH, EncData1),
 			    Data = <<Data0/binary, Data1/binary>>,
-			    recv_packet_data(S, SSH, PacketLen, Data);
+			    packet_data(S, SSH, PacketLen, Data);
 			Error ->
 			    Error
 		    end
@@ -1154,7 +1234,7 @@ recv_packet(S, SSH) ->
 	    Error
     end.
 
-recv_packet_data(S, SSH, PacketLen, Data) ->
+packet_data(S, SSH, PacketLen, Data) ->
     Seq = get(recv_sequence),
     Res = valid_mac(SSH, S, Data, Seq),
     put(recv_sequence, (Seq+1) band 16#ffffffff),
@@ -1164,13 +1244,13 @@ recv_packet_data(S, SSH, PacketLen, Data) ->
 	    PayloadLen = PacketLen - PaddingLen - 1,
 	    <<_:32, _:8, Payload:PayloadLen/binary, 
 	     _:PaddingLen/binary>> = Data,
-	    ?dbg(?DBG_PACKET, 
+	    ?DBG(SSH, ?DBG_PACKET, 
 		 "RECV_PACKET:~w, len=~p,payload=~w,padding=~w\n", 
 		 [Seq,PacketLen,PayloadLen,PaddingLen]),
 	    decompress(SSH, Payload);
 
 	false ->
-	    ?dbg(?DBG_PACKET, "RECV_PACKET:~w, len=~p\n", 
+	    ?DBG(SSH, ?DBG_PACKET, "RECV_PACKET:~w, len=~p\n", 
 		 [Seq,PacketLen]),
 	    terminate(S, SSH, ?SSH_DISCONNECT_MAC_ERROR,
 		      "Bad MAC #"++ integer_to_list(Seq))
@@ -1300,10 +1380,10 @@ encrypt(SSH, Data) ->
 	'3des-cbc' ->
 	    {K1,K2,K3} = SSH#ssh.encrypt_keys,
 	    IV0 = get(encrypt_ctx),
-	    ?dbg(?DBG_CRYPTO, "encrypt: IV=~p K1=~p, K2=~p, K3=~p\n",
+	    ?DBG(SSH, ?DBG_CRYPTO, "encrypt: IV=~p K1=~p, K2=~p, K3=~p\n",
 		 [IV0,K1,K2,K3]),
 	    Enc = crypto:des3_cbc_encrypt(K1,K2,K3,IV0,Data),
-	    ?dbg(?DBG_CRYPTO, "encrypt: ~p -> ~p\n", [Data, Enc]),
+	    ?DBG(SSH, ?DBG_CRYPTO, "encrypt: ~p -> ~p\n", [Data, Enc]),
 	    %% Enc = list_to_binary(E0),
 	    IV = crypto:des_cbc_ivec(Enc),
 	    put(encrypt_ctx, IV),
@@ -1352,11 +1432,11 @@ decrypt(SSH, Data) ->
 	'3des-cbc' ->
 	    {K1,K2,K3} = SSH#ssh.decrypt_keys,
 	    IV0 = get(decrypt_ctx),
-	    ?dbg(?DBG_CRYPTO, "decrypt: IV=~p K1=~p, K2=~p, K3=~p\n",
+	    ?DBG(SSH, ?DBG_CRYPTO, "decrypt: IV=~p K1=~p, K2=~p, K3=~p\n",
 		 [IV0,K1,K2,K3]),
 	    Dec = crypto:des3_cbc_decrypt(K1,K2,K3,IV0,Data),
 	    %% Enc = list_to_binary(E0),
-	    ?dbg(?DBG_CRYPTO, "decrypt: ~p -> ~p\n", [Data, Dec]),
+	    ?DBG(SSH, ?DBG_CRYPTO, "decrypt: ~p -> ~p\n", [Data, Dec]),
 	    IV = crypto:des_cbc_ivec(Data),
 	    put(decrypt_ctx, IV),
 	    Dec;
@@ -1459,12 +1539,18 @@ decompress_final(SSH) ->
 decompress(SSH, Data) ->
     case SSH#ssh.decompress of
 	none ->
+	    ?DBG(SSH, ?DBG_COMP, "No compression\n", []),
 	    {ok,Data};
 	zlib ->
 	    case zlib:inflate(get(decompress_ctx), Data, partial) of
 		{ok, Decompressed} ->
-		    {ok,list_to_binary(Decompressed)};
+		    Decomp = list_to_binary(Decompressed),
+		    ?DBG(SSH, ?DBG_COMP, "ZLib compression ~w => ~w\n", 
+			 [size(Data), size(Decomp)]),
+		    {ok,Decomp};
 		Error ->
+		    ?DBG(SSH, ?DBG_COMP, "ZLib compression ~w\n", 
+			 [Error]),
 		    Error
 	    end;
 	_ ->
@@ -1572,7 +1658,7 @@ hash(SSH, Char, N, HASH) ->
     K1 = HASH([K, H, Char, SessionID]),
     Sz = N div 8,
     <<Key:Sz/binary, _/binary>> = hash(K, H, K1, N-128, HASH),
-    ?dbg(?DBG_KEX, "Key ~s: ~s\n", [Char, fmt_binary(Key, 16, 4)]),
+    ?DBG(SSH, ?DBG_KEX, "Key ~s: ~s\n", [Char, fmt_binary(Key, 16, 4)]),
     Key.
 
 hash(K, H, Ki, N, HASH) when N =< 0 ->
@@ -1640,9 +1726,9 @@ valid_mac(SSH, S, Data, Seq) ->
 	    true;
        true ->
 	    {ok,MAC0} = gen_tcp:recv(S, SSH#ssh.recv_mac_size),
-	    ?dbg(?DBG_MAC, "~p: MAC0=~p\n", [Seq, MAC0]),
+	    ?DBG(SSH, ?DBG_MAC, "~p: MAC0=~p\n", [Seq, MAC0]),
 	    MAC1 = recv_mac(SSH, Data, Seq),
-	    ?dbg(?DBG_MAC, "~p: MAC1=~p\n", [Seq, MAC1]),
+	    ?DBG(SSH, ?DBG_MAC, "~p: MAC1=~p\n", [Seq, MAC1]),
 	     MAC0 == MAC1
     end.
 

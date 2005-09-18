@@ -5,6 +5,10 @@
 
 -module(ssh_epmd).
 
+-vsn("$Revision$ ").
+
+-rcsid("$Id$\n").
+
 -behaviour(gen_server).
 
 %% External exports

@@ -5,6 +5,11 @@
 
 -module(ssh_rsa).
 
+-vsn("$Revision$ ").
+
+-rcsid("$Id$\n").
+
+
 -compile(export_all).
 
 -export([verify/3]).
@@ -170,9 +175,9 @@ rsassa_pss_verify(Public=#ssh_key { public={N,E}},Mb,Sb) ->
     emsa_pss_verify(Mb, EM, ModBits-1).
 
 
-rsassa_pkcs1_v1_5_sign(Private=#ssh_key { public={N,_},private={_,D}},M) ->
-    K = (ssh_bits:isize(N)+7) div 8,    
-    EM = emsa_pkcs1_v1_5_encode(M, K),
+rsassa_pkcs1_v1_5_sign(Private=#ssh_key { public={N,_},private={_,D}},Mb) ->
+    K = (ssh_bits:isize(N)+7) div 8,
+    EM = emsa_pkcs1_v1_5_encode(Mb, K),
     M = os2ip(EM),
     S = rsasp1(Private, M),
     i2osp(S, K).

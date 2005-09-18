@@ -5,6 +5,10 @@
 
 -module(ssh_tcp_wrap).
 
+-vsn("$Revision$ ").
+
+-rcsid("$Id$\n").
+
 -export([spawn_server/3, server/3]).
 -export([server_init/4, server_loop/3, accept_loop/4]). %% helper
 

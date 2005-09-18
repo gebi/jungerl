@@ -5,6 +5,10 @@
 
 -module(ssh_math).
 
+-vsn("$Revision$ ").
+
+-rcsid("$Id$\n").
+
 -compile(export_all).
 
 -export([ilog2/1, ipow/3]).

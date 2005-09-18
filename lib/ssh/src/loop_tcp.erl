@@ -5,6 +5,10 @@
 
 -module(loop_tcp).
 
+-vsn("$Revision$ ").
+
+-rcsid("$Id$\n").
+
 
 %% Socket server for TCP/IP
 

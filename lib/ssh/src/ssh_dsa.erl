@@ -5,6 +5,10 @@
 
 -module(ssh_dsa).
 
+-vsn("$Revision$ ").
+
+-rcsid("$Id$\n").
+
 -compile(export_all).
 
 

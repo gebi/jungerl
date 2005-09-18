@@ -5,6 +5,10 @@
 
 -module(ssh_dist).
 
+-vsn("$Revision$ ").
+
+-rcsid("$Id$\n").
+
 %% Handles the connection setup phase with other Erlang nodes.
 
 -export([listen/1, accept/1, accept_connection/5,

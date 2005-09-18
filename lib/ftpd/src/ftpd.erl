@@ -52,8 +52,9 @@
 %%%
 %%%           Module:event(Event) , Event can be
 %%%
-%%%             {store, Name, Dir} : a file has been uploaded
-%%%             {retr, Name}       : a file has been downloaded
+%%%             {store, Name, User} : a file has been uploaded by User
+%%%             {retr, Name}        : a file has been downloaded
+%%%             {auth, User}        : User has authenticated successfully
 %%%
 %%%
 %%% TODO
@@ -538,10 +539,12 @@ pass(Password, Ctl, St) ->
 	    rsend(Ctl, 530, "Login incorrect"),
 	    St;
 	UserName ->
+	    ?dbg("Authenticating: ~p ...~n", [UserName]),
 	    AuthMod = call({getcfg, #sconf.auth_mod}),
-	    case AuthMod:auth(UserName, Password) of
+	    case catch AuthMod:auth(UserName, Password) of
 		true ->
 		    rsend(Ctl, 230, ["User ", UserName, " logged in, proceed"]),
+		    catch (St#cstate.event_mod):event({auth, UserName}),
 		    St#cstate{ust = valid};
 		{true, Root, DirAccess} ->
 		    ?dbg("Auth successful, DirAccess=~p~n", [DirAccess]),
@@ -550,8 +553,10 @@ pass(Password, Ctl, St) ->
 		    U2 = #user{name = UserName, access = Access},
 		    ?dbg("U2=~p~n", [U2]),
 		    rsend(Ctl, 230, ["User ", UserName, " logged in, proceed"]),
+		    catch (St#cstate.event_mod):event({auth, UserName}),
 		    St#cstate{ust = valid, rootwd = Root, user = U2};
-		false ->
+		_Else ->
+		    ?dbg("Authenticating: ~p got: ~p~n", [_Else]),
 		    rsend(Ctl, 530, "Login incorrect"),
 		    St
 	    end
@@ -794,7 +799,8 @@ do_store_fd(Fd, Ctl, St) ->
 	    rsend(Ctl,226, ["closing data connection, received ",
 			    integer_to_list(Count), " bytes"]),
 	    %% ugly...
-	    catch (St#cstate.event_mod):event({store, get(name), St#cstate.rootwd});
+	    catch (St#cstate.event_mod):event({store, get(name), 
+					       (St#cstate.user)#user.name});
 	{error,Err} ->
 	    rsend(Ctl,226, "closing data connection, aborted"),
 	    rsend(Ctl,550, ["error ", erl_posix_msg:message(Err)])

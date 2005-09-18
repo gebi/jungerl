@@ -36,3 +36,9 @@
 	  languge     %% string
 	 }).
 
+-record(ssh_msg_userauth_pk_ok,
+	{
+	  algorithm,     %% string
+	  key_blob       %% string
+	 }).
+

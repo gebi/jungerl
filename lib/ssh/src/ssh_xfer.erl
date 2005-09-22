@@ -302,6 +302,9 @@ xf_reply(XF, << ?SSH_FXP_STATUS, ?UINT32(ReqID), ?UINT32(Status),
     Stat = decode_status(Status),
     {status, ReqID, {Stat,binary_to_list(Err),binary_to_list(Lang),
 		     Reply}};
+xf_reply(XF, << ?SSH_FXP_STATUS, ?UINT32(ReqID), ?UINT32(Status)>>) ->
+    Stat = decode_status(Status),
+    {status, ReqID, {Stat,"","",<<>>}};
 xf_reply(XF, <<?SSH_FXP_HANDLE, ?UINT32(ReqID),
 	      ?UINT32(HLen), Handle:HLen/binary>>) ->
     {handle, ReqID, Handle};
@@ -483,9 +486,9 @@ encode_attr_flags(Vsn, all) ->
 encode_attr_flags(Vsn, Flags) ->
     encode_bits(
       fun(size) -> ?SSH_FILEXFER_ATTR_SIZE;
-	 (uidgid) when Vsn ==3 -> ?SSH_FILEXFER_ATTR_UIDGID;
+	 (uidgid) when Vsn >=2 -> ?SSH_FILEXFER_ATTR_UIDGID;
 	 (permissions) -> ?SSH_FILEXFER_ATTR_PERMISSIONS;
-	 (acmodtime) when Vsn == 3 -> ?SSH_FILEXFER_ATTR_ACMODTIME;
+	 (acmodtime) when Vsn >= 2 -> ?SSH_FILEXFER_ATTR_ACMODTIME;
 	 (accesstime) when Vsn >= 5 -> ?SSH_FILEXFER_ATTR_ACCESSTIME;
 	 (createtime) when Vsn >= 5 -> ?SSH_FILEXFER_ATTR_CREATETIME;
 	 (modifytime) when Vsn >= 5 -> ?SSH_FILEXFER_ATTR_MODIFYTIME;
@@ -591,16 +594,16 @@ encode_As(Vsn, [{AName, X}|As], Flags, Acc) ->
 	size ->
 	    encode_As(Vsn, As,Flags bor ?SSH_FILEXFER_ATTR_SIZE,
 		      [?uint64(X) | Acc]);
-	ownergroup when Vsn==3 ->
-	     encode_As(Vsn, As,Flags bor ?SSH_FILEXFER_ATTR_UIDGID,
-		       [?uint32(X) | Acc]);
 	ownergroup when Vsn>=5 ->
 	    encode_As(Vsn, As,Flags bor ?SSH_FILEXFER_ATTR_OWNERGROUP,
 		      [?string(X) | Acc]);
+	ownergroup when Vsn>=2 ->
+	    encode_As(Vsn, As,Flags bor ?SSH_FILEXFER_ATTR_UIDGID,
+		      [?uint32(X) | Acc]);
 	permissions ->
 	    encode_As(Vsn, As,Flags bor ?SSH_FILEXFER_ATTR_PERMISSIONS,
 		      [?uint32(X) | Acc]);
-	acmodtime when Vsn==3 ->
+	acmodtime when Vsn>=2 ->
 	    encode_As(Vsn, As,Flags bor ?SSH_FILEXFER_ATTR_ACMODTIME,
 		      [?uint32(X) | Acc]);
 	accesstime when Vsn>=5 ->
@@ -634,11 +637,11 @@ encode_As(Vsn, [], Flags, Acc) ->
 
 decode_ATTR(Vsn, <<?UINT32(Flags), Tail/binary>>) ->
     {Type,Tail2} =
-	if Vsn == 3 ->
-		{?SSH_FILEXFER_TYPE_UNKNOWN, Tail};
-	   Vsn >= 5 ->
+	if Vsn >= 5 ->
 		<<?BYTE(T), TL/binary>> = Tail,
-		{T, TL}
+		{T, TL};
+	   Vsn >= 2 ->
+		{?SSH_FILEXFER_TYPE_UNKNOWN, Tail}
 	end,
     decode_As(Vsn, 
 	      [{size, #ssh_xfer_attr.size},
@@ -665,19 +668,17 @@ decode_As(Vsn, [{AName, AField}|As], R, Flags, Tail) ->
 	size when ?is_set(?SSH_FILEXFER_ATTR_SIZE, Flags) ->
 	    <<?UINT64(X), Tail2/binary>> = Tail,
 	    decode_As(Vsn, As, setelement(AField, R, X), Flags, Tail2);
-	ownergroup when ?is_set(?SSH_FILEXFER_ATTR_UIDGID, Flags),Vsn==3 ->
-	    <<?UINT32(X), Tail2/binary>> = Tail,
-	    decode_As(Vsn, As, setelement(AField, R, X), Flags, Tail2);
 	ownergroup when ?is_set(?SSH_FILEXFER_ATTR_OWNERGROUP, Flags),Vsn>=5 ->
 	    <<?UINT32(Len), Bin:Len/binary, Tail2/binary>> = Tail,
 	    X = binary_to_list(Bin),
 	    decode_As(Vsn, As, setelement(AField, R, X), Flags, Tail2);
-
+	ownergroup when ?is_set(?SSH_FILEXFER_ATTR_UIDGID, Flags),Vsn>=2 ->
+	    <<?UINT32(X), Tail2/binary>> = Tail,
+	    decode_As(Vsn, As, setelement(AField, R, X), Flags, Tail2);
 	permissions when ?is_set(?SSH_FILEXFER_ATTR_PERMISSIONS,Flags),Vsn>=5->
 	    <<?UINT32(X), Tail2/binary>> = Tail,
 	    decode_As(Vsn, As, setelement(AField, R, X), Flags, Tail2);
-
-	permissions when ?is_set(?SSH_FILEXFER_ATTR_PERMISSIONS,Flags),Vsn==3->
+	permissions when ?is_set(?SSH_FILEXFER_ATTR_PERMISSIONS,Flags),Vsn>=2->
 	    <<?UINT32(X), Tail2/binary>> = Tail,
 	    R1 = setelement(AField, R, X),
 	    Type = case X band ?S_IFMT of
@@ -691,10 +692,6 @@ decode_As(Vsn, [{AName, AField}|As], R, Flags, Tail) ->
 		       _ -> unknown
 		   end,
 	    decode_As(Vsn, As, R1#ssh_xfer_attr { type=Type}, Flags, Tail2);
-
-	acmodtime when ?is_set(?SSH_FILEXFER_ATTR_ACMODTIME,Flags),Vsn==3 ->
-	    <<?UINT32(X), Tail2/binary>> = Tail,
-	    decode_As(Vsn, As, setelement(AField, R, X), Flags, Tail2);
 	accesstime when ?is_set(?SSH_FILEXFER_ATTR_ACCESSTIME,Flags),Vsn>=5 ->
 	    <<?UINT64(X), Tail2/binary>> = Tail,
 	    decode_As(Vsn, As, setelement(AField, R, X), Flags, Tail2);
@@ -705,6 +702,9 @@ decode_As(Vsn, [{AName, AField}|As], R, Flags, Tail) ->
 	    <<?UINT64(X), Tail2/binary>> = Tail,
 	    decode_As(Vsn, As, setelement(AField, R, X), Flags, Tail2);
 	subsecond_times when ?is_set(?SSH_FILEXFER_ATTR_SUBSECOND_TIMES,Flags),Vsn>=5 ->
+	    <<?UINT32(X), Tail2/binary>> = Tail,
+	    decode_As(Vsn, As, setelement(AField, R, X), Flags, Tail2);
+	acmodtime when ?is_set(?SSH_FILEXFER_ATTR_ACMODTIME,Flags),Vsn>=2 ->
 	    <<?UINT32(X), Tail2/binary>> = Tail,
 	    decode_As(Vsn, As, setelement(AField, R, X), Flags, Tail2);
 	acl when ?is_set(?SSH_FILEXFER_ATTR_ACL, Flags), Vsn>=5 ->
@@ -729,12 +729,12 @@ decode_As(Vsn, [], R, _, Tail) ->
 decode_names(Vsn, 0, Data) ->
     [];
 decode_names(Vsn, I, <<?UINT32(Len), FileName:Len/binary, 
-		      ?UINT32(LLen), LongName:LLen/binary,
-		      Tail/binary>>) when Vsn == 3 ->
+		      Tail/binary>>) when Vsn >= 5 ->
     {A, Tail2} = decode_ATTR(Vsn, Tail),
     [{binary_to_list(FileName), A} | decode_names(Vsn, I-1, Tail2)];
 decode_names(Vsn, I, <<?UINT32(Len), FileName:Len/binary, 
-		      Tail/binary>>) when Vsn >= 5 ->
+		      ?UINT32(LLen), LongName:LLen/binary,
+		      Tail/binary>>) when Vsn >= 2 ->
     {A, Tail2} = decode_ATTR(Vsn, Tail),
     [{binary_to_list(FileName), A} | decode_names(Vsn, I-1, Tail2)].
     

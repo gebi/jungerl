@@ -646,10 +646,11 @@ xreply({data,_,Data}) -> {ok, Data};
 xreply({name,_,Names}) -> {ok, Names};
 xreply({attrs, _, A}) -> {ok,attr_to_info(A)};
 xreply({extended_reply,_,X}) -> {ok, X};
-xreply({status,_,{ok, Err, _Lang, _Rep}}) -> ok;
+xreply({status,_,{ok, _Err, _Lang, _Rep}}) -> ok;
 xreply({status,_,{eof, Err, _Lang, _Rep}}) -> eof;
 xreply({status,_,{Stat, Err, _Lang, _Rep}}) -> {error,Stat};
 xreply({Code,_,Reply}) -> {Code,Reply}.
+
 
 
 %% convert: file_info -> ssh_xfer_attr
@@ -695,33 +696,37 @@ datetime_to_unix(DateTime) ->
 open_mode(Vsn,Modes) ->
     open_mode(Vsn, Modes, [], [], #ssh_xfer_attr{ type = regular }).
 
-open_mode(3, [read|Mode], Access, Flags, Attrs) ->
-    open_mode(3,Mode,[read_data,read_attributes|Access], [read|Flags], Attrs);
-open_mode(5, [read|Mode], Access, Flags, Attrs) ->
+open_mode(Vsn, [read|Mode], Access, Flags, Attrs) when Vsn >= 5 ->
     Flags1 =
 	case member(write, Mode) orelse member(truncate_existing, Flags) of
 	    false -> [open_existing | Flags];
 	    true  -> Flags
 	end,
-    open_mode(5, Mode, [read_data,read_attributes|Access], Flags1, Attrs);
-open_mode(3, [write|Mode], Access, Flags, Attrs) ->
-    open_mode(3, Mode, [write_data,write_attributes|Access], 
-	      [write,creat,trunc|Flags], Attrs);
-open_mode(5, [write|Mode], Access, Flags, Attrs) ->
+    open_mode(Vsn, Mode, [read_data,read_attributes|Access], Flags1, Attrs);
+open_mode(Vsn, [read|Mode], Access, Flags, Attrs) when Vsn >= 2 ->
+    open_mode(Vsn,Mode,[read_data,read_attributes|Access], [read|Flags], Attrs);
+
+open_mode(Vsn, [write|Mode], Access, Flags, Attrs) when Vsn >= 5 ->
     Flags1 =
 	case member(read, Mode) orelse member(existing, Flags) of
 	    true -> Flags;
 	    false -> [create_truncate|Flags]
 	end,
-    open_mode(5, Mode, [write_data,write_attributes|Access], 
+    open_mode(Vsn, Mode, [write_data,write_attributes|Access], 
 	      Flags1, Attrs);
-open_mode(3, [append|Mode],Access, Flags, Attrs) ->
-    open_mode(3, Mode, [write_data,write_attributes|Access], 
-	      [write,creat,trunc,append|Flags], Attrs);
-open_mode(5, [append|Mode],Access, Flags, Attrs) ->
-    open_mode(5, Mode, [write_data,write_attributes,append_data|Access], 
+open_mode(Vsn, [write|Mode], Access, Flags, Attrs) when Vsn >= 2 ->
+    open_mode(Vsn, Mode, [write_data,write_attributes|Access], 
+	      [write,creat,trunc|Flags], Attrs);
+
+open_mode(Vsn, [append|Mode],Access, Flags, Attrs) when Vsn >= 5 ->
+    open_mode(Vsn, Mode, [write_data,write_attributes,append_data|Access], 
 	      [open_or_create,write_data,write_attributes,append_data|Flags],
 	      Attrs);
+open_mode(Vsn, [append|Mode],Access, Flags, Attrs) when Vsn >= 2 ->
+    open_mode(Vsn, Mode, [write_data,write_attributes|Access], 
+	      [write,creat,trunc,append|Flags], Attrs);
+
+
 open_mode(Vsn, [raw|Mode],Access, Flags, Attrs) ->
     open_mode(Vsn, Mode, Access, Flags, Attrs);
 open_mode(Vsn, [binary|Mode],Access, Flags, Attrs) ->

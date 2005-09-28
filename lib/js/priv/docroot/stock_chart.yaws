@@ -1,0 +1,52 @@
+<html>
+<head>
+<script type="text/javascript" src="/js/prototype-1.2.0.js"></script>
+<script type="text/javascript" src="/js/fd2qs.js"></script>
+</head>
+<body>
+
+<h1>Stock Chart Ticker</h1>
+<p>
+<div id="the_chart">
+<erl>
+out(A) ->
+    %%
+    %% EXAMPLE: A stock chart ticker 
+    %%
+    %%    Note, this code is duplicated in stock_chart_ticker.yaws so
+    %%          it should really be moved into a common Erlang module.
+    %%          But I guess that is obvious....
+    %%
+    StockSymbol = "NT",  % Nortel
+    Query = "'http://finance.yahoo.com/d/quotes.csv?s="++StockSymbol++"&f=sl1d1t1&e=.csv'",
+    case string:tokens( os:cmd("curl --stderr /dev/null "++Query),  "\",\r\n") of
+	[Symbol, Quote, Date, Time] ->
+	    {ehtml, 
+	     {table, [],
+	      [{tr, [],
+		[{th, [], "Symbol"},
+		 {th, [], "Quote"},
+		 {th, [], "Date"},
+		 {th, [], "Time"}]},
+	       {tr, [],
+		[{td, [], Symbol},
+		 {td, [], Quote},
+		 {td, [], Date},
+		 {td, [], Time}]}]}};
+	_ ->
+	    {html, ["Failed to contact server..."]}
+    end.
+
+</erl>
+</div>
+<erl>
+out(A) ->
+    {ehtml, js:periodically_call_remote([{update, "the_chart"}, 
+					 {frequency, "60"},
+					 {url, "/stock_chart_ticker.yaws" }])}.
+
+
+</erl>
+
+</body>
+</html>

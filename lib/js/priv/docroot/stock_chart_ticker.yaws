@@ -1,0 +1,26 @@
+<erl>
+out(A) ->
+    %%
+    %% EXAMPLE: A stock chart ticker
+    %%
+    StockSymbol = "NT",  % Nortel
+    Query = "'http://finance.yahoo.com/d/quotes.csv?s="++StockSymbol++"&f=sl1d1t1&e=.csv'",
+    case string:tokens( os:cmd("curl --stderr /dev/null "++Query),  "\",\r\n") of
+	[Symbol, Quote, Date, Time] ->
+	    {ehtml, 
+	     {table, [],
+	      [{tr, [],
+		[{th, [], "Symbol"},
+		 {th, [], "Quote"},
+		 {th, [], "Date"},
+		 {th, [], "Time"}]},
+	       {tr, [],
+		[{td, [], Symbol},
+		 {td, [], Quote},
+		 {td, [], Date},
+		 {td, [], Time}]}]}};
+	_ ->
+	    {html, ["Failed to contact server..."]}
+    end.
+
+</erl>

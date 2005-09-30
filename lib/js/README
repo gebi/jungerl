@@ -19,6 +19,10 @@ To test it do:
 
      http://localhost:4080/
 
+   and
+
+     http://localhost:4080/tabtastic.yaws
+
 
 --Tobbe
 

@@ -1,14 +1,15 @@
 %%%-------------------------------------------------------------------
 %%% Created : 18 Jun 2005 by Tobbe <tobbe@tornkvist.org>
-%%% Desc.   : A rip-off of Ruby's javascript_helper.rb.
+%%% Desc.   : A rip-off of Ruby's javascript_helper.rb + interface
+%%%           to other good Javascript libraries.
 %%%-------------------------------------------------------------------
 -module(js).
 -export([link_to_function/2, link_to_function/3,
 	 link_to_remote/2, link_to_remote/3,
 	 observe_field/2, observe_form/2,
 	 periodically_call_remote/1, periodically_call_remote_S/1, 
-	 form_remote_tag/1,
-	 prototype_js/0, fd2qs_js/0]).
+	 form_remote_tag/1, prototype_js/0, fd2qs_js/0,
+	 tabtastic/1, tabtastic_js/0, tabtastic_css/0]).
 
 -import(lists,[flatten/1, member/2]).
 
@@ -19,7 +20,13 @@
 %%%
 %%% <script type="text/javascript" src="/prototype.yaws"></script>
 %%%
+%%% <script type="text/javascript" src="/tabtastic_js.yaws"></script>
+%%% <link rel="stylesheet" type="text/css" href="/tabtastic_css.yaws">
+%%%
+%%%
 %%% In the file prototype.yaws, we call: js:prototype_js/0
+%%%             tabtastic_js.yaws, we call: js:tabtastic_js/0
+%%%             tabtastic_css.yaws, we call: js:tabtastic_css/0
 %%%
 %%%
 prototype_js() ->
@@ -29,6 +36,46 @@ prototype_js() ->
 fd2qs_js() ->
     Dir = code:priv_dir(?MODULE),
     file:read_file(filename:join([Dir,"docroot","js","fd2qs.js"])).
+
+tabtastic_js() ->
+    %%Dir = code:priv_dir(?MODULE),
+    Dir = "/home/tobbe/jungerl/lib/js/priv",
+    file:read_file(filename:join([Dir,"docroot","Tabtastic","tabtastic.js"])).
+
+tabtastic_css() ->
+    %%Dir = code:priv_dir(?MODULE),
+    Dir = "/home/tobbe/jungerl/lib/js/priv",
+    error_logger:info_msg("~p~n", [filename:join([Dir,"docroot","Tabtastic","tabtastic.css"])]),
+    file:read_file(filename:join([Dir,"docroot","Tabtastic","tabtastic.css"])).
+
+
+%%%
+%%% --- TABTASTIC --- 
+%%% Takes a list of {DivID, Label, ActiveBool, Ehtml} and returns expanded Tabastic Ehtml
+%%%
+tabtastic(L) ->
+    {'div', [{id, "pagecontent"}],
+     tabtastic_toc(L) ++
+      tabtastic_divs(L)}.
+
+tabtastic_toc(L) ->
+    [{h2, [{class, "tabset_label"}], "Table of Contents"},
+     {ul, [{class, "tabset_tabs"}],
+      [{li,[],
+	{a, [{href,"#"++Id}]++is_active(Bool), Label}} ||
+	  {Id, Label, Bool, _} <- L]}].
+
+
+tabtastic_divs(L) ->
+    [{'div', [{id, Id}, {class, "tabset_content"}],
+      [{h2, [{class, "tabset_label"}], Label},
+       Ehtml]} || {Id, Label, _, Ehtml} <- L].
+
+
+is_active(true) -> [{class, "active"}];
+is_active(_)    -> [].
+      
+
 
 
 %%% ================================================================

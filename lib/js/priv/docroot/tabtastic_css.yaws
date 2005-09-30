@@ -1,0 +1,7 @@
+<erl>
+out(A) ->
+    error_logger:info_msg("tabtastic_css~n", []),
+    {ok, Bin} = js:tabtastic_css(),
+    {content, "text/css", binary_to_list(Bin)}.
+
+</erl>

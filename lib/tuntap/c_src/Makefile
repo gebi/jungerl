@@ -1,6 +1,6 @@
 include ../../../support/include.mk
 
-CFLAGS += -I $(ERL_C_INCLUDE_DIR)
+CFLAGS += -I $(ERL_C_INCLUDE_DIR) -I../../../support
 
 TUN_DRV_SO = ../priv/tun_drv.so
 TUNCTL = ../priv/tunctl

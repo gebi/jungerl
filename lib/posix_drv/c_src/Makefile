@@ -1,6 +1,6 @@
 include ../../../support/include.mk
 
-CFLAGS += -I$(ERL_C_INCLUDE_DIR) -I.
+CFLAGS += -I$(ERL_C_INCLUDE_DIR) -I../../../support -I.
 
 POSIX_DRV_SO = ../priv/posix_drv.so
 

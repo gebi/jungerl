@@ -7,7 +7,7 @@ DLL=so
 OBJ=o
 OUT=-o 
 
-override CFLAGS += -I$(ERL_C_INCLUDE_DIR)
+override CFLAGS += -I$(ERL_C_INCLUDE_DIR) -I../../../support
 
 debug: CFLAGS += -DDEBUG
 

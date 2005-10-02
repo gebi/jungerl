@@ -50,6 +50,7 @@ while [ "$1"x != x ]; do
 	;;
       -u)
 	EM_UPDATE=true
+	EM_CMD="install"
 	;;
       -i | install)
 	EM_CMD="install"

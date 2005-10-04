@@ -31,21 +31,18 @@
 %%%
 prototype_js() ->
     Dir = code:priv_dir(?MODULE),
-    file:read_file(filename:join([Dir,"docroot","js","prototype-1.2.0.js"])).
+    file:read_file(filename:join([Dir,"docroot","js","prototype-1.3.1.js"])).
 
 fd2qs_js() ->
     Dir = code:priv_dir(?MODULE),
     file:read_file(filename:join([Dir,"docroot","js","fd2qs.js"])).
 
 tabtastic_js() ->
-    %%Dir = code:priv_dir(?MODULE),
-    Dir = "/home/tobbe/jungerl/lib/js/priv",
+    Dir = code:priv_dir(?MODULE),
     file:read_file(filename:join([Dir,"docroot","Tabtastic","tabtastic.js"])).
 
 tabtastic_css() ->
-    %%Dir = code:priv_dir(?MODULE),
-    Dir = "/home/tobbe/jungerl/lib/js/priv",
-    error_logger:info_msg("~p~n", [filename:join([Dir,"docroot","Tabtastic","tabtastic.css"])]),
+    Dir = code:priv_dir(?MODULE),
     file:read_file(filename:join([Dir,"docroot","Tabtastic","tabtastic.css"])).
 
 

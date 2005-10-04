@@ -56,10 +56,12 @@ tabtastic(L) ->
       tabtastic_divs(L)}.
 
 tabtastic_toc(L) ->
-    [{h2, [{class, "tabset_label"}], "Table of Contents"},
+    AA = integer_to_list(element(3,erlang:now())), % quick and dirty...    
+    [{a, [{name, AA}], []},
+     {h2, [{class, "tabset_label"}], "Table of Contents"},
      {ul, [{class, "tabset_tabs"}],
       [{li,[],
-	{a, [{href,"#"}, {name,Id}]++is_active(Bool), Label}} ||
+	{a, [{href,"#"++AA}, {name,Id}]++is_active(Bool), Label}} ||
 	  {Id, Label, Bool, _} <- L]}].
 
 

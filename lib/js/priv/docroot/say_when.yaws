@@ -1,5 +1,6 @@
 <erl>
 out(A) ->
+    %%error_logger:info_msg("Inside say_when.yaws~n", []),
     {H,M,S} = time(),
     {html, ["<p>The time is <b>",
 	    integer_to_list(H), ":",

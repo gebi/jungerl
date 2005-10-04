@@ -31,7 +31,7 @@
 %%%
 prototype_js() ->
     Dir = code:priv_dir(?MODULE),
-    file:read_file(filename:join([Dir,"docroot","js","prototype-1.3.1.js"])).
+    file:read_file(filename:join([Dir,"docroot","js","prototype.js"])).
 
 fd2qs_js() ->
     Dir = code:priv_dir(?MODULE),
@@ -59,7 +59,7 @@ tabtastic_toc(L) ->
     [{h2, [{class, "tabset_label"}], "Table of Contents"},
      {ul, [{class, "tabset_tabs"}],
       [{li,[],
-	{a, [{href,"#"++Id}]++is_active(Bool), Label}} ||
+	{a, [{href,"#"}, {name,Id}]++is_active(Bool), Label}} ||
 	  {Id, Label, Bool, _} <- L]}].
 
 

@@ -4,7 +4,6 @@ and Yaws programming. The inspiration for this library is the
 impressive "Ruby on Rails" system and its support for Javascript,
 which are using the "Prototype" Javascript library.
 
-So far, the focus has been around the AJAX functionality.
 
 To test it do:
 
@@ -19,9 +18,11 @@ To test it do:
 
      http://localhost:4080/
 
-   and
+   or
 
      http://localhost:4080/tabtastic.yaws
+
+also checkout the stock_chart ticker in priv/docroot
 
 
 --Tobbe

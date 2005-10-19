@@ -1,5 +1,6 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Copyright (C) 2004 Thomas Lindgren <thomasl_erlang@yahoo.com>.
+%% @copyright Copyright(C) 2004-2005 Thomas Lindgren <thomasl_erlang@yahoo.com>.
+%% @license
 %% All rights reserved.
 %%
 %% Redistribution and use in source and binary forms, with or without
@@ -27,15 +28,38 @@
 %%
 %%			   LEXICAL ANALYSIS
 %%
-%% Author: Thomas Lindgren (040422-040425)
+%% Author: Thomas Lindgren (040422-040425; 041125; 051007-051016)
 %%
-%% INPUT:
-%%   regexps_to_table([{regexp, Regexp_string, Action [,Prio]}]) -> Lex_table
+%% Lexical analysis of strings: convert a sequence into a list of tokens
+%% according to regexp rules.
+%%
+%% USAGE:
+%%   lex:with([Regexp_rule], Sequence) -> [Token]
+%%     Regexp_rule is same as for regexps_to_table/2
+%%   lex:file_with([Regexp_rule], File) -> [Token]
+%%     As above but lexes a whole file.
+%%
+%% A sequence is a list of characters, a binary, or a pair of binary
+%% and position. Positions are an abstract datatype, see start_pos/0
+%% and its friends below. (You normally SHOULD NOT need to generate positions
+%% yourself.)
+%%
+%% EXAMPLES
+%%     lex:with(lex:real_erlang_lex(), "foo() -> zap().")
+%%     lex:file_with(lex:real_erlang_lex(), "file.erl")
+%%
+%%   For writing your own rules, see real_erlang_lex() and below. The functions
+%%  it uses to emit tokens and count lines can often be reused.
+%%
+%% MORE API:
+%%   regexps_to_table([{regexp, [Prio,] Regexp_string, Action [,Prio]}]) -> 
+%%                    Lex_table
 %%     where Action(AccToken) -> {token, Token} | no_token
 %%           Regexp_string is a regexp according to the regexp module
 %%           Prio is an integer rule priority (default: 0)
 %%            that chooses the rule to accept if there are several possible
 %%   longest(Lex_table, String) -> [Token]
+%%      Use a generated lex table to convert a string into a list of tokens.
 %%
 %%   regexps_to_nfa([{regexp, Regexp_string, Action}]) -> NFA
 %%     where Action(AccToken) -> {token, Token} | no_token
@@ -70,26 +94,107 @@
 %%    {regexp, "<", fun(_) -> {token, {op, lex:current_line(), '<'}} end}
 %% see also erlang_lex() and real_erlang_lex() below.
 %%
+%% YECC COMPATIBILITY
+%%
+%% Yecc expects the tokenizer to return tuples on the form
+%%   {Category, LineNumber, Symbol} or
+%%   {Category, LineNumber}
+%% if there is just one member of the Category. For example, all operators
+%% are the same while variables normally are different, so we would return
+%% something like
+%%   {var, 42, "VarName"}
+%% or
+%%   {'+', 17}
+%%
+%% Furthermore, the list of tokens should end with
+%%   {End_symbol, LineNumber}
+%% (where End_symbol is declared in the yecc file)
+%%
+%% It is up to you to return tokens suitable for yecc, but as you can see
+%% it's not too hard. Line numbers can 
+%%
 %% STATUS:
 %% A lex table for erlang_lex() becomes 142 DFA states and is generated
 %% (from regexps to ready to use) in 54.8 msec on my Athlon 1300+. This
-%% is roughly as complex as a programming language lexer gets.
+%% is approximately as complex as a programming language lexer gets.
 %%
 %% No known bugs.
 %%
-%% *** UNFINISHED ***
-%% - needs yecc-compatibility? esp. for incremental parsing
-%%   = write another driver (that acts differently on empty string)
-%% - permit more generous regexps? I don't know what are suitable ones
+%% To understand the code below, you should know about (deterministic
+%% and nondeterministic) finite automata.
 %%
-%% some finer details also remain
-%% - what if {seq, []}?
-%% - what if {disj, []}?
-%% - unicode vs 7b ascii vs 8b ascii vs ...?
-%%   ("lexing chinese"?)
+%% LEXING PERFORMANCE NOTE:
+%%
+%% The driver tries to match a maximally long token (aka "maximal munch")
+%% which means there can be _backtracking_ if a long match ultimately fails.
+%% In that case, the driver emits the longest known match and continues from
+%% the saved point. This means characters can be traversed several times.
+%% Consider the regexp (a|a*b), which matches a single 'a' or any number of
+%% 'a' followed by a 'b'. 
+%%
+%% For the string "aaaaa", the driver will traverse it all to try to
+%% match a*b, then see there is no match and emit 'a'. Then the same
+%% thing is done with the remaining "aaaa", "aaa", "aa" and "a". So
+%% lexing can be slow in this respect (quadratic at worst, I think, as
+%% shown, since you need to match at least one character every time and
+%% each match takes linear time).
+%%
+%% I'm not sure what is done in flex etc. for the corresponding situation.
+%% Note that this sort of overlap is not so common in real use (you need
+%% nasty regexps and nasty input), but be aware that it _may_ happen.
+%% 
+%% RANDOM NOTES:
+%% - An application: composing collections of regexps is simple, you
+%%   just set their priorities and concatenate => you can easily extend
+%%   your tokenizer dynamically! (just regenerate the lexer)
+%% - lex generation is fast, real_erlang_lex() is generated in 66-68
+%%   milliseconds on my 1.6 GHz laptop
+%%
+%% *** UNFINISHED ***
+%% - only handles UTF-8 (or rather, "8-bit ASCII"), will require
+%%   a rewrite to handle larger charsets
+%%   * curr. table requires about (s * c) words, where s is the number
+%%     of states and c the number of characters
+%%     = for 100 states and 65K characters, we get a table of about 26 MB
+%%       which is normally impractical
+%%   * curr. lex drivers work one byte at a time -- they will have to
+%%     be rewritten to munch 1 character at a time (this is probably
+%%     straightforward)
+%%   * probably other issues as well
+%% - permit more generous regexps? I don't know what are suitable ones
+%%   * flex has, e.g., match beginning of line
+%% - the regexp ".*" should probably be replaced by "[^\n]*", which
+%%   only matches up to end of line (I think the latter is what flex
+%%   uses)
+%% - extend lex drivers:
+%%   * incremental 1: if sequence ends, return a resumable state
+%%   * incremental 2: ("yacc compatible") when a token has been
+%%       matched, return it and a resumable state
+%%   * GENERATE CODE rather than just tables
+%%     = suitable when you want something really standalone
+%%     = simple version: emit a suitable driver + the table into a module
+%%       * actions must be emitted as text, somehow, rather than as
+%%         #fun<..>, obviously
+%%     = more complex: PE of driver wrt table
+%%   * variable handling of non-match
+%%     = simply fail (as now)
+%%     = emit non-matching character(s) (as lex/flex does)
+%%     = log failed stuff, etc
+%%     = pass a closure to handle non-matching?
+%%
+%% some finer details also remain to be addressed:
+%% - what if {seq, []}? (never happens, normally)
+%% - what if {disj, []}? (dito)
+%% - unicode vs 7b ascii vs 8b ascii vs ...? hmm
+%%   * "lexing chinese"?
+%%   * the current table structure probably is insufficient for large
+%%     character sets; it should be possible to move to something less
+%%     direct
 
 -module(lex).
--export([regexps_to_table/1,
+-author('thomasl_erlang@yahoo.com').
+-export([with/2,
+	 regexps_to_table/1,
 	 regexps_to_nfa/1,
 	 nfa_to_dfa/1,
 	 dfa_to_table/2
@@ -105,6 +210,31 @@
 	 current_line/0,
 	 count_lines/1
 	]).
+
+%% Examples
+-export([test_lexer/0,
+	 erlang_lex/0,
+	 real_erlang_lex/0,
+	 test/1,
+	 test/2,
+	 test_all/1,
+	 test_exp/1
+	]).
+
+%% Used when lexing a binary:
+-define(least_pos, 0).
+
+%% Wrapped io:format
+-define(log(Str, Xs), ok).
+%% -define(log(Str, Xs), io:format(Str, Xs)).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%% Quick entrypoint
+
+with(Regexp_rules, String) ->
+    Tab = regexps_to_table(Regexp_rules),
+    longest(Tab, String).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -330,54 +460,62 @@ collect_seq([]) ->
 %% The automata are built up from end to start, so that every automaton
 %% always has an existing "next state" to go to, the "accept state" which
 %% is the parameter.
+%%
+%% NOTE: we assume that each NFA state has non-overlapping outgoing ranges.
+%%  If you want to express c:(A -> B | A -> C), that we transition from
+%%  A to B or C when c is found, then you MUST use epsilon transitions:
+%%   (A eps-> S1, A eps-> S2, S1 -c-> B, S2 -c-> C)
+%%
+%% This is _equivalent_to_ having overlapping ranges, but is less terse
+%% (for good or bad).
 
 %% Regexps = [{regexp, RuleID, Regexp_syntree, Action, Prio}]
+%%
+%% The automaton for a regexp is
+%%   () -> (ri) -> (accepti)
+%% where
+%% () is the starting state, (ri) the automaton for ri and (accepti)
+%% the accepting state for ri (invoking its action)
+%% and -> here is an epsilon transition.
+%%
+%% For all regexps, we have a single start state that (conceptually
+%% at least) epsilon-transitions to each of the individual start states.
+%%
+%% NOTE: we ensure/assume that the accepting states are low-numbered.
+%%  This is implicit in calling init_accepting_states/1 to get the FA.
 
 regexps_to_nfa(Regexps) ->
-    %% this should be a collection of _distinct_ accepting states,
-    %% since we must distinguish the rules.
-    %%
-    %% The automaton is
-    %%   () -> (ri) -> (accepti)
-    %% where
-    %% () is the starting state, (ri) the automaton for ri and (accepti)
-    %% the accepting state for ri (invoking its action)
-    %%
-    %% why mapfoldl? because we then need not "merge" the FA datastructures
-    %%
-    %% Note: it might be a good thing to have all accepting states as
-    %% low numbers: it's simple to distinguish them from others!
-    %%
-    
-    %% 1. add accepting states, returns acc.states + FA
-    %%
-    %%    (could possibly combine w. step 2, but we want to keep
-    %%    accepting states low-numbered)
-
-    {AccStates, FA1} =
-	lists:mapfoldl(
-	  fun({regexp, AccID, Regexp, Action, Prio}, FA0) ->
-		  add_accepting_state(AccID, Prio, [], FA0)
-	  end,
-	  empty_fa(),
-	  Regexps
-	 ),
-
-    %% 2. add NFAs ending in accepting states, returns start states + FA
-
-    {StartStates, FA2} =
-	lists:mapfoldl(
-	  fun({{regexp, AccID, Regexp, Action, Prio}, AccState}, FA_in) ->
-		  regexp_to_nfa(Regexp, AccState, FA_in)
-	  end,
-	  FA1,
-	  zip(Regexps, AccStates)
-	 ),
-
-    %% 3. add epsilon transition to all the start states
-
-    {St, FA3} = add_state([ {epsilon, Start} || Start <- StartStates ], FA2),
+    {AccStates, FA1} = init_accepting_states(Regexps),
+    {StartStates, FA2} = nfa_states(Regexps, AccStates, FA1),
+    {St, FA3} = add_epsilon_transitions(StartStates, FA2),
     set_fa_start_state(St, FA3).
+
+%% Add initial accepting states, returns acc.states + FA
+
+init_accepting_states(Regexps) ->
+    lists:mapfoldl(
+      fun({regexp, AccID, Regexp, Action, Prio}, FA0) ->
+	      add_accepting_state(AccID, Prio, [], FA0)
+      end,
+      empty_fa(),
+      Regexps
+     ).
+
+%% Add NFAs ending in accepting states, returns start states + FA
+
+nfa_states(Regexps, AccStates, FA1) ->
+    lists:mapfoldl(
+      fun({{regexp, AccID, Regexp, Action, Prio}, AccState}, FA_in) ->
+	      regexp_to_nfa(Regexp, AccState, FA_in)
+      end,
+      FA1,
+      zip(Regexps, AccStates)
+     ).
+
+%% Add epsilon transition to all the start states
+
+add_epsilon_transitions(StartStates, FA2) ->
+    add_state([ {epsilon, Start} || Start <- StartStates ], FA2).
 
 %% takes (Regexp, ExitState, FA) as arguments
 %% returns {EntryState, NewFA}
@@ -435,8 +573,8 @@ nfa_to_dfa(NFA) ->
     Start = start_state(NFA),
     {NewStateName, Pre_DFA} = merge_nfa_states([Start], NFA, empty_pre_dfa()),
     DFA = pre_dfa_to_dfa(NewStateName, Pre_DFA),
-    io:format("NFA states: ~w~nDFA states: ~w~n", 
-	      [length(states_of(NFA)), length(states_of(DFA))]),
+    ?log("NFA states: ~w~nDFA states: ~w~n", 
+	 [length(states_of(NFA)), length(states_of(DFA))]),
     DFA.
 
 %% list of States to be merged and inserted into Done
@@ -782,7 +920,7 @@ epsilon_reach_all(States, FA, Seen) ->
 
 dfa_to_table(DFA, Regexp_rules) ->
     {AcceptLimit, NewDFA} = group_accepting_states(DFA),
-    io:format("~p accepting states~n", [AcceptLimit]),
+    ?log("~p accepting states~n", [AcceptLimit]),
     Actions = action_table(Regexp_rules, NewDFA, AcceptLimit),
     generate_code(NewDFA, AcceptLimit, Actions).
 
@@ -914,30 +1052,39 @@ rename_state(X, [], Map) ->
 %%
 %% Driving the lexical analysis
 %%
-%% We provide a function that performs tokenization over a string
-%% given a table to work with.
+%% We provide functions that performs tokenization over a string or a
+%% binary given a table to work with.
 %%
 %% There are three kinds of states:
 %% - accepting
 %% - non-accepting
 %% - error (this means no match possible)
 %%
-%% Shortest match: emit token when transiting from accepting state
-%%  to non-accepting or error.
-%%
-%% Longest match: emit latest token when transiting into error state
-%%  and save token when transiting from accepting to non-accepting state
+%% Longest match: emit latest token when transiting into error state;
+%%  save token when transiting from accepting to non-accepting state
+%%  since we may reenter an accepting state later
 %%  (this means more work and some backtracking, but is probably what
 %%  is intended)
 
-%% longest(Lex_table, String) -> [Token]
+%% longest(Lex_table, Sequence) -> [Token]
 %%
+%% A sequence is a string (list of char) or a binary
 
-longest({lex, Start, AcceptLimit, Table, Actions}, String) -> 
+longest(Lex, Seq) when binary(Seq) ->
+    longest_bin(Lex, Seq, start_pos());
+longest(Lex, {Bin, Pos}) when binary(Bin), integer(Pos), Pos >= ?least_pos ->
+    longest_bin(Lex, Bin, Pos);
+longest(Lex, Seq) when list(Seq) ->
+    longest_string(Lex, Seq).
+
+%% Longest match applied to string (list of chars)
+
+longest_string({lex, Start, AcceptLimit, Table, Actions}, String) 
+  when list(String) -> 
     no_lines(),
-    longest(Start, Table, AcceptLimit, Actions, String).
+    longest_string(Start, Table, AcceptLimit, Actions, String).
 
-longest(Start, Table, AcceptLimit, Actions, String) ->
+longest_string(Start, Table, AcceptLimit, Actions, String) ->
     Row = transition_table(Start, Table),
     pre_accept(String, none_acc(), Start, Row, 
 	       Table, AcceptLimit, Start, Actions).
@@ -992,7 +1139,8 @@ pre_accept("", Acc, State, Nxt, Table, AcceptLimit, Start, Actions) ->
 %% If we get into a non-accepting state, save the current match and
 %%  go into post_accept
 
-accept([C|Cs]=Lst, Acc, AccSt, State, Nxt, Table, AcceptLimit, Start, Actions) ->
+accept([C|Cs]=Lst, Acc, AccSt, State, Nxt, 
+       Table, AcceptLimit, Start, Actions) ->
     case next_state(C, Nxt) of
 	?no_match ->
 	    %% error state, so no further matching possible
@@ -1001,9 +1149,10 @@ accept([C|Cs]=Lst, Acc, AccSt, State, Nxt, Table, AcceptLimit, Start, Actions) -
 	    %%
 	    case emit_token(Actions, State, Acc) of
 		no_token ->
-		    longest(Start, Table, AcceptLimit, Actions, Lst);
+		    longest_string(Start, Table, AcceptLimit, Actions, Lst);
 		{token, T} ->
-		    [ T | longest(Start, Table, AcceptLimit, Actions, Lst) ]
+		    [T | longest_string(Start, Table, AcceptLimit, 
+					Actions, Lst) ]
 	    end;
 	N when N =< AcceptLimit ->
 	    %% still in accepting state, keep accumulating
@@ -1045,9 +1194,10 @@ post_accept([C|Cs]=Lst, Acc, AccSt, State, Nxt,
 	    {State0, Acc0, Cs0} = reset_match(AccSt),
 	    case emit_token(Actions, State0, Acc0) of
 		no_token ->
-		    longest(Start, Table, AcceptLimit, Actions, Cs0);
+		    longest_string(Start, Table, AcceptLimit, Actions, Cs0);
 		{token, T} ->
-		    [ T | longest(Start, Table, AcceptLimit, Actions, Cs0) ]
+		    [ T | longest_string(Start, Table, AcceptLimit, 
+					 Actions, Cs0) ]
 	    end;
 	N when N =< AcceptLimit ->
 	    %% we re-enter an accepting state
@@ -1065,9 +1215,9 @@ post_accept("", Acc, AccSt, State, Nxt, Table, AcceptLimit, Start, Actions) ->
     {State0, Acc0, Cs0} = reset_match(AccSt),
     case emit_token(Actions, State0, Acc0) of
 	no_token ->
-	    longest(Start, Table, AcceptLimit, Actions, Cs0);
+	    longest_string(Start, Table, AcceptLimit, Actions, Cs0);
 	{token, T} ->
-	    [ T | longest(Start, Table, AcceptLimit, Actions, Cs0) ]
+	    [ T | longest_string(Start, Table, AcceptLimit, Actions, Cs0) ]
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1105,6 +1255,213 @@ save_match(State, Acc, Cs) ->
 
 reset_match({match, State, Acc, Cs}) ->
     {State, Acc, Cs}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%% Longest match on sequence (binary() or {binary(), position()})
+%%
+%% *** UNFINISHED ***
+%% - does not permit incremental lexing
+
+%% not used, except for testing:
+longest_bin(Lex, Bin) when binary(Bin) ->
+    Pos = start_pos(),
+    longest_bin(Lex, Bin, Pos).
+
+%% Used when matching invoked from longest/2
+
+longest_bin({lex, Start, AcceptLimit, Table, Actions}, Bin, Pos) ->
+    no_lines(),
+    longest_bin(Start, Table, AcceptLimit, Actions, Bin, Pos).
+
+%% the following is used when matching restarts from a saved state {Bin, Pos}.
+
+longest_bin(Start, Table, AcceptLimit, Actions, {Bin, Pos}) ->
+    longest_bin(Start, Table, AcceptLimit, Actions, Bin, Pos).
+
+%% Here is the "moral entrypoint".
+
+longest_bin(Start, Table, AcceptLimit, Actions, Bin, Pos) ->
+    Row = transition_table(Start, Table),
+    pre_accept_bin(Bin, Pos, none_acc(), Start, Row,
+		   Table, AcceptLimit, Start, Actions).
+
+%% @see pre_accept/8 for most parameters (except Bin, Pos) and for
+%% how this is supposed to work.
+%%
+%% Bin: the binary being lexed
+%% Pos: the current position in the binary
+%%
+%% - if we reach end of sequence, stop
+%% - if we reach error state, match fails
+%% - if we enter accepting state, switch to accept_bin
+%% - otherwise, keep going
+%%
+%% *** UNFINISHED ***
+%% - we accumulate the chars into a list (which works)
+%%   but we should also permit just positions to be stored
+%%   for extra speed
+%% - incremental lexing not handled (curr_char not_found => "partial state")
+
+pre_accept_bin(Bin, Pos, Acc, State, Nxt, 
+	       Table, AcceptLimit, Start, Actions) ->
+    case curr_char(Bin, Pos) of
+	not_found ->
+	    %% sequence ended
+	    {no_match, lists:reverse(Acc), {Bin, Pos}};
+	{found, C} ->
+	    case next_state(C, Nxt) of
+		?no_match ->
+		    {no_match, lists:reverse(Acc), {Bin, Pos}};
+		N ->
+		    NewNxt = transition_table(N, Table),
+		    NxtPos = inc_pos(Pos),
+		    if
+			N =< AcceptLimit ->
+			    %% accepting state
+			    accept_bin(Bin, NxtPos, acc(C, Acc), none_acc(),
+				       N, NewNxt, Table, AcceptLimit,
+				       Start, Actions);
+			true ->
+			    %% not accepting
+			    pre_accept_bin(Bin, NxtPos, acc(C,Acc), N, NewNxt,
+					   Table, AcceptLimit, Start, Actions)
+		    end
+	    end
+    end.
+
+%% @see accept/9 for most parameters. Bin is the incoming binary, Pos
+%% is the current position in the binary.
+
+accept_bin(Bin, Pos, Acc, AccSt, State, Nxt, 
+	   Table, AcceptLimit, Start, Actions) ->
+    case curr_char(Bin, Pos) of
+	not_found ->
+	    %% sequence ended, we have a match
+	    case emit_token(Actions, State, Acc) of
+		no_token ->
+		    [];
+		{token, T} ->
+		    [T]
+	    end;
+	{found, C} ->
+	    case next_state(C, Nxt) of
+		?no_match ->
+		    case emit_token(Actions, State, Acc) of
+			no_token ->
+			    %% discard the acc.token, continue matching
+			    longest_bin(Start, Table, AcceptLimit, 
+					Actions, Bin, Pos);
+			{token, T} ->
+			    %% emit the token, continue matching
+			    [ T | longest_bin(Start, Table, AcceptLimit,
+					      Actions, Bin, Pos) ]
+	 	    end;
+		N ->
+		    NxtPos = inc_pos(Pos),
+		    NewNxt = transition_table(N, Table),
+		    if
+			N =< AcceptLimit ->
+			    %% remain in accepting state
+			    accept_bin(Bin, NxtPos, acc(C, Acc), AccSt, N,
+				       NewNxt, Table, AcceptLimit, 
+				       Start, Actions);
+			true ->
+			    %% leave accepting state, save what has
+			    %% matched so far
+			    post_accept_bin(Bin, NxtPos, acc(C, Acc),
+					    save_match(State, Acc, {Bin, Pos}),
+					    N, NewNxt, Table,
+					    AcceptLimit, Start, Actions)
+		    end
+	    end
+    end.
+
+%% @see post_accept/9 for most arguments; Bin and Pos is the binary
+%% and the position in the binary
+
+post_accept_bin(Bin, Pos, Acc, AccSt, State, Nxt,
+		Table, AcceptLimit, Start, Actions) ->
+    case curr_char(Bin, Pos) of
+	not_found ->
+	    %% no match possible, reset to saved token and continue from
+	    %% there
+	    {State0, Acc0, Seq0} = reset_match(AccSt),
+	    case emit_token(Actions, State0, Acc0) of
+		no_token ->
+		    longest_bin(Start, Table, AcceptLimit, 
+				Actions, Seq0);
+		{token, T} ->
+		    [ T | longest_bin(Start, Table, AcceptLimit, 
+				      Actions, Seq0) ]
+	    end;
+	{found, C} ->
+	    case next_state(C, Nxt) of
+		?no_match ->
+		    %% reset to saved token
+		    {State0, Acc0, Seq0} = reset_match(AccSt),
+		    case emit_token(Actions, State0, Acc0) of
+			no_token ->
+			    longest_bin(Start, Table, AcceptLimit, 
+					Actions, Seq0);
+			{token, T} ->
+			    [T | longest_bin(Start, Table, AcceptLimit,
+					     Actions, Seq0) ]
+		    end;
+		N ->
+		    NxtPos = inc_pos(Pos),
+		    NewNxt = transition_table(N, Table),
+		    if
+			N =< AcceptLimit ->
+			    %% reenter accepting state
+			    accept_bin(Bin, NxtPos, acc(C, Acc), AccSt, 
+				       N, NewNxt,
+				       Table, AcceptLimit, Start, Actions);
+			true ->
+			    %% still non-accepting
+			    post_accept_bin(Bin, NxtPos, acc(C, Acc), AccSt,
+					    N, NewNxt, Table, AcceptLimit,
+					    Start, Actions)
+		    end
+	    end
+    end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%% The character to be read is indicated by the "current position" in
+%% the binary. This position is an abstract value, only to be used with
+%% curr_char/2 and inc_pos/1.
+%%
+%% - see the match expression in curr_char/2 for an explanation why
+%%   we really store CurrPos-1 instead of CurrPos
+
+%% This is the abstract "start of sequence" position.
+%%
+%% if start_pos() is changed, also change ?least_pos above
+
+start_pos() ->
+    0.
+
+%% Increment position by one.
+%%
+%% = should be inlined
+
+inc_pos(Pos) ->
+    Pos+1.
+
+%% Select the current character. Note that since binaries are 1-indexed,
+%% and we use PrevPos as 0-indexed, we get a relatively simple match 
+%% expression (should be compilable into nice code).
+%%
+%% = should be inlined
+
+curr_char(Bin, PrevPos) ->
+    case Bin of
+	<<_:PrevPos/binary, C, _/binary>> ->
+	    {found, C};
+	_ ->
+	    not_found
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
@@ -1447,6 +1804,9 @@ zip([], []) ->
 warning(Str, Xs) ->
     io:format("Warning: " ++ Str, Xs).
 
+log(Str, Xs) ->
+    io:format(Str, Xs).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
 %% Testing stuff beyond this
@@ -1492,7 +1852,7 @@ test(1, String) ->
 %%
 %% (currently: 112 NFA states, 36 DFA states with 28 accepting states)
 
-test_grammar() ->
+test_lexer() ->
     [{regexp, ",", comma},
      {regexp, "\\(", lpar},     
      {regexp, "\\)", rpar},     
@@ -1658,7 +2018,7 @@ real_erlang_lex() ->
      {regexp, 1, "catch", token('catch') },
      {regexp, 1, "end", token('end') },
      {regexp, 1, "fun", token('fun') },
-     {regexp, 1, "if", token('if') },    % rule) 30
+     {regexp, 1, "if", token('if') },    % rule 30
      {regexp, 1, "of", token('of') },
      {regexp, 1, "receive", token('receive') },
      {regexp, 1, "when", token('when') },
@@ -1784,3 +2144,13 @@ whitespace() ->
 	    %% io:format("whitespace '~s'~n", [lists:reverse(Acc)]),
 	    no_token
     end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% Here is a rule for floats that also handles various IEEE special numbers
+
+float_rules() ->
+    [{regexp, 0, 
+      "((\\+|-)?[0-9]+\\.[0-9]+((E|e)(\\+|-)?[0-9]+)?|NAN|NaN|(\\+|-)?(INF|Inf|inf))",item(float)}
+    ].
+

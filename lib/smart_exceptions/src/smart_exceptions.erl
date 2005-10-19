@@ -1,5 +1,6 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Copyright (C) 2003 Thomas Lindgren <thomasl_erlang@yahoo.com>.
+%% @copyright Copyright(C) 2003-2005 Thomas Lindgren <thomasl_erlang@yahoo.com>.
+%% @license
 %% All rights reserved.
 %%
 %% Redistribution and use in source and binary forms, with or without
@@ -25,9 +26,10 @@
 %% NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 %% SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %%
+%%
 %%			   SMART EXCEPTIONS
 %%
-%% Author: Thomas Lindgren (030414-)
+%% Author: Thomas Lindgren (030414-; 051016)
 %%
 %% A simplified version of the earlier smart_exceptions.
 %%
@@ -53,6 +55,9 @@
 %% external distribution, just use parse_transform/2
 %%
 %% *** UNFINISHED ***
+%% - does not work for Wings 0.98.31 (lots of unsafe variables)
+%%   * the generated code looks a bit iffy
+%% - R10B compatibility is weak, not very tested
 %% - function undefined exceptions not caught, likewise for funs
 %%   * see error_handler:undefined_function/3 undefined_lambda/3
 %%     however, we can't redefine this globally
@@ -66,6 +71,16 @@
 -author('thomasl_erlang@yahoo.com').
 -export([parse_transform/2]).
 -export([file/2, file/3]).    %% only for internal use
+
+%% define r10 means 'try' is used in the generated code rather
+%% than 'catch'. Note that try is _handled_ by default.
+%%-define(r10, true).
+%% define 'internal' when you have my internal utilities available.
+%%-define(internal, true).
+
+%% use the first definition of ?msg when you want mild debug info
+%%-define(msg(Str, Xs), io:format(Str, Xs)).
+-define(msg(Str, Xs), ok).
 
 -define(default_exn_handler_mod, smart_exc_rt).
 
@@ -82,6 +97,7 @@ parse_transform(Forms, Opts) ->
 	none ->
 	    Forms;
 	_ ->
+	    ?msg("smart_exceptions for module\n", []),
 	    forms(M, Handler, Forms)
     end.
 
@@ -122,10 +138,120 @@ module({Mod, Exp, Forms, Misc}) ->
     Handler = get_exc_handler(),
     {Mod, Exp, forms(Mod, Handler, Forms), Misc}.
 
-forms(M, Handler, Forms) when atom(M), atom(Handler) ->
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%% Resolve local calls to primitive operations as follows:
+%% 1. Collect all function names defined in module, including imports
+%% 2. Walk each form, replacing local calls with remote ones
+%%
+%% As a side effect, we also resolve imported functions into remote
+%% calls at this point.
+
+simple_resolve_imports(Forms) ->
+    Imps_and_funcs = func_defs(Forms),
+    resolve_calls(Forms, Imps_and_funcs).
+
+func_defs([{attribute, La, import, {M, FAs}}|Forms]) ->
+    [ {{F,A}, {import, M}} || {F,A} <- FAs ] ++ func_defs(Forms);
+func_defs([{function,Lf, F, A, Clss}|Forms]) ->
+    [ {{F,A}, local} | func_defs(Forms) ];
+func_defs([_|Forms]) ->
+    func_defs(Forms);
+func_defs([]) ->
+    [].
+
+resolve_calls(Forms, FuncDefs) ->
+    [ resolve_form(Form, FuncDefs) || Form <- Forms ].
+
+%% Resolve imports to remote calls. Note that we FIRST check whether
+%% a local is a call to an erlang BIF. If so, the call is made to
+%% erlang:f(...). This is deliberate, since Erlang itself behaves that way.
+%% (Doing so is also arguable the wrong thing.)
+
+-ifdef(internal).
+resolve_form({function, _Lf, Fn, Ar, _Clss} = Form, FuncDefs) ->
+    ?msg("Resolving ~p\n", [{Fn, Ar}]),
+    mapform:form(
+      fun id/1,
+      fun id/1,
+      fun id/1,
+      fun id/1,
+      fun({call, Lc, {atom, Lf, F}, As}=Expr) ->
+	      FA = {F, A = length(As)},
+	      case erlang:is_builtin(erlang,F,A) of
+		  true ->
+		      %% if ALSO defined locally, should warn
+		      ?msg("Looking up ~p -> bif\n", [FA]),
+		      Lm = Lc,
+		      {call, Lc, 
+		       {remote, Lc, 
+			{atom, Lm, erlang}, {atom, Lf, F}}, As};
+		  false ->
+		      case lists:keysearch(FA, 1, FuncDefs) of
+			  {value, {_, local}} ->
+			      ?msg("Looking up ~p -> local\n", [FA]),
+			      Expr;
+			  {value, {_, {import, M}}} ->
+			      ?msg("Looking up ~p -> import\n", [FA]),
+			      {call, Lc,
+			       {remote, Lc, {atom, Lc, M}, {atom, Lf, F}}, As};
+			  false ->
+			      ?msg("Looking up ~p -> undefined\n", [FA]),
+			      Expr
+		      end
+	      end;
+	 (Expr) ->
+	      Expr
+      end,
+      fun(Wh, Oth) -> Oth end,
+      Form
+     );
+resolve_form(Form, FuncDefs) ->
+    Form.
+-else.
+resolve_form({function, _Lf, Fn, Ar, _Clss} = Form, FuncDefs) ->
+    ?msg("Resolving ~p\n", [{Fn, Ar}]),
+    mapform0(
+      fun({call, Lc, {atom, Lf, F}, As}=Expr) ->
+	      FA = {F, A = length(As)},
+	      case erlang:is_builtin(erlang,F,A) of
+		  true ->
+		      %% if ALSO defined locally, should warn
+		      ?msg("Looking up ~p -> bif\n", [FA]),
+		      Lm = Lc,
+		      {call, Lc, 
+		       {remote, Lc, 
+			{atom, Lm, erlang}, {atom, Lf, F}}, As};
+		  false ->
+		      case lists:keysearch(FA, 1, FuncDefs) of
+			  {value, {_, local}} ->
+			      ?msg("Looking up ~p -> local\n", [FA]),
+			      Expr;
+			  {value, {_, {import, M}}} ->
+			      ?msg("Looking up ~p -> import\n", [FA]),
+			      {call, Lc,
+			       {remote, Lc, {atom, Lc, M}, {atom, Lf, F}}, As};
+			  false ->
+			      ?msg("Looking up ~p -> undefined\n", [FA]),
+			      Expr
+		      end
+	      end;
+	 (Syntax) ->
+	      Syntax
+      end,
+      Form
+     );
+resolve_form(Form, FuncDefs) ->
+    Form.
+-endif.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+forms(M, Handler, Forms0) when atom(M), atom(Handler) ->
+    Forms = simple_resolve_imports(Forms0),
     [ form(M, Handler, Form) || Form <- Forms ].
 
--ifdef(om).
+-ifdef(internal).
 form(M, Handler, Form) ->
     {F, A} = function_name(Form),
     mapform:form(
@@ -157,6 +283,8 @@ form(M, Handler, Form) ->
 	      handle_unop(M, F, A, Lo, Op, E1, Handler);
 	 ({call,Lc,{remote,Lr,{atom,Lm,erlang},{atom,Lf,exit}},[Rsn]}=E) ->
 	      handle_exit(M, F, A, Lc, Rsn, Handler);
+	 ({call,Lc,{remote,Lr,{atom,Lm,erlang},{atom,Lf,fault}},[Rsn]}=E) ->
+	      handle_fault(M, F, A, Lc, Rsn, Handler);
 	 ({call,Lc,{atom,Lf,exit},[Rsn]}=E) ->
 	      handle_exit(M, F, A, Lc, Rsn, Handler);
 	 ({call,Lc,{remote,Lr,{atom,Lm,Mod},{atom,Lf,Fn}},As}=E) ->
@@ -167,9 +295,14 @@ form(M, Handler, Form) ->
 		  false ->
 		      E
 	      end;
+	 ({'try', Lt, Es, Clss, Try_clss, AfterEs}=E) ->
+	      %% - at present we just extend the regular Clss
+	      NewClss = handle_try_clause(M, F, A, Lt, Clss, Handler),
+	      {'try', Lt, Es, NewClss, Try_clss, AfterEs};
 	 (E) ->
 	      E
       end,
+      fun(Wh, Oth) -> Oth end,
       Form
      ).
 
@@ -203,6 +336,8 @@ form(M, Handler, Form) ->
 	      handle_unop(M, F, A, Lo, Op, E1, Handler);
 	 ({call,Lc,{remote,Lr,{atom,Lm,erlang},{atom,Lf,exit}},[Rsn]}=E) ->
 	      handle_exit(M, F, A, Lc, Rsn, Handler);
+	 ({call,Lc,{remote,Lr,{atom,Lm,erlang},{atom,Lf,fault}},[Rsn]}=E) ->
+	      handle_fault(M, F, A, Lc, Rsn, Handler);
 	 ({call,Lc,{atom,Lf,exit},[Rsn]}=E) ->
 	      handle_exit(M, F, A, Lc, Rsn, Handler);
 	 ({call,Lc,{remote,Lr,{atom,Lm,Mod},{atom,Lf,Fn}},As}=E) ->
@@ -213,6 +348,10 @@ form(M, Handler, Form) ->
 		  false ->
 		      E
 	      end;
+	 ({'try', Lt, Es, Clss, Try_clss, AfterEs}=E) ->
+	      %% - at present we just extend the regular Clss
+	      NewClss = handle_try_clause(M, F, A, Lt, Clss, Handler),
+	      {'try', Lt, Es, NewClss, Try_clss, AfterEs};
 	 (E) ->
 	      E
       end,
@@ -221,14 +360,6 @@ form(M, Handler, Form) ->
 -endif.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%%
-%% To suppress warnings for clauses that cannot match in R10B,
-%% we mark the clauses as compiler-generated by giving it a negative
-%% line number. That is probably harmless in pre-R10B versions.
-%% /Bjorn Gustavsson
-%%
-
 
 handle_function_clause(M, F, A, Lf, Clss, Handler) ->
     N = clauses_arity(Clss),
@@ -251,6 +382,16 @@ handle_if_clause(M, F, A, Lf, Clss, Handler) ->
 	[{clause, -Lf, Exc_hd, [], 
 	  [clause_handler(Handler, M, F, A, Lf, if_clause, Exc_hd)]}].
 
+handle_try_clause(M, F, A, Lf, Clss = [], Handler) ->
+    %% clauses may be empty, in which case we add nothing
+    Clss;
+handle_try_clause(M, F, A, Lf, Clss, Handler) ->
+    N = clauses_arity(Clss),
+    Exc_hd = mk_vars(1,N),
+    Clss ++ 
+	[{clause, -Lf, Exc_hd, [], 
+	  [clause_handler(Handler, M, F, A, Lf, try_clause, Exc_hd)]}].
+
 %% Note: we match the handler "P = <handler>" since
 %% erlc will think the clause is unsafe otherwise (since it always exits
 %% it's actually safe).
@@ -268,9 +409,11 @@ handle_match(M, F, A, Lm, P, E, Handler) ->
     {'case', Lm, E,
      [{clause, Lm, [{match, Lm, X, P}], [], [X]},
       {clause, -Lm, Exc_hd, [],
-       [{match, Lm, P, 
+       [{match, -Lm, P, 
 	 clause_handler(Handler, M, F, A, Lm, match, Exc_hd)}]}]}.
 
+-ifndef(r10).
+%% R9: catch and rethrow exception
 handle_binop(M, F, A, Lo, Op, E1, E2, Handler) ->
     Rsn = new_var(),
     X1 = new_var(),
@@ -280,12 +423,32 @@ handle_binop(M, F, A, Lo, Op, E1, E2, Handler) ->
      [{match, Lo, X1, E1},
       {match, Lo, X2, E2},
       {'case', Lo, {'catch', Lo, {op, Lo, Op, X1, X2}},
-       [{clause, Lo, [{tuple, Lo, [{atom, Lo, 'EXIT'}, Rsn]}], [],
+       [{clause, -Lo, [{tuple, Lo, [{atom, Lo, 'EXIT'}, Rsn]}], [],
 	 [op_handler(Handler, M, F, A, Lo, Rsn, binop, Op, [X1,X2])]},
-	{clause, Lo, [Res], [], [Res]}]}
+	{clause, -Lo, [Res], [], [Res]}]}
      ]
     }.
+-else.
+%% R10: use try
+handle_binop(M, F, A, Lo, Op, E1, E2, Handler) ->
+    Rsn = new_var(),
+    X1 = new_var(),
+    X2 = new_var(),
+    Res = new_var(),
+    {block, Lo,
+     [{match, Lo, X1, E1},
+      {match, Lo, X2, E2},
+      {'try', Lo,
+       [{op, Lo, Op, X1, X2}],
+       [],
+       [{clause, -Lo, [exit_pat(Rsn)], [],
+	 [op_handler(Handler, M, F, A, Lo, Rsn, binop, Op, [X1,X2])]}],
+       []
+      }]}.
+-endif.
 
+-ifndef(r10).
+%% R9: catch and rethrow exception
 handle_unop(M, F, A, Lo, Op, E1, Handler) ->
     Rsn = new_var(),
     X1 = new_var(),
@@ -293,15 +456,36 @@ handle_unop(M, F, A, Lo, Op, E1, Handler) ->
     {block, Lo,
      [{match, Lo, X1, E1},
       {'case', Lo, {'catch', Lo, {op, Lo, Op, X1}},
-       [{clause, Lo, [{tuple, Lo, [{atom, Lo, 'EXIT'}, Rsn]}], [],
+       [{clause, -Lo, [{tuple, Lo, [{atom, Lo, 'EXIT'}, Rsn]}], [],
 	 [op_handler(Handler, M, F, A, Lo, Rsn, unop, Op, [X1])]},
-	{clause, Lo, [Res], [], [Res]}]}
+	{clause, -Lo, [Res], [], [Res]}]}
      ]
     }.
+-else.
+%% R10: use try
+handle_unop(M, F, A, Lo, Op, E1, Handler) ->
+    Rsn = new_var(),
+    X1 = new_var(),
+    Res = new_var(),
+    {block, Lo,
+     [{match, Lo, X1, E1},
+      {'try', Lo,
+       [{op, Lo, Op, X1}],
+       [],
+       [{clause, 0, [exit_pat(Rsn)], [], 
+	 [op_handler(Handler, M, F, A, Lo, Rsn, unop, Op, [X1])]}],
+       []
+      }]}.
+-endif.
 
 handle_exit(M, F, A, Le, Rsn, Handler) ->
     exit_handler(Handler, M, F, A, Le, Rsn).
 
+handle_fault(M, F, A, Le, Rsn, Handler) ->
+    fault_handler(Handler, M, F, A, Le, Rsn).
+
+-ifndef(r10).
+%% R9: catch and rethrow exception
 handle_bif(M, F, A, Lb, Mod, Fn, Ar, Args, Handler) ->
     Xs = mk_vars(1, Ar),
     BIF_call = {call, Lb,
@@ -312,10 +496,35 @@ handle_bif(M, F, A, Lb, Mod, Fn, Ar, Args, Handler) ->
     {block, Lb,
      [ {match, Lb, X, Arg} || {X, Arg} <- zip(Xs, Args) ]
      ++ [{'case', Lb, {'catch', 0, BIF_call},
-	  [{clause, Lb, [{tuple, Lb, [{atom, Lb, 'EXIT'}, Rsn]}], [],
+	  [{clause, -Lb, [{tuple, Lb, [{atom, Lb, 'EXIT'}, Rsn]}], [],
 	    [op_handler(Handler, M, F, A, Lb, Rsn, bif, {Mod, Fn}, Xs)]},
-	   {clause, Lb, [Res], [], [Res]}]}]
+	   {clause, -Lb, [Res], [], [Res]}]}]
     }.
+-else.
+%% R10: use try
+handle_bif(M, F, A, Lb, Mod, Fn, Ar, Args, Handler) ->
+    Xs = mk_vars(1, Ar),
+    BIF_call = {call, Lb,
+		{remote, Lb, {atom, Lb, Mod}, {atom, Lb, Fn}},
+		Xs},
+    Rsn = new_var(),
+    Res = new_var(),
+    {block, Lb,
+     [ {match, Lb, X, Arg} || {X, Arg} <- zip(Xs, Args) ]
+     ++ 
+     [{'try', Lb, [BIF_call],
+       [],
+       [{clause, -Lb, [exit_pat(Rsn)], [], 
+	 [op_handler(Handler, M, F, A, Lb, Rsn, bif, {Mod, Fn}, Xs)]}],
+       []
+      }]}.
+-endif.
+
+-ifdef(r10).
+%% Internally, try clauses exit:Rsn are converted to {exit,Rsn,_}
+exit_pat(Rsn) ->
+    {tuple, 0, [{atom,0,exit},Rsn,{var,0,'_'}]}.
+-endif.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
@@ -334,6 +543,22 @@ exit_handler(Handler, M, F, A, Line, Rsn) ->
 		[ erl_parse:abstract(Term) 
 		  || Term <- [{M, F, A}, {line, Line}] ] ++ [Rsn],
 	    mk_exit(Line, Args);
+	smart_exc ->
+	    Args = 
+		[ erl_parse:abstract(Term) 
+		  || Term <- [M, F, A, Line] ] ++ [Rsn],
+	    mk_invoke(Line, Handler, Args)
+    end.
+
+%% For faults (special form of exits, {Rsn, CallStack})
+
+fault_handler(Handler, M, F, A, Line, Rsn) ->
+    case ?exn_handler of
+	smart_exit ->
+	    Args = 
+		[ erl_parse:abstract(Term) 
+		  || Term <- [{M, F, A}, {line, Line}] ] ++ [Rsn],
+	    mk_fault(Line, Args);
 	smart_exc ->
 	    Args = 
 		[ erl_parse:abstract(Term) 
@@ -385,6 +610,11 @@ op_handler(Handler, M, F, A, Line, Rsn, Ty, Op, Exc_hd) ->
 mk_exit(Line, Args) ->
     {call, Line, 
      {atom, Line, exit}, 
+     [{tuple, Line, Args}]}.
+
+mk_fault(Line, Args) ->
+    {call, Line, 
+     {remote, Line, {atom, Line, erlang}, {atom, Line, fault}}, 
      [{tuple, Line, Args}]}.
 
 mk_invoke(Line, Handler, Args) ->

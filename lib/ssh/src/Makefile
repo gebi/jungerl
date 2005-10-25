@@ -39,7 +39,9 @@ MODULES = \
 	ssh_dist \
 	ssh_epmd \
 	ssh \
-	sftp
+	sftp \
+	scp
+
 
 
 INCLUDE = ../include

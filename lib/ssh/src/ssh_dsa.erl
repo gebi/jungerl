@@ -33,7 +33,7 @@ verify_file(File, Sig) ->
     verify(Key, Bin, Sig).
 
 
-sign(Private=#ssh_key { private={P,Q,G,X} },Mb) ->
+sign(#ssh_key { private={P,Q,G,X} },Mb) ->
     K = ssh_bits:irandom(160) rem Q,
     R = ssh_math:ipow(G, K, P) rem Q,
     Ki = ssh_math:invert(K, Q),
@@ -42,7 +42,7 @@ sign(Private=#ssh_key { private={P,Q,G,X} },Mb) ->
     <<R:160/big-unsigned-integer, S:160/big-unsigned-integer>>.
 
 
-verify(Public=#ssh_key { public={P,Q,G,Y} },Mb,Sb) ->
+verify(#ssh_key { public={P,Q,G,Y} },Mb,Sb) ->
     <<R0:160/big-unsigned-integer, S0:160/big-unsigned-integer>> = Sb,
     ?ssh_assert(R0 >= 0 andalso R0 < Q andalso
 		S0 >= 0 andalso S0 < Q, out_of_range),

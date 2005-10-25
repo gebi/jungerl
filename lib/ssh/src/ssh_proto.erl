@@ -22,7 +22,8 @@
 -export([disconnect/2, disconnect/3, disconnect/4]).
 
 -export([client_init/4, server_init/3]).
--export([sign/3]).
+-export([server_sys_init/2]).
+-export([sign/3, verify/4]).
 
 %% io wrappers
 -export([read_password/2, read_line/2]).
@@ -198,7 +199,9 @@ read_line(SSH, Prompt) when record(SSH,ssh) ->
 
 sign(SSH, Key, Data) when record(Key, ssh_key), pid(SSH) ->
     call(SSH, {sign, Key, Data}).
-    
+
+verify(SSH, Key, Data, Signature) when record(Key, ssh_key), pid(SSH) ->
+    call(SSH, {verify, Key, Data, Signature}).    
 
 call(SSH, Req) ->
     Ref = make_ref(),
@@ -230,6 +233,13 @@ listen(Port, Opts) ->
 listen(Addr, Port, Opts) ->
     spawn_link(?MODULE, server_init, [Addr, Port, Opts]).
 
+%% send protocol message
+send(SSH, R) ->
+    SSH ! {ssh_msg, self(), R}.
+
+install(SSH, Messages) ->
+    SSH ! {ssh_install, Messages}.
+
 debug(SSH, Message) ->
     debug(SSH, true, Message, "en").
 
@@ -237,27 +247,31 @@ debug(SSH, Message, Lang) ->
     debug(SSH, true, Message, Lang).
 
 debug(SSH, Display, Message, Lang) ->
-    SSH ! {ssh_msg, self(), #ssh_msg_debug { always_display = Display,
-					     message = Message,
-					     language = Lang }}.
+    R = #ssh_msg_debug { always_display = Display,
+			 message = Message,
+			 language = Lang },
+    send(SSH, R).
 
 ignore(SSH, Data) ->
-    SSH ! {ssh_msg, self(), #ssh_msg_ignore { data = Data }}.
+    send(SSH, #ssh_msg_ignore { data = Data }).
 
 disconnect(SSH, Code) ->
     disconnect(SSH, Code, "", "").
 
-disconnect(SSH, Code, Msg) ->
+disconnect(SSH, Code, _Msg) ->
     disconnect(SSH, Code, "", "").
 
+
+
 disconnect(SSH, Code, Msg, Lang) ->
-    SSH ! {ssh_msg, self(), #ssh_msg_disconnect { code = Code,
-						  description = Msg,
-						  language = Lang }}.
+    R = #ssh_msg_disconnect { code = Code,
+			      description = Msg,
+			      language = Lang },
+    send(SSH, R).
 
 
 service_request(SSH, Name) ->
-    SSH ! {ssh_msg, self(), #ssh_msg_service_request { name = Name}},
+    send(SSH,#ssh_msg_service_request { name = Name}),
     receive
 	{ssh_msg, SSH, R} when record(R, ssh_msg_service_accept) ->
 	    ok;
@@ -288,7 +302,7 @@ client_init(User, Host, Port, Opts) ->
 
 server_init(Addr, Port, Opts) ->
     Serv = fun(S) ->
-		   User = spawn_link(?MODULE,server_sys_init, [self()]),
+		   User = spawn_link(?MODULE,server_sys_init, [self(),Opts]),
 		   SSH = ssh_init(S, server, Opts),
 		   server_hello(S, User, SSH)
 	   end,
@@ -296,24 +310,16 @@ server_init(Addr, Port, Opts) ->
 			       {ifaddr,Addr},{reuseaddr,true}],
 			Serv).
 
-
 %%
 %% Subsystem dispatcher!!!
 %%
-server_sys_init(SSH) ->
+server_sys_init(SSH, Opts) ->
+    io:format("SSH: server_sys_init: started ~p\n", [self()]),
     receive
-	{ok, SSH} -> %% wait for connection to be ready
-	    server_sys(SSH)
-    end.
-
-server_sys(SSH) ->
-    receive
-	{ssh_msg, SSH, Msg} ->
-	    io:format("SSH: server_sys: got message ~p\n", [Msg]),
-	    server_sys(SSH);
-	Other ->
-	    io:format("SSH: server_sys: got message ~p\n", [Other]),
-	    server_sys(SSH)
+	{SSH, {ok, SSH}} -> %% wait for connection to be ready
+	    ssh_cm:server_init(SSH, Opts);
+	{SSH, {error,Reason}} ->
+	    io:format("SSH: server_sys_init: error=~p\n", [Reason])
     end.
 
 %%
@@ -636,7 +642,7 @@ client_kex(S, SSH, 'diffie-hellman-group-exchange-sha1') ->
 	Error ->
 	    Error
     end;
-client_kex(S, SSH, Kex) ->
+client_kex(_S, _SSH, Kex) ->
     {error, {bad_kex_algorithm, Kex}}.
 
 
@@ -699,7 +705,7 @@ server_kex(S, SSH, 'diffie-hellman-group-exchange-sha1') ->
 	Error ->
 	    Error
     end;
-server_kex(S, SSH, Kex) ->
+server_kex(_S, _SSH, Kex) ->
     {error, {bad_kex_algorithm, Kex}}.
 
 
@@ -736,8 +742,7 @@ ssh_main(S, User, SSH) ->
 						      get(recv_sequence)-1}),
 		    inet:setopts(S, [{active, once}]),
 		    ssh_main(S, User, SSH);
-		{error, Other} ->
-		    
+		{error, _Other} ->
 		    inet:setopts(S, [{active, once}]),
 		    %% send disconnect!
 		    User ! {ssh_msg, self(),
@@ -749,6 +754,7 @@ ssh_main(S, User, SSH) ->
 	    end;
 
 	{tcp_closed, S} ->
+	    %% io:format("ssh_proto: Got tcp_closed User=~p\n", [User]),
 	    User ! {ssh_msg, self(),
 		    #ssh_msg_disconnect { code=?SSH_DISCONNECT_CONNECTION_LOST,
 					  description = "Connection closed",
@@ -796,7 +802,10 @@ handle_call({get_cb,key}, From, SSH) ->
 handle_call({sign,Key,Data}, From, SSH) ->
     reply(SSH, From, {ok, sign_data(Key, Data, SSH)}),
     SSH;
-handle_call(Other, From, SSH) ->
+handle_call({verify, Key, Data, Signature}, From, SSH) ->
+    reply(SSH, From, verify_data(Key, Data, Signature, SSH)),
+    SSH;
+handle_call(_Other, From, SSH) ->
     reply(SSH, From, {error, bad_call}),
     SSH.
 
@@ -815,17 +824,15 @@ get_host_key(SSH) ->
     case ALG#alg.hkey of
 	'ssh-rsa' ->
 	    case Mod:private_host_rsa_key(Scope) of
-		{ok,Key=#ssh_key { public={N,E}} } ->
-		    {Key,
-		     ssh_bits:encode(["ssh-rsa",E,N],[string,mpint,mpint])};
+		{ok,Key=#ssh_key { public={_,_}} } ->
+		    {Key, ssh_bits:key_to_blob(Key)};
 		Error ->
 		    exit(Error)
 	    end;
 	'ssh-dss' ->
 	    case Mod:private_host_dsa_key(Scope) of
-		{ok,Key=#ssh_key { public={P,Q,G,Y}}} ->
-		    {Key, ssh_bits:encode(["ssh-dss",P,Q,G,Y],
-					  [string,mpint,mpint,mpint,mpint])};
+		{ok,Key=#ssh_key { public={_,_,_,_}}} ->
+		    {Key, ssh_bits:key_to_blob(Key)};
 		Error ->
 		    exit(Error)
 	    end;
@@ -844,8 +851,38 @@ sign_data(Key, Data, SSH) ->
 	    ssh_bits:encode(["ssh-dss",SIG],[string,binary])
     end.
 
+verify_data(Key, Data, Signature, SSH) ->
+    SessionID = SSH#ssh.session_id,
+    case Key#ssh_key.type of
+	rsa -> 
+	    case catch ssh_bits:decode(Signature, [string,binary]) of
+		["ssh-rsa",SIG] ->
+		    H = <<?STRING(SessionID),Data/binary>>,
+		    case catch ssh_rsa:verify(Key,H,SIG) of 
+			{'EXIT',Reason} -> {error, Reason};
+			Res -> Res
+		    end;
+		_ ->
+		    {error, bad_signature}
+	    end;
+	dsa -> 
+	    case catch ssh_bits:decode(Signature,[string,binary]) of
+		["ssh-dss",SIG] ->
+		    H = <<?STRING(SessionID),Data/binary>>,
+		    case catch ssh_dsa:verify(Key, H, SIG) of
+			{'EXIT',Reason} -> {error, Reason};
+			Res -> Res
+		    end;
+		_ ->
+		    {error, bad_signature}
+	    end;
+	_ ->
+	    {error, bad_key}
+    end.
+    
 
-sign_host_key(S, SSH, Private, H) ->
+
+sign_host_key(_S, SSH, Private, H) ->
     ALG = SSH#ssh.algorithms,
     case ALG#alg.hkey of
 	'ssh-rsa' ->
@@ -870,7 +907,7 @@ sign_host_key(S, SSH, Private, H) ->
 
 
 
-verify_host_key(S, SSH, K_S, H, H_SIG) ->
+verify_host_key(_S, SSH, K_S, H, H_SIG) ->
     ALG = SSH#ssh.algorithms,
     case ALG#alg.hkey of
 	'ssh-rsa' ->
@@ -909,7 +946,7 @@ known_host_key(SSH, Public) ->
     case (SSH#ssh.key_cb):lookup_host_key(SSH#ssh.peer) of
 	{ok, Public} ->
 	    ok;
-	{ok, BadPublic} ->
+	{ok, _BadPublic} ->
 	    case (SSH#ssh.key_cb):update_host_key(SSH#ssh.peer,Public) of
 		{'EXIT',_} ->
 		    {error, bad_public_key};
@@ -1083,7 +1120,7 @@ save_alg(Role, ALG, [{Key,A} | As]) ->
 		s_lng -> save_alg(Role, ALG#alg { s_lng = A }, As)
 	    end
     end;
-save_alg(Role, ALG, []) ->
+save_alg(_Role, ALG, []) ->
     ALG.
 
 install_alg(SSH) ->
@@ -1649,7 +1686,7 @@ hash(SSH, Char, Bits) ->
 	end,
     hash(SSH, Char, Bits, HASH).
 
-hash(SSH, Char, 0, HASH) ->
+hash(_SSH, _Char, 0, _HASH) ->
     <<>>;
 hash(SSH, Char, N, HASH) ->
     K = ssh_bits:mpint(SSH#ssh.shared_secret),
@@ -1661,7 +1698,7 @@ hash(SSH, Char, N, HASH) ->
     ?DBG(SSH, ?DBG_KEX, "Key ~s: ~s\n", [Char, fmt_binary(Key, 16, 4)]),
     Key.
 
-hash(K, H, Ki, N, HASH) when N =< 0 ->
+hash(_K, _H, Ki, N, _HASH) when N =< 0 ->
     Ki;
 hash(K, H, Ki, N, HASH) ->
     Kj = HASH([K, H, Ki]),
@@ -1741,8 +1778,8 @@ valid_mac(SSH, S, Data, Seq) ->
 dh_group1() ->
     {2, 16#FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE65381FFFFFFFFFFFFFFFF}.
 
-dh_gen_key(G,P, Bits) ->
-    Q = (P-1) div 2,
+dh_gen_key(G,P, _Bits) ->
+    _Q = (P-1) div 2,
     Private = ssh_bits:irandom(ssh_bits:isize(P)-1, 1, 1),
     Public = ssh_math:ipow(G, Private, P),
     {Private,Public}.
@@ -1775,7 +1812,7 @@ fmt_block(Bin, BlockSize, GroupSize) ->
     fmt_block(Bin, BlockSize, 0, GroupSize).
     
 
-fmt_block(Bin, 0, I, G) ->
+fmt_block(Bin, 0, _I, _G) ->
     binary_to_list(Bin);
 fmt_block(Bin, Sz, G, G) when G =/= 0 ->
     ["\n" | fmt_block(Bin, Sz, 0, G)];

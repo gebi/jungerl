@@ -16,7 +16,7 @@
 -export([mpint/1,  bignum/1, string/1, name_list/1]).
 -export([b64_encode/1, b64_decode/1]).
 -export([install_messages/1, uninstall_messages/1]).
--export([key_blob/1, fingerprint/1]).
+-export([key_to_blob/1, blob_to_key/1, fingerprint/1]).
 
 %% integer utils
 -export([isize/1]).
@@ -99,22 +99,32 @@ install_messages(Codes) ->
 	    end, Codes).
 
 uninstall_messages(Codes) ->
-    foreach(fun({Name, Code, Ts}) ->
+    foreach(fun({Name, Code, _Ts}) ->
 		    ?dbg(true, "uninstall msg: ~s = ~w ~w\n", 
-			 [Name,Code,Ts]),
+			 [Name,Code,_Ts]),
 		    erase({msg_name,Code}),
 		    erase({msg_code,Name})
 	    end, Codes).
 
 fingerprint(Key) ->
-    Bin = key_blob(Key),
+    Bin = key_to_blob(Key),
     erlang:md5(Bin).
 
-key_blob(#ssh_key { type=rsa, public = {N,E}}) ->
+key_to_blob(#ssh_key { type=rsa, public = {N,E}}) ->
     encode(["ssh-rsa",E,N],[string,mpint,mpint]);
-key_blob(#ssh_key { type=dsa, public = {P,Q,G,Y}}) ->
+key_to_blob(#ssh_key { type=dsa, public = {P,Q,G,Y}}) ->
     encode(["ssh-dss",P,Q,G,Y],
 	   [string,mpint,mpint,mpint,mpint]).
+
+blob_to_key(Blob) ->
+    case decode(Blob, [string, '...']) of
+	["ssh-rsa", Bin] ->
+	    [E,N] = decode(Bin, [mpint,mpint]),
+	    #ssh_key { type=rsa, public={N,E}};
+	["ssh-dss", Bin] ->
+	    [P,Q,G,Y] = decode(Bin, [mpint,mpint,mpint,mpint]),
+	    #ssh_key { type=dsa, public = {P,Q,G,Y}}
+    end.
 
 %%
 %% Encode a record, the type spec is expected to be 
@@ -284,7 +294,7 @@ decode(Binary, Offset, [Type|Ts], Acc) ->
 	    <<_:Offset/binary, X/binary>> = Binary,
 	    {Offset+size(X), reverse([X | Acc])}
     end;
-decode(Binary, Offset, [], Acc) ->
+decode(_Binary, Offset, [], Acc) ->
     {Offset, reverse(Acc)}.
 
 
@@ -358,7 +368,7 @@ bin2i(X) ->
 fill_bits(N,C) ->
     list_to_binary(fill(N,C)).
 
-fill(0,C) -> [];
+fill(0,_C) -> [];
 fill(1,C) -> [C];
 fill(N,C) ->
     Cs = fill(N div 2, C),
@@ -401,7 +411,7 @@ irandom_odd(Bits) ->
 %%       Bot = 0 - do not set the least signifcant bit
 %%       Bot = 1 - set the least signifcant bit (i.e always odd)
 %%
-irandom(0, Top, Bottom) -> 
+irandom(0, _Top, _Bottom) -> 
     0;
 irandom(Bits, Top, Bottom) ->
     Bytes = (Bits+7) div 8,
@@ -435,7 +445,7 @@ random(N, TMask, BMask) ->
 %% TopMask is bitwised or'ed to the first byte
 %% BotMask is bitwised or'ed to the last byte
 %%
-rnd(0, TMask, BMask) ->
+rnd(0, _TMask, _BMask) ->
     [];
 rnd(1, TMask, BMask) ->
     [(rand8() bor TMask) bor BMask];

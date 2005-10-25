@@ -12,6 +12,7 @@
 
 -include("../include/ssh.hrl").
 -include("../include/ssh_connect.hrl").
+-include("../include/ssh_userauth.hrl").
 
 -define(DEFAULT_PACKET_SIZE, 32768).
 -define(DEFAULT_WINDOW_SIZE, 2*?DEFAULT_PACKET_SIZE).
@@ -25,6 +26,7 @@
 -export([start/2, start/3, start/4]).
 -export([start_link/2, start_link/3, start_link/4]).
 -export([dist_start/1, dist_start/2]).
+-export([server_session/2]).
 
 -define(DBG_SSHMSG, true).
 -define(DBG_SSHCM,  true).
@@ -98,7 +100,7 @@ start_link(Name, Host, Port, Opts) ->
 	{Pid, Reply} ->
 	    erlang:demonitor(Ref),
 	    receive
-		{'DOWN', Ref, _, _, Reason} ->
+		{'DOWN', Ref, _, _, _Reason} ->
 		    flush
 	    after 0 ->
 		    flush
@@ -127,9 +129,7 @@ dist_start(Node, Opts) when atom(Node), list(Opts) ->
 		undefined ->
 		    start(CMHost, Host, Opts);
 		Pid ->
-		    {ok,Pid};
-		_ ->
-		    {error, einval}
+		    {ok,Pid}
 	    end;
 	_ ->
 	    {error, einval}
@@ -180,7 +180,7 @@ session_open(CM, InitialWindowSize, MaxPacketSize) ->
     receive
 	{ssh_cm, CM, {open, Channel}} ->
 	    {ok, Channel};
-	{ssh_cm, CM, {open_error, Reason, Descr, Lang}} ->
+	{ssh_cm, CM, {open_error, _Reason, Descr, _Lang}} ->
 	    {error, Descr}
     end.
 
@@ -201,7 +201,7 @@ direct_tcpip(CM, RemoteIP, RemotePort, OrigIP, OrigPort,
 	    receive
 		{ssh_cm, CM, {open, Channel}} ->
 		    {ok, Channel};
-		{ssh_cm, CM, {open_error, Reason, Descr, Lang}} ->
+		{ssh_cm, CM, {open_error, _Reason, Descr, _Lang}} ->
 		    {error, Descr}
 	    end
     end.
@@ -237,7 +237,7 @@ open_pty(CM, Channel, Term, Width, Height, PixWidth, PixHeight, PtyOpts) ->
     request(CM, Channel, "pty-req", true, 
 	    [?string(Term),
 	     ?uint32(Width), ?uint32(Height),
-	     ?uint32(0),?uint32(0),
+	     ?uint32(PixWidth),?uint32(PixHeight),
 	     encode_pty_opts(PtyOpts)]).
 
 setenv(CM, Channel, Var, Value) ->
@@ -345,9 +345,9 @@ global_request(CM, Type, Reply, Data) ->
     CM ! {ssh_cm, self(), {global_request,self(),Type,Reply,Data}},
     if Reply == true ->
 	    receive
-		{ssh_cm, CM, {success, Channel}} ->
+		{ssh_cm, CM, {success, _Channel}} ->
 		    ok;
-		{ssh_cm, CM, {failure, Channel}} ->
+		{ssh_cm, CM, {failure, _Channel}} ->
 		    error
 	    end;
        true ->
@@ -468,7 +468,7 @@ connect_auth(Host, Port, Opts) ->
     case ssh_proto:connect(Host, Port, Opts) of
 	{ok,SSH} ->
 	    case lists:keysearch(userauth, 1, Opts) of
-		{value,{_, AuthList}} ->
+		{value,{_, _AuthList}} ->
 		    case user_auth(SSH, Opts) of
 			ok -> {ok, SSH};
 			Error -> Error
@@ -500,6 +500,31 @@ user_auth(SSH, Opts) ->
 	    ssh_proto:disconnect(SSH, ?SSH_DISCONNECT_BY_APPLICATION),
 	    Error
     end.
+
+server_init(SSH, Opts) ->
+    receive
+	{ssh_msg, SSH, R} when record(R, ssh_msg_service_request) ->
+	    io:format("CM: server_init: got message ~p\n", [R]),
+	    if R#ssh_msg_service_request.name == "ssh-userauth" ->
+		    case ssh_userauth:server_auth(SSH, Opts) of
+			{ok,_Service} ->
+			    SSH ! {ssh_install, connect_messages()},
+			    R1 = #ssh_msg_userauth_success { },
+			    ssh_proto:send(SSH, R1),
+			    CTab = ets:new(cm_tab, 
+					   [set,{keypos,#channel.local_id}]),
+			    cm_loop(SSH, CTab);
+			{error,_Reason} ->
+			    error
+		    end;
+	       true ->
+		    error
+	    end;
+	Other ->
+	    io:format("CM: server_sys: got message ~p\n", [Other]),
+		    error
+    end.
+
     
 
 %% Register the cm
@@ -550,31 +575,31 @@ cm_loop(SSH, CTab) ->
 	    Caller ! {cm_reply, Ref, Reply},
 	    ?MODULE:cm_loop(SSH, CTab);
 
-	{'EXIT', SSH, Reason} ->
-	    ?dbg(true, "SSH_CM ~p EXIT ~p\n", [SSH, Reason]),
+	{'EXIT', SSH, _Reason} ->
+	    ?dbg(true, "SSH_CM ~p EXIT ~p\n", [SSH, _Reason]),
 	    ok;
 
-	{'EXIT', Pid, Reason} ->
-	    ?dbg(true, "Pid ~p EXIT ~p\n", [Pid, Reason]),
+	{'EXIT', _Pid, _Reason} ->
+	    ?dbg(true, "Pid ~p EXIT ~p\n", [_Pid, _Reason]),
 	    cm_loop(SSH, CTab);
 	
-	{'DOWN', Ref, process, Pid, Reason} ->
-	    ?dbg(true, "Pid ~p DOWN ~p\n", [Pid, Reason]),
+	{'DOWN', _Ref, process, Pid, _Reason} ->
+	    ?dbg(true, "Pid ~p DOWN ~p\n", [Pid, _Reason]),
 	    down_user(SSH, Pid, CTab),
 	    ?MODULE:cm_loop(SSH, CTab)
     end.
 
 
-cm_call({attach, User}, SSH, CTab) ->
+cm_call({attach, User}, _SSH, _CTab) ->
     case add_user(User) of
 	ok ->
 	    {ok, self()};
 	Error ->
 	    Error
     end;
-cm_call({detach, User}, SSH, CTab) ->
+cm_call({detach, User}, SSH, _CTab) ->
     del_user(User,SSH);
-cm_call({send_window, Channel}, SSH, CTab) ->
+cm_call({send_window, Channel}, _SSH, CTab) ->
     case ets:lookup(CTab, Channel) of
 	[C] ->
 	    {ok, {C#channel.send_window_size,
@@ -582,7 +607,7 @@ cm_call({send_window, Channel}, SSH, CTab) ->
 	[] -> 
 	    {error, einval}
     end;
-cm_call({recv_window, Channel}, SSH, CTab) ->
+cm_call({recv_window, Channel}, _SSH, CTab) ->
     case ets:lookup(CTab, Channel) of
 	[C] ->
 	    {ok, {C#channel.recv_window_size,
@@ -590,7 +615,7 @@ cm_call({recv_window, Channel}, SSH, CTab) ->
 	[] -> 
 	    {error, einval}
     end;
-cm_call({set_user, Channel, User}, SSH, CTab) ->
+cm_call({set_user, Channel, User}, _SSH, CTab) ->
     case is_user(User) of
 	false -> {error, einval};
 	true ->
@@ -602,7 +627,7 @@ cm_call({set_user, Channel, User}, SSH, CTab) ->
 		    {error, einval}
 	    end
     end;
-cm_call({set_user_ack, Channel,Ack}, SSH, CTab) ->
+cm_call({set_user_ack, Channel,Ack}, _SSH, CTab) ->
     case ets:lookup(CTab, Channel) of
 	[C] ->
 	    ets:insert(CTab, C#channel { user_ack = Ack }),
@@ -610,7 +635,7 @@ cm_call({set_user_ack, Channel,Ack}, SSH, CTab) ->
 	[] -> 
 	    {error, einval}
     end;
-cm_call({info,User}, SSH, CTab) ->
+cm_call({info,User}, _SSH, CTab) ->
     {ok, 
      ets:foldl(
        fun(C, Acc) when User == all; C#channel.user == User ->
@@ -619,7 +644,7 @@ cm_call({info,User}, SSH, CTab) ->
 	       Acc
        end, [], CTab)};
     
-cm_call(_, _, CTab) ->
+cm_call(_, _SSH, _CTab) ->
     {error, bad_call}.
 
 
@@ -743,6 +768,28 @@ ssh_message(SSH, CTab, Msg) ->
 							  decode_ip(Address), Port,
 							  decode_ip(Orig), OrigPort}})
 		    end;
+
+		"session" ->
+		    Channel = new_channel_id(),
+		    User = spawn_link(?MODULE, server_session,
+				      [self(),Channel]),
+		    LWindowSz = ?DEFAULT_WINDOW_SIZE,
+		    LPacketSz = ?DEFAULT_PACKET_SIZE,
+		    C = #channel { type = Type,
+				   sys = "none",
+				   user = User,
+				   local_id = Channel,
+				   remote_id = RID,
+				   recv_window_size = LWindowSz,
+				   recv_packet_size = LPacketSz,
+				   send_window_size = RWindowSz,
+				   send_packet_size = RPacketSz },
+		    ets:insert(CTab, C),
+		    add_user(User),
+		    User ! {self(), {ok, self()}},
+		    channel_open_confirmation(SSH, RID, Channel,
+					      LWindowSz, LPacketSz);
+
 		_ ->
 		    channel_open_failure(SSH, RID, 
 					 ?SSH_OPEN_ADMINISTRATIVELY_PROHIBITED,
@@ -755,11 +802,14 @@ ssh_message(SSH, CTab, Msg) ->
 				   data = Data } ->
 	    case Type of
 		"exit-status" ->
+		    channel_success(SSH, Channel, WantReply),
 		    <<?UINT32(Status)>> = Data,
 		    send_user(CTab, Channel, {exit_status,Channel,Status});
+
 		"exit-signal" ->
+		    channel_success(SSH, Channel, WantReply),
 		    <<?UINT32(SigLen), SigName:SigLen/binary,
-		     ?BOOLEAN(Core), 
+		     ?BOOLEAN(_Core), 
 		     ?UINT32(ErrLen), Err:ErrLen/binary,
 		     ?UINT32(LangLen), Lang:LangLen/binary>> = Data,
 		    send_user(CTab, Channel, {exit_signal, Channel,
@@ -767,6 +817,7 @@ ssh_message(SSH, CTab, Msg) ->
 					      binary_to_list(Err),
 					      binary_to_list(Lang)});
 		"xon-xoff" ->
+		    channel_success(SSH, Channel, WantReply),
 		    <<?BOOLEAN(CDo)>> = Data,
 		    CanDo = if CDo == 0 -> false;
 			       true -> true
@@ -774,26 +825,53 @@ ssh_message(SSH, CTab, Msg) ->
 		    send_user(CTab, Channel, {xon_xoff,Channel,CanDo});
 		
 		"window-change" ->
+		    channel_success(SSH, Channel, WantReply),
 		    <<?UINT32(Width),?UINT32(Height),
 		     ?UINT32(PixWidth), ?UINT32(PixHeight)>> = Data,
 		    send_user(CTab, Channel, {window_change,Channel,
 					      Width, Height,
 					      PixWidth, PixHeight});
 		"signal" ->
+		    channel_success(SSH, Channel, WantReply),
 		    <<?UINT32(SigLen), SigName:SigLen/binary>> = Data,
 		    send_user(CTab, Channel, {signal,Channel,
 					      binary_to_list(SigName)});
+		"exec" ->
+		    channel_success(SSH, Channel, WantReply),
+		    <<?UINT32(ExecLen), ExecName:ExecLen/binary>> = Data,
+		    send_user(CTab, Channel, {exec,Channel,
+					      binary_to_list(ExecName)});
+		"shell" ->
+		    channel_success(SSH, Channel, WantReply),
+		    send_user(CTab, Channel, {shell,Channel});
+
+		"subsystem" ->
+		    channel_success(SSH, Channel, WantReply),
+		    <<?UINT32(SubLen), SubName:SubLen/binary>> = Data,
+		    send_user(CTab, Channel, {subsystem,Channel,
+					      binary_to_list(SubName)});
+		"pty-req" ->
+		    channel_success(SSH, Channel, WantReply),
+		    <<?UINT32(TermLen), BinTerm:TermLen/binary,
+		     ?UINT32(Width),?UINT32(Height),
+		     ?UINT32(PixWidth), ?UINT32(PixHeight),
+		     ?UINT32(OptLen), OptBin:OptLen/binary>> = Data,
+		    Term = binary_to_list(BinTerm),
+		    PtyOpts = decode_pty_opts(OptBin),
+		    PtyParams = #ssh_pty_params { terminal = Term,
+						  width = Width, 
+						  height = Height,
+						  pix_width = PixWidth, 
+						  pix_height=PixHeight,
+						  pty_opts = PtyOpts },
+		    send_user(CTab, Channel, {pty_req,Channel,PtyParams});
 		_ ->
-		    if WantReply == true ->
-			    channel_failure(SSH, Channel);
-		       true ->
-			    ignore
-		    end
+		    channel_failure(SSH, Channel, WantReply)
 	    end;
 	    
-	#ssh_msg_global_request { name = Type,
+	#ssh_msg_global_request { name = _Type,
 				  want_reply = WantReply,
-				  data = Data } ->
+				  data = _Data } ->
 	    if WantReply == true ->
 		    request_failure(SSH);
 	       true ->
@@ -801,16 +879,18 @@ ssh_message(SSH, CTab, Msg) ->
 	    end;
 	
 
-	#ssh_msg_disconnect { code = Code,
-			      description = Description,
-			      language = Lang } ->
-	    ?dbg(true, "Disconnected: ~s\n", [Description]),
+	#ssh_msg_disconnect { code = _Code,
+			      description = _Description,
+			      language = _Lang } ->
+	    ?dbg(true, "Disconnected: ~s\n", [_Description]),
 	    %% close all channels
 	    ets:foldl(
 	      fun(C, _) ->
 		      send_user(C, {closed, C#channel.local_id})
 	      end, ok, CTab),
 	    ets:delete(CTab),
+	    %% FIXME: this may/will kill spawn-linked user before getting
+	    %%        a chance to receive the closed messaged...
 	    exit(disconnected);
 
 	_ ->
@@ -903,7 +983,64 @@ update_sys(CTab, C, Type) ->
 	    ok
     end.
 
+server_session(SSH,Channel) ->
+    receive
+	{SSH, {ok, SSH}} ->
+	    server_dispatch(SSH,Channel,#ssh_pty_params{})
+    after 20000 ->
+	    timeout
+    end.
+%%
+%% enter subsystems
+%%
+%% {ssh_cm, CM, {exec,Channel,"scp -t"}}
+%%    scp file user@host:path
+%% {ssh_cm, CM, {shell,Channel}}
+%%    ssh user@host
+%% {ssh_cm, CM, {subsystem,Channel,"sftp"}}
+%%       sftp user@host
+%% {ssh_cm, CM, {subsystem,Channel,"erl"}}
+%%       ssh -s user@host erl
+%% 
+server_dispatch(SSH,Channel) ->
+    server_dispatch(SSH,Channel,#ssh_pty_params {}).
 
+server_dispatch(SSH,Channel,PtyParams) ->
+    receive
+	{ssh_cm, CM, {subsystem,Channel,"sftp"}} ->
+	    sftp:server(SSH,CM,Channel);
+
+	{ssh_cm, CM, {subsystem,Channel,"erl"}} ->
+	    ssh:server(SSH, CM, Channel,PtyParams,user);
+
+	{ssh_cm, CM, {exec,Channel,"scp -t "++ Path}} ->
+	    io:format("File transfer requested\n"),
+	    scp:copy_to_server(SSH, CM, Channel, Path);
+
+	{ssh_cm, CM, {exec,Channel,"scp -f "++ Path}} ->
+	    io:format("File transfer requested\n"),
+	    scp:copy_from_server(SSH, CM, Channel, Path);
+
+	{ssh_cm, CM, {shell,Channel}} ->
+	    ssh:server(SSH, CM, Channel,PtyParams,user_drv);
+
+	{ssh_cm, _CM, {pty_req,Channel,PtyParams1}} ->
+	    ?MODULE:server_dispatch(SSH,Channel,PtyParams1);
+
+	{ssh_cm, _CM, {window_change,Channel,
+		      Width,Height,PixWidth,PixHeight}} ->
+	    PtyParams1 = PtyParams#ssh_pty_params { width=Width,
+						    height=Height,
+						    pix_width=PixWidth,
+						    pix_height=PixHeight},
+	    ?MODULE:server_dispatch(SSH,Channel,PtyParams1);
+
+	Msg ->
+	    io:format("Msg=~p\n", [Msg]),
+	    server_dispatch(SSH,Channel)
+    after 20000 ->
+	    timeout
+    end.
 
 
 %% Allocate channel ID 
@@ -923,7 +1060,7 @@ down_user(SSH, User, CTab) ->
 	      fun(C, _) when C#channel.user == User ->
 		      channel_close(SSH,  C#channel.remote_id),
 		      ets:delete(CTab, C#channel.local_id);
-		 (C, _) ->
+		 (_C, _) ->
 		      ok
 	      end, ok, CTab),
 	    del_user(User,SSH);
@@ -945,7 +1082,7 @@ add_user(User) ->
 		       end,
 	    put(users, [User | UserList]),
 	    ok;
-	Ref ->
+	_Ref ->
 	    ok
     end.
 
@@ -968,7 +1105,7 @@ del_user(User,SSH) ->
 			[] ->
 			    ssh_proto:disconnect(SSH, 0),
 			    ok;
-			{registered_name,Name} ->
+			{registered_name,_Name} ->
 			    ok
 		    end;
 	       true ->
@@ -988,12 +1125,13 @@ del_bind([]) -> ok.
 is_user(User) ->
     case get({ref, User}) of
 	undefined -> false;
-	Ref -> true
+	_Ref -> true
     end.
 	    
 
 %% Send ssh_cm messages to the 'user'
 send_user(C, Msg) when record(C, channel) ->
+    ?dbg(true, "send user:~p msg=~p\n", [C#channel.user, Msg]),
     C#channel.user ! {ssh_cm, self(), Msg}.
 
 send_user(CTab, Channel, Msg) ->
@@ -1074,9 +1212,9 @@ remove_from_send_window(CTab, C, DataType, UserAck, User, Data) ->
 get_window(Bs, PSz, WSz) ->
     get_window(Bs, PSz, WSz, []).
 
-get_window(Bs, PSz, 0, Acc) ->
+get_window(Bs, _PSz, 0, Acc) ->
     {reverse(Acc), 0, Bs};
-get_window([B0 = {DataType,UserAck,User,Bin} | Bs], PSz, WSz, Acc) ->
+get_window([B0 = {DataType,_UserAck,_User,Bin} | Bs], PSz, WSz, Acc) ->
     BSz = size(Bin),
     if BSz =< WSz ->  %% will fit into window
 	    if BSz =< PSz ->  %% will fit into a packet
@@ -1098,7 +1236,7 @@ get_window([B0 = {DataType,UserAck,User,Bin} | Bs], PSz, WSz, Acc) ->
 		       PSz, WSz-PSz, 
 		       [{DataType,false,undefined,Bin1}|Acc])
     end;
-get_window([], PSz, WSz, Acc) ->
+get_window([], _PSz, WSz, Acc) ->
     {reverse(Acc), WSz, []}.
 
 
@@ -1114,12 +1252,23 @@ channel_close(SSH, Channel) ->
 	   #ssh_msg_channel_close { recipient_channel = Channel }}.
 
 channel_success(SSH, Channel) ->
+    channel_success(SSH, Channel, true).
+
+channel_success(SSH, Channel, true) ->
     SSH ! {ssh_msg, self(),
-	   #ssh_msg_channel_success { recipient_channel = Channel }}.
+	   #ssh_msg_channel_success { recipient_channel = Channel }};
+channel_success(_SSH, _Channel, false) ->
+    ok.
 
 channel_failure(SSH, Channel) ->
+    channel_failure(SSH, Channel,true).
+
+channel_failure(SSH, Channel,true) ->
     SSH ! {ssh_msg, self(),
-	   #ssh_msg_channel_failure { recipient_channel = Channel }}.
+	   #ssh_msg_channel_failure { recipient_channel = Channel }};
+channel_failure(_SSH, _Channel, false) ->
+    ok.
+
 
 
 channel_adjust_window(SSH, Channel, Bytes) ->
@@ -1152,7 +1301,8 @@ channel_open_confirmation(SSH, RID, LID, WindowSize, PacketSize) ->
 	   #ssh_msg_channel_open_confirmation { recipient_channel = RID,
 						sender_channel = LID,
 						initial_window_size = WindowSize,
-						maximum_packet_size = PacketSize}}.
+						maximum_packet_size = PacketSize,
+						data = <<>> }}.
 
 channel_open_failure(SSH, RID, Reason, Description, Lang) ->
     SSH ! {ssh_msg, self(),
@@ -1183,7 +1333,7 @@ request_success(SSH,Data) ->
     SSH ! {ssh_msg, self(), #ssh_msg_request_success { data=Data }}.
 
 
-decode_pty_opts(<<?TTY_OP_END>>) ->		     
+decode_pty_opts(<<?TTY_OP_END>>) ->
     [];
 decode_pty_opts(<<Code, ?UINT32(Value), Tail/binary>>) ->
     Op = case Code of

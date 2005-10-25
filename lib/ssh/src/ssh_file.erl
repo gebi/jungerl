@@ -17,7 +17,8 @@
 
 -export([public_host_dsa_key/1,private_host_dsa_key/1,
 	 public_host_rsa_key/1,private_host_rsa_key/1,
-	 public_host_key/1,private_host_key/1]).
+	 public_host_key/1,private_host_key/1,
+	 authorized_key/4, authorized_user/4]).
 
 -export([lookup_host_key/1, 
 	 add_host_key/2, 
@@ -58,6 +59,74 @@ private_host_key(Type) ->
     File = filename:join(ssh_dir(Type), "ssh_host_key"),
     read_private_key_v1(File,private).
 
+%% locate authorized key Key
+authorized_key(Type, _User, _Service, KeyBlob) ->
+    Key = ssh_bits:b64_encode(KeyBlob),
+    io:format("Key=~p\n", [Key]),
+    File = filename:join(ssh_dir(Type), "authorized_keys"),
+    lookup_authorized_key(File, Key).
+
+lookup_authorized_key(File, Key) ->
+    case file:open(File, [read]) of
+	{ok,Fd} ->
+	    Res = (catch lookup_authorized_key_fd(Fd, Key)),
+	    file:close(Fd),
+	    Res;
+	Error ->
+	    Error
+    end.
+
+lookup_authorized_key_fd(Fd, Key) ->
+    case io:get_line(Fd, '') of
+	eof ->
+	    {error, not_found};
+	Line ->
+	    Ts = string:tokens(Line, " "),
+	    case Ts of
+		[_KeyType, Key | _Comment] ->
+		    ok;
+		_ ->
+		    lookup_authorized_key_fd(Fd,Key)
+	    end
+    end.
+
+authorized_user(Type, User, _Service, Password) ->
+    File = filename:join(ssh_dir(Type), "authorized_users"),
+    lookup_authorized_user(File, User, Password).
+
+lookup_authorized_user(File, User, Password) ->
+    case file:open(File, [read]) of
+	{ok,Fd} ->
+	    Res = (catch lookup_authorized_user_fd(Fd, User, Password)),
+	    file:close(Fd),
+	    Res;
+	Error ->
+	    Error
+    end.
+
+lookup_authorized_user_fd(Fd, User, Password) ->
+    case io:get_line(Fd, '') of
+	eof ->
+	    {error, not_found};
+	Line ->
+	    case string:tokens(Line, ":") of
+		[User, Password] ->
+		    ok;
+		[User, "{SHA}"++SHAPassword] ->
+		    case ssh_bits:b64_encode(crypto:sha(Password)) of
+			SHAPassword ->
+			    ok;
+			_ ->
+			    lookup_authorized_user_fd(Fd, User, Password)
+		    end;
+		[User, _] ->
+		    lookup_authorized_user_fd(Fd, User, Password);
+		_ ->
+		    lookup_authorized_user_fd(Fd, User, Password)
+	    end
+    end.
+
+
 %% lookup_host_key
 %% return {ok, Key(s)} or {error, not_found}
 %%
@@ -91,7 +160,7 @@ delete_host_key(Host) ->
     end.
 
 %% default ssh_file behaviour is to reject updates
-update_host_key(Host, Key) ->
+update_host_key(_Host, _Key) ->
     {error, bad_public_key}.
 
 %%
@@ -133,7 +202,7 @@ decode_public_key_v2(K_S, "ssh-dss") ->
 	    {ok,#ssh_key { type = dsa,
 			   public = {P,Q,G,Y}
 			  }};
-	A ->
+	_ ->
 	    {error, bad_format}
     end;
 decode_public_key_v2(_, _) ->
@@ -145,11 +214,11 @@ read_public_key_v1(File) ->
 	{ok,Bin} ->
 	    List = binary_to_list(Bin),
 	    case io_lib:fread("~d ~d ~d ~s", List) of
-		{ok,[Sz,E,N,Comment],_} ->
+		{ok,[_Sz,E,N,Comment],_} ->
 		    {ok,#ssh_key { type = rsa,
 				   public ={N,E},
 				   comment = Comment }};
-		Error ->
+		_Error ->
 		    {error, bad_format}
 	    end;
 	Error ->
@@ -228,7 +297,7 @@ read_private_key_v1(File, Type) ->
 
 decode_private_key_v1(Bin, CipherNum, Type) ->
     case ssh_bits:decode(Bin,0,[uint32, bignum, bignum, string]) of
-	{Offset,[NSz,N,E,Comment]} ->
+	{Offset,[_NSz,N,E,Comment]} ->
 	    if Type == public ->
 		    {ok,#ssh_key { type=rsa,
 				   public={N,E},
@@ -317,7 +386,7 @@ delete_key_fd(Fd, Host, ReadPos0, WritePos0) ->
 	Line ->
 	    {ok,ReadPos1} = file:position(Fd, cur),
 	    case string:tokens(Line, " ") of
-		[HostList, Type, KeyData] ->
+		[HostList, _Type, _KeyData] ->
 		    case lists:member(Host, string:tokens(HostList, ",")) of
 			true ->
 			    delete_key_fd(Fd, Host, ReadPos1, WritePos0);
@@ -378,17 +447,17 @@ read_pem(Cs, Type) ->
 
 read_pem64(Cs, Acc, Type) ->
     case read_line(Cs) of
-	{"-----END "++Rest,Cs1} ->
+	{"-----END "++Rest,_Cs1} ->
 	    case string:tokens(Rest, " ") of
 		[Type, "PRIVATE", "KEY-----"] ->
 		    {ok,ssh_bits:b64_decode(append(reverse(Acc)))};
-		Toks ->
+		_Toks ->
 		    %% io:format("TOKENS=~p\n", [Toks]),
 		    {error, bad_format}
 	    end;
 	{B64, Cs1} when Cs1 =/= "" ->
 	    read_pem64(Cs1, [B64|Acc], Type);
-	What ->
+	_What ->
 	    {error, bad_format}
     end.
 

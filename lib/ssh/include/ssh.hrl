@@ -204,6 +204,18 @@
 	  comment = ""
 	 }).
 
+%% passed to shell program
+-record(ssh_pty_params,
+	{
+	  terminal = "dumb",
+	  width = 80,
+	  height = 24,
+	  pix_width = 0,
+	  pix_height = 0,
+	  pty_opts = []
+	 }).
+
+
 %% assertion macro
 -define(ssh_assert(Expr, Reason),
 	case Expr of

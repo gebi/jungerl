@@ -80,11 +80,11 @@ rsavp1(#ssh_key { public={N,E}}, S)  ->
 rsaes_oaep_encrypt(Public, M) ->
     rsaes_oaep_encrypt(Public, M, <<>>).
 
-rsaes_oaep_encrypt(Public=#ssh_key { public={N,E}}, M, L) ->
+rsaes_oaep_encrypt(Public=#ssh_key { public={N,_E}}, M, L) ->
     ?ssh_assert(size(L) =< 16#ffffffffffffffff, label_to_long),
     K = (ssh_bits:isize(N)+7) div 8,
     MLen = size(M),
-    LLen  = size(L),
+    %% LLen  = size(L),
     ?ssh_assert(MLen =< K - 2*?HLen - 2, message_to_long),
     LHash = ?HASH(L),
     PS = ssh_bits:fill_bits(K - MLen - 2*?HLen - 2, 0),
@@ -102,7 +102,7 @@ rsaes_oaep_encrypt(Public=#ssh_key { public={N,E}}, M, L) ->
 rsaes_oaep_decrypt(Key, C) ->
     rsaes_oaep_decrypt(Key, C, <<>>).
 
-rsaes_oaep_decrypt(Private=#ssh_key { public={N,_},private={_,D}},Cb,L) ->
+rsaes_oaep_decrypt(Private=#ssh_key { public={N,_},private={_,_D}},Cb,L) ->
     ?ssh_assert(size(L) =< 16#ffffffffffffffff, label_to_long),
     K = (ssh_bits:isize(N)+7) div 8,
     ?ssh_assert(K == 2*?HLen + 2, decryption_error),
@@ -119,7 +119,7 @@ rsaes_oaep_decrypt(Private=#ssh_key { public={N,_},private={_,D}},Cb,L) ->
 	    DB = ssh_bits:xor_bits(MaskedDB, DbMask),
 	    PSLen = K - MLen - 2*?HLen - 2,
 	    case DB of
-		<<LHash:?HLen, PS:PSLen/binary, 16#01, M/binary>> ->
+		<<LHash:?HLen, _PS:PSLen/binary, 16#01, M/binary>> ->
 		    M;
 		_ ->
 		    exit(decryption_error)
@@ -129,7 +129,7 @@ rsaes_oaep_decrypt(Private=#ssh_key { public={N,_},private={_,D}},Cb,L) ->
     end.
 
 
-rsaes_pkcs1_v1_5_encrypt(Public=#ssh_key { public={N,E}}, M) ->    
+rsaes_pkcs1_v1_5_encrypt(Public=#ssh_key { public={N,_E}}, M) ->    
     K = (ssh_bits:isize(N)+7) div 8,
     MLen = size(M),
     ?ssh_assert(MLen =< K - 11, message_to_long),
@@ -140,7 +140,7 @@ rsaes_pkcs1_v1_5_encrypt(Public=#ssh_key { public={N,E}}, M) ->
     i2osp(C, K).
 
 
-rsaes_pkcs1_v1_5_decrypt(Private=#ssh_key { public={N,_},private={_,D}},
+rsaes_pkcs1_v1_5_decrypt(Private=#ssh_key { public={N,_},private={_,_D}},
 			 Cb) ->
     K = (ssh_bits:isize(N)+7) div 8,
     CLen = size(Cb),
@@ -150,13 +150,13 @@ rsaes_pkcs1_v1_5_decrypt(Private=#ssh_key { public={N,_},private={_,D}},
     EM = i2osp(M, K),
     PSLen = K - CLen - 3,
     case EM of
-	<<16#00, 16#02, PS:PSLen/binary, 16#00, M>> ->
+	<<16#00, 16#02, _PS:PSLen/binary, 16#00, M>> ->
 	    M;
 	_ ->
 	    exit(decryption_error)
     end.
 
-rsassa_pss_sign(Private=#ssh_key { public={N,_},private={_,D}},Mb) ->
+rsassa_pss_sign(Private=#ssh_key { public={N,_},private={_,_D}},Mb) ->
     ModBits = ssh_bits:isize(N),
     K = (ModBits+7) div 8,
     EM = emsa_pss_encode(Mb, ModBits - 1),
@@ -164,7 +164,7 @@ rsassa_pss_sign(Private=#ssh_key { public={N,_},private={_,D}},Mb) ->
     S = rsasp1(Private, M),
     i2osp(S, K).
 
-rsassa_pss_verify(Public=#ssh_key { public={N,E}},Mb,Sb) ->
+rsassa_pss_verify(Public=#ssh_key { public={N,_E}},Mb,Sb) ->
     ModBits = ssh_bits:isize(N),
     K = (ModBits+7) div 8,
     ?ssh_assert(size(Sb) == K, invalid_signature),
@@ -175,14 +175,14 @@ rsassa_pss_verify(Public=#ssh_key { public={N,E}},Mb,Sb) ->
     emsa_pss_verify(Mb, EM, ModBits-1).
 
 
-rsassa_pkcs1_v1_5_sign(Private=#ssh_key { public={N,_},private={_,D}},Mb) ->
+rsassa_pkcs1_v1_5_sign(Private=#ssh_key { public={N,_},private={_,_D}},Mb) ->
     K = (ssh_bits:isize(N)+7) div 8,
     EM = emsa_pkcs1_v1_5_encode(Mb, K),
     M = os2ip(EM),
     S = rsasp1(Private, M),
     i2osp(S, K).
 
-rsassa_pkcs1_v1_5_verify(Public=#ssh_key { public={N,E}}, Mb, Sb) ->
+rsassa_pkcs1_v1_5_verify(Public=#ssh_key { public={N,_E}}, Mb, Sb) ->
     K = (ssh_bits:isize(N)+7) div 8,
     ?ssh_assert(size(Sb) == K, invalid_signature),
     S = os2ip(Sb),

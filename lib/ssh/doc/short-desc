@@ -1,0 +1,1 @@
+This package contains a ssh implementation inclunding scp and port forwarding in both directions. It also supports distribution over ssh.

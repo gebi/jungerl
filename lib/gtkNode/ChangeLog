@@ -1,3 +1,12 @@
+2005-11-05  Mats Cronqvist  <locmacr@mwlx084>
+
+	* README (Module): typo
+
+	* examples/simple/Makefile (Module): added +debug_info
+
+	* src/gtkNode_internal.c (Module): gn_*() must return boolean in
+	order to get error handling to work with bulking
+
 2005-09-02  Mats Cronqvist  <locmacr@mwlx084>
 
 	* src/check (Module): smarter. compares version of GTK with

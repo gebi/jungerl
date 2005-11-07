@@ -1,0 +1,23 @@
+  prf - a simple framework for running diagnostics on a remote node
+
+  imagine this scenario; there is an embedded erlang node, the
+target. you cannot put files (e.g. beam files) on the computer it runs
+on. you can connect to it through erlang distribution. you want to run
+diagnostics tools, maybe tracing. you want those tools to reconnect if
+the target restarts.
+
+  enter prf. a simple client-server design, where the server runs on
+the target. both the server and the client has callback modules
+(collectors and consumers, respectively).
+  when starting a client, one specifies the target and the
+consumer. an attribute of a consumer is which collectors it is
+associated with. if there is no server on the target, it is
+started. there are currently 2 collectors implemented, prfSys (system
+info) and prfPrc (process info).
+  every 2 seconds the server checks how many clients each collector
+has. if it's more than 0 the server will call the collector and send
+the collector output to each client. otherwise it'll do nothing.
+  if the server exits, or the target goes down, the client will
+periodically try to retstart the server.
+  if the client goes down, all associated servers will remove it from
+their client list.

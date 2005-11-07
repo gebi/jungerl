@@ -1,0 +1,26 @@
+
+  start a client;
+prfHost:start(atom(Name), atom(Nodename),atom(Consumer)) -> pid()
+  Name is the name of the client
+  Consumer is the name of a module that implements the consumer callbacks
+
+  stopping a client;
+prfHost:stop(atom(Name))
+
+  collector callback;
+
+collect(term(State)) -> {NewState, Data}
+  the initial value of State is atom(init)
+
+  consumer callbacks;
+init(atom(TargetNode)) -> term(InitialState)
+
+terminate(State) -> void() 
+
+tick(State,Data) -> term(NewState)
+
+servers() -> list(atom(Collector))
+  Collector is the name of a module that implements the collector callbacks
+
+config(term(State),term(Data)) -> term(NewState)
+  called when the client process receives {config, Data}.

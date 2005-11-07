@@ -1,0 +1,23 @@
+#!/bin/bash
+
+usage(){
+    U1="usage: $0 [-setcookie <cookie>] [-nocookie] "
+    U2="[-nettick <tick>] [-nospawn] nodename"
+    echo $U1 $U2
+    exit
+}
+
+while [ -n "$1" ] 
+  do
+  ARGS="$ARGS $LAST"
+  LAST=$1
+  shift
+done
+
+if [ -n "$LAST"]; then usage; fi
+
+Erl -vsn R9 $ARGS \
+-pa $JUNGERL/lib/prf/examples/gperf \
+-pa $JUNGERL/lib/prf/ebin \
+-pa $JUNGERL/lib/gtkNode/ebin \
+-s gperf start $LAST

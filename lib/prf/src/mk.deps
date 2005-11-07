@@ -1,0 +1,10 @@
+#!/bin/tcsh
+if ( -f $3 ) \rm $3
+foreach f ( *erl )
+ echo -n $1/$f:r".beam": | cat >> $3
+ foreach i ( `grep -E "\-include\(" $f | cut -f2 -d'"'` )
+  echo -n " $2/$i " | cat >> $3
+ end
+ echo  $f | cat >> $3
+ echo '	$('$4')' $f | cat >> $3
+end

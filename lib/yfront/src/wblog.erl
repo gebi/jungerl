@@ -4,7 +4,7 @@
 %%%
 %%% @author Torbjörn Törnkvist <tobbe@tornkvist.org>
 %%% 
-%%% @doc <b>wblog</b> is a Yaws appmod plugin that implements a simple (we)blog service.
+%%% @doc <b>wblog</b> is a Yaws plugin that implements a simple (we)blog service.
 %%%      With <b>wblog</b>, it is possible to add blog entries as well as list- 
 %%%      and traverse the entries. Entries are stored in a Mnesia table that is 
 %%%      created once with the {@link setup/0} function. New entries are added 

@@ -1,0 +1,123 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Module wblog</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body bgcolor="white">
+<h1>Module wblog</h1>
+<b>wblog</b> is a Yaws appmod plugin that implements a simple (we)blog service.<ul><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul><p><b>Authors:</b> Torbjörn Törnkvist (<a href="mailto:tobbe@tornkvist.org"><tt>tobbe@tornkvist.org</tt></a>).</p>
+<h2><a name="description">Description</a></h2><b>wblog</b> is a Yaws appmod plugin that implements a simple (we)blog service.
+        With <b>wblog</b>, it is possible to add blog entries as well as list-
+        and traverse the entries. Entries are stored in a Mnesia table that is
+        created once with the <a href="#setup-0"><code>setup/0</code></a> function. New entries are added
+        with the <a href="#new-3"><code>new/3</code></a> and  <a href="#new-4"><code>new/4</code></a> functions. A comment for
+        a specified entry is added by the <a href="#add_comment-3"><code>add_comment/3</code></a>.
+  
+        <p>To make it as adaptable as possble it is possible to either
+        take care of the final formatting yourself, or to retrieve the result
+        in EHTML format. In some cases it is also possble to provide
+        CSS tag info, which is attached to the resulting EHTML.</p>
+  
+        <p>In the wblog/priv directory, a Yaws configuration file can
+        be found that can be used for testing wblog. Start it as:</p>
+  
+        <pre>yaws -i -c $path/priv/yaws.conf -pa $path/ebin</pre>
+  
+        <p>Setup Mnesia as:</p>
+  
+        <pre>
+         application:load(mnesia).
+         application:set_env(mnesia, dir, "/tmp/yfront").
+         mnesia:create_schema([node()]).
+         application:start(mnesia).
+         wblog:setup().
+        </pre>
+  
+        <p>Then point your browser at: http://localhost:4080/</p>
+  
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1"><tr><td valign="top"><a href="#add_comment-3">add_comment/3</a></td><td>Add a comment to the specified wblog entry.</td></tr>
+<tr><td valign="top"><a href="#ehtml_entry-1">ehtml_entry/1</a></td><td>Produces an EHTML structure, representing the specified entry.</td></tr>
+<tr><td valign="top"><a href="#ehtml_entry-2">ehtml_entry/2</a></td><td>Works as <a href="#ehtml_entry-1"><code>ehtml_entry/1</code></a> but also takes a list of options.</td></tr>
+<tr><td valign="top"><a href="#ehtml_list-2">ehtml_list/2</a></td><td>Produce a summary list
+        based on a list of wblog entries.</td></tr>
+<tr><td valign="top"><a href="#entries-1">entries/1</a></td><td>Returns the N last wblog entries.</td></tr>
+<tr><td valign="top"><a href="#entries-2">entries/2</a></td><td>Returns the N last wblog entries for specified User.</td></tr>
+<tr><td valign="top"><a href="#entries-3">entries/3</a></td><td>Returns the N last wblog entries for specified User starting at Id.</td></tr>
+<tr><td valign="top"><a href="#entry-1">entry/1</a></td><td>Returns a list with a matching wblog record.</td></tr>
+<tr><td valign="top"><a href="#new-3">new/3</a></td><td>Add a new <i>wblog entry</i>.</td></tr>
+<tr><td valign="top"><a href="#new-4">new/4</a></td><td>Add a new <i>wblog entry</i> for a specified user.</td></tr>
+<tr><td valign="top"><a href="#setup-0">setup/0</a></td><td>Creates the Mnesia tables: <b>wblog</b> and <b>wblog_meta</b>.</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3><a name="add_comment-3">add_comment/3</a></h3>
+<tt>add_comment(Id, Text, Who) -&gt; term()
+</tt><p>Add a comment to the specified wblog entry.</p>
+
+<h3><a name="ehtml_entry-1">ehtml_entry/1</a></h3>
+<tt>ehtml_entry(E) -&gt; term()
+</tt><p>Produces an EHTML structure, representing the specified entry.</p>
+
+<h3><a name="ehtml_entry-2">ehtml_entry/2</a></h3>
+<tt>ehtml_entry(E, Opts) -&gt; term()
+</tt><p>Works as <a href="#ehtml_entry-1"><code>ehtml_entry/1</code></a> but also takes a list of options.
+        By providing the option: {href, WblogPage} , links to Prev(ious),
+        Next, and Permalink will be created by appending WblogPage to the
+        query argument: id=ID. The option: {comment, CommentPage} will
+        create a link for creating comments, pointing to CommentsPage
+        appended with the query argument id=ID.</p>
+
+<h3><a name="ehtml_list-2">ehtml_list/2</a></h3>
+<tt>ehtml_list(Ws, Opts) -&gt; term()
+</tt><p>Produce a summary list
+        based on a list of wblog entries.
+        The result is an EHTML table.
+        It is possible to attach CSS tags to the table by
+        providing a list of tuples like:
+        <c>{table, [{class, "my-table"}]}</c>
+        Special targets are:
+        <c>{href, "/wblog_entry.yaws"}</c>
+        <c>{date, List-of-CSS-typles}</c>
+        where href will be used for creating the link for
+        entry. The link will be appended with a query
+        argument "?id=ID". The 'date' tag is used for
+        passing in CSS info for the Date information.</p>
+
+<h3><a name="entries-1">entries/1</a></h3>
+<tt>entries(N) -&gt; term()
+</tt><p>Returns the N last wblog entries.</p>
+
+<h3><a name="entries-2">entries/2</a></h3>
+<tt>entries(N, User) -&gt; term()
+</tt><p>Returns the N last wblog entries for specified User.</p>
+
+<h3><a name="entries-3">entries/3</a></h3>
+<tt>entries(N, User, Id) -&gt; term()
+</tt><p>Returns the N last wblog entries for specified User starting at Id.</p>
+
+<h3><a name="entry-1">entry/1</a></h3>
+<tt>entry(Id) -&gt; term()
+</tt><p>Returns a list with a matching wblog record.</p>
+
+<h3><a name="new-3">new/3</a></h3>
+<tt>new(Head, Text, RSS) -&gt; term()
+</tt><p>Add a new <i>wblog entry</i>.
+        Specify the header and the text body, and if the
+        entry should be feed into the Yaws RSS feed.</p>
+
+<h3><a name="new-4">new/4</a></h3>
+<tt>new(User, Head, Text, RSS) -&gt; term()
+</tt><p>Add a new <i>wblog entry</i> for a specified user.
+        Works as <a href="#new-3"><code>new/3</code></a> but with a specific user added.
+        This makes it possible to maintain several distinct users.</p>
+
+<h3><a name="setup-0">setup/0</a></h3>
+<tt>setup() -&gt; term()
+</tt><p>Creates the Mnesia tables: <b>wblog</b> and <b>wblog_meta</b>.
+        This function should only be called once, when the wblog Mnesia-tables
+        are to be created.</p>
+</body>
+</html>

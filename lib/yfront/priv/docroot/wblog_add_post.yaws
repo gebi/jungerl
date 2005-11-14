@@ -1,0 +1,11 @@
+<erl>
+out(A) ->
+    {ok, Title} = yaws_api:postvar(A, "title"),
+    {ok, Text} = yaws_api:postvar(A, "entry"),
+    wblog:new("tobbe", Title, Text, false),
+    {redirect, ["/wblog.yaws"]}.
+
+    
+
+
+</erl>

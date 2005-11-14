@@ -1,0 +1,39 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Module wraplog</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body bgcolor="white">
+<h1>Module wraplog</h1>
+<b>wraplog</b> is a simple wraplog.<ul><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul><p><b>Authors:</b> Torbjörn Törnkvist (<a href="mailto:tobbe@tornkvist.org"><tt>tobbe@tornkvist.org</tt></a>).</p>
+<h2><a name="description">Description</a></h2><b>wraplog</b> is a simple wraplog.
+        It attaches itself to the standard error logger so that
+        all error messages produced by the <a href="error_logger.html"><code>error_logger</code></a>
+        module ends up in the wraplog.
+  
+        <p>At startup, a file is specified to the <a href="#start-1"><code>start/1</code></a>
+        function. This file will get a number prefix for each
+        wraplog. The number of wraplogs and the size of each file
+        can be specified with the <a href="#start-3"><code>start/3</code></a> function. Per
+        default, 9 files will be used, each having a size of 500 KB.</p>
+  
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1"><tr><td valign="top"><a href="#start-1">start/1</a></td><td>Start the specified wraplog.</td></tr>
+<tr><td valign="top"><a href="#start-3">start/3</a></td><td>Start the specified wraplog with specified size and number of files.</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3><a name="start-1">start/1</a></h3>
+<tt>start(LogFile) -&gt; term()
+</tt><p>Start the specified wraplog.
+        Example: <code>start("/tmp/mywraplog").</code></p>
+
+<h3><a name="start-3">start/3</a></h3>
+<tt>start(LogFile, LogSize, NoLogFiles) -&gt; term()
+</tt><p>Start the specified wraplog with specified size and number of files.
+        Example: <code>start("/tmp/mywraplog", 256000, 5).</code>
+        This will create a file: <i>/tmp/mywraplog.1</i></p>
+</body>
+</html>

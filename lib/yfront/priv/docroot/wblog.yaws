@@ -1,0 +1,61 @@
+<html>
+<head>
+<title>Example of how to use the wblog module</title>
+<style>
+#wblog-list {width: 150px; margin-left: 30px; float: left; 
+             font-size: x-small; border: solid}
+#wblog-entries {width: 400px; margin-left: 30px; 
+		float: left; padding-left: 10px; 
+		border: solid;}
+.wblog-head {font-size: large;}
+.wblog-body {font-size: medium;}
+.wblog-prev {font-size: small; padding-left: 10px;}
+.wblog-next {font-size: small; padding-left: 10px;}
+.wblog-permalink {font-size: small; padding-left: 10px;}
+.wblog-add-comment {font-size: small; padding-left: 10px;}
+.wblog-date {font-size: xx-small; color: green;}
+.wblog-comments {margin: 5px 10px 10px 20px;
+		 font-size: small; color: red;}
+.wblog-comment-head {margin: 10px 10px 0px 30px;
+		     font-size: x-small; color: green;}
+.wblog-comment-body {margin: 5px 10px 0px 30px;
+		     font-size: small;}
+</style>
+</head>
+<body>
+<h1>Example of how to use the wblog module</h1>
+<p>To add a new entry, click <a href="/wblog_add.yaws">here</a>.
+
+<erl>
+out(A) ->
+    Es = case yaws_api:queryvar(A, "id") of
+	     {ok, Id} -> 
+		 {ok, Res} = wblog:entries(6, "tobbe", Id),
+		 Res;
+	     _ ->
+		 {ok, Res} = wblog:entries(6, "tobbe"),
+		 Res
+	 end,
+    {ehtml, 
+     [mk_entries(take(1, Es)),
+      mk_summary(Es)]}.
+
+mk_entries(Es) ->
+    Opts = [{href, "/wblog.yaws"}, 
+	    {comment, "/wblog_add_comment.yaws"}],
+    {'div', [{id, "wblog-entries"}],
+     lists:map(fun(E) -> wblog:ehtml_entry(E, Opts) end, Es)}.
+
+mk_summary(Es) ->
+    {'div', [{id, "wblog-list"}],
+     wblog:ehtml_list(Es, [{href, "/wblog.yaws"}, 
+			   {date, [{class, "wblog-date"}]}])}.
+
+take(0, _)              -> [];
+take(_, [])             -> [];
+take(N, [H|T]) when N>0 -> [H|take(N-1,T)].
+
+</erl>
+
+</body>
+</html>

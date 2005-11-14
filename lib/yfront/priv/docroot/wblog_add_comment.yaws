@@ -1,0 +1,70 @@
+<html>
+<head>
+<title>Example of how to use the wblog module</title>
+<style>
+#wblog-list {width: 150px; margin-left: 30px; float: left; 
+             font-size: x-small; border: solid}
+.wblog-date {font-size: xx-small; color: green;}
+#wblog-comment-area {width: 400px; margin-left: 30px; 
+		     float: left; padding-left: 10px; 
+		     border: solid; font-size: small;}
+.wblog-comment-area-who1 {font-size: small; font-weight: bold; 
+			  padding: 10px 0px 0px 10px;}
+.wblog-comment-area-who2 {font-size: small; padding: 10px 0px 0px 10px;}
+.wblog-comment-area-text1 {font-size: small; font-weight: bold; 
+			   padding: 10px 0px 0px 10px;}
+.wblog-comment-area-text2 {font-size: small; padding: 10px 0px 0px 10px;}
+.wblog-comment-area-submit {font-size: small; padding: 10px 0px 0px 10px;}
+</style>
+</head>
+<body>
+<h1>Example of how to use the wblog module</h1>
+<p>Add your comments below.</p>
+
+
+<erl>
+out(A) ->
+    Es = case yaws_api:queryvar(A, "id") of
+	     {ok, Id} -> 
+		 {ok, Res} = wblog:entries(6, "tobbe", Id),
+		 Res;
+	     _ ->
+		 {ok, Res} = wblog:entries(6, "tobbe"),
+		 Res
+	 end,
+    {ehtml, 
+     [mk_comment(hd(Es)),
+      mk_summary(Es)]}.
+
+mk_comment(E) ->
+    {'div', [{id, "wblog-comment-area"}],
+     [{form, [{method, post},
+              {action, "wblog_add_comment_post.yaws"}],
+       [{input, [{type, "hidden"},
+		 {name, "id"},
+		 {value, wblog:id(E)}]},
+	{'div', [{class, "wblog-comment-area-who1"}], "Who: "},
+	{'div', [{class, "wblog-comment-area-who2"}],	
+	 {input, [{name, "who"},
+		  {type, text}
+		   ]}},
+	{'div', [{class, "wblog-comment-area-text1"}], "Comment: "},
+	{'div', [{class, "wblog-comment-area-text2"}],
+	 {textarea, [{name, "comment"},
+		     {type, "textarea"},
+		     {rows, "10"}, {cols, "35"}
+		    ],
+	  ""}},
+	{'div', [{class, "wblog-comment-area-submit"}],	
+	 {input, [{type, submit}, 
+		  {value, "Submit"}]}}]}]}.
+
+mk_summary(Es) ->
+    {'div', [{id, "wblog-list"}],
+     wblog:ehtml_list(Es, [{href, "/wblog.yaws"}, 
+			   {date, [{class, "wblog-date"}]}])}.
+
+</erl>
+
+</body>
+</html>

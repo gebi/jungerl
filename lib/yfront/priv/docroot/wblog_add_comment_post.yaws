@@ -1,0 +1,12 @@
+<erl>
+out(A) ->
+    {ok, Id} = yaws_api:postvar(A, "id"),
+    {ok, Who} = yaws_api:postvar(A, "who"),
+    {ok, Comment} = yaws_api:postvar(A, "comment"),
+    wblog:add_comment(Id, Comment, Who),
+    {redirect, ["/wblog.yaws?id="++Id]}.
+
+    
+
+
+</erl>

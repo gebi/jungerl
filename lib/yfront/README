@@ -1,0 +1,12 @@
+
+Yfront - The Yaws toolbox
+=========================
+
+The intention with Yfront is to create a toolbox of
+useful building blocks for building Yaws web applications.
+Especially, this includes the combination of Yaws and Mnesia.
+
+For more info about the various parts of yfront.
+Look at the documentation in: docs/index.html
+
+Cheers, Tobbe

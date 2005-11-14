@@ -1,0 +1,21 @@
+<html>
+<head>
+<title>Example of how to use the wblog module</title>
+<style>
+.wblog-entry {width: 300px; margin-left: 30px;}
+.wblog-head {font-size: large;}
+.wblog-body {font-size: medium;}
+.wblog-prev {font-size: small; float: left}
+.wblog-next {font-size: small; float: right}
+</style>
+</head>
+<body>
+<h1>Example of how to use the wblog module</h1>
+<erl>
+out(A) ->
+    {ok, Id} = yaws_api:queryvar(A, "id"),
+    Res = wblog:ehtml_entry(Id),
+    {ehtml, Res}.
+</erl>
+</body>
+</html>

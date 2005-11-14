@@ -1,0 +1,50 @@
+<html>
+<head>
+<title>Example of how to use the wblog module</title>
+<style>
+#wblog-area {width: 400px; margin-left: 30px; 
+	     float: left; padding-left: 10px; 
+	     border: solid; font-size: small;}
+.wblog-area-title1 {font-size: small; font-weight: bold; 
+		    padding: 10px 0px 0px 10px;}
+.wblog-area-title2 {font-size: small; padding: 10px 0px 0px 10px;}
+.wblog-area-text1 {font-size: small; font-weight: bold; 
+		   padding: 10px 0px 0px 10px;}
+.wblog-area-text2 {font-size: small; padding: 10px 0px 0px 10px;}
+.wblog-area-submit {font-size: small; padding: 10px 0px 0px 10px;}
+</style>
+</head>
+<body>
+<h1>Example of how to use the wblog module</h1>
+<p>Add your entry below.</p>
+
+
+<erl>
+out(A) ->
+    {ehtml, 
+     [mk_entry()]}.
+
+mk_entry() ->
+    {'div', [{id, "wblog-area"}],
+     [{form, [{method, post},
+              {action, "wblog_add_post.yaws"}],
+       [{'div', [{class, "wblog-area-title1"}], "Blog Title: "},
+	{'div', [{class, "wblog-area-title2"}],	
+	 {input, [{name, "title"},
+		  {type, text}
+		   ]}},
+	{'div', [{class, "wblog-area-text1"}], "Blog Entry: "},
+	{'div', [{class, "wblog-area-text2"}],
+	 {textarea, [{name, "entry"},
+		     {type, "textarea"},
+		     {rows, "10"}, {cols, "35"}
+		    ],
+	  ""}},
+	{'div', [{class, "wblog-area-submit"}],	
+	 {input, [{type, submit}, 
+		  {value, "Submit"}]}}]}]}.
+
+</erl>
+
+</body>
+</html>

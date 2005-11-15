@@ -1,3 +1,7 @@
+2005-11-15  Mats Cronqvist  <locmacr@mwlx084>
+
+	* src/Makefile (Module): added -lpthread to the linker flags (crux)
+
 2005-11-05  Mats Cronqvist  <locmacr@mwlx084>
 
 	* README (Module): typo

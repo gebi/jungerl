@@ -18,7 +18,7 @@ EIINC = $(wildcard $(OTP_ROOT)/lib/erlang/lib/erl_interface-*/include)
 
 GENS = $(GEN)/gtk_generated.h $(GEN)/gdk_generated.h $(GEN)/g_generated.h
 IFLAGS = -I$(INC) -I$(GEN) -I$(EIINC) $(GTKINCS)
-LFLAGS = $(GTKLIBS) -L$(EILIB) -lei #-lsocket 
+LFLAGS = $(GTKLIBS) -L$(EILIB) -lei -lpthread 
 CINCS  = $(wildcard $(INC)/*.h) 
 CS     = $(wildcard *.c)
 OBJS   = $(patsubst %.c, $(OBJ)/%.o, $(CS))

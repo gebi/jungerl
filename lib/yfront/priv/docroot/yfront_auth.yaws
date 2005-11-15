@@ -1,0 +1,15 @@
+<erl>
+out(A) ->
+    case yfront:authorization_hdr(A) of
+	{User, Passwd, _Data} ->
+	    io:format("got auth, User=~p , Passwd=~p~n", [User,Passwd]),
+	    {html, "<html><head></head><body>OK</body></html>"};
+	XX ->
+	    io:format("got NO auth , XX=~p~n", [XX]),
+	    %%yfront:auth_digest_redirect()
+	    yfront:auth_redirect("yfront")
+    end.
+
+</erl>
+
+	     

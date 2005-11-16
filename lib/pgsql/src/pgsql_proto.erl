@@ -115,10 +115,10 @@ authenticate(Sock) ->
 		2 -> % Kerberos 5
 		    exit({nyi, auth_kerberos5});
 		3 -> % Password
-		    PassString = option(password, ""),
-		    PassWordLen = length(PassString) + 5,
-		    Password = <<PassWordLen:32/integer,
-				PassString, 0:32/integer>>,
+		    PassString = list_to_binary(option(password, "")),
+		    PassWordLen = size(PassString) + 5,
+		    Password = <<$p, PassWordLen:32/integer,
+		                 PassString/binary, 0>>,
 		    ok = send(Sock, Password),
 		    authenticate(Sock);
 		4 -> % Hashed password
@@ -229,6 +229,14 @@ idle(Sock, Pid) ->
 	    Packet = encode_message(squery, Query),
 	    ok = send(Sock, Packet),
 	    {ok, Result} = process_squery([]),
+	    case lists:keymember(error, 1, Result) of
+		true ->
+		    RBPacket = encode_message(squery, "ROLLBACK"),
+		    ok = send(Sock, RBPacket),
+		    {ok, RBResult} = process_squery([]);
+		_ ->
+		    ok
+	    end,
 	    Pid ! {pgsql, Ref, Result},
 	    idle(Sock, Pid);
 	%% Extended query
@@ -335,6 +343,8 @@ process_squery(Log) ->
 	    process_squery([Command|Log]);
 	{pgsql, {ready_for_query, Status}} ->
 	    {ok, lists:reverse(Log)};
+	{pgsql, {error_message, Error}} ->
+	    process_squery([{error, Error}|Log]);
 	{pgsql, Any} ->
 	    process_squery(Log)
     end.

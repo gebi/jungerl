@@ -144,7 +144,7 @@ static void md4drv_from_erlang(ErlDrvData drv_data, char *buf, int len)
     MD4Update(&context, buf, len);
     MD4Final(digest, &context);
 
-    if (!(bin = driver_alloc_binary(len))) {
+    if (!(bin = driver_alloc_binary(16))) {
 	driver_send_error(md4, &am_enomem);
     }
     else {

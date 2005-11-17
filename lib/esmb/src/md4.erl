@@ -26,7 +26,7 @@ start() ->
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
-digest(String) ->
+digest(String) when list(String) ->
     gen_server:call(?SERVER, {digest, String}, infinity);
 digest(Bin) when binary(Bin) ->
     digest(binary_to_list(Bin)).

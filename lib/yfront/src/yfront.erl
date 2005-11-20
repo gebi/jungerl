@@ -24,7 +24,7 @@
 auth_redirect() ->
     auth_redirect("").
 
-%%% @doc Works as {@link auth_redirect/0, specify realm.
+%%% @doc Works as {@link auth_redirect/0}, specify realm.
 auth_redirect(Realm) ->
     auth_redirect0("realm=\""++Realm++"\"").
 

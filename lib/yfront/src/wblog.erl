@@ -39,7 +39,8 @@
 %%%-------------------------------------------------------------------
 -module(wblog).
 
--export([new/3, new/4, ehtml_entry/1, ehtml_entry/2, entry/1, add_comment/3,
+-export([new/3, new/4, entry/1, add_comment/3,
+	 ehtml_entry/1, ehtml_entry/2, ehtml_entry/3,
 	 entries/1, entries/2, entries/3, ehtml_list/2]).
 %% Run only once, at setup.
 -export([setup/0]).
@@ -215,42 +216,69 @@ ehtml_entry(E) when record(E, wblog) ->
 %%%      create a link for creating comments, pointing to CommentsPage 
 %%%      appended with the query argument id=ID. 
 ehtml_entry(E, Opts) when record(E, wblog) -> 
+    ehtml_entry(E, Opts, []).
+
+%%% @doc Works as {@link ehtml_entry/2} but also takes a list of language translations.
+%%%      By providing language specific Key-Value tuples, it is possible
+%%%      adapt the wblog to different languages. A tuple consist of a predefined
+%%%      key and a translated string. The predefined keys are:
+%%%      <ul>
+%%%      <li>{prev, String} - string denoting previous entry, 
+%%%                           default is <i>"prev"</i></li>
+%%%      <li>{next, String} - string denoting next entry, 
+%%%                           default is <i>"next"</i></li>
+%%%      <li>{permalink, String} - string denoting current entry, 
+%%%                                default is <i>"permalink"</i></li>
+%%%      <li>{add_comment, String} - string denoting link to add a comment, 
+%%%                                  default is <i>"add comment"</i></li>
+%%%      <li>{singular_comment, String} - string denoting the translation, 
+%%%                                       of the word <i>"comment"</i> which
+%%%                                       also is the default value.</li>
+%%%      <li>{plural_comment, String} - string denoting the translation, 
+%%%                                     of the word <i>"comments"</i> which
+%%%                                     also is the default value.</li>
+%%%      <li>{by, String} - string denoting the translation, 
+%%%                         of the word <i>"by"</i> which
+%%%                         also is the default value.</li>
+%%%      </ul>
+ehtml_entry(E, Opts, Lang) when record(E,wblog),list(Opts),list(Lang) ->
      {'div', [{class, "wblog-entry"}],
      [{p, [{class, "wblog-head"}], {pre_html, E#wblog.head}},
       {p, [{class, "wblog-body"}], {pre_html, E#wblog.text}},
       {p, [],
        [{span, [{class, "wblog-prev"}], 
-	 lnk(E#wblog.prev, "prev", Opts)},         % FIXME do gettext
+	 lnk(E#wblog.prev, lang(prev, Lang, "prev"), Opts)},         % FIXME do gettext
 	{span, [{class, "wblog-next"}], 
-	 lnk(E#wblog.next, "next", Opts)},
+	 lnk(E#wblog.next, lang(next, Lang, "next"), Opts)},
 	{span, [{class, "wblog-permalink"}], 
-	 lnk(E#wblog.id, "permalink", Opts)},
+	 lnk(E#wblog.id, lang(permalink, Lang, "permalink"), Opts)},
 	{span, [{class, "wblog-add-comment"}], 
-	 comment(E#wblog.id, "add comment", Opts)}]},
-      maybe_comment(E)]}; 
-ehtml_entry(Id, Opts) -> 
+	 comment(E#wblog.id, lang(add_comment, Lang, "add comment"), Opts)}]},
+      maybe_comment(E, Lang)]}; 
+ehtml_entry(Id, Opts, Lang) -> 
     [E] = entry(Id),
-    ehtml_entry(E, Opts).
+    ehtml_entry(E, Opts, Lang).
 
-maybe_comment(E) when E#wblog.comments == [] ->
+maybe_comment(E, Lang) when E#wblog.comments == [] ->
     [{p, [{class, "wblog-comments"}], 
-      {pre_html, "0 comments"}}];
-maybe_comment(E) ->
+      {pre_html, "0 "++lang(plural_comments, Lang, "comments")}}];
+maybe_comment(E, Lang) ->
     Len = length(E#wblog.comments),
     [{p, [{class, "wblog-comments"}], 
-      {pre_html, i2l(Len)++" comment"++plural(Len)}},
-     fmt_comments(E#wblog.comments)].
+      {pre_html, i2l(Len)++" "++maybe_plural(Len, Lang)}},
+     fmt_comments(E#wblog.comments, Lang)].
 
-plural(I) when I > 1 -> "s";
-plural(_)            -> "".
+maybe_plural(1, Lang) -> lang(singular_comment, Lang, "comment");
+maybe_plural(_, Lang) -> lang(plural_comment, Lang, "comments").
 
-fmt_comments([H|T]) ->
+fmt_comments([H|T], Lang) ->
     [{p, [],
       [{'div', [{class, "wblog-comment-head"}],
-	{pre_html, date2str(H#wblog_comment.date)++" by: "++H#wblog_comment.who}},
+	{pre_html, date2str(H#wblog_comment.date)++
+	 " "++lang(by, Lang, "by")++": "++H#wblog_comment.who}},
        {'div', [{class, "wblog-comment-body"}],
-	{pre_html, H#wblog_comment.text}}]} | fmt_comments(T)];
-fmt_comments([]) ->
+	{pre_html, H#wblog_comment.text}}]} | fmt_comments(T, Lang)];
+fmt_comments([], _) ->
     [].
 
 
@@ -271,11 +299,19 @@ lnk(Id, Head, Opts, Tag) ->
 	 opts(a, Opts)],
      Head}.
 	 
+lang(Key, List, Default) ->
+    opts(Key, List, Default).
 
 opts(Key, Opts) ->
     case lists:keysearch(Key, 1, Opts) of
 	{value, {_,V}} when list(V) -> V;
 	_                           -> []
+    end.
+
+opts(Key, Opts, Default) ->
+    case lists:keysearch(Key, 1, Opts) of
+	{value, {_,V}} when list(V) -> V;
+	_                           -> Default
     end.
 
 user2str(?NO_USER) -> "";

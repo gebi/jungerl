@@ -44,7 +44,18 @@ mk_entries(Es) ->
     Opts = [{href, "/wblog.yaws"}, 
 	    {comment, "/wblog_add_comment.yaws"}],
     {'div', [{id, "wblog-entries"}],
-     lists:map(fun(E) -> wblog:ehtml_entry(E, Opts) end, Es)}.
+     lists:map(fun(E) -> wblog:ehtml_entry(E, Opts, trans()) end, Es)}.
+
+trans() ->
+    [];
+trans() ->
+    %% Example, Swedish translation (consider using gettext)
+    [{prev, "tidigare"},
+     {next, "nästa"},
+     {add_comment, "kommentera"},
+     {singular_comment, "kommentar"},
+     {plural_comment, "kommentarer"},
+     {by, "av"}].
 
 mk_summary(Es) ->
     {'div', [{id, "wblog-list"}],

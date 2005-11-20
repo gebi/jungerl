@@ -6,8 +6,8 @@
 </head>
 <body bgcolor="white">
 <h1>Module wblog</h1>
-<b>wblog</b> is a Yaws appmod plugin that implements a simple (we)blog service.<ul><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul><p><b>Authors:</b> Torbjörn Törnkvist (<a href="mailto:tobbe@tornkvist.org"><tt>tobbe@tornkvist.org</tt></a>).</p>
-<h2><a name="description">Description</a></h2><b>wblog</b> is a Yaws appmod plugin that implements a simple (we)blog service.
+<b>wblog</b> is a Yaws plugin that implements a simple (we)blog service.<ul><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul><p><b>Authors:</b> Torbjörn Törnkvist (<a href="mailto:tobbe@tornkvist.org"><tt>tobbe@tornkvist.org</tt></a>).</p>
+<h2><a name="description">Description</a></h2><b>wblog</b> is a Yaws plugin that implements a simple (we)blog service.
         With <b>wblog</b>, it is possible to add blog entries as well as list-
         and traverse the entries. Entries are stored in a Mnesia table that is
         created once with the <a href="#setup-0"><code>setup/0</code></a> function. New entries are added
@@ -40,6 +40,7 @@
 <table width="100%" border="1"><tr><td valign="top"><a href="#add_comment-3">add_comment/3</a></td><td>Add a comment to the specified wblog entry.</td></tr>
 <tr><td valign="top"><a href="#ehtml_entry-1">ehtml_entry/1</a></td><td>Produces an EHTML structure, representing the specified entry.</td></tr>
 <tr><td valign="top"><a href="#ehtml_entry-2">ehtml_entry/2</a></td><td>Works as <a href="#ehtml_entry-1"><code>ehtml_entry/1</code></a> but also takes a list of options.</td></tr>
+<tr><td valign="top"><a href="#ehtml_entry-3">ehtml_entry/3</a></td><td>Works as <a href="#ehtml_entry-2"><code>ehtml_entry/2</code></a> but also takes a list of language translations.</td></tr>
 <tr><td valign="top"><a href="#ehtml_list-2">ehtml_list/2</a></td><td>Produce a summary list
         based on a list of wblog entries.</td></tr>
 <tr><td valign="top"><a href="#entries-1">entries/1</a></td><td>Returns the N last wblog entries.</td></tr>
@@ -69,6 +70,32 @@
         query argument: id=ID. The option: {comment, CommentPage} will
         create a link for creating comments, pointing to CommentsPage
         appended with the query argument id=ID.</p>
+
+<h3><a name="ehtml_entry-3">ehtml_entry/3</a></h3>
+<tt>ehtml_entry(E, Opts, Lang) -&gt; term()
+</tt><p>Works as <a href="#ehtml_entry-2"><code>ehtml_entry/2</code></a> but also takes a list of language translations.
+        By providing language specific Key-Value tuples, it is possible
+        adapt the wblog to different languages. A tuple consist of a predefined
+        key and a translated string. The predefined keys are:
+        <ul>
+        <li>{prev, String} - string denoting previous entry,
+                             default is <i>"prev"</i></li>
+        <li>{next, String} - string denoting next entry,
+                             default is <i>"next"</i></li>
+        <li>{permalink, String} - string denoting current entry,
+                                  default is <i>"permalink"</i></li>
+        <li>{add_comment, String} - string denoting link to add a comment,
+                                    default is <i>"add comment"</i></li>
+        <li>{singular_comment, String} - string denoting the translation,
+                                         of the word <i>"comment"</i> which
+                                         also is the default value.</li>
+        <li>{plural_comment, String} - string denoting the translation,
+                                       of the word <i>"comments"</i> which
+                                       also is the default value.</li>
+        <li>{by, String} - string denoting the translation,
+                           of the word <i>"by"</i> which
+                           also is the default value.</li>
+        </ul></p>
 
 <h3><a name="ehtml_list-2">ehtml_list/2</a></h3>
 <tt>ehtml_list(Ws, Opts) -&gt; term()

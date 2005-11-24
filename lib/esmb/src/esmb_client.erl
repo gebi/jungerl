@@ -227,7 +227,7 @@ ls(S, Neg, {Pdu0, Cwd} = State) ->
     Cset = get(charset),
     WinPath = mk_winpath(Neg, Cwd, Cset),
     Udir = to_ucs2(Neg, add_wildcard(Neg, Cset, WinPath), Cset),
-    Pdu = esmb:list_dir(S, Pdu0, Udir),
+    Pdu = (catch esmb:list_dir(S, Pdu0, Udir)),
     print_file_info(Neg, Pdu#smbpdu.finfo),
     {Pdu, Cwd}.
 
@@ -239,7 +239,8 @@ print_file_info(Neg, L) ->
 			   X#file_info.size,
 			   check_attr(X#file_info.attr)])
 	end,
-    lists:foreach(F, L).
+    lists:foreach(F, L),
+    io:format("Number of entries are ~w~n", [string:len(L)]).
 
 dt(X) ->
     {Y,M,D} = X#dt.last_access_date,

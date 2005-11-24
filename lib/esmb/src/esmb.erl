@@ -111,9 +111,12 @@
 -include("esmb_rpc.hrl").
 
 
-
+-ifdef(debug).
+-define(sdbg(S,A), ?elog(S,A)).
+-else.
 -define(sdbg(S,A), true).
-%%-define(sdbg(S,A), ?elog(S,A)).
+-endif.
+
 
 %%% ==============================================
 %%% ====== T Y P E  D E C L A R A T I O N S ======
@@ -909,8 +912,7 @@ connect(Host, SockOpts) -> connect(Host, SockOpts, ?PORT).
 %%% @end
 %%%
 connect(Host, SockOpts, Port) ->
-    Opts = [binary, {packet, 0}|SockOpts],
-    case gen_tcp:connect(Host, Port, Opts) of
+    case esmb_netbios:connect(Host, Port, SockOpts) of
 	{ok,S} ->
     case nbss_session_request(S, "*SMBSERVER", caller()) of
 		{ok,_} ->
@@ -929,7 +931,7 @@ connect(Host, SockOpts, Port) ->
 %%% @end
 %%%
 close(S) ->
-    gen_tcp:close(S),
+    esmb_netbios:close(S),
     ok.
 
 
@@ -1195,6 +1197,7 @@ c_delete_file(S, InReq, Path) ->
 %%% @end
 %%%
 list_dir(S, InReq, Path) ->
+    ?sdbg("Enter list_dir/3~n", []),
     catch c_list_dir(S, InReq, Path).
 
 c_list_dir(S, InReq, Path) ->
@@ -1203,7 +1206,7 @@ c_list_dir(S, InReq, Path) ->
 	{Req2, X} when X#find_result.eos == true -> 
 	    Req2#smbpdu{finfo = X#find_result.finfo};
 	{Req2, X} -> 
-	    list_dir_cont(S, Req2, Path, X#find_result.sid, X#find_result.finfo)
+	    list_dir_cont(S, Req2, <<>>, X#find_result.sid, X#find_result.finfo)
     end.
 
 list_dir_cont(S, InReq, Path, Sid, Finfo) ->
@@ -1291,7 +1294,11 @@ negotiate(S) ->
 
 c_negotiate(S) ->
     {Req, Pdu} = smb_negotiate_pdu(),
-    decode_smb_response(Req, nbss_session_service(S, Pdu)).
+    Neg = decode_smb_response(Req, nbss_session_service(S, Pdu)),
+    %% Sigh...we want to get hold of the socket in case
+    %% we need to retrieve more data, e.g far down in the
+    %% dec_trans2_xxxxx code.
+    Neg#smb_negotiate_res{sock = S}.
 
 
 %%%
@@ -1631,6 +1638,7 @@ dec_transaction_req(Req, Pdu) ->
 		_/binary>> = Buffer
 	end).
 		
+
 dec_trans2_find_x2(Req, Pdu, SubCmd) ->
     Res = safe_dec_smb(Req, Pdu),  % NB: may throw(Pdu)
     <<TotParamCount:16/little,
@@ -1655,11 +1663,94 @@ dec_trans2_find_x2(Req, Pdu, SubCmd) ->
 		   LastNameOffset,
 		   Res#smbpdu.bf),
     <<_:DataOffset/binary, Data/binary>> = Pdu,
+    x2_more(Res, Sid, Data, SearchCount, EndOfSearch,
+	    TotDataCount, DataCount + DataDisplacement).
+
+
+
+%%% We have got all the data
+x2_more(Res, Sid, Data, SearchCount, EoS, TotDataCount, TotDataCount) ->
+    ?sdbg("x2_more - Yes, we got all data~n", []),
+    Finfo = dec_find_file_both_dir_info(Res, Data, SearchCount),
+    {Res, #find_result{sid = Sid, 
+		       eos = to_bool(EoS), 
+		       finfo = Finfo}};
+%%% We need more data
+x2_more(Res, Sid, Data, SearchCount, EoS, TotDataCount, DataCount) 
+  when TotDataCount > DataCount ->
+    ?sdbg("x2_more - We need more data (~w)~n", [TotDataCount - DataCount]),
+    X = x2_get_more(Res, Data),
+    Finfo = dec_find_file_both_dir_info(Res, X#smbpdu.data, SearchCount),
+    {Res, #find_result{sid = Sid, 
+		       eos = to_bool(EoS), 
+		       finfo = Finfo}};
+%%% Bad case, log error, and handle it gracefully !!
+x2_more(Res, Sid, Data, SearchCount, EoS, TotDataCount, DataCount) ->
+    ?elog("+++ x2_more got error: TotDataCount=~p , DataCount=~p~n",
+	  [TotDataCount, DataCount]),
     Finfo = dec_find_file_both_dir_info(Res, Data, SearchCount),
     %%print_fd_info(Finfo),
     {Res, #find_result{sid = Sid, 
-		       eos = to_bool(EndOfSearch), 
+		       eos = to_bool(EoS), 
 		       finfo = Finfo}}.
+
+x2_get_more(Req, Data) ->
+    S = (Req#smbpdu.neg)#smb_negotiate_res.sock,
+    {ok, _, Pdu} = esmb_netbios:recv(S),
+    Res = safe_dec_smb(Req, Pdu),  % NB: may throw(Pdu)
+    <<TotParamCount:16/little,
+     TotDataCount:16/little,
+     _:16/little,                  % reserved
+     ParamCount:16/little,
+     ParamOffset:16/little,
+     ParamDisplacement:16/little,
+     DataCount:16/little,
+     DataOffset:16/little,
+     DataDisplacement:16/little,
+     SetupCount,
+     _/binary>> = Res#smbpdu.wp,
+    Bf = Res#smbpdu.bf,
+    {SetupWords, B1} =
+	if (SetupCount > 0) ->
+		<<Xsw:SetupCount/binary,Xb1/binary>> = Bf,
+		{Xsw, Xb1};
+	   true ->
+		{<<>>, Bf}
+	end,
+    %% We may have some pad bytes here between the
+    %% ByteCount parameter and the actual data.
+    %% Strip it off by computing how many bytes
+    %% we have upto and including the ByteCount param,
+    %% and subtract that from the DataOffset param.
+    %% Whatever is left is the number of pad-bytes.
+    Pad = DataOffset - 
+	(?SMB_HEADER_LEN + 
+	 1 +    % WordCount == 1 byte
+	 ((Res#smbpdu.wc + SetupCount) * 2) + 
+	 2),    % ByteCount == 2 bytes
+    NewData = if (Pad > 0) ->
+		      <<SS:Pad/binary,Xdata/binary>> = B1,
+		      Xdata;
+		 true ->
+		      B1
+	      end,
+    if 
+	(TotDataCount == (DataCount + DataDisplacement)) ->
+	    ?sdbg("x2_get_more - Yes, got it all~n", []),
+	    Res#smbpdu{data = concat_binary([Data,NewData])};
+	(TotDataCount > (DataCount + DataDisplacement)) ->
+	    ?sdbg("x2_get_more - Need more ~n", [TotDataCount - (DataCount + DataDisplacement)]),
+	    x2_get_more(Res, concat_binary([Data,NewData]));
+	true ->
+	    %% Bad case, see comment above.
+	    ?elog("x2_get_more: ERROR TotDataCount=~p , DataCount=~p~n",
+		  [TotDataCount, DataCount]),
+	    Res#smbpdu{data = concat_binary([Data,NewData])}
+    end.
+	    
+
+
+
 
 %%% ---
 
@@ -1696,8 +1787,10 @@ dec_find_file_both_dir_info(<<Offset:32/little,  % Offset to next struct
 dec_find_file_both_dir_info(Rest, Ucode, Max, I) when I > Max ->
     [];
 dec_find_file_both_dir_info(Rest, Ucode, Max, I) ->
-    ?elog("dec_find_file_both_dir_info: <ERROR> Missing file info I=~p~n",[I]),
-    %%hexprint(b2l(Rest)),
+    {backtrace, BT} = process_info(self(), backtrace),
+    ?elog("dec_find_file_both_dir_info: <ERROR> Missing file info I=~p Max=~p~nBacktrace=~s~n",
+	  [I,Max,binary_to_list(BT)]),
+    hexprint(b2l(Rest)),
     [].
 
 
@@ -2193,7 +2286,7 @@ wp_trans2_find_x2(SubCmd, PathLen, NullLen) ->
      <<ParamCount:16/little,     % Total parameter bytes sent
       0:16/little,               % Total data bytes sent
       10:16/little,              % Max parameter bytes to return
-      4096:16/little,            % Max data bytes to return
+      ?MAX_BUFFER_SIZE:16/little,% Max data bytes to return
       0,                         % Max setup words to return
       0,                         % reserved
       0:16/little,               % Flags

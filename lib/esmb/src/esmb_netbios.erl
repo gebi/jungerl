@@ -10,7 +10,7 @@
 	 nbss_session_service/2, nbss_datagram_service/2,
 	 nbss_src_name/1, nbss_dst_name/1, nb_dec_name/1,
 	 tt_ename/1, tt_dname/1, dec_nbns/2, positive_query_response_pdu/2,
-	 dec_nbss_datagram/1]).
+	 dec_nbss_datagram/1, recv/1, connect/3, close/1]).
 
 -import(esmb, [b2l/1, ip2bin/1, bin2ip/1, ip2str/1, lcase/1, sizeof/1]).
 
@@ -30,7 +30,7 @@ nbss_session_service(S, SMB_pdu) ->
 
 nbss_datagram_service(Dgm, Pdu) ->
     Res = gen_udp:send(Dgm#netbios_dgm.sock, 
-		       "192.168.128.255",
+		       "192.168.128.255",         %% FIXME
 		       ?NETBIOS_DGM_PORT,
 		       nbss_datagram_pdu(Dgm, Pdu)),
     Res.
@@ -62,26 +62,27 @@ dec_nbns(Bin, _Ns) ->
     Bin.  % NYI !!
    
 
-dec_msg(<<?POSITIVE_SESSION_RESPONSE,Flags,Length:16>>) ->
+dec_msg(_, <<?POSITIVE_SESSION_RESPONSE,Flags,Length:16>>) ->
     {ok, ?POSITIVE_SESSION_RESPONSE};
-dec_msg(<<?SESSION_SERVICE, _, Length:16, SMB_pdu/binary>>) ->
-    {ok, ?SESSION_SERVICE, get_more(Length, sizeof(SMB_pdu), [SMB_pdu])};
-dec_msg(<<?SESSION_KEEP_ALIVE, _/binary>>) ->
+dec_msg(S, <<?SESSION_SERVICE, _, Length:16, SMB_pdu/binary>>) ->
+    {ok, ?SESSION_SERVICE, get_more(S, Length, sizeof(SMB_pdu), [SMB_pdu])};
+dec_msg(_, <<?SESSION_KEEP_ALIVE, _/binary>>) ->
     {ok, ?SESSION_KEEP_ALIVE};
-dec_msg(<<?NEGATIVE_SESSION_RESPONSE,Flags,Length:16,Ecode>>) ->
+dec_msg(_, <<?NEGATIVE_SESSION_RESPONSE,Flags,Length:16,Ecode>>) ->
     Emsg =  neg_sess_resp(Ecode),
     {error, neg_sess_resp(Ecode)};
-dec_msg(Bin) ->
+dec_msg(_, Bin) ->
     ?elog("dec_msg got: ~p~n",[Bin]),
     {error, Bin}.
 
-get_more(Expected, Got, Bins) when Got < Expected ->
-    receive 
-	{tcp,_,Bin} ->
-	    get_more(Expected, Got + size(Bin), [Bin | Bins])
+get_more(S, Expected, Got, Bins) when Got < Expected ->
+    case recv(S, Expected - Got) of
+	{ok, Bin} ->
+	    get_more(S, Expected, Got + size(Bin), [Bin | Bins])
     end;
-get_more(_, _, Bins) ->
+get_more(_, Expected, _Got, Bins) ->
     concat_binary(lists:reverse(Bins)).
+
 
 neg_sess_resp(16#80) -> "Not listening on called name";
 neg_sess_resp(16#81) -> "Not listening for calling name";
@@ -274,35 +275,63 @@ lcase_host(T) when tuple(T) -> T;
 lcase_host(L) when list(L)  -> lcase(L).
 
 
+%%%
+%%% We want to make sure we connect in passive mode so
+%%% that we can control exactly how many bytes to be read.
+%%%
+connect(Host, Port, SockOpts) ->
+    Opts = [binary, {packet,0}, {active,false} | SockOpts],
+    gen_tcp:connect(Host, Port, Opts).
+
+close(Sock) ->
+    gen_tcp:close(Sock).
+
+
 send_recv(S, Packet) ->
     gen_tcp:send(S, [Packet]),
     recv(S).
 
 recv(S) ->
-    receive 
-	{tcp,S,Bin} ->
-	    case dec_msg(Bin) of
-		{ok, ?SESSION_KEEP_ALIVE} ->
-		    recv(S);
-		Else ->
-		    Else
-	    end;
-
-	{tcp,_,Bin} ->
-	    %%?elog("recv: ignoring stale tcp msg~n",[]),
-	    recv(S);
-	    
-	{tcp_closed,S} ->
-	    %%?elog("recv: port closed~n",[]),
-	    exit(closed);
-	    
-	{tcp_closed,_} ->
-	    %%?elog("recv: ignoring stale port closed msg~n",[]),
-	    recv(S);
-	    
-	Else ->
-	    %%?elog("recv: got unexpected msg: ~p~n",[Else]),
-	    gen_tcp:close(S),
-	    exit(Else)
+    case recv_4(S) of
+	{ok, Bin} -> 
+	    dec_msg(S, Bin);
+	{error, Reason} ->
+	    ?elog("recv/1: got error, Reason=~p~n", [Reason]),
+	    {error, Reason}
     end.
+
+recv_4(S) ->
+    recv(S, 4).
+
+recv(S, Length) ->
+    gen_tcp:recv(S, Length).
+
+
+%%%old_recv(S) ->
+%%%    receive 
+%%%	{tcp,S,Bin} ->
+%%%	    case dec_msg(Bin) of
+%%%		{ok, ?SESSION_KEEP_ALIVE} ->
+%%%		    recv(S);
+%%%		Else ->
+%%%		    Else
+%%%	    end;
+%%%
+%%%	{tcp,_,Bin} ->
+%%%	    %%?elog("recv: ignoring stale tcp msg~n",[]),
+%%%	    recv(S);
+%%%	    
+%%%	{tcp_closed,S} ->
+%%%	    %%?elog("recv: port closed~n",[]),
+%%%	    exit(closed);
+%%%	    
+%%%	{tcp_closed,_} ->
+%%%	    %%?elog("recv: ignoring stale port closed msg~n",[]),
+%%%	    recv(S);
+%%%	    
+%%%	Else ->
+%%%	    %%?elog("recv: got unexpected msg: ~p~n",[Else]),
+%%%	    gen_tcp:close(S),
+%%%	    exit(Else)
+%%%    end.
 

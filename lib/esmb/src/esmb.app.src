@@ -1,14 +1,8 @@
 {application,esmb,
- [{description,"Erlang SMB Library"},
+ [{description,"esmb handling"},
   {vsn,"%VSN%"},
   {modules,[%MODULES%]},
   {registered,[]},
   {env, []},
   {mod, {esmb_app, []}},
-  {applications,[kernel,stdlib,sasl]},
-  {dependencies,
-   [{kernel, "2.9.6"},
-    {stdlib, "1.12.7"},
-    {fd_server, "2.3.0"},
-    {sasl,"1.10.1"}]}]}.
-
+  {applications,[kernel,stdlib,sasl]}]}.

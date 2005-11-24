@@ -220,7 +220,6 @@
 
 
 -define(HEADER_SIZE, 100).        % max_data_sent = max_buffer_size - header_size
-%-define(MAX_BUFFER_SIZE, 8192).  
 -define(MAX_BUFFER_SIZE, 16644).  
 
 %%% This record hold the negotiation result.
@@ -234,7 +233,9 @@
 	  samba2=false,
 	  samba2_cset=?CSET_ASCII,
 	  netware=false,
-	  flags2                % copy of the flags2 field from the neg. PDU
+	  flags2,               % copy of the flags2 field from the neg. PDU
+	  %% --- Own, additional info
+	  sock                  % The Socket fd used for this session
 	  }).
 
 %%% SecurityMode flags when LANMAN is negotiated

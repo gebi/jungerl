@@ -39,7 +39,7 @@
 %%%-------------------------------------------------------------------
 -module(wblog).
 
--export([new/3, new/4, entry/1, add_comment/3,
+-export([new/3, new/4, new/5, entry/1, add_comment/3,
 	 ehtml_entry/1, ehtml_entry/2, ehtml_entry/3,
 	 entries/1, entries/2, entries/3, ehtml_list/2]).
 %% Run only once, at setup.
@@ -92,13 +92,23 @@ new(Head, Text, RSS) ->
 %%%      Works as {@link new/3} but with a specific user added.
 %%%      This makes it possible to maintain several distinct users.
 new(User, Head, Text, RSS) -> 
+    new(User, Head, Text, RSS, "").
+
+%%% @doc Add a new <i>wblog entry</i> .
+%%%      Works as {@link new/4} but with a specific page link added.
+%%%      This is used for storing a link to the wblog entry into
+%%%      the RSS feed (if RSS is enabled). For example, a link can
+%%%      be <i>"http://localhost:4080/wblog.yaws"</i> , which will be
+%%%      concatenated with <i>"?id=34545433"</i> before it is stored
+%%%      in the Yaws RSS feed.
+new(User, Head, Text, RSS, Link) -> 
     Id = mk_id(),
     W = #wblog{id   = Id,
 	       user = User,
 	       head = Head,
 	       text = Text,
 	       date = now_to_gregsec()},
-    store_rss(RSS, User, Head, Text),
+    store_rss(RSS, User, Head, Text, Link++"?id="++i2l(Id)),
     F = fun() ->
 		case mnesia:read({wblog_meta, User}) of
 		    [M] ->
@@ -282,12 +292,18 @@ fmt_comments([], _) ->
     [].
 
 
-     
 %%% Store blog entry into the RSS feeder
-store_rss(false, User, Head, Text) ->       % RSS not enabled
+store_rss(false, _User, _Head, _Text, _Link) ->   % RSS not enabled
     ok;
-store_rss(RSS, User, Head, Text) ->
-    tbd.
+store_rss(true, User, Head, Text, Link) ->
+    yaws_rss:insert(wblog, l2a(User), Head,
+                    Link,  
+                    Text,
+                    User).
+
+l2a(L) when list(L) -> list_to_atom(L);
+l2a(A) when atom(A) -> A.
+
 
 lnk(Id, Head, Opts) -> lnk(Id, Head, Opts, href).
 
@@ -313,9 +329,6 @@ opts(Key, Opts, Default) ->
 	{value, {_,V}} when list(V) -> V;
 	_                           -> Default
     end.
-
-user2str(?NO_USER) -> "";
-user2str(User)     -> User.
 
 
 date2str(GregSec) ->
@@ -356,9 +369,6 @@ mk_id() ->
 
 i2l(I) when integer(I) -> integer_to_list(I);
 i2l(L) when list(L)    -> L.
-
-safe_hd([H|_]) -> H;
-safe_hd(_)     -> '$no_entry_found'.
 
 %%% transaction value
 tVALUE({atomic,Val})     -> {ok, Val};

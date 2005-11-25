@@ -1,8 +1,10 @@
 <erl>
 out(A) ->
+    Host = (A#arg.headers)#headers.host,
     {ok, Title} = yaws_api:postvar(A, "title"),
     {ok, Text} = yaws_api:postvar(A, "entry"),
-    wblog:new("tobbe", Title, Text, false),
+    %%wblog:new("tobbe", Title, Text, false),
+    wblog:new("tobbe", Title, Text, true, "http://"++Host++"/wblog.yaws"),
     {redirect, ["/wblog.yaws"]}.
 
     

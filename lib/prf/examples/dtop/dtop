@@ -18,7 +18,6 @@ echo last $LAST
 if [ -z "$LAST" ]; then usage; fi
 
 Erl $ARGS \
--pa $JUNGERL/lib/prf/examples/gperf \
+-pa $JUNGERL/lib/prf/examples/dtop \
 -pa $JUNGERL/lib/prf/ebin \
--pa $JUNGERL/lib/gtkNode/ebin \
--s gperf start $LAST
+-s dtop start $LAST

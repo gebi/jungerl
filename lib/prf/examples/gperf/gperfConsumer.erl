@@ -11,7 +11,7 @@
 
 -record(data,{net=[],sys=[]}).
 -record(ld, {node,gtkPid,data=#data{},
-	     mem_max=512*1024*1024,net_max=100,load_max=1}).
+	     mem_max=512*1024*1024,net_max=4000,load_max=1}).
 
 collectors() -> [prfSys,prfNet].
 

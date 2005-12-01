@@ -1,0 +1,6 @@
+2005-12-01  Mats Cronqvist  <locmacr@mwlx084>
+
+	* gperf (Module): bugfix
+
+	* gperfConsumer.erl (Module): changed hardcoded :< netload Y-axis
+

@@ -26,8 +26,8 @@ static void start_gtk(int argc, char **argv, int ErlFd){
 int main(int argc, char **argv){
   int fd;
 
-  if ( argc != 6 ){
-    g_print("Usage: %s node host erlang_regname cookie node_name\n", argv[0]);
+  if ( argc != 7 ){
+    g_print("Usage: %s node host regname cookie node_name erl_dist_vsn\n", argv[0]);
     return 1;
   }
   

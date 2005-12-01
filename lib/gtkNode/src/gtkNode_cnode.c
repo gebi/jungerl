@@ -7,6 +7,7 @@
 #define REMREG argv[3]
 #define COOKIE argv[4]
 #define NODE_NAME argv[5]
+#define ERL_DIST_VSN argv[6]
 
 static int fd;			/* fd to remote Erlang node */
 static gchar* rem_regname;    /* process name on remote Erlang node */
@@ -22,6 +23,8 @@ int gn_start_cnode(char **argv) {
   strcat(rem_node_name,REMHOST);
   rem_regname = g_strdup(REMREG);
   g_print("I am %s, you are %s\n", NODE_NAME, rem_node_name);
+
+  ei_set_compat_rel(ERL_DIST_VSN); /* erlnode version of dist. protocol */
 
   if ( ei_connect_init(&ec, NODE_NAME, COOKIE, CREATION) < 0 )
     g_critical("ei_connect_init");

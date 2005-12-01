@@ -67,9 +67,21 @@ make_cmd(Name) ->
 	false -> erlang:fault({executable_no_found,Bin});
 	Exe -> 
 	    [Node,Host] = string:tokens(atom_to_list(node()),"@"),
+	    RegName = atom_to_list(Name),
 	    Cookie = atom_to_list(erlang:get_cookie()),
 	    NN = atom_to_list(?MODULE)++"_"++atom_to_list(Name),
-	    string_join([Exe,Node,Host,atom_to_list(Name),Cookie,NN]," ")
+	    EDV = integer_to_list(erl_dist_vsn()),
+	    string_join([Exe,Node,Host,RegName,Cookie,NN,EDV]," ")
+    end.
+
+erl_dist_vsn() ->
+    case string:tokens(erlang:system_info(version),".") of
+	[[X]|_] when X < $5-> throw({ancient_erl_version,[X]});
+	["5","0"|_] -> 7;
+	["5","1"|_] -> 7;
+	["5","2"|_] -> 8;
+	["5","3"|_] -> 9;
+	_ -> 10
     end.
 
 string_join([Pref|Toks], Sep) ->

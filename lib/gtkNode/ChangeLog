@@ -1,3 +1,17 @@
+2005-12-01  Mats Cronqvist  <locmacr@mwlx084>
+
+	* src/gtkNode.c (Module): 
+	* src/gtkNode.erl (Module): 
+	* src/gtkNode_cnode.c (Module): erlang node passes its
+	distribution version number to cnode. cnode set the correct
+	compatibility mode. should work for erls back to R7.
+
+	* src/Makefile (Module): always building against R10
+
+	* src/check_otp (Message): script used by makefile to ensure
+	correct OTP. we want R10 or later, and assert the we can find erlc
+	and ei.h.
+
 2005-11-15  Mats Cronqvist  <locmacr@mwlx084>
 
 	* src/Makefile (Module): added -lpthread to the linker flags (crux)

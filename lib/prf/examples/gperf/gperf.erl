@@ -1,5 +1,7 @@
 -module(gperf).
 -export([start/1]).
 
-start([Node]) -> prfHost:start([gperf,Node,gperfConsumer]);
-start(Node) -> prfHost:start(gperf,Node,gperfConsumer).
+start([Node]) -> 				%from bash
+    prfHost:start([gperf,Node,gperfConsumer]),halt();
+start(Node) -> 					%from erlang shell
+    prfHost:start(gperf,Node,gperfConsumer).

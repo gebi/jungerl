@@ -1,3 +1,8 @@
+2005-12-02  Mats Cronqvist  <locmacr@mwlx084>
+
+	* gperf (Module): 
+	* gperf.erl (Module): fixed start script (again)
+
 2005-12-01  Mats Cronqvist  <locmacr@mwlx084>
 
 	* gperf (Module): bugfix

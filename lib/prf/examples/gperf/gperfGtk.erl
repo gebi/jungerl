@@ -11,6 +11,7 @@
 -export([loop/1]).				%internal export
 -import(filename,[join/1,dirname/1]).
 -import(random,[uniform/1]).
+-import(lists,[foreach/2,flatten/1,keysearch/3,nth/2,reverse/1,seq/2,sort/1]).
 
 -define(MARG,10).
 -define(XSIZE,2000).
@@ -49,7 +50,7 @@ loop(LD = #ld{name=Name}) ->
 
 dump_ld(LD) ->
     F = fun({N,V})->io:fwrite("~p~n",[{N,V}]) end,
-    lists:foreach(F,zip(record_info(fields,ld),tl(tuple_to_list(LD)))).
+    foreach(F,zip(record_info(fields,ld),tl(tuple_to_list(LD)))).
 
 zip([],[]) -> [];
 zip([A|As],[B|Bs]) -> [{A,B}|zip(As,Bs)].
@@ -87,7 +88,7 @@ resize_toplevel(Widget) ->
 
 %%%
 redraw(LD) ->
-    lists:foreach(fun({DA,_Colors}) -> redraw(DA,LD) end, ?DAREAS),
+    foreach(fun({DA,_Colors}) -> redraw(DA,LD) end, ?DAREAS),
     LD.
 
 redraw(Darea,LD = #ld{x=X,dAreas=Dareas}) ->
@@ -102,13 +103,12 @@ stuff(LD = #ld{dAreas=Dareas,x=X},Datas) ->
 
 stuffit(_X,[],[]) -> ok;
 stuffit(X,[Data|Datas],[{_DAname,Darea}|Dareas]) ->
-    stuffer(X,Data,1,Darea),
+    VIs = reverse(sort(zip(Data,seq(1,length(Data))))),
+    foreach(fun(VI) -> stuffer(X,Darea,VI) end, VIs),
     stuffit(X,Datas,Dareas).
 
-stuffer(_X,[],_N,Darea) -> ok;
-stuffer(X,[Val|Vals],N,Darea) ->
-    draw_line(Darea,N,X,Val),
-    stuffer(X,Vals,N+1,Darea).
+stuffer(X,Darea,{Val,I}) ->
+    draw_line(Darea,I,X,Val).
 
 timeline(LD = #ld{state=disc}, no_time) -> LD;
 timeline(LD = #ld{state=disc}, {_H,M,_S}) -> stat_change(up,LD#ld{minute=M});
@@ -116,7 +116,7 @@ timeline(LD = #ld{state=conn}, no_time) -> stat_change(down,LD);
 %%timeline(LD = #ld{minute=undefined},{_H,M,_S}) -> LD#ld{minute=M};
 timeline(LD = #ld{minute=M},{_H,M,_S}) -> LD;
 timeline(LD = #ld{dAreas=Dareas},{_,M,_}=HMS) ->
-    lists:foreach(fun(Darea)->draw_timeline(Darea,LD,HMS) end,Dareas),
+    foreach(fun(Darea)->draw_timeline(Darea,LD,HMS) end,Dareas),
     LD#ld{minute=M}.
 
 stat_change(up,LD) ->     
@@ -133,7 +133,7 @@ draw_timeline({_,Darea},LD,{H,M,_S}) ->
     draw_time(Darea,LD,{H,M}).
 
 draw_time(#dArea{px_fg=Pxfg,px_bg=Pxbg,layout=Layout,gc_fg=GC},LD,{H,M}) ->
-    Tm = lists:flatten(io_lib:fwrite("~2.2.0w:~2.2.0w",[H,M])),
+    Tm = flatten(io_lib:fwrite("~2.2.0w:~2.2.0w",[H,M])),
     g(Layout,'GN_pango_layout_set_text',[Tm,"geneva 6"]),
     g(Pxfg,'Gdk_draw_layout',[GC,LD#ld.x,90,Layout]),
     g(Pxbg,'Gdk_draw_layout',[GC,LD#ld.x-?XHALF,90,Layout]).
@@ -147,7 +147,7 @@ draw_line(DA,GCtag,X,Y) ->
     g(DA#dArea.px_fg,'Gdk_draw_line',[GC,X,Y0,X,Y1]),
     g(DA#dArea.px_bg,'Gdk_draw_line',[GC,X-?XHALF,Y0,X-?XHALF,Y1]).
 
-get_gc(DA,N) when is_integer(N) -> lists:nth(N,DA#dArea.gcs);
+get_gc(DA,N) when is_integer(N) -> nth(N,DA#dArea.gcs);
 get_gc(DA,fg) -> DA#dArea.gc_fg;
 get_gc(DA,bg) -> DA#dArea.gc_bg.
 
@@ -193,7 +193,7 @@ pixmaps(N,Win) ->
     [Pixmap|pixmaps(N-1,Win)].
 
 clear_all(LD) ->
-    lists:foreach(fun(DA)->clear_one(DA) end, LD#ld.dAreas),
+    foreach(fun(DA)->clear_one(DA) end, LD#ld.dAreas),
     LD.
 
 clear_one({_,#dArea{px_fg=Px1,px_bg=Px2,gc_fg=GCfg,gc_bg=GCbg}}) ->
@@ -229,9 +229,7 @@ snd_rec(Cmd, Args) ->
     end.
 
 lks(Tag,List) ->
-    {value,{Tag,Val}} = lists:keysearch(Tag,1,List),
+    {value,{Tag,Val}} = keysearch(Tag,1,List),
     Val.
-dv(A,0) -> 0;
-dv(A,B) -> A/B.
 
 %%%GUI=gperf_GUI,G = fun(Wid,Cmd,Args)->GUI! {self(),[{Cmd,[Wid|Args]}]}, receive {GUI,{reply,[{ok,Rep}]}} -> Rep;{GUI,{reply,[{error,Rep}]}} -> erlang:fault({Cmd,Args,Rep}) end end.

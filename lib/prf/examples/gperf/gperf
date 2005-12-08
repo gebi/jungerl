@@ -16,9 +16,7 @@ else
 fi
 
 n=4
-while [ 0 -lt "$n" ]; do 
-    SPATH=`dirname $SPATH` ; let "n--"
-done
+while [ 0 -lt "$n" ]; do SPATH=`dirname $SPATH`; let "n--"; done
 
 detach="-detached"
 ERL=erl

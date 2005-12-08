@@ -1,3 +1,8 @@
+2005-12-08  Mats Cronqvist  <locmacr@mwlx084>
+
+	* gperfGtk.erl (Module): sorts plotted values such that biggest
+	value gets plotted first etc. means all colors are always visible.
+
 2005-12-02  Mats Cronqvist  <locmacr@mwlx084>
 
 	* gperf (Module): 

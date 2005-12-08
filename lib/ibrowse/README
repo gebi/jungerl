@@ -5,6 +5,7 @@ ibrowse is a HTTP client. The following are a list of features.
 	- supports GET, POST, OPTIONS, HEAD, PUT, DELETE, TRACE only
 	- Understands HTTP/0.9, HTTP/1.0 and HTTP/1.1
 	- Understands chunked encoding
+        - Can generate requests using Chunked Transfer-Encoding
 	- Named pools of connections to each webserver
 	- Pipelining support
 	- Download to file
@@ -16,10 +17,17 @@ ibrowse is a HTTP client. The following are a list of features.
 
 Comments to : Chandrashekhar.Mullaparthi@t-mobile.co.uk
 
-CONTRIBUTIONS
-=============
+CONTRIBUTIONS & CHANGE HISTORY
+==============================
 08-May-2005 - Youns Hafri made a CRUX LINUX port of ibrowse.
 	      http://yhafri.club.fr/crux/index.html
+
+22-Nov-2005 - Added ability to generate requests using the Chunked 
+              Transfer-Encoding.
+
+08-Dec-2005 - Richard Cameron (camster@citeulike.org). Patch to ibrowse to
+              prevent port number being included in the Host header when port
+              80 is intended.
 
 Here are some usage examples. Enjoy!
 

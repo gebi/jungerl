@@ -744,14 +744,16 @@ unpack_and_make(P, Fetched) ->
 	ok = file:set_cwd(Current_directory),
 	io:format(green("finished!")++"~n", []).
 
+%%% Does '-o' work in all tar's ?
+%%% (do not attempt to restore ownership when extracting)
 is_untar_ok( Tarfile, Target, Make ) ->
-	Tar = lists:append( ["tar -xzf ", Tarfile] ), 
+	Tar = lists:append( ["tar -xzof ", Tarfile] ), 
 	%% make used for erlmerge was gnumake. 
 	%% wild assumption: gnutar is in the same directory as gnumake. 
 	Gtar = filename:join( [filename:dirname( Make ), "gtar"] ),
-	Gnu_tar = lists:append( [Gtar, " -xzf ", Tarfile] ),
+	Gnu_tar = lists:append( [Gtar, " -xzof ", Tarfile] ),
 	Gtar2 = filename:join( [filename:dirname( Make ), "tar"] ),
-	Gnu_tar2 = lists:append( [Gtar2, " -xzf ", Tarfile] ),
+	Gnu_tar2 = lists:append( [Gtar2, " -xzof ", Tarfile] ),
 	More_tar = lists:append( ["gunzip -c ", Tarfile, " | tar -xf -"] ),
 	is_untar_ok_alternatives( Target, [Tar, Gnu_tar, Gnu_tar2, More_tar] ).
 

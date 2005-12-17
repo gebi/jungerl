@@ -1,5 +1,5 @@
 %%% File    : pgsql.erl
-%%% Author  : Christian Sunesson <chrisu@kth.se>
+%%% Author  : Christian Sunesson <chsu79@gmail.com>
 %%% Description : PostgresQL interface
 %%% Created : 11 May 2005
 

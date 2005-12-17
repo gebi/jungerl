@@ -42,6 +42,8 @@
 
 %% For protocol unwrapping, pgsql_tcp for example.
 -export([decode_packet/2]).
+-export([encode_message/2]).
+-export([encode/2]).
 
 -import(pgsql_util, [option/2]).
 -import(pgsql_util, [socket/1]).

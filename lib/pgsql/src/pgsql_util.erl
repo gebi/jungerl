@@ -16,6 +16,7 @@
 
 %% Protocol packing
 -export([string/1, make_pair/2, split_pair/1]).
+-export([split_pair_rec/1]).
 -export([count_string/1, to_string/1]).
 -export([oids/2, coldescs/2, datacoldescs/3]).
 -export([decode_row/2, decode_descs/1]).
@@ -92,16 +93,28 @@ make_pair(Key, Value) ->
 
 split_pair(Bin) when binary(Bin) ->
     split_pair(binary_to_list(Bin));
-split_pair(S) ->
-    {Key, [0|S1]} = lists:splitwith(fun(C) ->
-					  C /= 0
-				  end,
-				  S),
-    {Value, _} = lists:splitwith(fun(C) ->
-					 C /= 0
-				 end,
-				 S1),
-    {Key, Value}.
+split_pair(Str)  ->
+    split_pair_rec(Str, norec).
+
+split_pair_rec(Bin) when binary(Bin) ->
+    split_pair_rec(binary_to_list(Bin));
+split_pair_rec(Arg)  ->
+    split_pair_rec(Arg,[]).
+
+split_pair_rec([], Acc) ->
+    lists:reverse(Acc);
+split_pair_rec([0], Acc) ->
+    lists:reverse(Acc);
+split_pair_rec(S, Acc) ->
+    Fun = fun(C) -> C /= 0 end,
+    {Key, [0|S1]} = lists:splitwith(Fun, S),
+    {Value, [0|Tail]} = lists:splitwith(Fun, S1),
+    case Acc of 
+        norec -> {Key, Value};
+        _ ->
+            split_pair_rec(Tail, [{Key, Value}| Acc])
+    end.
+
 
 count_string(Bin) when binary(Bin) ->
     count_string(Bin, 0).

@@ -588,6 +588,11 @@ quit(State) ->
     ?EDIT_TERMINAL:teardown(),
     halt().
 
+-command({stop, [], "Exit the editor process, without halting Erlang."}).
+stop(State) ->
+    ?EDIT_TERMINAL:teardown(),
+    init:restart().  % FIXME , should do something nicer... (tobbe)
+
 -command({printf, [{string, "String:"}],
 	  "Print a string to standard output (the file edit.out)"}).
 

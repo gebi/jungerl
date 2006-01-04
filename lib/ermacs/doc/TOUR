@@ -106,10 +106,30 @@ Multiple buffers
 You can use "C-x C-f" to open a new file, and then "C-x b" back here
 as you would in emacs (but without the completions).
 
+
+The ~/.ermacs file
+------------------
+
+Works similar to the ~/.erlang file, i.e you can put erlang
+code there to be evaluated. For example, if you want to redefine
+the global keymap so that "C-x C-c" doesn't halt the Erlang node,
+the add a line such as:
+
+  edit_keymap:global_set_key("C-x C-c", {edit_lib, stop, []}).
+
+to your ~/.ermacs file. 
+(make sure that you make a newline after the dot)
+
+
 Other stuff
 -----------
 
 To see what else there is, look in the keymap definition:
 
   C-x C-f ../src/edit_globalmap.erl RET
+
+If you want to change the foreground/background colors, you
+can set the COLORFGBG environment variable like this:
+
+  export COLORFGBG="green;black"
 

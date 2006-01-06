@@ -1,5 +1,9 @@
 2006-01-06  Mats Cronqvist  <locmacr@mwlx084>
 
+	* src/gtkNode_glade.c (Module): since it seems there can be
+	signals witout events, gtkNode can now pass the event type 'NONE'
+	to the erlang side.
+
 	* src/gtkNode.erl (Module): added a debug server. start
 	gtkNode:debug() on the erlang side, then start the c-node in the
 	debugger. args like this;
@@ -7,9 +11,14 @@
 	e.g. erl snode gtkNodeDBG snookie gtkNodeCDBG 10
 	
 	* src/gtkNode_glade.c (Module): handle the case where the signal
-	handler gets called but there is not event. have no idea why this
+	handler gets called but there is no event. have no idea why this
 	can happen...
 
+	but wait... in glade we coupled the "clicked" signal to
+	gn_sighandler. but "clicked" isn't necessarily connected to a GDK
+	event? e.g. if you click a button many times by holding the space
+	bar down. that's just one GDK_PRESS (or whatever it's called).
+	
 	* src/gtkNode.c (Module): cosmetic
 
 2005-12-01  Mats Cronqvist  <locmacr@mwlx084>

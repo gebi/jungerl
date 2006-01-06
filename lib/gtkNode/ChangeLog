@@ -1,3 +1,17 @@
+2006-01-06  Mats Cronqvist  <locmacr@mwlx084>
+
+	* src/gtkNode.erl (Module): added a debug server. start
+	gtkNode:debug() on the erlang side, then start the c-node in the
+	debugger. args like this;
+	<erlnode name> <host> gtkNodeDBG <cookie> <cnode name> <erts version>
+	e.g. erl snode gtkNodeDBG snookie gtkNodeCDBG 10
+	
+	* src/gtkNode_glade.c (Module): handle the case where the signal
+	handler gets called but there is not event. have no idea why this
+	can happen...
+
+	* src/gtkNode.c (Module): cosmetic
+
 2005-12-01  Mats Cronqvist  <locmacr@mwlx084>
 
 	* src/gtkNode.c (Module): 

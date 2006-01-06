@@ -13,10 +13,14 @@ static void start_gtk(int argc, char **argv, int ErlFd){
   GIOFunc func = gn_handle_read;
   gpointer user_data = NULL;
   
+  /* exit on g_critical */
+  g_log_set_always_fatal(G_LOG_LEVEL_CRITICAL);
+
+  
   /* initialise libraries */
   gtk_init(&argc, &argv);
 
-
+  /* watch the erlang ditsribution file descriptor */
   channel = g_io_channel_unix_new(ErlFd);
   g_io_add_watch(channel, condition, func, user_data); 
 
@@ -25,14 +29,13 @@ static void start_gtk(int argc, char **argv, int ErlFd){
 
 int main(int argc, char **argv){
   int fd;
-
+  
   if ( argc != 7 ){
-    g_print("Usage: %s node host regname cookie node_name erl_dist_vsn\n", argv[0]);
+    g_print("Usage: %s node host regname cookie node_name erl_dist_vsn\n", 
+	    argv[0]);
     return 1;
   }
   
-  g_log_set_always_fatal(G_LOG_LEVEL_CRITICAL);/* exit on g_critical */
-
   fd = gn_start_cnode(argv);
   start_gtk(argc, argv, fd);
 

@@ -17,9 +17,11 @@ void gn_sighandler(GtkWidget *widget){
   char evtype[100];
   const char *widgetname;
   
+  /* instantiate the GdkEventType */
   g_assert( gn_GType_from_name("GdkEventType") ); 
-  
-  gdk_event = gtk_get_current_event();
+
+  if ( ! (gdk_event = gtk_get_current_event()) )
+    return;
   wid = gtk_get_event_widget(gdk_event);
   g_assert( gn_get_enum_name("GdkEventType", gdk_event->type, evtype));
   if ( ! (widgetname = glade_get_widget_name(widget)) )

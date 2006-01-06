@@ -6,7 +6,7 @@
 %%% Created : 22 Nov 2004 by Mats Cronqvist <qthmacr@mwux005>
 %%%-------------------------------------------------------------------
 -module(gtkNode).
--export([start/1,stop/1]).
+-export([start/1,stop/1,debug/0]).
 %%-export([recv/0]).
 %%-export([glade/1,widget_get_attr/1,new_gvalue/2]).
 
@@ -33,6 +33,34 @@ start(Name) ->
 
 stop(Pid) ->
     Pid ! quit.
+
+debug() ->
+    case whereis(gtkNodeDBG) of
+	undefined -> spawn(fun initDBG/0);
+	_ -> erlang:fault({already_started,gtkNodeDBG})
+    end.
+
+initDBG() ->
+    process_flag(trap_exit,true), 
+    register(gtkNodeDBG, self()),
+    Handler = spawn_link(fun initDBGH/0),
+    waiting_handshake(#st{handler_pid=Handler, name=gtkNodeDBG}).    
+
+initDBGH() ->
+    register(gtkNodeDBGH, self()),
+    loopDBGH().
+
+loopDBGH() ->
+    receive 
+	{gtkNodeDBG, {signal, Sig}} ->
+	    io:fwrite("signal - ~p~n", [Sig]),loopDBGH();
+	{gtkNodeDBG, {reply, Rep}} ->
+	    io:fwrite("signal - ~p~n", [Rep]),loopDBGH();
+	{cmd, Cmd} ->
+	    gtkNodeDBG ! {self(),Cmd},loopDBGH();
+	quit ->
+	    gtkNodeDBG ! quit
+    end.
 
 %%%-------------------------------------------------------------------
 %%% implements the gtkNode middleman process

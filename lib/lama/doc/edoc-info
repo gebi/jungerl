@@ -1,0 +1,3 @@
+{application,lama}.
+{packages,[]}.
+{modules,[lama,lama_alarm_h,lama_guard,lama_syslog_h,tracer]}.

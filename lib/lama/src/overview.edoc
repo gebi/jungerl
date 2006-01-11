@@ -1,0 +1,136 @@
+
+        LAMA -  Log and Alarm Manager overview page
+
+@author Serge Aleynikov <serge@hq.idt.net>
+@copyright 2003 Serge Aleynikov
+@version {@vsn} $Rev: 283 $ $LastChangedDate: 2005-11-07 16:27:46 -0500 (Mon, 07 Nov 2005) $
+@title LAMA - Log and Alarm Manager Overview
+
+@doc This application implements LAMA - Log and Alarm Manager.
+
+<h3><a name="contents">Contents</a></h3>
+<ol>
+  <li><a href="#fs">Features</a></li>
+  <li><a href="#sc">Configuration Options</a></li>
+  <li><a href="#mc">Programming Macros</a></li>
+  <li><a href="#cm">Configuration Management</a></li>
+  <li><a href="#ex">Examples</a></li>
+</ol>
+
+
+<h3><a name="fs">Features</a></h3>
+
+LAMA offers the following features:
+<ul>
+<li>Event handler logging of all error_logger's standard reports to
+    syslog</li>
+<li>Setting and clearing alarms that are logged to syslog</li>
+<li>Defining map between alarms and SNMP traps, so that when
+    an alarm is set/cleared, it will cause an associated SNMP
+    trap to be sent to a configured SNMP manager, logged
+    to syslog, and displayed on screen through a standard
+    error_logger's report.</li>
+<li>Standard macros to report errors of various priorities</li>
+<li>Functions to process application configuration options</li>
+<li>A module {@link tracer} for function call tracing</li>
+</ul>
+It installs two event handlers: {@link lama_alarm_h} (that
+replaces SASL's standard alarm_handler), and {@link lama_syslog_h} (in
+error_logger event manager).  Both event handlers are fault tolerant
+by being supervised by guarding processes (see {@link lama_guard}).
+Module {@link lama} implements the application LAMA and its supervisor.
+Note that this application will not start unless SASL is started.
+<p/>
+
+<h3><a name="sc">Configuration Options</a></h3>
+
+<dl>
+<dt><code>{notify_name, NotifyName::string()}</code></dt>
+<dd>NotifyName is a key from the SNMP's ``notify.config'' file.  It
+    defines the host destinations for all alarms sent to an SNMP manager.
+    Default value is "".</dd>
+<dt><code>{alarm_traps, AlarmTraps::list()}</code></dt>
+<dd>A mapping between AlarmIDs and Traps.  It is used to lookup a trap
+    when a corresponding alarm is set.  ``AlarmTraps'' contains either
+    {AlarmID, Trap, Varbinds} tuples, or an atom: ``os_mon'' - for
+    setting all three OS_MON's traps (process memory / system memory / disk).</dd>
+<dt><code>{syslog_host, HostName::string()}</code></dt>
+<dd>Host for receiving syslog messages.  Default: <i>"localhost"</i>.</dd>
+<dt><code>{syslog_indent, Indent::atom()}</code></dt>
+<dd>Default indent used to identify the application in log messages.
+    Use application:get_applicaiton/0 in applications.  Default: <i>lama</i>.</dd>
+<dt><code>{syslog_facility, Facility::atom()}</code></dt>
+<dd>Log facility used by syslog. Default: <i>user</i>.
+    Posible values: user,mail,daemon,auth,syslog,lpr,news,uucp,cron,ftp,local0-7</dd>
+<dt><code>{syslog_types, Types::list()}</code></dt>
+<dd>Types of messages that need to be sent to syslog.  Default: <code>[alert, error, warning]</code>.
+    By default ``notice'', ``debug'' and ``info'' messages are not sent to syslog,
+    but printed to screen.  Use this option to override the default behaviour.</dd>
+<dt><code>{ignore_types, Types::list()}</code></dt>
+<dd>Types of messages that will be ignored.  Supported values
+    <code>[alert, error, warning, notice, debug, info]</code>.  Default: <code>[]</code>.
+    If you want to completely ignore some message types, use this option.  This is
+    convenient when you want to have some debugging information printed during
+    development, and don't want that verbosity in production.</dd>
+<dt><code>{alarm_set_priority, Priority::atom()}</code></dt>
+<dd>Syslog priority to use when sending an alarm. Default: ``error''</dd>
+<dt><code>{alarm_cleared_priority, Priority::atom()}</code></dt>
+<dd>Syslog priority to use when clearing an alarm. Default: ``warning''</dd>
+</dl>
+
+<h3><a name="mc">Programming Macros</a></h3>
+
+<dl>
+<dt><code>?ALERT(Format, Args)</code></dt>
+<dd>Notify error_logger handler with an event forwarded to syslog with the ``alert'' priority.</dd>
+
+<dt><code>?ERROR(Format, Args)</code></dt>
+<dd>Notify error_logger handler with an event forwarded to syslog with the ``error'' priority.</dd>
+
+<dt><code>?WARNING(Format, Args)</code></dt>
+<dd>Notify error_logger handler with an event forwarded to syslog with the ``warning'' priority.</dd>
+
+<dt><code>?INFO(Format, Args)</code></dt>
+<dd>Notify error_logger handler with an ``info'' event displayed on the terminal without standard error header.</dd>
+
+<dt><code>?DEBUG(Format, Args)</code></dt>
+<dd>Notify error_logger handler with an ``debug'' event displayed on the terminal without standard error header.</dd>
+</dl>
+
+The same macros are also available with a ``DIST_'' prefix that will send the event to all
+known Erlang nodes.<p/>
+
+<h3><a name="cm">Configuration Management</a></h3>
+
+Lama module exports several functions (<code>get_app_*</code>, <code>get_opt</code>,
+<code>verify_config</code>) that can be used to perform type verification of configuration
+options.  The following guideline is suggested:
+
+<ul>
+<li>A MODULE included in an application that requires custom typed parameters exports a function
+    <code>get_def_options/0</code>.  This function should return a list {@link lama:typed_options()} of
+    options parameters with their default values and expected types. E.g.:
+    <pre>
+        get_def_options() ->
+          %% {param_name,  def_value, expected_type}
+            [{notify_name, "",        string},
+             {alarm_traps, [os_mon],  fun check_altr/2}].
+    </pre>
+</li>
+<li>The main application module that uses <code>application</code> behaviour calls
+    <code>MODULE:get_def_options/0</code>, and passes the result to {@link lama:get_app_options/3},
+    which fetches all options in the resulting list from the application's environment, and
+    checks their types.  It returns the list of validated paramaters (<code>{@link lama:options()})</code>
+    that can be passed to the application's supervisor.
+
+    <pre>
+        start(_, Options) ->
+            Params = lama:get_app_options(lama, Options, MODULE:get_def_options()),
+            supervisor:start_link({local, main_sup}, ?MODULE, [Params]).
+    </pre>
+</li>
+</ul>
+
+<h3><a name="ex">Examples</a></h3>
+
+@end

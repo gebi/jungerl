@@ -1,0 +1,198 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Module lama</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body bgcolor="white">
+
+<h1>Module lama</h1>
+This module implements LAMA - Log and Alarm Management Applicaiton.
+<ul><li><a href="#description">Description</a></li><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>
+<p><b>Version:</b> $Rev: 358 $
+            $LastChangedDate: 2006-01-05 20:37:25 -0500 (Thu, 05 Jan 2006) $</p>
+<p><b>Behaviour:</b> <a href="application.html"><tt>application</tt></a>.</p>
+<p><b>Authors:</b> Serge Aleynikov (<a href="mailto:serge@hq.idt.net"><tt>serge@hq.idt.net</tt></a>).</p>
+
+<h2><a name="description">Description</a></h2>This module implements LAMA - Log and Alarm Management Applicaiton.
+   This module provides interface functions for .<p> </p>
+  
+<h2><a name="types">Data Types</a></h2>
+
+<h3><a name="type-expected_type">expected_type()</a></h3>
+<p><tt>expected_type() = ExpectedType</tt>
+<ul><li><tt>ExpectedType = atom | {value, ValidItems::list()} | tuple | boolean | string | integer | {integer, Min::integer(), Max::integer()} | float | {float, Min::float(), Max::float()} | list | {list, ValidItems::list()} | {list_of, Type} | Fun</tt></li><li><tt>Type = integer | float | atom | list | tuple | number | string | ValidItems</tt></li><li><tt>Fun = (Opt, Value) -&gt; ok | <a href="#type-throw">throw({error, {bad_config, {Key, Val}, Reason}})</a></tt></li><li><tt>ValidItems = list()</tt></li></ul></p>
+
+
+<h3><a name="type-option">option()</a></h3>
+<p><tt>option() = {Option::atom(), Value::term()}</tt></p>
+
+
+<h3><a name="type-options">options()</a></h3>
+<p><tt>options() = [Option::<a href="#type-option">option()</a>]</tt></p>
+
+
+<h3><a name="type-typed_option">typed_option()</a></h3>
+<p><tt>typed_option() = {Option::atom(), Value::term(), ExpType::<a href="#type-expected_type">expected_type()</a>}</tt></p>
+
+
+<h3><a name="type-typed_options">typed_options()</a></h3>
+<p><tt>typed_options() = [TypedOption::<a href="#type-typed_option">typed_option()</a>]</tt></p>
+
+
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1"><tr><td valign="top"><a href="#add_alarm_trap-3">add_alarm_trap/3</a></td><td>Add an alarm to trap mapping to the internal #state.alarm_map list.</td></tr>
+<tr><td valign="top"><a href="#check_alarm-2">check_alarm/2</a></td><td>Based on the return value of Fun set or clear an Alarm.</td></tr>
+<tr><td valign="top"><a href="#clear_alarm-1">clear_alarm/1</a></td><td>Clear alarm that was previously set by set_alarm/1.</td></tr>
+<tr><td valign="top"><a href="#get_alarms-0">get_alarms/0</a></td><td>Get currently active alarms.</td></tr>
+<tr><td valign="top"><a href="#get_app_env-3">get_app_env/3</a></td><td>Fetch a value of the application's environment variable <code>Key</code>.</td></tr>
+<tr><td valign="top"><a href="#get_app_env-4">get_app_env/4</a></td><td>Fetch a value of the application's environment variable <code>Key</code>.</td></tr>
+<tr><td valign="top"><a href="#get_app_opt-3">get_app_opt/3</a></td><td>Same as get_app_env/3, but returns an Option tuple {Key, Value}
+       rather than just a Value.</td></tr>
+<tr><td valign="top"><a href="#get_app_opt-4">get_app_opt/4</a></td><td>Same as get_app_env/4 but returns a tuple {Key, Value} rather than
+       a Value.</td></tr>
+<tr><td valign="top"><a href="#get_app_options-3">get_app_options/3</a></td><td>Look up TypedOptions in the environment.</td></tr>
+<tr><td valign="top"><a href="#get_app_options2-3">get_app_options2/3</a></td><td>Same as get_app_options/3, but will override environment options
+       with values in the <code>Overrides</code> list, instead of using them as
+       defaults.</td></tr>
+<tr><td valign="top"><a href="#get_opt-2">get_opt/2</a></td><td>Fetch the Option's value from the <code>Options</code> list.</td></tr>
+<tr><td valign="top"><a href="#get_opt-3">get_opt/3</a></td><td>Same as get_opt/2, but instead of throwing an error, it returns
+       a <code>Default</code> value if the <code>Opt</code> is not in the <code>Options</code> list.</td></tr>
+<tr><td valign="top"><a href="#os_path-1">os_path/1</a></td><td>Perform replacement of environment variable values in the OsPath.</td></tr>
+<tr><td valign="top"><a href="#set_alarm-1">set_alarm/1</a></td><td>Set alarm.</td></tr>
+<tr><td valign="top"><a href="#start-0">start/0</a></td><td>Start LAMA application.</td></tr>
+<tr><td valign="top"><a href="#stop-0">stop/0</a></td><td>Stop LAMA application.</td></tr>
+<tr><td valign="top"><a href="#throw_error-3">throw_error/3</a></td><td/></tr>
+<tr><td valign="top"><a href="#verify_config-1">verify_config/1</a></td><td>For each <code>Option</code> in the <code>Options</code> list
+       perform type verification.</td></tr>
+<tr><td valign="top"><a href="#verify_config-2">verify_config/2</a></td><td>Fetch selected options from the application's environment and
+       perform type verification.</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3><a name="add_alarm_trap-3">add_alarm_trap/3</a></h3>
+<p><tt>add_alarm_trap(AlarmID::atom(), Trap::atom(), Varbinds::list()) -&gt; ok</tt></p>
+<p>Add an alarm to trap mapping to the internal #state.alarm_map list.
+  Same as <a href="lama_alarm_h.html#add_alarm_trap-3"><code>lama_alarm_h:add_alarm_trap/3</code></a>.</p>
+<p><b>See also:</b> <a href="lama_alarm_h.html#add_alarm_trap-3">lama_alarm_h:add_alarm_trap/3</a>.</p>
+
+<h3><a name="check_alarm-2">check_alarm/2</a></h3>
+<p><tt>check_alarm(Fun::function(), Alarm::<a href="#type-alarm">alarm()</a>) -&gt; ok</tt>
+<ul><li><tt>Fun = () -&gt; <a href="#type-boolean">boolean()</a></tt></li><li><tt><a name="type-alarm">alarm()</a> = <a href="lama_alarm_h.html#type-alarm">lama_alarm_h:alarm()</a></tt></li></ul></p>
+<p>Based on the return value of Fun set or clear an Alarm.</p>
+
+<h3><a name="clear_alarm-1">clear_alarm/1</a></h3>
+<p><tt>clear_alarm(AlarmId::<a href="#type-alarm_id">alarm_id()</a>) -&gt; ok</tt>
+<ul><li><tt><a name="type-alarm_id">alarm_id()</a> = <a href="lama_alarm_h.html#type-alarm_id">lama_alarm_h:alarm_id()</a></tt></li></ul></p>
+<p>Clear alarm that was previously set by set_alarm/1. This function
+       is equivalent to <a href="lama_alarm_h.html#clear_alarm-1"><code>lama_alarm_h:clear_alarm/1</code></a>.</p>
+<p><b>See also:</b> <a href="#check_alarm-2">check_alarm/2</a>, <a href="lama_alarm_h.html#clear_alarm-1">lama_alarm_h:clear_alarm/1</a>.</p>
+
+<h3><a name="get_alarms-0">get_alarms/0</a></h3>
+<p><tt>get_alarms() -&gt; Alarms</tt>
+<ul><li><tt>Alarms = [Alarm::<a href="#type-alarm">alarm()</a>]</tt></li></ul></p>
+<p>Get currently active alarms.</p>
+
+<h3><a name="get_app_env-3">get_app_env/3</a></h3>
+<p><tt>get_app_env(App::atom(), Key::atom(), Default::term()) -&gt; Value::term()</tt></p>
+<p>Fetch a value of the application's environment variable <code>Key</code>.
+       Use <code>Default</code> if that value is not set.</p>
+
+<h3><a name="get_app_env-4">get_app_env/4</a></h3>
+<p><tt>get_app_env(App::atom(), Key::atom(), Default::term(), ExpectedType::<a href="#type-expected_type">expected_type()</a>) -&gt; Value::term()</tt></p>
+<p>Fetch a value of the application's environment variable <code>Key</code>.
+       Use <code>Default</code> if that value is not set.  Perform validation of
+       value type given ExpectedType.</p>
+<p><b>See also:</b> <a href="#get_app_env-5">get_app_env/5</a>.</p>
+
+<h3><a name="get_app_opt-3">get_app_opt/3</a></h3>
+<p><tt>get_app_opt(App::atom(), Key::atom(), Default::term()) -&gt; Option::<a href="#type-option">option()</a></tt></p>
+<p>Same as get_app_env/3, but returns an Option tuple {Key, Value}
+       rather than just a Value.</p>
+
+<h3><a name="get_app_opt-4">get_app_opt/4</a></h3>
+<p><tt>get_app_opt(App::atom(), Key::atom(), Default::term(), ExpectedType::<a href="#type-expected_type">expected_type()</a>) -&gt; Option::<a href="#type-option">option()</a></tt></p>
+<p>Same as get_app_env/4 but returns a tuple {Key, Value} rather than
+       a Value.</p>
+<p><b>See also:</b> <a href="#get_app_env-4">get_app_env/4</a>, <a href="#get_opt-2">get_opt/2</a>, <a href="#get_opt-3">get_opt/3</a>.</p>
+
+<h3><a name="get_app_options-3">get_app_options/3</a></h3>
+<p><tt>get_app_options(App::atom(), DefOptions::<a href="#type-options">options()</a>, TypedOptions::<a href="#type-typed_options">typed_options()</a>) -&gt; Options::<a href="#type-options">options()</a></tt></p>
+<p>Look up TypedOptions in the environment. If not found use defaults
+       in the DefOptions list, and if not found there, use the default
+       values from a TypedOption's tuple: {_Key, DefaultValue, _Type}.
+  <pre>  Example:
+     start_application(StartOptions) -&gt;
+         get_app_options(test, StartArgs, [{file, "bar", string}]),
+         ... .
+ 
+     start_application([])              -&gt;   [{file, "bar"}].
+     start_application([{file, "foo"}]) -&gt;   [{file, "foo"}].
+ 
+     If application's environment had {file, "zzz"}, than this tuple
+     would've been returned instead.</pre></p>
+<p><b>See also:</b> <a href="#get_app_env-4">get_app_env/4</a>.</p>
+
+<h3><a name="get_app_options2-3">get_app_options2/3</a></h3>
+<p><tt>get_app_options2(App::atom(), Overrides::<a href="#type-options">options()</a>, TypedOptions::<a href="#type-typed_options">typed_options()</a>) -&gt; Options::<a href="#type-options">options()</a></tt></p>
+<p>Same as get_app_options/3, but will override environment options
+       with values in the <code>Overrides</code> list, instead of using them as
+       defaults.</p>
+
+<h3><a name="get_opt-2">get_opt/2</a></h3>
+<p><tt>get_opt(Opt::atom(), Options) -&gt; term() | <a href="#type-throw">throw({error, Reason})</a></tt>
+<ul><li><tt>Options = [{Option::atom(), Value::term()}]</tt></li></ul></p>
+<p>Fetch the Option's value from the <code>Options</code> list</p>
+<p><b>See also:</b> <a href="#get_app_env-4">get_app_env/4</a>, <a href="#get_app_env-5">get_app_env/5</a>, <a href="#get_opt-3">get_opt/3</a>.</p>
+
+<h3><a name="get_opt-3">get_opt/3</a></h3>
+<p><tt>get_opt(Opt::atom(), Options, Default::term()) -&gt; term()</tt>
+<ul><li><tt>Options = [{Option::atom(), Value::term()}]</tt></li></ul></p>
+<p>Same as get_opt/2, but instead of throwing an error, it returns
+       a <code>Default</code> value if the <code>Opt</code> is not in the <code>Options</code> list.</p>
+<p><b>See also:</b> <a href="#get_app_env-4">get_app_env/4</a>, <a href="#get_app_env-5">get_app_env/5</a>, <a href="#get_opt-2">get_opt/2</a>.</p>
+
+<h3><a name="os_path-1">os_path/1</a></h3>
+<p><tt>os_path(OsPath::string()) -&gt; Path::string()</tt></p>
+<p>Perform replacement of environment variable values in the OsPath.
+  <pre>     Example:
+        lama:os_path("$ROOTDIR/myapp") -&gt; "/usr/local/lib/erlang/myapp"</pre></p>
+<p><b>See also:</b> <a href="os.html#getenv-1">os:getenv/1</a>.</p>
+
+<h3><a name="set_alarm-1">set_alarm/1</a></h3>
+<p><tt>set_alarm(Alarm::<a href="#type-alarm">alarm()</a>) -&gt; ok</tt>
+<ul><li><tt><a name="type-alarm">alarm()</a> = <a href="lama_alarm_h.html#type-alarm">lama_alarm_h:alarm()</a></tt></li></ul></p>
+<p>Set alarm. This function
+       is equivalent to <a href="lama_alarm_h.html#set_alarm-1"><code>lama_alarm_h:set_alarm/1</code></a>.</p>
+<p><b>See also:</b> <a href="#check_alarm-2">check_alarm/2</a>, <a href="lama_alarm_h.html#set_alarm-1">lama_alarm_h:set_alarm/1</a>.</p>
+
+<h3><a name="start-0">start/0</a></h3>
+<p><tt>start() -&gt; ok | {error, Reason}</tt></p>
+<p>Start LAMA application.  This is a shortcut for
+       application:start/1.</p>
+<p><b>See also:</b> <a href="application.html#start-1">application:start/1</a>.</p>
+
+<h3><a name="stop-0">stop/0</a></h3>
+<p><tt>stop() -&gt; ok | {error, Reason}</tt></p>
+<p>Stop LAMA application.  This is a shortcut for
+       application:stop/1.</p>
+<p><b>See also:</b> <a href="application.html#stop-1">application:stop/1</a>.</p>
+
+<h3><a name="throw_error-3">throw_error/3</a></h3>
+<tt>throw_error(Tag, Val, Reason) -&gt; term()
+</tt>
+
+<h3><a name="verify_config-1">verify_config/1</a></h3>
+<p><tt>verify_config(TypedOptions::<a href="#type-typed_options">typed_options()</a>) -&gt; Options::<a href="#type-options">options()</a> | <a href="#type-throw">throw({error, Reason})</a></tt></p>
+<p>For each <code>Option</code> in the <code>Options</code> list
+       perform type verification.</p>
+
+<h3><a name="verify_config-2">verify_config/2</a></h3>
+<p><tt>verify_config(App::atom(), Options::TypedOptions) -&gt; ok | <a href="#type-throw">throw({error, Reason})</a></tt>
+<ul><li><tt>TypedOptions = <a href="#type-typed_options">typed_options()</a></tt></li></ul></p>
+<p>Fetch selected options from the application's environment and
+       perform type verification.</p>
+<p><b>See also:</b> <a href="#get_app_env-4">get_app_env/4</a>.</p>
+</body>
+</html>

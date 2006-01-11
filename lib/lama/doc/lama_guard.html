@@ -1,0 +1,48 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Module lama_guard</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body bgcolor="white">
+
+<h1>Module lama_guard</h1>
+This module implements a guard process for custom event handlers.
+<ul><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>
+<p><b>Version:</b> $Rev: 318 $
+            $LastChangedDate: 2005-12-21 14:22:57 -0500 (Wed, 21 Dec 2005) $</p>
+<p><b>Authors:</b> Serge Aleynikov (<a href="mailto:serge@hq.idt.net"><tt>serge@hq.idt.net</tt></a>).</p>
+
+<h2><a name="description">Description</a></h2>This module implements a guard process for custom event handlers
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1"><tr><td valign="top"><a href="#init-4">init/4</a></td><td/></tr>
+<tr><td valign="top"><a href="#start_link-3">start_link/3</a></td><td>Use this function to link this process to a supervisor.</td></tr>
+<tr><td valign="top"><a href="#system_code_change-4">system_code_change/4</a></td><td/></tr>
+<tr><td valign="top"><a href="#system_continue-3">system_continue/3</a></td><td/></tr>
+<tr><td valign="top"><a href="#system_terminate-4">system_terminate/4</a></td><td/></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3><a name="init-4">init/4</a></h3>
+<tt>init(GuardName, HandlerModule, Options, Parent) -&gt; term()
+</tt>
+
+<h3><a name="start_link-3">start_link/3</a></h3>
+<p><tt>start_link(GuardName::atom(), HandlerModule::atom(), Options::list()) -&gt; {ok, Pid} | {error, {already_started, Pid}} | {error, Reason}</tt></p>
+<p>Use this function to link this process to a supervisor.  Note that it uses
+  proc_lib so that this process would comply with OTP release management principles</p>
+
+<h3><a name="system_code_change-4">system_code_change/4</a></h3>
+<tt>system_code_change(GuardName, Module, OldVsn, Extra) -&gt; term()
+</tt>
+
+<h3><a name="system_continue-3">system_continue/3</a></h3>
+<tt>system_continue(Parent, Debug, GuardName) -&gt; term()
+</tt>
+
+<h3><a name="system_terminate-4">system_terminate/4</a></h3>
+<tt>system_terminate(Reason, Parent, Debug, GuardName) -&gt; term()
+</tt>
+</body>
+</html>

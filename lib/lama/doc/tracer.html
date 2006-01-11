@@ -1,0 +1,65 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Module tracer</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body bgcolor="white">
+
+<h1>Module tracer</h1>
+This module implements tracing support for function calls.
+<ul><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>
+<p><b>Version:</b> $Rev: 265 $
+   $LastChangedDate: 2005-10-21 14:56:03 -0400 (Fri, 21 Oct 2005) $</p>
+<p><b>Authors:</b> Serge Aleynikov (<a href="mailto:serge@hq.idt.net"><tt>serge@hq.idt.net</tt></a>).</p>
+
+<h2><a name="description">Description</a></h2>This module implements tracing support for function calls.  It is
+   similar to dbg:c/3, however it can return the trace as its result.
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1"><tr><td valign="top"><a href="#print_trace-1">print_trace/1</a></td><td/></tr>
+<tr><td valign="top"><a href="#t-3">t/3</a></td><td>Call M:F function with Args arguments, and return a tuple
+  {Result, Trace} containing call trace.</td></tr>
+<tr><td valign="top"><a href="#t-4">t/4</a></td><td>Call M:F function with Args arguments, and return a tuple
+  {Result, Trace} containing call trace.</td></tr>
+<tr><td valign="top"><a href="#tf-3">tf/3</a></td><td>Trace a function call and return trace result.</td></tr>
+<tr><td valign="top"><a href="#tf-4">tf/4</a></td><td>Trace a function call and return trace result.</td></tr>
+<tr><td valign="top"><a href="#tp-3">tp/3</a></td><td>Trace a function call and print trace result to the console.</td></tr>
+<tr><td valign="top"><a href="#tp-4">tp/4</a></td><td>Trace a function call and print trace result to the console.</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3><a name="print_trace-1">print_trace/1</a></h3>
+<tt>print_trace(Trace) -&gt; term()
+</tt>
+
+<h3><a name="t-3">t/3</a></h3>
+<p><tt>t(M::atom(), F::atom(), Args::list()) -&gt; {Result::term(), Trace::list()}</tt></p>
+<p>Call M:F function with Args arguments, and return a tuple
+  {Result, Trace} containing call trace.</p>
+
+<h3><a name="t-4">t/4</a></h3>
+<p><tt>t(M::atom(), F::atom(), Args::list(), Flags::list()) -&gt; {Result::term(), Trace::list()}</tt></p>
+<p>Call M:F function with Args arguments, and return a tuple
+  {Result, Trace} containing call trace.</p>
+
+<h3><a name="tf-3">tf/3</a></h3>
+<p><tt>tf(M, F, Args) -&gt; TraceList::term()</tt></p>
+<p>Trace a function call and return trace result.</p>
+
+<h3><a name="tf-4">tf/4</a></h3>
+<p><tt>tf(M, F, Args, Flags) -&gt; TraceList::term()</tt></p>
+<p>Trace a function call and return trace result.
+       See <a href="http://www.erlang.org/edoc/doc/kernel/doc/erlang.html#trace-3"><code>//kernel/erlang:trace/3</code></a> for description of Flags.</p>
+
+<h3><a name="tp-3">tp/3</a></h3>
+<p><tt>tp(M, F, Args) -&gt; Result::term()</tt></p>
+<p>Trace a function call and print trace result to the console.</p>
+
+<h3><a name="tp-4">tp/4</a></h3>
+<p><tt>tp(M, F, Args, Flags::FlagList) -&gt; Result::term()</tt>
+<ul><li><tt>FlagList = [Flag::atom()]</tt></li></ul></p>
+<p>Trace a function call and print trace result to the console.
+       See <a href="http://www.erlang.org/edoc/doc/kernel/doc/erlang.html#trace-3"><code>//kernel/erlang:trace/3</code></a> for description of Flags.</p>
+</body>
+</html>

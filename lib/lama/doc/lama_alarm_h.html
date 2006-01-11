@@ -1,0 +1,134 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Module lama_alarm_h</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body bgcolor="white">
+
+<h1>Module lama_alarm_h</h1>
+This module implements a replacement for SASL's alarm_handler.
+<ul><li><a href="#description">Description</a></li><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>
+<p><b>Version:</b>  $Rev: 265 $
+  </p>
+<p><b>Behaviour:</b> <a href="gen_event.html"><tt>gen_event</tt></a>.</p>
+<p><b>Authors:</b> Serge Aleynikov (<a href="mailto:serge@hq.idt.net"><tt>serge@hq.idt.net</tt></a>).</p>
+
+<h2><a name="description">Description</a></h2>This module implements a replacement for SASL's alarm_handler.
+   It offers two features:
+   <ul>
+   <li>Setting and clearing alarms that are not duplicated (in contrast
+       to SASL's alarm_handler) and that are logged to syslog using
+       lama_log_handler)</li>
+   <li>Defining map between alarms and SNMP traps, so that when
+       an alarm is set/cleared, it will cause an associated SNMP
+       trap to be sent to a configured SNMP manager.</li>
+   </ul>
+   This handler is fault tolegant as it is guarded by the
+   <code>lama_guard</code> process.  In case of a handler crash the
+   process will receive a notification sent by <code>gen_event</code>
+   exit, and will be restarted by the parent <code>lama_sup_safe</code>
+   supervisor defined in the <code>lama</code> module.<p> </p>
+<h2><a name="types">Data Types</a></h2>
+
+<h3><a name="type-alarm">alarm()</a></h3>
+<p><tt>alarm() = {AlarmId::<a href="#type-alarm_id">alarm_id()</a>, Description::term()}</tt></p>
+
+
+<h3><a name="type-alarm_id">alarm_id()</a></h3>
+<p><tt>alarm_id() = atom() | {atom(), Data::term()}</tt></p>
+
+
+<h3><a name="type-varbinds">varbinds()</a></h3>
+<p><tt>varbinds() = list() | Fun</tt>
+<ul><li><tt>Fun = () -&gt; list()</tt></li></ul></p>
+
+
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1"><tr><td valign="top"><a href="#add_alarm_trap-3">add_alarm_trap/3</a></td><td>Add an alarm to trap mapping to the internal #state.alarm_map list.</td></tr>
+<tr><td valign="top"><a href="#clear_alarm-1">clear_alarm/1</a></td><td>Clear alarm that was previously set by set_alarm/1.</td></tr>
+<tr><td valign="top"><a href="#delete_alarm_trap-1">delete_alarm_trap/1</a></td><td>Delete an alarm to trap mapping.</td></tr>
+<tr><td valign="top"><a href="#get_alarm_map-0">get_alarm_map/0</a></td><td>Get currently active alarms.</td></tr>
+<tr><td valign="top"><a href="#get_alarms-0">get_alarms/0</a></td><td>Get currently active alarms.</td></tr>
+<tr><td valign="top"><a href="#get_def_options-0">get_def_options/0</a></td><td>Gets default module's options.</td></tr>
+<tr><td valign="top"><a href="#set_alarm-1">set_alarm/1</a></td><td>Set alarm.</td></tr>
+<tr><td valign="top"><a href="#start_link-1">start_link/1</a></td><td>Installs the new alarm handler.</td></tr>
+<tr><td valign="top"><a href="#stop-0">stop/0</a></td><td>Remore alarm handler.</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3><a name="add_alarm_trap-3">add_alarm_trap/3</a></h3>
+<p><tt>add_alarm_trap(AlarmID::atom(), Trap::atom(), Varbinds::<a href="#type-varbinds">varbinds()</a>) -&gt; ok</tt></p>
+<p>Add an alarm to trap mapping to the internal #state.alarm_map list.
+  Note: when Alarm key is a tuple of ::alarm_id() type, use the first element
+  of the tuple as the AlarmID parameter to this function.<br>
+  <code>Example:
+        {{AlarmID, _}, _} = {{disk_almost_full, "/usr"}, "Low disk space"}
+        add_alarm_trap(AlarmID, diskAlmostFullAlarm, []).</code></p>
+
+<h3><a name="clear_alarm-1">clear_alarm/1</a></h3>
+<p><tt>clear_alarm(AlarmId::<a href="#type-alarm_id">alarm_id()</a>) -&gt; ok | {error, Reason}</tt></p>
+<p>Clear alarm that was previously set by set_alarm/1.
+  Error is returned if the alarm is mapped to an SNMP trap,
+  and notification couldn't be sent (in this case the alarm will still
+  be added to the internal alarm list).</p>
+<p><b>See also:</b> <a href="#check_alarm-2">check_alarm/2</a>, <a href="#set_alarm-1">set_alarm/1</a>.</p>
+
+<h3><a name="delete_alarm_trap-1">delete_alarm_trap/1</a></h3>
+<p><tt>delete_alarm_trap(AlarmID::atom()) -&gt; ok</tt></p>
+<p>Delete an alarm to trap mapping.</p>
+
+<h3><a name="get_alarm_map-0">get_alarm_map/0</a></h3>
+<p><tt>get_alarm_map() -&gt; AlarmMap</tt>
+<ul><li><tt>AlarmMap = [{AlarmId::<a href="#type-alarm_id">alarm_id()</a>, Trap::atom(), Varbinds::<a href="#type-varbinds">varbinds()</a>}]</tt></li></ul></p>
+<p>Get currently active alarms.</p>
+
+<h3><a name="get_alarms-0">get_alarms/0</a></h3>
+<p><tt>get_alarms() -&gt; Alarms</tt>
+<ul><li><tt>Alarms = [Alarm::<a href="#type-alarm">alarm()</a>]</tt></li></ul></p>
+<p>Get currently active alarms.</p>
+
+<h3><a name="get_def_options-0">get_def_options/0</a></h3>
+<p><tt>get_def_options() -&gt; TypedOptions::<a href="#type-typed_options">typed_options()</a></tt>
+<ul><li><tt><a name="type-typed_options">typed_options()</a> = <a href="lama.html#type-typed_options">lama:typed_options()</a></tt></li></ul></p>
+<p>Gets default module's options.</p>
+
+<h3><a name="set_alarm-1">set_alarm/1</a></h3>
+<p><tt>set_alarm(Alarm::<a href="#type-alarm">alarm()</a>) -&gt; ok | {error, Reason}</tt></p>
+<p>Set alarm.  Multiple invocations of this function with the
+  same <code>AlarmId</code> will not cause duplicate alarms to
+  to be set. Error is returned if the alarm is mapped to an SNMP trap,
+  and notification couldn't be sent (in this case the alarm will still
+  be added to the internal alarm list).</p>
+<p><b>See also:</b> <a href="#check_alarm-2">check_alarm/2</a>, <a href="#clear_alarm-1">clear_alarm/1</a>.</p>
+
+<h3><a name="start_link-1">start_link/1</a></h3>
+<p><tt>start_link(Options) -&gt; ok | already_started | <a href="#type-throw">throw({error, Reason})</a></tt>
+<ul><li><tt>Options = [Option]</tt></li><li><tt>Option = {notify_name, NotifyName::string()} | {alarm_traps, AlarmTraps::list()}</tt></li><li><tt>AlarmTraps = os_mon | {AlarmID::atom(), Trap::atom(), Varbinds::<a href="#type-varbinds">varbinds()</a>}</tt></li></ul></p>
+<p>Installs the new alarm handler.  It should be called from
+  the lama_guard's process.<br>
+  Options:
+  <ul>
+  <li><code>NotifyName</code> - Defines the key from the SNMP's
+      <code>notify.config</code> configuration file that indicates
+      the destination SNMP managers that will be receiving
+      SNMP traps</li>
+  <li><code>AlarmTraps</code> - Defines alarm to trap mappings that
+      should generate SNMP alarms when corresponding AlarmID's a
+      set/cleared.  <code>os_mon</code> value adds standard alarms and
+      traps defined in OTP-OS-MON-MIB.mib.  When adding
+      {AlarmID, Trap, Varbinds::varbinds()} option, Trap must be known to
+      the SNMP agent by loading some MIB file containing its definition.
+      Varbinds contains a list of additional values that will be sent
+      along with the trap, or a function returning such a list.
+      Refer to SNMP agen't guide for the use of this feature</li>
+  </ul>
+  Note: Internal store of alarms is a list, and this implementation
+  is not efficient for handling a large number of distinct alarms.</p>
+
+<h3><a name="stop-0">stop/0</a></h3>
+<p><tt>stop() -&gt; ok | {error, Reason}</tt></p>
+<p>Remore alarm handler.</p>
+</body>
+</html>

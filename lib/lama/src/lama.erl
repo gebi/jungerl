@@ -21,8 +21,8 @@
 %%% @type typed_options() = [ TypedOption::typed_option() ]
 %%% @type typed_option()  = {Option::atom(), Value::term(), ExpType::expected_type()}
 %%% @author   Serge Aleynikov <serge@hq.idt.net>
-%%% @version $Rev: 358 $
-%%%          $LastChangedDate: 2006-01-05 20:37:25 -0500 (Thu, 05 Jan 2006) $
+%%% @version $Rev: 363 $
+%%%          $LastChangedDate: 2006-01-11 17:52:44 -0500 (Wed, 11 Jan 2006) $
 %%% @end
 %%%------------------------------------------------------------------------
 %%% Created 20-Mar-2003
@@ -381,8 +381,6 @@ verify_type(_Tag, Val, list)    when is_list(Val) -> Val;
 verify_type(Tag,  Val, {list, ValidItems}) when is_list(Val) ->
     [find_in_list(Tag, I, ValidItems) || I <- Val], Val;
 verify_type(_Tag, Val, boolean) when is_boolean(Val) -> Val;
-verify_type( Tag, Val, Fun)     when is_function(Fun, 2) ->
-    Fun(Tag, Val), Val;
 verify_type(Tag, Val, {list_of, Type}) when is_list(Val)  ->
     F = fun(A) when Type =:= atom,    is_atom(A)    -> ok;
            (A) when Type =:= string                 -> is_string(A);
@@ -394,6 +392,8 @@ verify_type(Tag, Val, {list_of, Type}) when is_list(Val)  ->
            (_) -> throw_error(Tag, Val, {list_of, Type, expected})
         end,
     [F(V) || V <- Val], Val;
+verify_type( Tag, Val, Fun) when is_function(Fun, 2), not is_tuple(Fun) -> % In current Erlang release is_function({a, b},2) returns true
+    Fun(Tag, Val), Val;
 verify_type(Tag, Val, string) -> is_string(Tag, Val), Val;
 verify_type(Tag, Val, _) ->
     throw_error(Tag, Val, unknown_param).

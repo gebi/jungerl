@@ -1,0 +1,16 @@
+{application, lama,
+   [{description, "LAMA  Log and Alarm Manager"},
+    {vsn, "%VSN%"},
+    {modules, [lama,
+               lama_guard,
+               lama_alarm_h,
+               lama_syslog_h,
+			   tracer
+              ]},
+    {registered, [lama, lama_sup, lama_guard_syslog, lama_guard_alarm]},
+    {applications, [kernel, stdlib]},
+    {env, []},
+    {mod, {lama, []}}
+   ]
+}.
+

@@ -3,7 +3,7 @@
 
 @author Serge Aleynikov <serge@hq.idt.net>
 @copyright 2003 Serge Aleynikov
-@version {@vsn} $Rev: 283 $ $LastChangedDate: 2005-11-07 16:27:46 -0500 (Mon, 07 Nov 2005) $
+@version {@vsn} $Rev: 359 $ $LastChangedDate: 2006-01-11 10:28:26 -0500 (Wed, 11 Jan 2006) $
 @title LAMA - Log and Alarm Manager Overview
 
 @doc This application implements LAMA - Log and Alarm Manager.

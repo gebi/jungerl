@@ -4,8 +4,8 @@
 %%% @author Serge Aleynikov <serge@hq.idt.net>
 %%% @doc This module implements tracing support for function calls.  It is
 %%% similar to dbg:c/3, however it can return the trace as its result.
-%%% @version $Rev: 265 $
-%%% $LastChangedDate: 2005-10-21 14:56:03 -0400 (Fri, 21 Oct 2005) $
+%%% @version $Rev: 359 $
+%%% $LastChangedDate: 2006-01-11 10:28:26 -0500 (Wed, 11 Jan 2006) $
 %%% @end
 %%% $URL: http://devlinuxpro.mis.idt.net/svn/apps/DRiP/current/lib/lama/src/tracer.erl $
 %%%------------------------------------------------------------------------

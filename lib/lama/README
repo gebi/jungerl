@@ -1,0 +1,13 @@
+LAMA - Log and Alarm Management Application
+===========================================
+
+This application is designed to handle alarms, SNMP traps, syslog logging,
+configuration management as well as other useful functions needed in 
+production systems.
+
+Refer to docs/index.html for the documentation.
+
+Regards,
+
+Serge
+<serge@hq.idt.net>

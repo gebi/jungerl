@@ -1,5 +1,7 @@
 2006-01-16  Mats Cronqvist  <locmacr@mwlx084>
 
+	* src/check (Module): removed the dummy *_generated.h files from CVS
+
 	* src/gtkNode_cnode.c (Module): newbie argv-bug :<
 
 2006-01-06  Mats Cronqvist  <locmacr@mwlx084>

@@ -1,8 +1,8 @@
-#!/bin/bash
+#!/bin/bash -x
 
 usage(){
     U1="usage: $0 [-setcookie <cookie>] [-nocookie] "
-    U2="[-nettick <tick>] [-win] [-vsn <OTP version>] nodename"
+    U2="[-nettick <tick>] [-win] [-dbg] [-vsn <OTP version>] nodename"
     echo $U1 $U2
     exit
 }
@@ -16,16 +16,21 @@ else
 fi
 
 n=4
-while [ 0 -lt "$n" ]; do SPATH=`dirname $SPATH`; let "n--"; done
-
+while [ 0 -lt "$n" ]; do SPATH=`dirname $SPATH`; let n=n-1; done
+echo SPATH $SPATH
 detach="-detached"
 ERL=erl
+START="-s gperf start"
 
 while [ -n "$1" ] 
   do
   case $1 in
       "-help"|"-h"|"-?")
 	  usage
+	  ;;
+      "-dbg")
+	  detach=""
+	  START="-s lists sort"
 	  ;;
       "-win")
 	  WIN="xterm -sb -sl 9999 -bg gold -fg black -e"
@@ -36,8 +41,8 @@ while [ -n "$1" ]
 	  shift
 	  ERLP=`which erl`
 	  ERLP=`dirname $ERLP` ; ERLP=`dirname $ERLP` ; ERLP=`dirname $ERLP`
-	  ERL=`echo $ERLP/${vsn}*/bin/erl`
-	  if [ ! -x "$ERL" ]; then usage; fi
+	  ERL=`echo $ERLP/*${vsn}*/bin/erl`
+	  if [ ! -x "$ERL" ]; then usage; echo $ERL; fi
 	  ;;
       "-nettick"|"-tick")
 	  nettick="-kernel net_ticktime $2"
@@ -60,7 +65,11 @@ while [ -n "$1" ]
   esac
   shift
 done
-if [ -z "$TARG" ]; then usage; fi
+if [ -z "$TARG" ]; then 
+    usage; 
+else
+    START="$START $TARG"
+fi
 
 name="gperf_"$$
 FLAGS="$detach -boot start_sasl -sasl errlog_type error +A16"
@@ -70,4 +79,4 @@ $WIN $ERL $FLAGS $DISTR \
 -pa $SPATH/prf/examples/gperf \
 -pa $SPATH/prf/ebin \
 -pa $SPATH/gtkNode/ebin \
--s gperf start $TARG
+$START

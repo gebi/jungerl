@@ -1,3 +1,7 @@
+2006-01-16  Mats Cronqvist  <locmacr@mwlx084>
+
+	* gperf (Module): -dbg flag
+
 2005-12-08  Mats Cronqvist  <locmacr@mwlx084>
 
 	* gperfGtk.erl (Module): sorts plotted values such that biggest

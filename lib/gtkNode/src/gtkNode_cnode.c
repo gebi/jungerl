@@ -7,7 +7,7 @@
 #define REMREG argv[3]
 #define COOKIE argv[4]
 #define NODE_NAME argv[5]
-#define ERL_DIST_VSN argv[6]
+#define ERL_DIST_VSN atoi(argv[6])
 
 static int fd;			/* fd to remote Erlang node */
 static gchar* rem_regname;    /* process name on remote Erlang node */

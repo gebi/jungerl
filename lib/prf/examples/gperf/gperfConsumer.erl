@@ -58,18 +58,17 @@ ltime(#data{sys=Sys}) ->
     end.
 
 load(Max,#data{sys=N},#data{sys=O}) ->
-    [beamload(Max,N,O)|sysload(N)].
-
-sysload(N) ->
-    U = w(user,N)/100,
-    K = w(kernel,N)/100,
-    W = w(wait,N)/100,
-    [U,U+K,U+K+W].
+    User = w(user,N)/100,
+    Kern = w(kernel,N)/100,
+    Wait = w(wait,N)/100,
+    Beam = beamload(User,N,O),
+    [Beam,User,User+Kern,max(User+Kern+Wait, Max)].
 
 beamload(Max,N,O) ->
     case dv(w(runtime,N)-w(runtime,O),w(wall_clock,N)-w(wall_clock,O)) of
-	Load when 0 < Load, Load < Max -> Load;
-	_ -> 0
+	Load when Load < 0 -> 0;
+	Load when Max < Load -> Max;
+	Load -> Load
     end.
 
 mem(Max,#data{sys=Sys},_LD) ->

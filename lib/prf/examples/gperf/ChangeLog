@@ -1,3 +1,8 @@
+2006-01-17  Mats Cronqvist  <locmacr@mwlx084>
+
+	* gperfConsumer.erl (Module):  cpu load now shows beam, user, kernel, io
+	* gperfGtk.erl (Module): in blue,red,green,magenta
+
 2006-01-16  Mats Cronqvist  <locmacr@mwlx084>
 
 	* gperf (Module): -dbg flag

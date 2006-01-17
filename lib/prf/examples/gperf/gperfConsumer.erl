@@ -58,10 +58,13 @@ ltime(#data{sys=Sys}) ->
     end.
 
 load(Max,#data{sys=N},#data{sys=O}) ->
-    [sysload(N),beamload(Max,N,O)].
+    [beamload(Max,N,O)|sysload(N)].
 
 sysload(N) ->
-    (w(user,N)+w(kernel,N))/100.
+    U = w(user,N)/100,
+    K = w(kernel,N)/100,
+    W = w(wait,N)/100,
+    [U,U+K,U+K+W].
 
 beamload(Max,N,O) ->
     case dv(w(runtime,N)-w(runtime,O),w(wall_clock,N)-w(wall_clock,O)) of
@@ -82,7 +85,7 @@ net(Max,#data{net=NetN},#data{net=NetO}) ->
      max(1,dv(OutN-OutO,Max))].
 
 net1([],In,Out) -> {In,Out};
-net1([{Nod,N}|X],I,O) -> 
+net1([{_Nod,N}|X],I,O) -> 
     {In,Out} = net2(N,[],[]),
     net1(X,I+In,O+Out).
 
@@ -98,7 +101,7 @@ w(Tag,List) ->
 	_ -> 0
     end.
 
-dv(A,0) -> 0;
+dv(_,0) -> 0;
 dv(A,B) -> A/B.
 
 max(R,V) when V < R -> V;

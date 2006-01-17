@@ -19,7 +19,7 @@
 -define(WXSIZE,200).
 -define(WYSIZE,?YSIZE).
 -define(XHALF,(?XSIZE div 2)).
--define(DAREAS, [{drawingarea1,[blue,red]},
+-define(DAREAS, [{drawingarea1,[blue,red,green,magenta]},
 		 {drawingarea2,[black,blue,red,yellow]},
 		 {drawingarea3,[red,green]}]).
 

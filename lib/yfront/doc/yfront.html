@@ -5,14 +5,24 @@
 <link rel="stylesheet" type="text/css" href="stylesheet.css">
 </head>
 <body bgcolor="white">
+
 <h1>Module yfront</h1>
-<b>yfront</b> is a toolbox for building Yaws/Mnesia web apps.<ul><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul><p><b>Authors:</b> Torbjörn Törnkvist (<a href="mailto:tobbe@tornkvist.org"><tt>tobbe@tornkvist.org</tt></a>).</p>
+<b>yfront</b> is a toolbox for building Yaws/Mnesia web apps.
+<ul><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>
+<p><b>Authors:</b> Torbjörn Törnkvist (<a href="mailto:tobbe@tornkvist.org"><tt>tobbe@tornkvist.org</tt></a>).</p>
+
 <h2><a name="description">Description</a></h2><b>yfront</b> is a toolbox for building Yaws/Mnesia web apps.
   
 <h2><a name="index">Function Index</a></h2>
 <table width="100%" border="1"><tr><td valign="top"><a href="#auth_digest_redirect-0">auth_digest_redirect/0</a></td><td/></tr>
 <tr><td valign="top"><a href="#auth_redirect-0">auth_redirect/0</a></td><td>Return a 401 Authorization-Required status code, require Basic-Authentication.</td></tr>
 <tr><td valign="top"><a href="#auth_redirect-1">auth_redirect/1</a></td><td>Works as <a href="#auth_redirect-0"><code>auth_redirect/0</code></a>, specify realm.</td></tr>
+<tr><td valign="top"><a href="#init_sequence-1">init_sequence/1</a></td><td>Initiate sequence counter to: 1.</td></tr>
+<tr><td valign="top"><a href="#init_sequence-2">init_sequence/2</a></td><td>Initiate sequence counter to: Value.</td></tr>
+<tr><td valign="top"><a href="#sequence-1">sequence/1</a></td><td>Returns current value for sequence Name
+        and increment.</td></tr>
+<tr><td valign="top"><a href="#sequence-2">sequence/2</a></td><td>Increment sequence with Inc.</td></tr>
+<tr><td valign="top"><a href="#setup_sequence-0">setup_sequence/0</a></td><td>Creates sequence table on local node.</td></tr>
 </table>
 
 <h2><a name="functions">Function Details</a></h2>
@@ -28,5 +38,27 @@
 <h3><a name="auth_redirect-1">auth_redirect/1</a></h3>
 <tt>auth_redirect(Realm) -&gt; term()
 </tt><p>Works as <a href="#auth_redirect-0"><code>auth_redirect/0</code></a>, specify realm.</p>
+
+<h3><a name="init_sequence-1">init_sequence/1</a></h3>
+<tt>init_sequence(Name) -&gt; term()
+</tt><p>Initiate sequence counter to: 1</p>
+
+<h3><a name="init_sequence-2">init_sequence/2</a></h3>
+<tt>init_sequence(Name, Value) -&gt; term()
+</tt><p>Initiate sequence counter to: Value</p>
+
+<h3><a name="sequence-1">sequence/1</a></h3>
+<tt>sequence(Name) -&gt; term()
+</tt><p>Returns current value for sequence Name
+        and increment. Sequence is created if it does not exists,
+        and initial value 0 is returned.</p>
+
+<h3><a name="sequence-2">sequence/2</a></h3>
+<tt>sequence(Name, Inc) -&gt; term()
+</tt><p>Increment sequence with Inc</p>
+
+<h3><a name="setup_sequence-0">setup_sequence/0</a></h3>
+<tt>setup_sequence() -&gt; term()
+</tt><p>Creates sequence table on local node.</p>
 </body>
 </html>

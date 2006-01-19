@@ -28,23 +28,76 @@
 
 <erl>
 out(A) ->
-    Es = case yaws_api:queryvar(A, "id") of
-	     {ok, Id} -> 
-		 {ok, Res} = wblog:entries(6, "tobbe", Id),
-		 Res;
-	     _ ->
-		 {ok, Res} = wblog:entries(6, "tobbe"),
-		 Res
-	 end,
+    case yaws_api:queryvar(A, "action") of
+	{ok, "view"} ->
+	    Es = case yaws_api:queryvar(A, "id") of
+		     {ok, Id} -> 
+			 {ok, Res} = wblog:entries(6, "tobbe", Id),
+			 Res;
+		     _ ->
+			 {ok, Res} = wblog:entries(6, "tobbe"),
+			 Res
+		 end,
+	    build_page(Es);
+	{ok, "edit"} ->
+	    case yaws_api:queryvar(A, "id") of
+		{ok, Id} -> edit_entry(Id);
+		_ ->
+		    {html, []}  % error
+	    end;
+	_ ->
+	    {ok, Res} = wblog:entries(6, "tobbe"),
+	    build_page(Res)
+    end.
+	    
+build_page(Es) ->
     {ehtml, 
      [mk_entries(take(1, Es)),
       mk_summary(Es)]}.
 
+edit_entry(Id) ->
+    {ehtml,
+     [mk_entry(Id)]}.
+
+mk_entry(Id) ->
+    [E] = wblog:entry(Id),
+    {'div', [{id, "wblog-area"}],
+     [{form, [{method, post},
+              {action, "wblog_edit_post.yaws"}],
+       [{'div', [{class, "wblog-area-title1"}], "Blog Title: "},
+	{'div', [{class, "wblog-area-title2"}],	
+	 {input, [{name, "title"},
+		  {type, text},
+		  {value, wblog:head(E)}
+		   ]}},
+	{'div', [{class, "wblog-area-text1"}], "Blog Entry: "},
+	{'div', [{class, "wblog-area-text2"}],
+	 {textarea, [{name, "entry"},
+		     {type, "textarea"},
+		     {rows, "10"}, {cols, "35"}
+		    ],
+	  [wblog:text(E)]}},
+	{'div', [{class, "wblog-area-submit"}],	
+	 [{input, [{type, hidden},
+		   {name, "wblogid"},
+		   {value, Id}]},
+	  {input, [{type, submit}, 
+		   {value, "Submit"}]}]}]}]}.
+
+
+
+
+
 mk_entries(Es) ->
-    Opts = [{href, "/wblog.yaws"}, 
-	    {comment, "/wblog_add_comment.yaws"}],
+    Opts = [{href, "/wblog.yaws?action=view"}, 
+	    {comment, "/wblog_add_comment.yaws?action=comment"}],
     {'div', [{id, "wblog-entries"}],
-     lists:map(fun(E) -> wblog:ehtml_entry(E, Opts, trans()) end, Es)}.
+     lists:map(fun(E) -> 
+		       {'div', [],
+			[{a, [{href, "/wblog.yaws?action=edit&id="++wblog:id(E)}],
+			  "Edit Me"},
+			 wblog:ehtml_entry(E, Opts, trans())]}
+	       end, Es)}.
 
 trans() ->
     [];
@@ -59,7 +112,7 @@ trans() ->
 
 mk_summary(Es) ->
     {'div', [{id, "wblog-list"}],
-     wblog:ehtml_list(Es, [{href, "/wblog.yaws"}, 
+     wblog:ehtml_list(Es, [{href, "/wblog.yaws?action=view"}, 
 			   {date, [{class, "wblog-date"}]}])}.
 
 take(0, _)              -> [];

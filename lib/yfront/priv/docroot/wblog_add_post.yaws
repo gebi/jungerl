@@ -4,7 +4,7 @@ out(A) ->
     {ok, Title} = yaws_api:postvar(A, "title"),
     {ok, Text} = yaws_api:postvar(A, "entry"),
     %%wblog:new("tobbe", Title, Text, false),
-    wblog:new("tobbe", Title, Text, true, "http://"++Host++"/wblog.yaws"),
+    wblog:new("tobbe", Title, Text, true, "http://"++Host++"/wblog.yaws?action=view"),
     {redirect, ["/wblog.yaws"]}.
 
     

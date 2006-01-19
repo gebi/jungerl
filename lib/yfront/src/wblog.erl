@@ -21,7 +21,8 @@
 %%%
 %%%      <pre>yaws -i -c $path/priv/yaws.conf -pa $path/ebin</pre>
 %%%
-%%%      <p>Setup Mnesia as:</p>
+%%%      <p>The very first time you start the system you need to
+%%%         setup Mnesia as shown below:</p>
 %%%
 %%%      <pre>
 %%%       application:load(mnesia).
@@ -33,6 +34,15 @@
 %%% 
 %%%      <p>Then point your browser at: http://localhost:4080/</p>
 %%%
+%%%      <p>Note that, once you have setup Mnesia, it suffice to start 
+%%%         the system as shown below:</p>
+%%%
+%%%      <pre>
+%%%       application:load(mnesia).
+%%%       application:set_env(mnesia, dir, "/tmp/yfront").
+%%%       application:start(mnesia).
+%%%      </pre>
+%%%
 %%% @end
 %%%
 %%% $Id$
@@ -41,11 +51,10 @@
 
 -export([new/3, new/4, new/5, entry/1, add_comment/3,
 	 ehtml_entry/1, ehtml_entry/2, ehtml_entry/3,
-	 entries/1, entries/2, entries/3, ehtml_list/2]).
+	 entries/1, entries/2, entries/3, ehtml_list/2,
+	 replace/4, id/1, head/1, text/1]).
 %% Run only once, at setup.
 -export([setup/0]).
-%% Internal
--export([id/1]).
 
 -import(lists, [map/2, foldl/3, foldr/3, keysort/2, reverse/1]).
 
@@ -79,8 +88,14 @@ create_wblog_meta() ->
 				    {type, set},
 				    {disc_copies, [node()]}]).
 
-%%% @private
-id(E) -> E#wblog.id.
+%%% @doc Return the identifier for this weblog entry.
+id(Entry) when record(Entry, wblog) -> Entry#wblog.id.
+
+%%% @doc Return the header for this weblog entry.
+head(Entry) when record(Entry, wblog) -> Entry#wblog.head.
+
+%%% @doc Return the text body for this weblog entry.
+text(Entry) when record(Entry, wblog) -> Entry#wblog.text.
 
 %%% @doc Add a new <i>wblog entry</i>.
 %%%      Specify the header and the text body, and if the
@@ -101,6 +116,8 @@ new(User, Head, Text, RSS) ->
 %%%      be <i>"http://localhost:4080/wblog.yaws"</i> , which will be
 %%%      concatenated with <i>"?id=34545433"</i> before it is stored
 %%%      in the Yaws RSS feed.
+%%%
+%%%      Note: If the link contains a '?' we will conctenate '&amp;id=345...'
 new(User, Head, Text, RSS, Link) -> 
     Id = mk_id(),
     W = #wblog{id   = Id,
@@ -108,7 +125,7 @@ new(User, Head, Text, RSS, Link) ->
 	       head = Head,
 	       text = Text,
 	       date = now_to_gregsec()},
-    store_rss(RSS, User, Head, Text, Link++"?id="++i2l(Id)),
+    store_rss(RSS, User, Head, Text, query_append(Link, "id="++i2l(Id))),
     F = fun() ->
 		case mnesia:read({wblog_meta, User}) of
 		    [M] ->
@@ -124,6 +141,24 @@ new(User, Head, Text, RSS, Link) ->
 		end
 	end,
     tVALUE(mnesia:transaction(F)).
+
+%%% @doc Replace a <i>wblog entry</i> .
+%%%      This makes it possible to edit and update a blog entry.
+%%%      A check is made to assure that the user is the same as
+%%%      stored in the entry. If not, the replace operation will fail.
+replace(Id, User, Head, Text) -> 
+    F = fun() ->
+		case mnesia:read(wblog, Id, write) of
+		    [E] when E#wblog.user == User ->
+			mnesia:write(E#wblog{head = Head, 
+					     text = Text});
+		    _ ->
+			{error, "wrong user"}
+		end
+	end,
+    tVALUE(mnesia:transaction(F)).
+	       
+		    
 
 %%% @doc Add a comment to the specified wblog entry.
 add_comment(Id, Text, Who) ->
@@ -203,7 +238,8 @@ entry_t(Id) ->
 %%%      <c>{date, List-of-CSS-typles}</c>
 %%%      where href will be used for creating the link for
 %%%      entry. The link will be appended with a query
-%%%      argument "?id=ID". The 'date' tag is used for
+%%%      argument "?id=ID" (note: if the link contains a '?'
+%%%      character we will append '&amp;id=Id'). The 'date' tag is used for
 %%%      passing in CSS info for the Date information.
 ehtml_list(Ws, Opts) ->
     {table, opts(table, Opts),
@@ -257,7 +293,7 @@ ehtml_entry(E, Opts, Lang) when record(E,wblog),list(Opts),list(Lang) ->
       {p, [{class, "wblog-body"}], {pre_html, E#wblog.text}},
       {p, [],
        [{span, [{class, "wblog-prev"}], 
-	 lnk(E#wblog.prev, lang(prev, Lang, "prev"), Opts)},         % FIXME do gettext
+	 lnk(E#wblog.prev, lang(prev, Lang, "prev"), Opts)},
 	{span, [{class, "wblog-next"}], 
 	 lnk(E#wblog.next, lang(next, Lang, "next"), Opts)},
 	{span, [{class, "wblog-permalink"}], 
@@ -311,9 +347,16 @@ comment(Id, Head, Opts) -> lnk(Id, Head, Opts, comment).
 
 lnk(false, Head, _, _)   -> Head;
 lnk(Id, Head, Opts, Tag) ->
-    {a, [{href, opts(Tag, Opts)++"?id="++i2l(Id)} |
+    {a, [{href, query_append(opts(Tag, Opts),"id="++i2l(Id))} |
 	 opts(a, Opts)],
      Head}.
+
+%%% Be smart: if our query argument is the first then use '?' else '&'
+query_append(P, S) ->
+    case string:chr(P, $?) of
+	I when I>0 -> P++"&"++S;
+	_          -> P++"?"++S
+    end.
 	 
 lang(Key, List, Default) ->
     opts(Key, List, Default).

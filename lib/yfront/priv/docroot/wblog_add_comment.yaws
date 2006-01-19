@@ -24,17 +24,22 @@
 
 <erl>
 out(A) ->
-    Es = case yaws_api:queryvar(A, "id") of
-	     {ok, Id} -> 
-		 {ok, Res} = wblog:entries(6, "tobbe", Id),
-		 Res;
-	     _ ->
-		 {ok, Res} = wblog:entries(6, "tobbe"),
-		 Res
-	 end,
-    {ehtml, 
-     [mk_comment(hd(Es)),
-      mk_summary(Es)]}.
+    case yaws_api:queryvar(A, "action") of
+	{ok, "comment"} -> 
+	    Es = case yaws_api:queryvar(A, "id") of
+		     {ok, Id} -> 
+			 {ok, Res} = wblog:entries(6, "tobbe", Id),
+			 Res;
+		     _ ->
+			 {ok, Res} = wblog:entries(6, "tobbe"),
+			 Res
+		 end,
+	    {ehtml, 
+	     [mk_comment(hd(Es)),
+	      mk_summary(Es)]};
+	_ ->
+	    {redirect, "/wblog.yaws"}  % error
+    end.
 
 mk_comment(E) ->
     {'div', [{id, "wblog-comment-area"}],

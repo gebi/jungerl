@@ -5,14 +5,18 @@
 <link rel="stylesheet" type="text/css" href="stylesheet.css">
 </head>
 <body bgcolor="white">
+
 <h1>Module wblog</h1>
-<b>wblog</b> is a Yaws plugin that implements a simple (we)blog service.<ul><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul><p><b>Authors:</b> Torbjörn Törnkvist (<a href="mailto:tobbe@tornkvist.org"><tt>tobbe@tornkvist.org</tt></a>).</p>
-<h2><a name="description">Description</a></h2><b>wblog</b> is a Yaws plugin that implements a simple (we)blog service.
+<b>wblog</b> is a Yaws plugin that implements a simple (we)blog service.
+<ul><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>
+<p><b>Authors:</b> Torbjörn Törnkvist (<a href="mailto:tobbe@tornkvist.org"><tt>tobbe@tornkvist.org</tt></a>).</p>
+
+<h2><a name="description">Description</a></h2><p><b>wblog</b> is a Yaws plugin that implements a simple (we)blog service.
         With <b>wblog</b>, it is possible to add blog entries as well as list-
         and traverse the entries. Entries are stored in a Mnesia table that is
         created once with the <a href="#setup-0"><code>setup/0</code></a> function. New entries are added
         with the <a href="#new-3"><code>new/3</code></a> and  <a href="#new-4"><code>new/4</code></a> functions. A comment for
-        a specified entry is added by the <a href="#add_comment-3"><code>add_comment/3</code></a>.
+        a specified entry is added by the <a href="#add_comment-3"><code>add_comment/3</code></a>.</p>
   
         <p>To make it as adaptable as possble it is possible to either
         take care of the final formatting yourself, or to retrieve the result
@@ -24,7 +28,8 @@
   
         <pre>yaws -i -c $path/priv/yaws.conf -pa $path/ebin</pre>
   
-        <p>Setup Mnesia as:</p>
+        <p>The very first time you start the system you need to
+           setup Mnesia as shown below:</p>
   
         <pre>
          application:load(mnesia).
@@ -35,6 +40,15 @@
         </pre>
   
         <p>Then point your browser at: http://localhost:4080/</p>
+  
+        <p>Note that, once you have setup Mnesia, it suffice to start
+           the system as shown below:</p>
+  
+        <pre>
+         application:load(mnesia).
+         application:set_env(mnesia, dir, "/tmp/yfront").
+         application:start(mnesia).
+        </pre>
   
 <h2><a name="index">Function Index</a></h2>
 <table width="100%" border="1"><tr><td valign="top"><a href="#add_comment-3">add_comment/3</a></td><td>Add a comment to the specified wblog entry.</td></tr>
@@ -47,9 +61,14 @@
 <tr><td valign="top"><a href="#entries-2">entries/2</a></td><td>Returns the N last wblog entries for specified User.</td></tr>
 <tr><td valign="top"><a href="#entries-3">entries/3</a></td><td>Returns the N last wblog entries for specified User starting at Id.</td></tr>
 <tr><td valign="top"><a href="#entry-1">entry/1</a></td><td>Returns a list with a matching wblog record.</td></tr>
+<tr><td valign="top"><a href="#head-1">head/1</a></td><td>Return the header for this weblog entry.</td></tr>
+<tr><td valign="top"><a href="#id-1">id/1</a></td><td>Return the identifier for this weblog entry.</td></tr>
 <tr><td valign="top"><a href="#new-3">new/3</a></td><td>Add a new <i>wblog entry</i>.</td></tr>
 <tr><td valign="top"><a href="#new-4">new/4</a></td><td>Add a new <i>wblog entry</i> for a specified user.</td></tr>
+<tr><td valign="top"><a href="#new-5">new/5</a></td><td>Add a new <i>wblog entry</i> .</td></tr>
+<tr><td valign="top"><a href="#replace-4">replace/4</a></td><td>Replace a <i>wblog entry</i> .</td></tr>
 <tr><td valign="top"><a href="#setup-0">setup/0</a></td><td>Creates the Mnesia tables: <b>wblog</b> and <b>wblog_meta</b>.</td></tr>
+<tr><td valign="top"><a href="#text-1">text/1</a></td><td>Return the text body for this weblog entry.</td></tr>
 </table>
 
 <h2><a name="functions">Function Details</a></h2>
@@ -110,7 +129,8 @@
         <c>{date, List-of-CSS-typles}</c>
         where href will be used for creating the link for
         entry. The link will be appended with a query
-        argument "?id=ID". The 'date' tag is used for
+        argument "?id=ID" (note: if the link contains a '?'
+        character we will append '&amp;id=Id'). The 'date' tag is used for
         passing in CSS info for the Date information.</p>
 
 <h3><a name="entries-1">entries/1</a></h3>
@@ -129,6 +149,14 @@
 <tt>entry(Id) -&gt; term()
 </tt><p>Returns a list with a matching wblog record.</p>
 
+<h3><a name="head-1">head/1</a></h3>
+<tt>head(Entry) -&gt; term()
+</tt><p>Return the header for this weblog entry.</p>
+
+<h3><a name="id-1">id/1</a></h3>
+<tt>id(Entry) -&gt; term()
+</tt><p>Return the identifier for this weblog entry.</p>
+
 <h3><a name="new-3">new/3</a></h3>
 <tt>new(Head, Text, RSS) -&gt; term()
 </tt><p>Add a new <i>wblog entry</i>.
@@ -141,10 +169,33 @@
         Works as <a href="#new-3"><code>new/3</code></a> but with a specific user added.
         This makes it possible to maintain several distinct users.</p>
 
+<h3><a name="new-5">new/5</a></h3>
+<tt>new(User, Head, Text, RSS, Link) -&gt; term()
+</tt><p><p>Add a new <i>wblog entry</i> .
+        Works as <a href="#new-4"><code>new/4</code></a> but with a specific page link added.
+        This is used for storing a link to the wblog entry into
+        the RSS feed (if RSS is enabled). For example, a link can
+        be <i>"http://localhost:4080/wblog.yaws"</i> , which will be
+        concatenated with <i>"?id=34545433"</i> before it is stored        
+in the Yaws RSS feed.</p>
+  
+        Note: If the link contains a '?' we will conctenate '&amp;id=345...'</p>
+
+<h3><a name="replace-4">replace/4</a></h3>
+<tt>replace(Id, User, Head, Text) -&gt; term()
+</tt><p>Replace a <i>wblog entry</i> .
+        This makes it possible to edit and update a blog entry.
+        A check is made to assure that the user is the same as
+        stored in the entry. If not, the replace operation will fail.</p>
+
 <h3><a name="setup-0">setup/0</a></h3>
 <tt>setup() -&gt; term()
 </tt><p>Creates the Mnesia tables: <b>wblog</b> and <b>wblog_meta</b>.
         This function should only be called once, when the wblog Mnesia-tables
         are to be created.</p>
+
+<h3><a name="text-1">text/1</a></h3>
+<tt>text(Entry) -&gt; term()
+</tt><p>Return the text body for this weblog entry.</p>
 </body>
 </html>

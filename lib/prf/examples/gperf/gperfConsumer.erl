@@ -62,7 +62,7 @@ load(Max,#data{sys=N},#data{sys=O}) ->
     Kern = w(kernel,N)/100,
     Wait = w(wait,N)/100,
     case User of
-	0 -> Beam = beamload(1,N,O);
+	0.0 -> Beam = beamload(1,N,O);
 	_ -> Beam = beamload(User,N,O)
     end,
     [Beam,User,User+Kern,max(User+Kern+Wait, Max)].

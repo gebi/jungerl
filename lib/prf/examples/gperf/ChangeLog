@@ -1,3 +1,7 @@
+2006-01-25  Mats Cronqvist  <locmacr@mwlx084>
+
+	* gperf (Module): using the compatibilty switch
+
 2006-01-23  Mats Cronqvist  <locmacr@mwlx084>
 
 	* gperfConsumer.erl (Module): beamload required os_mon to display

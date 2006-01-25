@@ -19,7 +19,7 @@ n=4
 while [ 0 -lt "$n" ]; do SPATH=`dirname $SPATH`; let n=n-1; done
 echo SPATH $SPATH
 detach="-detached"
-ERL=erl
+VSN=""
 START="-s gperf start"
 
 while [ -n "$1" ] 
@@ -30,19 +30,14 @@ while [ -n "$1" ]
 	  ;;
       "-dbg")
 	  detach=""
-	  START="-s lists sort"
 	  ;;
       "-win")
 	  WIN="xterm -sb -sl 9999 -bg gold -fg black -e"
 	  detach=""
 	  ;;
       "-vsn"|"-version")
-	  vsn=$2
+	  VSN="+R "$2
 	  shift
-	  ERLP=`which erl`
-	  ERLP=`dirname $ERLP` ; ERLP=`dirname $ERLP` ; ERLP=`dirname $ERLP`
-	  ERL=`echo $ERLP/*${vsn}*/bin/erl`
-	  if [ ! -x "$ERL" ]; then usage; echo $ERL; fi
 	  ;;
       "-nettick"|"-tick")
 	  nettick="-kernel net_ticktime $2"
@@ -75,7 +70,7 @@ name="gperf_"$$
 FLAGS="$detach -boot start_sasl -sasl errlog_type error +A16"
 DISTR="-hidden -sname $name $cookie $nettick"
 
-$WIN $ERL $FLAGS $DISTR \
+$WIN erl $VSN $FLAGS $DISTR \
 -pa $SPATH/prf/examples/gperf \
 -pa $SPATH/prf/ebin \
 -pa $SPATH/gtkNode/ebin \

@@ -1,52 +1,17 @@
 #!/bin/bash
 
-root1=`which erl`
-if [ -n  "root1" ]; then
-    root1=`dirname $root1`
-    root1=`dirname $root1`
-else
-    root1=""
+if [ "$1" == "-root" -o "$1" == "" ]; then
+    erl -noinput -eval 'io:format("~s~n", [code:root_dir()]), halt(0).'
 fi
 
-if [ -n "$OTP_ROOT" ]; then
-    root2=$OTP_ROOT
-else
-    root2=""
+if [ "$1" == "-ei" -o "$1" == "" ]; then
+    erl -noinput -eval \
+        'case code:lib_dir("erl_interface") of
+            {error, bad_name} ->
+                io:format("not found~n", []),
+                halt(1);
+            LibDir ->
+                io:format("~s~n", [LibDir]),
+                halt(0)
+        end.'
 fi
-
-if [ "$root1" == "$root2" ]; then
-    roots=$root1
-else
-    roots="$root1 $root2"
-fi
-
-for r in $roots 
-  do
-  for root in `dirname $r`/*
-    do
-    if [ -d $root/lib/erlang/lib ]; then
-	dir=$root/lib/erlang/lib
-	vsn=`basename $dir/erl_interface* | cut -f2 -d"-" `
-	ei=$dir/erl_interface-$vsn
-	if [ `echo $vsn | cut -f1 -d"."` -ge 3 -a \
-	    `echo $vsn | cut -f2 -d"."` -ge 5 -a \
-	    -f $root/bin/erlc ]; then
-	    ROOT=$root
-	    EI=$ei
-	fi
-    elif [ -d $root/lib ]; then
-	dir=$root/lib
-	vsn=`basename $dir/erl_interface* | cut -f2 -d"-"`
-	ei=$dir/erl_interface-$vsn
-	if [ `echo $vsn | cut -f1 -d"."` -ge 3 -a \
-	    `echo $vsn | cut -f2 -d"."` -ge 5 -a \
-	    -f $root/bin/erlc ]; then
-	    ROOT=$root
-	    EI=$ei
-	fi
-    fi
-  done
-done
-
-if [ "$1" == "-root" -o "$1" == "" ]; then echo $ROOT; fi
-if [ "$1" == "-ei" -o "$1" == "" ]; then echo $EI; fi

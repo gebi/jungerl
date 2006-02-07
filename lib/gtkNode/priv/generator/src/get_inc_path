@@ -1,14 +1,17 @@
-#!/bin/tcsh
+#!/bin/bash
 
-if ( $#argv != 2 ) exit
-set pkg = $1
-set pk = $2
+if [ $# -ne 2 ]; then
+    exit
+fi
+PKG="$1"
+PK="$2"
 
-set cflags = `pkg-config --cflags $pkg`
-set pth = ""
-foreach f ($cflags)
-  if ( `echo "$f" | grep "include/$pk"` != "" ) then
-    set pth = `echo $f | cut -c3-`
-  endif
-end
-echo $pth
+CFLAGS=`pkg-config --cflags "$PKG"`
+PTH=""
+for f in $CFLAGS; do
+    if [ "`echo "$f" | grep "include/$PK"`" != "" ]; then
+        PTH=`echo "$f" | cut -c3-`
+    fi
+done
+echo $PTH
+

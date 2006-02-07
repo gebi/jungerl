@@ -1,3 +1,17 @@
+2006-01-26  Romain Lenglet  <rlenglet@users.forge.objectweb.org>
+
+	* src/get_inc_path priv/generator/src/get_inc_path: reimplemented in
+	bash instead of tcsh, so that all scripts only depend on bash
+
+	* src/check_otp: redevelopped using Erlang's code:root_dir/0 and
+	code:lib_dir/1; now works all the time, including when the "erl"
+	command in the PATH is not in the Erlang installation hierarchy (e.g.
+	on Debian, erl is in /usr/bin, whereas the Erlang root is
+	/usr/lib/erlang)
+
+	* priv/gen/gdk_generated-2.8.10.h priv/gen/g_generated-2.8.10.h
+	priv/gen/gtk_generated-2.8.10.h: added generated files for GTK 2.8.10
+
 2006-01-16  Mats Cronqvist  <locmacr@mwlx084>
 
 	* src/check (Module): removed the dummy *_generated.h files from CVS

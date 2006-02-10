@@ -71,7 +71,7 @@ while [ "$1"x != x ]; do
 	EM_CMD="suicide"
 	EM_SUICIDE="y"
 	;;
-      -h)
+      -h | help)
 	usage
 	exit
 	;;

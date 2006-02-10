@@ -1,6 +1,22 @@
 
-For developers (as of 14 Apr 2005)
+For developers (as of 20 Jan 2006)
 ----------------------------------
+
+
+Information about installing erlmerge somewhere else than
+$(ERLANG)/lib.
+If you are want the default install directory skip to ''Install it as:''
+
+Otherwise, before running make, change directory to config and do:
+
+./configure erlmerge_install_top=</where/you/want/it>
+This will install the erlmerge script as
+</where/you/want/it>/bin/erlmerge
+and the erlmerge application as
+</where/you/want/it>/lib/erlmerge-<vsn>
+
+Then back up to this directory and follow the description below.
+
 
 Install it as:
 
@@ -27,7 +43,11 @@ This will store the sync info in:
 
  ..../erlmerge_DB/sync.erlmerge
 
-List the DB again and look for 'eldap' and 'eradius'
+Those that are located behind a firewall/proxy should do:
+erlmerge -z <proxy>:<port> sync
+
+
+Search the DB again and look for 'eldap' and 'eradius'
 They should not be installed.
 
 Now, to install an application do as in this example:
@@ -47,10 +67,4 @@ application esmb may end up as a directory:
 
 Which will make it available when you start your
 Erlang node/shell.
-
-
-
-
-
-
 

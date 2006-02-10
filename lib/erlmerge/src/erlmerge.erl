@@ -37,15 +37,16 @@
 	  original = false   % did this app exist when erlmerge was installed?
 	 }).
 
+%%% default values in erlmerge script
 -record(options, {
 	  cmd,
-	  args = [],
+	  args,
 	  elib_dir,
-	  dryrun = false,
-	  update = false,
-	  url = "http://www.trapexit.org/trapexit.erlmerge",
-	  proxy = [],
-	  make_used = []
+	  dryrun,
+	  update,
+	  url,
+	  proxy,
+	  make_used
 	  }).
 
 -record(s, {}).
@@ -59,7 +60,6 @@ run() ->
     Opts = get_opts(),
     #options{elib_dir=Lib_dir, cmd=Cmd} = Opts,
     add_libs_to_path( Lib_dir ),
-%    analyse_switches(),
     exec( Cmd, Opts ),
     init:stop().
 
@@ -67,32 +67,21 @@ get_opts() ->
     #options{cmd      = l2a(os:getenv("EM_CMD")),
 	     %% Remove leading and trailing space
 	     args     = string:strip(os:getenv("EM_ARGS")),
-	     elib_dir = os:getenv("ERL_LIB_DIR"),
+	     elib_dir = get_opts_safe_getenv("ERL_LIB_DIR"),
 	     dryrun   = list2bool(os:getenv("EM_DRYRUN"), false),
 	     update   = list2bool(os:getenv("EM_UPDATE"), false),
-	     url      = os:getenv("EM_URL"),
-	     proxy      = os:getenv("EM_PROXY"),
-	     make_used      = os:getenv("MAKE_USED_FOR_ERLMERGE")}.
+	     url      = get_opts_safe_getenv("EM_URL"),
+	     proxy      = get_opts_safe_getenv("EM_PROXY"),
+	     make_used      = get_opts_safe_getenv("MAKE_USED_FOR_ERLMERGE")}.
 
-%analyse_switches() ->
-%    case init:get_argument(erlmerge) of
-%	{ok, Switches} -> put_switches(Switches);
-%	_              -> ok
-%    end.
-%
-%put_switches([[Key, Value] | T]) ->
-%    put(l2a(Key), l2a(Value)),
-%    put_switches(T);
-%put_switches([]) ->
-%    ok.
+get_opts_safe_getenv( Env_var ) ->
+	case os:getenv( Env_var ) of
+	false ->
+		[];
+	Value ->
+		Value
+	end.
 
-
-%rm_space([$\s|T]) -> rm_space(T);
-%rm_space([])      -> [];
-%rm_space(L)       -> L.
-%
-%%%% Remove leading and trailing space
-%rm_space2(L) -> lists:reverse(rm_space(lists:reverse(rm_space(L)))).
 
 exec(sync, P) ->
     #options{url=Url, proxy=Proxy} = P,
@@ -104,10 +93,9 @@ exec(sync, P) ->
 	    DbFname = db_fname(ElibDir),
 	    sync_db(SyncFname, DbFname);
 	{error, econnrefused} ->
-	    io:format("Unable to connect with: ~p~n", [Url]);
+	    ?elog("Unable to connect with: ~p~n", [Url]);
 	Else ->
-	    ?elog("failed to retrieve URL=~p, got: ~p~n", [Url, Else]),
-	    {error, "failed to retrieve URL!"}
+	    ?elog("Failed to retrieve URL=~p, got: ~p~n", [Url, Else])
     end;
 %%%
 exec(search, P) ->
@@ -169,33 +157,24 @@ exec(suicide, P) ->
     rm_erlmerge(ElibDir);
 %%%
 exec(Cmd, P) ->
-    io:format("<ERROR> Unknown command: ~p , Opts: ~p~n", [Cmd, P]).
+    ?elog("Unknown command: ~p , Opts: ~p~n", [Cmd, P]).
 
 
 rm_erlmerge(ElibDir) ->
     %% Remove packet database
-    Dir = erlmerge_db_directory(ElibDir),
+    Dir = erlmerge_db_directory( ElibDir ),
     rm_all( Dir ),
-    io:format("Removed: ~s~n", [Dir]),
+    io:fwrite( "Removed: ~s~n", [Dir] ),
     %% Remove the application(s) , all versions
     Wildcard = filename:join( [ElibDir, "erlmerge-*"] ),
     lists:foreach( fun rm_all/1, filelib:wildcard(Wildcard) ),
-    io:format("Removed: erlmerge application~n", []),
+    io:fwrite( "Removed: erlmerge application~n" ),
     %% Remove the erlmerge script (the link is removed from the script itself)
-    Script = filename:join([ElibDir, "..", "bin", "erlmerge"]),
+    Script = filename:join( [ElibDir, "..", "bin", "erlmerge"] ),
     ok = file:delete( Script ),
-    io:format("Removed: ~s~n", [Script]).
+    io:fwrite( "Removed: ~s~n", [Script] ).
     
 
-%rm_apps([A|T], ElibDir) when A#app.installed == true ->
-%    Dir = lists:concat([A#app.name, "-", A#app.vsn]),
-%    os:cmd("(cd " ++ ElibDir ++ "; rm -rf " ++ Dir ++ ")"),
-%    io:format("Removed: ~s~n", [filename:join([ElibDir, Dir])]),
-%    rm_apps(T, ElibDir);
-%rm_apps([A|T], ElibDir) when A#app.installed == false ->
-%    rm_apps(T, ElibDir);
-%rm_apps([], _) ->
-%    ok.
 
 get_non_orig_apps() ->
     F = fun(A,Acc) when A#app.original == false ->
@@ -212,9 +191,9 @@ install(P) ->
 	    Packages_to_install = analyse_versions(P, Apps),
 	    fetch_tar_balls_and_install(P, Packages_to_install);
 	{error, Emsg} ->
-	    io:format("<ERROR>: ~s~n", [Emsg]);
+	    ?elog("Analyse dependency failed: ~s~n", [Emsg]);
 	{cycle, Cycle} ->
-	    io:format("<ERROR>: dependency cycle found: ~p~n", [Cycle])
+	    ?elog("Analyse dependency cycle found: ~p~n", [Cycle])
     end.
 	    
 %%% Check that we have all the necessary App versions.
@@ -680,7 +659,6 @@ list2bool("true", _)  -> true;
 list2bool("false", _) -> false;
 list2bool(_, Default) -> Default.
 
-%sleep(T) -> receive after T -> true end.
 
 
 fetch_tar_balls_and_install(_P, []) -> ok;
@@ -707,7 +685,7 @@ fetch_tar_balls(P, [H|T], Fetched, NotFetched) ->
 		    file:write_file(PathName, l2b(File)),
 		    fetch_tar_balls(P, T, [H|Fetched], NotFetched);
 		{error, econnrefused} ->
-		    io:format(green("Unable to connect to:")++" ~p~n", [Location]),
+		    io:format(green("Unable to connect with:")++" ~p~n", [Location]),
 		    fetch_tar_balls(P, T, Fetched, [H|NotFetched]);
 		Else ->
 		    io:format(green("failed to retrieve:")++" ~p, got: ~p~n", [Location, Else]),
@@ -727,71 +705,82 @@ unpack_and_make(P, Fetched) ->
 		Fname = fname( Loc ),
 		PathName = filename:join( [distfiles( ElibDir ), Fname] ),
 		%% Unpack the tar-ball
-		io:format(green("unpacking:")++" ~s.....", [Fname]),
+		io:fwrite( green("unpacking:")++" ~s.....", [Fname] ),
 		Application = lists:concat([Name,"-",Vsn]),
-%		Dir = filename:join( [ElibDir, Application] ),
-		case is_untar_ok( PathName, Application, Make ) of
+		case is_untar_ok( PathName ) of
 		true ->
 		    %% Run make
 		    Installed = is_make_ok( Application, Make ),
-		    db_insert(App#app{installed = Installed});
+		    db_insert( App#app{installed = Installed} );
 		false ->
-		    io:format("failed unpacking: ~s.....", [Fname])
+		    io:fwrite( "failed unpacking: ~s.....", [Fname] )
 		end
 	end,
-	lists:foreach(Fun, Fetched),
+	lists:foreach( Fun, Fetched ),
 	%% back to original directory
-	ok = file:set_cwd(Current_directory),
-	io:format(green("finished!")++"~n", []).
+	ok = file:set_cwd( Current_directory ),
+	io:fwrite( green("finished!")++"~n" ).
 
-%%% Does '-o' work in all tar's ?
-%%% (do not attempt to restore ownership when extracting)
-is_untar_ok( Tarfile, Target, Make ) ->
-	Tar = lists:append( ["tar -xzof ", Tarfile] ), 
-	%% make used for erlmerge was gnumake. 
-	%% wild assumption: gnutar is in the same directory as gnumake. 
-	Gtar = filename:join( [filename:dirname( Make ), "gtar"] ),
-	Gnu_tar = lists:append( [Gtar, " -xzof ", Tarfile] ),
-	Gtar2 = filename:join( [filename:dirname( Make ), "tar"] ),
-	Gnu_tar2 = lists:append( [Gtar2, " -xzof ", Tarfile] ),
-	More_tar = lists:append( ["gunzip -c ", Tarfile, " | tar -xf -"] ),
-	is_untar_ok_alternatives( Target, [Tar, Gnu_tar, Gnu_tar2, More_tar] ).
-
-is_untar_ok_alternatives( _Target, [] ) -> false;
-is_untar_ok_alternatives( Target, [Tar|T] ) ->
-	Res = os:cmd(Tar),
-	io:format("~s~n", [Res]),
-	case filelib:is_dir( Target ) of
-	true ->
+is_untar_ok( Tarfile ) ->
+	case erl_tar:extract( Tarfile, [compressed]) of
+	ok ->
 		true;
-	false ->
-		is_untar_ok_alternatives( Target, T )
+	{error, Reason} ->
+		erl_tar:format_error( Reason ),
+		false
 	end.
 
 is_make_ok( Application, Make ) ->
 	{ok, Current_directory} = file:get_cwd(),
 	%% work in the application directory
 	ok = file:set_cwd(Application),
-	%% make used for erlmerge was gnumake. 
-	%% wild assumption: other gnu programs are in the same directory as gnumake.
-	%% if original make fails, add this directory to the path
-	New_path = lists:append( ["PATH=", filename:dirname( Make ), ":$PATH"] ),
-	Make2 = lists:append( [New_path, " ", filename:basename( Make )] ),
-	Result = is_make_ok_alternatives(Application, ["make", Make, Make2]),
+	io:fwrite( green("compiling:")++" ~s.....", [Application] ),
+	Result = case filelib:is_regular( "Emakefile" ) of
+		true ->	% Emakefile exists as regular file. use erlang make.
+			case make:all() of
+			up_to_date ->
+				true;
+			error ->
+				false
+			end;
+		false ->	% try os make
+			is_make_ok_os_alternatives( Application, Make )
+		end,
+	%% back to current directory
 	ok = file:set_cwd(Current_directory),
 	Result.
 
-is_make_ok_alternatives( _Application, [] ) -> false;
-is_make_ok_alternatives( Application, [Make|T] ) ->
-	io:format(green("compiling:")++" ~s.....", [Application]),
+is_make_ok_os_alternatives( Application, [] ) ->
+	is_make_ok_try_alternatives( Application, ["make"] );
+is_make_ok_os_alternatives( Application, Make ) ->
+	%% 1 use make available with operating system.
+	%% 2 if 1 fails use gnumake used for erlmerge (if available).
+	%% add the directory of gnumake to the path and try gnumake again.
+	%% somebody using gnumake might also use other gnu specific programs.
+	New_path = lists:append( ["PATH=", filename:dirname( Make ), ":$PATH"] ),
+	Make2 = lists:append( [New_path, " ", filename:basename( Make )] ),
+	is_make_ok_try_alternatives(Application, ["make", Make2]).
+	
+is_make_ok_try_alternatives( _Application, [] ) -> fail;
+is_make_ok_try_alternatives( Application, [Make|T] ) ->
+	io:fwrite( "with ~s~n", [Make]),
 	%%?elog("~s~n", ["(cd " ++ ElibDir ++ "/" ++ Dir ++ "; make)"]),
 	Res = os:cmd( lists:append([Make, " ; echo $?"]) ),
-	io:format("~s~n", [Res]),
-	case erlang:list_to_integer( erlang:hd(lists:reverse( string:tokens(Res, "\n") )) ) of
+	Lines = string:tokens( Res, "\n" ),
+	case erlang:length( Lines ) < 10 of
+	true ->
+		io:fwrite("~s~n", [Res]);
+	false ->	% only write last few Lines
+		io:fwrite("~n...deleted~n"),
+		Fun = fun (Line) -> io:fwrite("~s~n", [Line]) end,
+		lists:foreach( Fun, lists:nthtail(10, Lines) )
+	end,
+	%% check status (what echo $? produced)
+	case erlang:list_to_integer(lists:last( Lines )) of
 	0 ->
 		true;
 	_Else ->
-		is_make_ok_alternatives( Application, T )
+		is_make_ok_try_alternatives( Application, T )
 	end.
 
 
@@ -802,7 +791,7 @@ rm_non_original_applications( ElibDir ) ->
 	Fun = fun (#app{installed=true, name=Name, vsn=Vsn}) ->
 				Application = lists:concat( [Name, "-", Vsn] ),
 				rm_all( Application ),
-				io:format("Removed: ~s~n", [a2l( Name )]);
+				io:fwrite("Removed: ~s~n", [a2l( Name )]);
 			(#app{installed=false}) -> ok
 		end,
 	lists:foreach( Fun, get_non_orig_apps() ),

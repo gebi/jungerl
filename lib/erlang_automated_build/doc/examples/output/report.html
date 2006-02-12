@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html>
+  <head>
+    <title>IDX-Tsunami  -  </title>
+	<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+	<link rel="Index" href="/"/>
+    <style type="text/css">
+	  body { background-color: #EEEEEE;}
+      h1, h2, h3, h4 { color: #005A9C;  }
+      h1 { font: 175% sans-serif; padding: 5px; text-align: center;}
+      h2 { font: 130% sans-serif; padding: 5px; }
+      h2.main { text-align: center;
+          background-color: #DD8888;
+          }
+      h3 { font: 130% sans-serif; 
+          text-align: center;
+          background-color: #DDDDDD;
+          margin-left: 20px; 
+          border: 1px solid #CCCCCC;
+          margin-right: 20px; 
+          }
+      h4 { font: bold 100% sans-serif }
+      h5 { font: italic 100% sans-serif }
+      h6 { font: small-caps 100% sans-serif }
+      var {color: red; }
+      kbd {font-weight: bold;}
+      code {color: blue; }
+      samp {color: #5A009C; }
+      table.stats {
+          margin-left: 25px;
+          background-color: #DDDDDD;
+          border: 1px solid #000;
+          }
+      address { font-size: small; text-align: center;}
+      #footer {
+          position:              fixed;
+          bottom:                0px;
+          left:                  0;
+          right:                  0;
+          background-color: #fff; 
+          width: 100%;
+          padding: 2px;
+          border: 1px solid #999999;
+          }
+      #maincontent {     
+          margin-left:  190px;
+          padding: 5px;
+          }
+      #headerBox {
+          position:    fixed;
+          float:       left;
+          width:  190px;
+          height: 90%;
+          background-color: #FFFFFF; 
+          border: 1px solid #ffffff;
+             } 
+      th.stats {
+          border-bottom: 1px solid #005A9C;
+          border-top: 1px solid #005A9C;
+          } 
+      td.stats {
+          border-right: 1px solid #AAA;
+          text-align: right;
+          } 
+      #os_mon {text-align: center; } 
+      .version {
+          font: italic 80% sans-serif; 
+          color: #005A9C; 
+          text-align: center;
+          }
+      </style>
+  </head>
+<body>
+	<div id="headerBox">
+        <h1>IDX-Tsunami </h1>
+      <p class="version"><em>version 1.1.0</em></p>
+
+      <h2><a class="subtitle" href="report.html">Stats Report </a></h2>
+      <ul>
+        <li><a href="report.html#stats">Main statistics</a></li>
+        <li><a href="report.html#transaction">Transactions</a></li>
+        <li><a href="report.html#network">Network Throughput</a></li>
+        <li><a href="report.html#count">Counters</a></li>
+        <li><a href="report.html#http_status">HTTP status</a></li>
+        <li><a href="report.html#errors">Errors</a></li>
+      </ul>
+
+      <h2><a class="subtitle" href="graph.html">Graphs Report </a></h2>
+      <ul>
+        <li><a href="graph.html#response_time">Response times</a></li>
+        <li><a href="graph.html#throughput">Throughput graphs</a></li>
+        <li><a href="graph.html#users">Simultaneous Users</a></li>
+        <li><a href="graph.html#http_status">HTTP status</a></li>
+        <li><a href="graph.html#errors">Errors</a></li>
+     </ul>
+      <h2><a class="subtitle" href="tsunami_load.xml">XML Config file</a></h2>
+    </div>
+
+
+<div id="maincontent">
+ <h2 class="main">IDX-Tsunami - Statistics</h2> 
+
+<div id="stats">
+ <h3>Main Statistics</h3> 
+ <table class="stats">
+  <tr><th class="stats">Name</th> <th class="stats">highest mean value</th> <th class="stats">lowest mean value</th><th class="stats">Highest Rate</th>
+  </tr>
+     <tr>
+		<td class="stats">connect</td>
+		<td class="stats">0.00168386 sec</td>
+		<td class="stats">0.000396973 sec</td>
+		<td class="stats">11.3 / sec</td>
+     </tr>
+     <tr>
+		<td class="stats">page</td>
+		<td class="stats">0.0114862 sec</td>
+		<td class="stats">0.00453198 sec</td>
+		<td class="stats">11.3 / sec</td>
+     </tr>
+     <tr>
+		<td class="stats">request</td>
+		<td class="stats">0.0114862 sec</td>
+		<td class="stats">0.00453198 sec</td>
+		<td class="stats">11.3 / sec</td>
+     </tr>
+     <tr>
+		<td class="stats">session</td>
+		<td class="stats">0.013466 sec</td>
+		<td class="stats">0.00662305 sec</td>
+		<td class="stats">11.5 / sec</td>
+     </tr>
+ </table>
+</div>
+
+<div id="transaction">
+ <h3>Transactions Statistics</h3> 
+ <table class="stats">
+  <tr><th class="stats">Name</th> <th class="stats">highest mean value</th><th class="stats">Highest Rate</th>
+  </tr>
+     <tr>
+		<td class="stats">tr_run_load</td>
+		<td class="stats">0.01189 sec</td>
+		<td class="stats">11.3 / sec</td>
+     </tr>
+ </table>
+</div>
+
+<div id="network">
+ <h3>Network Throughput</h3> 
+ <table class="stats">
+  <tr><th class="stats">Name</th> <th class="stats">Highest Rate</th><th class="stats">Total</th>
+  </tr>
+     <tr>
+		<td class="stats">size</td>
+		<td class="stats">107.88 Kb/sec</td>
+		<td class="stats">3.01 MB</td>
+     </tr>
+ </table>
+</div>
+
+
+<div id="count">
+ <h3>Counters Statistics</h3> 
+ <table class="stats">
+  <tr><th class="stats">Name</th> <th class="stats">Highest Rate</th><th class="stats">Total number</th>
+  </tr>
+     <tr>
+		<td class="stats">finish_users_count</td>
+		<td class="stats">11.5 / sec</td>
+		<td class="stats">2709 </td>
+     </tr>
+     <tr>
+		<td class="stats">users_count</td>
+		<td class="stats">11.6 / sec</td>
+		<td class="stats">2709 </td>
+     </tr>
+ </table>
+</div>
+
+<div id="errors">
+ <h3>Errors</h3> 
+ <table class="stats">
+  <tr><th class="stats">Name</th> <th class="stats">Highest Rate</th><th class="stats">Total number</th>
+  </tr>
+     <tr>
+		<td class="stats">error_unknown</td>
+		<td class="stats">1.3 / sec</td>
+		<td class="stats">124 </td>
+     </tr>
+ </table>
+</div>
+
+
+
+
+<div id="http_status">
+ <h3>HTTP return code </h3> 
+ <table class="stats">
+  <tr><th class="stats">Code</th>  <th class="stats">Highest Rate</th><th class="stats">Total number</th>
+  </tr>
+     <tr>
+		<td class="stats">200</td>
+		<td class="stats">11.3 / sec</td>
+		<td class="stats">2585</td>
+     </tr>
+ </table>
+</div>
+
+</div>
+<hr/>
+<div id="footer">
+    <address>
+		Copyright &copy; IDEALX S.A.S 2004 - <a href="http://tsunami.idealx.org">http://tsunami.idealx.org/</a>
+        Contact:   <a href="mailto:idx-tsunami@lists.IDEALX.org">idx-tsunami@lists.IDEALX.org</a>
+    </address>
+</div>
+  </body>
+</html>
+

@@ -1,0 +1,5 @@
+#!/bin/bash
+# This file is used by the user editable variable
+# CVS_RSH_SUBSTITUTE in the erlang_automated_build script
+PRIV_KEY_FILE="/path/to/your/private/key.file"
+ssh -i $PRIV_KEY_FILE  "$@"

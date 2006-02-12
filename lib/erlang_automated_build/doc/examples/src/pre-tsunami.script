@@ -1,0 +1,3 @@
+#! /bin/bash
+cd /opt/erlang_apps/myapp/ebin
+erl -s start_app -sname myapp 

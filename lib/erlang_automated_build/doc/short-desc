@@ -1,0 +1,10 @@
+erlang_automated_build is a shell script which will run some or all of:
+* a CVS download of code
+* a full compile
+* a test suite
+* a Dialyzer analysis
+* a Tsunami load test
+
+The results of these are graphed and copied to a location as a web page.
+
+There is also e-mail notification on fail/success.

@@ -1252,9 +1252,6 @@ if [ $SKIP_TSUNAMI = "false" ]; then
     # Tsunami writes to a time/dated log file - we will have do do some
     # finangaling to get which one... @YMMM eek!
     TSU_DATETIME=`ls -c -d -1 -r  2* | tail -n 1`
-    echo "TSU_ANALYSE_LOC is $TSU_ANALYSE_LOC"
-    echo "TSUNAMI_LOG_LOC is $TSUNAMI_LOG_LOC"
-    echo "TSU_DATETIME is $TSU_DATETIME"
     cd "$TSUNAMI_LOG_LOC/$TSU_DATETIME"
     RETURN=`$TSU_ANALYSE_LOC/analyse_msg.pl --stats idx-tsunami.log  --html --extra  --plot`
     RETURN=`$POST_TSUNAMI_SCRIPT`

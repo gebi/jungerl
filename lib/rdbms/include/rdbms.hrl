@@ -37,3 +37,49 @@
 %%
 -record(rdbms_obj, {name,		% name of the struct
 		    attributes = []}).	% [{AttrName, Type, Value}]
+
+
+
+%%% Index record, unordered index
+-record(ix, {key,
+             oid}).
+
+%%% Index record, ordered index
+-record(ord_ix, {key,         % {IxValue, Oid}
+                 dummy = 1}).
+
+%%% Index record, weighted (ordered) index
+-record(w_ix, {key,           % {IxValue, Weight, Oid}
+	       dummy = 1}).
+
+%% Index meta-data
+-record(index, {pos,   % {Attr, Tag} | Attr::integer()
+                m_f,   % {Module, Function}
+                arg,   % term()
+                %% is_ordered = false,
+		type = bag,   % ordered | bag | weighted | set
+                table_name,
+                tab_opts = [],
+                options = []}).
+
+-record(verify, {is_schema_trans,
+		 tab_property,
+		 attr_property,
+		 global_property,
+		 table_info}).
+
+-record(attribute, {name,
+		    tab,
+		    value,
+		    type}).
+
+%%%-define(NULL, '#.[].#').  % this is my definition of a null value.
+-define(NULL, undefined).  % this is my bowing to reality
+
+
+-ifdef(debug).
+-define(dbg(Fmt, Args), io:format("~p-~p: " ++ Fmt, [?MODULE,?LINE|Args])).
+-else.
+-define(dbg(Fmt,Args), no_debug).
+-endif.
+

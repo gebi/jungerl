@@ -34,15 +34,6 @@
 -author('ulf.wiger@ericsson.com').
 
 
--ifdef(debug).
--define(dbg(Fmt, Args), io:format("~p-~p: " ++ Fmt, [?MODULE,?LINE|Args])).
--else.
--define(dbg(Fmt,Args), no_debug).
--endif.
-
--define(NULL, '#.[].#').  % this is my definition of a null value.
--define(KEYPOS, 2).
-
 %%%----------------------------------------------------------------------
 %%% #2.    EXPORT LISTS
 %%%----------------------------------------------------------------------
@@ -51,81 +42,88 @@
 
 %% Substitute for mnesia:transaction/1.
 -export([activity/1]).
+-export([begin_activity/4, end_activity/4]).
 
-%% Initializes the dictionary.
--export([add_properties/1,	% ([Prop])
-	 do_add_properties/1,
-	 do_add_properties/2,	% ([Prop]) called within a schema transaction
-	 drop_references/1,
-	 do_drop_references/1]).
+
+-export([load_schema/1, load_schema/2]).
 
 -export([create_table/2,
 	 do_create_table/2,
 	 delete_table/1,
 	 do_delete_table/1]).
 
-%% Attribute metadata
--export([bounds/1,	% (Attr)
-	 default/1,	% (Attr)
-	 references/1,	% (Attr)
-	 required/1,	% (Attr)
-	 key_type/1,	% ({Tab, Attr})
-	 key_type/2,	% (Tab, Attr)
-	 set_property/2,	% (PropKey, Value)
-	 type/1]).	% (Attr)
+-export([make_simple_form/1]).
 
--export([verify_attribute/2,	% (Value, Attribute)
-	 verify_type/2,		% (Value, Attribute)
-	 verify_bounds/2]).	% (Value, Attribute)
-
--export([access/2]).  % NYI
-
-%% Representation
--export([make_object/1,		% make an rdbms object, new or from existing
-	 make_object/2,		% make/update an RDBMS object
-	 make_simple_form/1,	% make a simple xmerl form
-	 make_simple_form/2,	% make/update a simple xmerl form
-	 make_record/1]).	% make an Erlang record from an RDBMS obj
-
-
-%% Table metadata
--export([attributes/1,			% (Table)
-	 all_attributes/1,		% (Table)
-	 attribute/2,			% (Position, Table)
-	 attribute_value/3,		% (Table, AttrName, Object)
-	 position/2,			% (Attribute, Table)
-	 default_record/1,		% (Table)
-	 verify_write/2,		% (Table, Object)
-	 verify_delete/2,		% (Table, Key)
-	 verify_delete_object/2,	% (Table, Object)
-	 action_on_read/1,		% (Table)
-	 action_on_write/1,		% (Table)
+%%% Table metadata
+-export([
+%%% 	 attributes/1,			% (Table)
+%%% 	 all_attributes/1,		% (Table)
+%%% 	 attribute/2,			% (Position, Table)
+%%% 	 attribute_value/3,		% (Table, AttrName, Object)
+%%% 	 position/2,			% (Attribute, Table)
+%%% 	 default_record/1,		% (Table)
+%%% 	 verify_write/2,		% (Table, Object)
+%%% 	 verify_delete/2,		% (Table, Key)
+%%% 	 verify_delete_object/2,	% (Table, Object)
 	 register_commit_action/1,	% (function/0)
 	 register_rollback_action/1]).	% (function/0)
 
 -export([null_value/0]).
+-export([mk_oid/2]).
 
-%% Update
+%%% Update - Mnesia access module callbacks
 -export([lock/4,
 	 write/5,
 	 delete/5,
 	 delete_object/5,
 	 read/5,
+	 select/5,
 	 match_object/5,
 	 all_keys/4,
 	 index_match_object/6,
 	 index_read/6,
-	 table_info/4]).
+	 table_info/4,
+	 first/3,
+	 last/3,
+	 next/4,
+	 prev/4,
+	 foldl/6,
+	 foldr/6,
+	 select/5,
+	 select/6,
+	 select_cont/3]).
+-export([onload_fun/2]).
 
-%% extra retrieval functions
--export([select/4,		% (Tab, SelectAttr, SelectKey, ProjectAttrs)
-	 fetch_objects/3]).	% (Tab, SelectAttr, SelectKey)
+%% Used by other rdbms modules (includes VMod)
+-export([read/6,
+	 do_select/6]).
+
+-export([fetch_verification_module/0,
+	 default_verification_module/0]). % for remote procedure calls
+
+%%% extra retrieval functions
+%%%-export([fetch_objects/3]).	% (Tab, SelectAttr, SelectKey)
 
 %%%----------------------------------------------------------------------
 %%% #2.2   EXPORTED INTERNAL FUNCTIONS
 %%%----------------------------------------------------------------------
 
 -include("rdbms.hrl").
+-include_lib("mnesia/src/mnesia.hrl").
+
+-import(mnesia, [abort/1]).
+-import(lists, [keysearch/3, foreach/2, foldl/3, foldr/3]).
+
+-define(KEYPOS, 2).
+
+-define(vmod, fetch_verification_module()).
+-define(JIT_MODULE, rdbms_verify_jit).
+
+-record(rdbms_activity, {is_schema_transaction = false,
+			 verification_module = {rdbms_verify, vrec(false)},
+			 refs_logs = [],
+			 funs = []}).
+
 
 %%%----------------------------------------------------------------------
 %%% #3.    CODE
@@ -146,48 +144,133 @@
 %%%----------------------------------------------------------------------
 
 
-activity(Fun) ->
-    %% We maintain our own transaction Id (for the "additional actions")
-    Id = erlang:now(),
-    F = fun() ->
-		setup_transaction(Id),
-		Fun()
-	end,
-    %% We perform a catch on a wrapped call to activity/1. This may look
-    %% funny, but we want to allow {'EXIT', Reason} as a return value from
-    %% activity/1 (which could happen if the last expression of the fun
-    %% is a catch expression. This doesn't mean that the transaction was
-    %% aborted in mnesia's eyes.
-    Result = (catch {ok, mnesia:activity(transaction, F, [], ?MODULE)}),
-    handle_result(Result, get_transaction_levels()).
-
-
-%% handle result from activity/1 (above)
-%%
-handle_result(Result, [_]) ->
-    %% top level result
-    case Result of
-	{'EXIT', Reason} ->
-	    additional_action(rollback),
-	    cleanup_transaction(),
-	    exit(Reason);
-	{ok, ReturnValue} ->
-	    additional_action(commit),
-	    cleanup_transaction(),
-	    ReturnValue
-    end;
-handle_result(Result, [Level|_]) ->
-    %% inner transaction result
-    case Result of
-	{'EXIT', Reason} ->
-	    additional_action(rollback, Level),
-	    cleanup_transaction(Level),
-	    exit(Reason);
-	{ok, ReturnValue} ->
-	    pop_transaction_level(),
-	    ReturnValue
+begin_activity(_Type, Factor, Tid, Ts) ->
+    {?MODULE, Tid, Ts} = get(mnesia_activity_state),  % assertion
+    if Factor > 1 ->
+	    %% transaction restarted
+	    #rdbms_activity{refs_logs = Logs} = A =
+		get_activity_state(),
+	    case Logs of 
+		[] ->
+		    ok;
+		[_|_] ->
+		    foreach(fun(Log) -> ets:delete(Log) end, Logs),
+		    put_activity_state(
+		      A#rdbms_activity{refs_logs = []})
+	    end;
+       Factor == 1 ->
+	    if Ts#tidstore.level == 1 ->
+		    undefined = get_activity_state(),
+		    {IsSchemaTrans, VMod} = verification_module(),
+		    put_activity_state(
+		      #rdbms_activity{is_schema_transaction = IsSchemaTrans,
+				      verification_module = VMod});
+	       Ts#tidstore.level > 1 ->
+		    #rdbms_activity{refs_logs = Logs} = A =
+			get_activity_state(),
+		    case Logs of
+			[] ->
+			    ok;
+			[PrevLog|_] ->
+			    NewLog = new_refs_log(),
+			    ets:insert(NewLog, ets:tab2list(PrevLog)),
+			    put_activity_state(
+			      A#rdbms_activity{refs_logs = [NewLog|Logs]})
+		    end
+	    end
     end.
 
+%%% TODO: mnesia_schema:schema_transaction() doesn't use
+%%% mnesia:activity(), so the default access module isn't used.
+%%%
+end_activity(Result, Type, _Tid, Ts) ->
+    #rdbms_activity{is_schema_transaction = IsSchemaTrans,
+		    refs_logs = Logs,
+		    funs = Funs} = A = 
+	get_activity_state(),
+
+    case Ts#tidstore.level of
+	1 ->
+	    case Logs of
+		[] -> ok;
+		[RefsLog] ->
+		    %% there should never be more than at most one level 
+		    %% of refs_log here. Otherwise, something's gone wrong.
+		    ets:delete(RefsLog)
+	    end,
+	    case Result of
+		{atomic, _} ->
+		    foreach(fun({F, _Level, commit}) ->
+				    catch_run(F, commit);
+			       (_) ->
+				    ok
+			    end, lists:reverse(Funs)),
+		    if Type == read_only ->
+			    case erlang:module_loaded(?JIT_MODULE) of
+				false ->
+				    io:format("generating (read-only)~n",
+					      []),
+				    GenRes =
+					(catch rdbms_codegen:regenerate()),
+				    io:format("GenRes = ~p~n", [GenRes]);
+				true ->
+				    ok
+			    end;
+		       IsSchemaTrans; Type == asym_trans ->
+			    case ets:select_count(
+				   Ts#tidstore.store,
+				   [{'$1',[{'==',{element,1,'$1'},'op'}],
+				     [true]}]) of
+				0 ->
+				    io:format("no need to regenerate~n", []);
+				N when N > 0 ->
+				    io:format("TidStore = ~n~p~n",
+					      [ets:tab2list(
+						 Ts#tidstore.store)]),
+				    io:format(
+				      "Schema updated - regenerate!~n", []),
+				    GenRes =
+					(catch rdbms_codegen:regenerate()),
+				    io:format("GenRes = ~p~n", [GenRes])
+			    end;
+		       true ->
+			    ok
+		    end;
+		{aborted, _} ->
+		    foreach(fun({F, _Level, rollback}) ->
+				    catch_run(F, rollback);
+			       (_) ->
+				    ok
+			    end, lists:reverse(Funs))
+	    end,
+	    erase_activity_state();
+	L when L > 1 ->
+	    case Result of 
+		{aborted, _} ->
+		    NewFuns = [{F,Level,FType} ||
+				  {F,Level,FType} <- Funs,
+				  Level =/= L],
+		    put_activity_state(A#rdbms_activity{funs = NewFuns});
+		{atomic,_} ->
+		    case Logs of
+			[ThisLog,PrevLog|Rest] ->
+			    Refs = ets:tab2list(ThisLog),
+			    ets:delete(ThisLog),
+			    ets:insert(PrevLog, Refs),
+			    put_activity_state(
+			      A#rdbms_activity{refs_logs = [PrevLog|Rest]});
+			[_SingleLog] ->
+			    ok;
+			[] ->
+			    ok
+		    end
+	    end
+    end.
+
+
+
+activity(Fun) ->
+    mnesia:activity(transaction, Fun, [], ?MODULE).
 
 
 create_table(Name, Opts) ->
@@ -197,15 +280,27 @@ create_table(Name, Opts) ->
       end).
 
 do_create_table(Name, Opts) ->
-    case lists:keysearch(rdbms, 1, Opts) of
+    case keysearch(rdbms, 1, Opts) of
 	{value, {_, Props}} ->
 	    Options = lists:keydelete(rdbms,1,Opts),
 	    Cs = mnesia_schema:list2cs([{name,Name}|Options]),
 	    mnesia_schema:do_create_table(Cs),
-	    rdbms:do_add_properties(Props);
+	    io:format("created ~p~n" , [Name]),
+	    {Indexes, Props1} =
+		case keysearch(indexes, 1, Props) of
+		    {value, {_, I}} ->
+			{I, lists:keydelete(indexes, 1, Props)};
+		    false ->
+			{[], Props}
+		end,
+	    lists:foreach(
+	      fun({K,V}) -> 
+		      rdbms_props:do_set_property(Name,K,V)
+	      end, Props1),
+%%%	    rdbms_props:do_add_properties(Props1, Name),
+	    rdbms_index:do_add_indexes(Name, Indexes);
 	false ->
-	    Options = lists:keydelete(rdbms,1,Opts),
-	    Cs = mnesia_schema:list2cs([{name,Name}|Options]),
+	    Cs = mnesia_schema:list2cs([{name,Name}|Opts]),
 	    mnesia_schema:do_create_table(Cs)
     end.
 
@@ -217,58 +312,65 @@ delete_table(Name) ->
 
 do_delete_table(Name) ->
     mnesia_schema:do_delete_table(Name),
-    do_drop_references(Name).
-
-
-
-
-table_properties(Props, Tab) ->
-    verify_table_properties(Props, Tab).
-
-
-add_properties(Props) ->
-    F = fun() ->
-		do_add_properties(Props)
-	end,
-    mnesia_schema:schema_transaction(F).
-
-
-do_add_properties(Props, Tab) ->
-    do_add_properties(table_properties(Props, Tab)).
-
-do_add_properties([{Key, Val}|T]) ->
-    do_set_property(Key, Val),
-    do_add_properties(T);
-do_add_properties([]) ->
-    ok.
-
-drop_references(ToTab) ->
-    mnesia_schema:schema_transaction(
-      fun() ->
-	      do_drop_references(ToTab)
-      end).
-
-do_drop_references(ToTab) ->
-    lists:foreach(
-      fun(Tab) ->
-	      Props = mnesia:table_info(Tab, user_properties),
-	      search_props(Props, ToTab, Tab)
-      end, mnesia:system_info(tables)).
-
-search_props([{{attr,Attr,references},Refs}|Props], ToTab, Tab) ->
-    case [{T,A,As} || {T,A,As} <- Refs,
-		      T == ToTab] of
+    rdbms_groups:do_drop_membership(Name),
+    rdbms_props:do_drop_references(Name),
+    case rdbms_props:indexes(Name) of
+	[_|_] = Indexes ->
+	    rdbms_index:do_delete_indexes(Indexes);
 	[] ->
-	    %% no reference to ToTab
-	    search_props(Props, ToTab, Tab);
-	Remove ->
-	    do_set_property({attr,{Tab,Attr},references}, Refs -- Remove),
-	    search_props(Props, ToTab, Tab)
-    end;
-search_props([P|Ps], ToTab, Tab) ->
-    search_props(Ps, ToTab, Tab);
-search_props([], _, _) ->
-    ok.
+	    ok
+    end.
+
+
+load_schema(File) ->
+    load_schema(File, erl_eval:new_bindings()).
+
+load_schema(File, Bindings0) ->
+    Vars = [{'SchemaNodes', mnesia:table_info(schema, disc_copies)}],
+    Bindings = 
+	foldl(
+	  fun({K, V}, Bs) ->
+		  erl_eval:add_binding(K, V, Bs)
+	  end, Bindings0, Vars),
+    case file:script(File, Bindings) of
+	{ok, Dictionary} ->
+	    mnesia_schema:schema_transaction(
+	      fun() ->
+		      load_dictionary(Dictionary, [])
+	      end);
+	Error ->
+	    Error
+    end.
+
+load_dictionary(Dict, Parent) when is_list(Dict) ->
+    foreach(
+      fun({table, Tab, Opts}) ->
+	      case keysearch(rdbms, 1, Opts) of
+		  false          -> do_create_table(Tab, Opts);
+		  {value,{_,[]}} -> do_create_table(Tab, Opts);
+		  {value, {_, [_|_] = ROpts}} ->
+		      case keysearch(membership, 1, ROpts) of
+			  false ->
+			      do_create_table(Tab, Opts);
+			  {value, {_, P}} when Parent =/= P, Parent =/= [] ->
+			      abort({conflicting_membership, Tab});
+			  {value, _} ->
+			      Opts1 = lists:keyreplace(
+					rdbms, 1, Opts,
+					lists:keydelete(membership, 1, ROpts)),
+			      do_create_table(Tab, Opts1)
+		      end
+	      end;
+	 ({group, Group, Members}) ->
+	      load_dictionary(Members, Group),
+	      MemberNames = lists:map(
+			      fun({table, T, _}) -> {table, T};
+				 ({group, G, _}) -> {group, G}
+			      end, Members),
+	      rdbms_group:do_add_group(Group, MemberNames)
+      end, Dict).
+
+
 
 %% mnesia callbacks =====================================
 %%   for each callback, an internal function is implemented.
@@ -277,193 +379,249 @@ search_props([], _, _) ->
 %%   No integrity checks are performed on the internal functions.
 
 
-lock(ActivityId, Opaque, LockItem, LockKind) -> 
-    mnesia:lock(ActivityId, Opaque, LockItem, LockKind).
+lock(ActivityId, Opaque, LockItem, LockKind) ->
+    Module = case LockItem of
+		 {record, T, _} -> get_module(T);
+		 {table, T} -> get_module(T);
+		 _ -> mnesia
+	     end,
+    Module:lock(ActivityId, Opaque, LockItem, LockKind).
 
-%lock(LockItem, LockKind) ->
-%    {ActivityId, Opaque} = get_mnesia_transaction_data(),
-%    mnesia:lock(ActivityId, Opaque, LockItem, LockKind).
 
-write(ActivityId, Opaque, Tab, Rec, LockKind) ->
+write(Tid, Ts, Tab, Rec, LockKind) ->
     ?dbg("verify_write(~p, ~p)~n", [Tab, Rec]),
-    {WTab, WRec} = if record(Rec, rdbms_obj) ->
-			   {Rec#rdbms_obj.name, rdbms_obj_to_record(Rec)};
-		      true ->
-			   {Tab, Rec}
-		   end,
-    verify_write(WTab, WRec),
-    do_write(ActivityId, Opaque, WTab, WRec, LockKind).
+    VMod = ?vmod,
+    validate_rec(Tab, Rec, VMod),
+    do_write(Tid, Ts, Tab, Rec, LockKind, VMod),
+    check_references(Tab, Rec, write, VMod).
 
 
-% do_write(Tab, Rec) ->
-%     {ActivityId, Opaque} = get_mnesia_transaction_data(),
-%     do_write(ActivityId, Opaque, Tab, Rec, write).
 
-do_write(ActivityId, Opaque, WTab, WRec, LockKind) ->
-    case action_on_write(WTab) of
-	default ->
-	    mnesia:write(ActivityId, Opaque, WTab, WRec, LockKind);
-	F ->
-	    F(WRec)
-    end.
+do_write(ActivityId, Opaque, WTab, WRec, LockKind, VMod) ->
+    AMod = access_module(WTab, VMod),
+    AMod:write(ActivityId, Opaque, WTab, WRec, LockKind),
+    rdbms_index:update_index(
+      ActivityId, Opaque, WTab, write, WRec, LockKind, VMod).
     
 
 %% non-exported function -- used by rdbms internally, no verification
 %%
-write(Tab, Rec) ->
+write(Tab, Rec, VMod) ->
     {ActivityId, Opaque} = get_mnesia_transaction_data(),
-    do_write(ActivityId, Opaque, Tab, Rec, write).
+    do_write(ActivityId, Opaque, Tab, Rec, write, VMod).
 
-delete(ActivityId, Opaque, Tab, Key, LockKind) ->
-    verify_delete(Tab, Key).
+delete(Tid, Ts, Tab, Key, LockKind) ->
+    delete(Tid, Ts, Tab, Key, LockKind, ?vmod).
 
-
-% do_delete(Tab, Rec) ->
-%     {ActivityId, Opaque} = get_mnesia_transaction_data(),
-%     do_delete(ActivityId, Opaque, Tab, Rec, write).
-
-% do_delete(ActivityId, Opaque, Tab, Key, LockKind) ->
-%     case action_on_delete(Tab) of
-% 	default ->
-% 	    mnesia:delete(ActivityId, Opaque, Tab, Key, LockKind);
-% 	F ->
-% 	    F(key, Key)
-%     end.
+delete(Tid, Ts, Tab, Key, LockKind, VMod) ->
+    Objs = read(Tid, Ts, Tab, Key, LockKind, VMod),
+    AMod = access_module(Tab, VMod),
+    foreach(fun(Obj) ->
+		    verify_delete_object(Tab, Obj, VMod),
+		    AMod:delete_object(Tid, Ts, Tab, Obj, LockKind),
+		    rdbms_index:update_index(
+		      Tid, Ts, Tab, delete_object, Obj, LockKind, VMod)
+	    end, Objs).
 
 
-
-%delete(Tab, Key) ->
-%    {ActivityId, Opaque} = get_mnesia_transaction_data(),
-%    case action_on_delete(Tab) of
-%	default ->
-%	    mnesia:delete(ActivityId, Opaque, Tab, Key, write);
-%	F ->
-%	    F(key, Key)
-%    end.
-delete_object(Tab, Obj) ->
+delete_object(Tab, Obj, VMod) ->
     {ActivityId, Opaque} = get_mnesia_transaction_data(),
-    delete_object(ActivityId, Opaque, Tab, Obj, write).
+    delete_object(ActivityId, Opaque, Tab, Obj, write, VMod).
 
 
 delete_object(ActivityId, Opaque, Tab, Obj, LockKind) ->
-    verify_delete_object(Tab, Obj).
+    VMod = ?vmod,
+    delete_object(ActivityId, Opaque, Tab, Obj, LockKind, VMod).
+
+delete_object(ActivityId, Opaque, Tab, Obj, LockKind, VMod) ->
+    verify_delete_object(Tab, Obj, VMod),
+    do_delete_object(ActivityId, Opaque, Tab, Obj, LockKind, VMod).
 
 
-do_delete_object(ActivityId, Opaque, Tab, Obj, LockKind) ->
-    case action_on_delete(Tab) of
-	default ->
-	    mnesia:delete_object(
-	      ActivityId, Opaque, Tab, Obj, LockKind);
-	F ->
-	    F(object, Obj)
-    end.
+do_delete_object(Tid, Ts, Tab, Obj, LockKind, VMod) ->
+    AMod = access_module(Tab, VMod),
+    AMod:delete_object(Tid, Ts, Tab, Obj, LockKind),
+    rdbms_index:update_index(Tid, Ts, Tab, delete_object, Obj, LockKind, VMod).
 
 
+read(Tid, Ts, Tab, Key, LockKind) ->
+    read(Tid, Ts, Tab, Key, LockKind, ?vmod).
 
-%% I want cascading delete to work through multiple levels, but
-%% activating the uncommented line below may cause an endless loop.
-do_delete_object(Tab, Obj) ->
+read(Tid, Ts, Tab, Key, LockKind, VMod) ->
+    AMod = access_module(Tab, VMod),
+    on_read(Tab, AMod:read(Tid, Ts, Tab, Key, LockKind), VMod).
+
+read(Tab, Key, VMod) ->
+    {Tid, Ts} = get_mnesia_transaction_data(),
+    read(Tid, Ts, Tab, Key, read, VMod).
+
+
+match_object(ActivityId, Opaque, Tab, Pattern, _LockKind) ->
+    VMod = ?vmod,
+    AMod = access_module(Tab, VMod),
+    AMod:match_object(ActivityId, Opaque, Tab, Pattern, read).
+
+match_object(Tab, Pattern, VMod) ->
     {ActivityId, Opaque} = get_mnesia_transaction_data(),
-%     delete_object(ActivityId, Opaque, Tab, Obj, write).
-    do_delete_object(ActivityId, Opaque, Tab, Obj, write).
-
-
-read(ActivityId, Opaque, Tab, Key, LockKind) ->
-    case action_on_read(Tab) of
-	default ->
-	    mnesia:read(ActivityId, Opaque, Tab, Key, LockKind);
-	F ->
-	    F(Key)
-    end.
-
-read(Tab, Key) ->
-    {ActivityId, Opaque} = get_mnesia_transaction_data(),
-    case action_on_read(Tab) of
-	default ->
-	    mnesia:read(ActivityId, Opaque, Tab, Key, read);
-	F ->
-	    F(Key)
-    end.
-
-
-match_object(ActivityId, Opaque, Tab, Pattern, LockKind) ->
-    mnesia:match_object(ActivityId, Opaque, Tab, Pattern, read).
-
-match_object(Tab, Pattern) ->
-    {ActivityId, Opaque} = get_mnesia_transaction_data(),
-    mnesia:match_object(ActivityId, Opaque, Tab, Pattern, read).
-
+    VMod = ?vmod,
+    AMod = access_module(Tab, VMod),
+    AMod:match_object(ActivityId, Opaque, Tab, Pattern, read).
 
 all_keys(ActivityId, Opaque, Tab, LockKind) ->
-    mnesia:all_keys(ActivityId, Opaque, Tab, LockKind).
-
-%all_keys(Tab) ->
-%    {ActivityId, Opaque} = get_mnesia_transaction_data(),
-%    mnesia:all_keys(ActivityId, Opaque, Tab, read).
+    VMod = ?vmod,
+    AMod = access_module(Tab, VMod),
+    AMod:all_keys(ActivityId, Opaque, Tab, LockKind).
 
 index_match_object(ActivityId, Opaque, Tab, Pattern, Attr, LockKind) ->
-    mnesia:index_match_object(ActivityId, Opaque, Tab, 
-			      Pattern, Attr, LockKind).
+    VMod = ?vmod,
+    AMod = access_module(Tab, VMod),
+    AMod:index_match_object(ActivityId, Opaque, Tab, 
+			    Pattern, Attr, LockKind).
 
-%index_match_object(Tab, Pattern, Attr) ->
-%    {ActivityId, Opaque} = get_mnesia_transaction_data(),
-%    mnesia:index_match_object(ActivityId, Opaque, Tab, 
-%			      Pattern, Attr, read).
+index_read(Tid, Ts, Tab, SecondaryKey, Attr, LockKind) ->
+    index_read(Tid, Ts, Tab, SecondaryKey, Attr, LockKind, ?vmod).
 
-index_read(ActivityId, Opaque, Tab, SecondaryKey, Attr, LockKind) ->
-    mnesia:index_read(ActivityId, Opaque, Tab, SecondaryKey, Attr, LockKind).
+index_read(Tid, Ts, Tab, SecondaryKey, Attr, LockKind, VMod) ->
+    rdbms_index:read(Tid, Ts, Tab, SecondaryKey, Attr, LockKind, VMod).
 
-index_read(Tab, SecondaryKey, Attr) ->
-    {ActivityId, Opaque} = get_mnesia_transaction_data(),
-    mnesia:index_read(ActivityId, Opaque, Tab, SecondaryKey, Attr, read).
+index_read(Tab, SecondaryKey, Attr, VMod) ->
+    {Tid, Ts} = get_mnesia_transaction_data(),
+    index_read(Tid, Ts, Tab, SecondaryKey, Attr, VMod).
 
 
-table_info(ActivityId, Opaque, Tab, InfoItem) ->
-    mnesia:table_info(ActivityId, Opaque, Tab, InfoItem).
+table_info(_ActivityId, _Opaque, Tab, InfoItem) ->
+    VMod = ?vmod,
+    table_info(Tab, InfoItem, VMod).
 
-table_info(Tab, InfoItem) ->
-    mnesia:table_info(Tab, InfoItem).
+
+first(Tid, Ts, Tab) ->
+    first(Tid, Ts, Tab, ?vmod).
+
+first(Tid, Ts, Tab, VMod) ->
+    AMod = access_module(Tab, VMod),
+    AMod:first(Tid, Ts, Tab).
+
+last(Tid, Ts, Tab) ->
+    last(Tid, Ts, Tab, ?vmod).
+
+last(Tid, Ts, Tab, VMod) ->
+    AMod = access_module(Tab, VMod),
+    AMod:last(Tid, Ts, Tab).
+
+next(Tid, Ts, Tab, Key) ->
+    next(Tid, Ts, Tab, Key, ?vmod).
+    
+next(Tid, Ts, Tab, Key, VMod) ->
+    AMod = access_module(Tab, VMod),
+    AMod:next(Tid, Ts, Tab, Key).
+
+prev(Tid, Ts, Tab, Key) ->
+    prev(Tid, Ts, Tab, Key, ?vmod).
+    
+prev(Tid, Ts, Tab, Key, VMod) ->
+    AMod = access_module(Tab, VMod),
+    AMod:prev(Tid, Ts, Tab, Key).
+
+foldl(Tid, Ts, Fun, Acc, Tab, LockKind) ->
+    foldl(Tid, Ts, Fun, Acc, Tab, LockKind, ?vmod).
+
+foldl(Tid, Ts, Fun, Acc, Tab, LockKind, VMod) ->
+    AMod = access_module(Tab, VMod),
+    AMod:foldl(Tid, Ts, Fun, Acc, Tab, LockKind).
+
+foldr(Tid, Ts, Fun, Acc, Tab, LockKind) ->
+    foldr(Tid, Ts, Fun, Acc, Tab, LockKind, ?vmod).
+
+foldr(Tid, Ts, Fun, Acc, Tab, LockKind, VMod) ->
+    AMod = access_module(Tab, VMod),
+    AMod:foldr(Tid, Ts, Fun, Acc, Tab, LockKind).
+
+
+
+select(Tid, Ts, Tab, Pat, LockKind) ->
+    do_select(Tid, Ts, Tab, Pat, LockKind, ?vmod).
+
+do_select(Tid, Ts, Tab, Pat, LockKind, VMod) ->
+    AMod = access_module(Tab, VMod),
+    AMod:select(Tid, Ts, Tab, Pat, LockKind).
+
+select(Tid, Ts, Tab, Pat, NObjects, LockKind) ->
+    do_select(Tid, Ts, Tab, Pat, NObjects, LockKind, ?vmod).
+
+do_select(Tid, Ts, Tab, Pat, NObjects, LockKind, VMod) ->
+    AMod = access_module(Tab, VMod),
+    case AMod:select(Tid, Ts, Tab, Pat, NObjects, LockKind) of
+	'$end_of_table' = Result ->
+	    Result;
+	{Objs, Cont} ->
+	    {Objs, {AMod, fun(Tid1, Ts1) ->
+				  AMod:select_cont(Tid1, Ts1, Cont)
+			  end}}
+    end.
+
+
+%%% Cont is required to be a fun/2 as returned from rdbms:do_select/7 above.
+%%%
+select_cont(Tid, Ts, {AMod, Cont}) when is_function(Cont, 2) ->
+    case Cont(Tid, Ts) of
+	{Objs, Cont1} ->
+	    {Objs, {AMod, fun(Tid1, Ts1) ->
+				  AMod:select_cont(Tid1, Ts1, Cont1)
+			  end}};
+	'$end_of_table' ->
+	    '$end_of_table'
+    end.
+
+
+onload_fun(Table, LoadReason) ->
+    rdbms_index:index_init_fun(Table, LoadReason).
 
 %% end mnesia callbacks =====================================
 
 
-select(Tab, Attr, Key, Attrs) when list(Attrs) ->
-    select(fetch_objects(Tab, Attr, Key), Tab, Key, Attrs, list);
-select(Tab, Attr, Key, Attrs) when tuple(Attrs) ->
-    select(fetch_objects(Tab, Attr, Key), Tab, Key, 
-	   tuple_to_list(Attrs), tuple).
+%%% fetch_objects(Tab, Attr, Keys) ->
+%%%     fetch_objects(Tab, Attr, Keys, ?vmod).
 
-select([Obj|Objs], Tab, Key, Attrs, list) ->
-    Vals = [attribute_value(Tab, A, Obj) || A <- Attrs],
-    [Vals|select(Objs, Tab, Key, Attrs, list)];
-select([Obj|Objs], Tab, Key, Attrs, tuple) ->
-    Vals = [attribute_value(Tab, A, Obj) || A <- Attrs],
-    [list_to_tuple(Vals)|select(Objs, Tab, Key, Attrs, tuple)];
-select([], _, _, _, _) ->
-    [].
-
-
-fetch_objects(Tab, Attr, Key) ->
-    case key_type(Tab, Attr) of
+fetch_objects(Tab, Attr, Keys, VMod) ->
+    case key_type(Tab, Attr, VMod) of
 	primary ->
-	    read(Tab, Key);
+	    lists:flatmap(
+	      fun(K) ->
+		      read(Tab, K, VMod)
+	      end, Keys);
 	secondary ->
-	    opt_index_read(Tab, Key, Attr);
+	    lists:flatmap(
+	      fun(K) ->
+		      opt_index_read(Tab, K, Attr, VMod)
+	      end, Keys);
 	attribute ->
-	    Wild = table_info(Tab, wild_pattern),
-	    Apos = attribute_position(Tab, Attr),
-	    match_object(Tab, setelement(Apos, Wild, Key));
+	    Wild = table_info(Tab, wild_pattern, VMod),
+	    Apos = attribute_position(Tab, Attr, VMod),
+	    Pat = [{setelement(Apos, Wild, Key), [], ['$_']} ||
+		      Key <- Keys],
+	    select(Tab, Pat, VMod);
+%%%	    Found = match_object(Tab, setelement(Apos, Wild, Key), VMod);
 	{compound, Attrs} ->
-	    Wild = table_info(Tab, wild_pattern),
-	    match_object(Tab, build_compound_pattern(Attrs, Key, Wild, Tab))
+	    Wild = table_info(Tab, wild_pattern, VMod),
+	    Pat =
+		[{build_compound_pattern(Attrs,Key,Wild,Tab,VMod),[],['$_']} ||
+		    Key <- Keys],
+	    select(Tab, Pat, VMod)
+%%% 	    match_object(
+%%% 	      Tab, build_compound_pattern(
+%%% 		     Attrs, Key, Wild, Tab, VMod), VMod)
     end.
 
-%% opt_index_read(Tab, Key, Attr)
-%% This function should really allow for other kinds of index than the ones
-%% made possible through mnesia (not implemented yet)
-%%
-opt_index_read(Tab, Key, Attr) ->
-    index_read(Tab, Key, Attr).
+select(Tab, Pattern, VMod) ->
+    {Tid, Ts} = get_mnesia_transaction_data(),
+    VMod = ?vmod,
+    AMod = access_module(Tab, VMod),
+    AMod:select(Tid, Ts, Tab, Pattern, write).
+
+
+
+opt_index_read(Tab, Key, Attr, VMod) ->
+    index_read(Tab, Key, Attr, VMod).
 
 
 %% build_compound_pattern([AttrName], Key, WildPattern, TableName)
@@ -474,15 +632,16 @@ opt_index_read(Tab, Key, Attr) ->
 %% we can specify 'name' := ["ulf", "wiger"], and this function will translate
 %% it to #person{surname = "ulf", lastname = "wiger"}.
 %%
-build_compound_pattern(Attrs, Key, Wild, Tab) when tuple(Key) ->
-    build_compound_pattern1(Attrs, tuple_to_list(Key), Wild, Tab);
-build_compound_pattern(Attrs, Key, Wild, Tab) ->
-    build_compound_pattern1(Attrs, Key, Wild, Tab).
+build_compound_pattern(Attrs, Key, Wild, Tab, VMod) when tuple(Key) ->
+    build_compound_pattern1(Attrs, tuple_to_list(Key), Wild, Tab, VMod);
+build_compound_pattern(Attrs, Key, Wild, Tab, VMod) ->
+    build_compound_pattern1(Attrs, Key, Wild, Tab, VMod).
 
-build_compound_pattern1([Attr|Attrs], [Value|Vals], Pat, Tab) ->
-    Pos = attribute_position(Tab, Attr),
-    build_compound_pattern1(Attrs, Vals, setelement(Pos, Pat, Value), Tab);
-build_compound_pattern1([], [], Pat, _) ->
+build_compound_pattern1([Attr|Attrs], [Value|Vals], Pat, Tab, VMod) ->
+    Pos = attribute_position(Tab, Attr, VMod),
+    build_compound_pattern1(
+      Attrs, Vals, setelement(Pos, Pat, Value), Tab, VMod);
+build_compound_pattern1([], [], Pat, _, _) ->
     Pat.
     
 
@@ -498,11 +657,15 @@ build_compound_pattern1([], [], Pat, _) ->
 null_value() -> ?NULL.
 
 
+mk_oid(_Tab, _Attr) ->
+    {node(), erlang:now()}.
+
 %% if functions are called during a transaction which have side-effects,
 %% these functions may be used to "commit" or "undo" the effect.
 %% multiple calls can be made during one transaction; the functions will
 %% be called LIFO *after* the transaction is aborted or commited.
 %%
+%% TODO - changed call order to FIFO
 register_rollback_action(Fun) ->
     register_action(rollback, Fun).
 
@@ -524,88 +687,28 @@ register_commit_action(Fun) ->
 %%% #3.3.1   Code for Additional Actions (post-transaction triggers).
 %%%----------------------------------------------------------------------
 
-setup_transaction(Id) ->
-    Key = trans_level_key(),
-    case get(Key) of
+register_action(Type, Fun) when Type==rollback; Type==commit ->
+    case get(mnesia_activity_state) of
+	{_M, _Tid, Ts} ->
+	    #rdbms_activity{funs = Funs} = A =
+		get_activity_state(),
+	    Funs1 = [{Fun, Ts#tidstore.level, Type}|Funs],
+	    put_activity_state(A#rdbms_activity{funs = Funs1});
 	undefined ->
-	    put(Key, [Id]);
-	L = [Id|_] ->
-	    L;	% this happens at transaction restart
-	L ->
-	    %% we're setting up an inner transaction -- push Id onto stack
-	    put(Key, [Id|L])
-    end,
-    CommitKey = additional_action_key(commit, Id),
-    RollbackKey = additional_action_key(rollback, Id),
-    put(CommitKey, []),
-    put(RollbackKey, []),
-    ok.
-
-
-register_action(Type, Fun) ->
-    Key = additional_action_key(Type),
-    case get(Key) of
-	undefined ->
-	    exit(no_transaction);
-	[] ->
-	    put(Key, [Fun]);
-	Funs when list(Funs) ->
-	    put(Key, [Fun|Funs])
+	    exit(no_transaction)
     end.
 
-additional_action_key(Type) ->
-    additional_action_key(Type, transaction_level()).
+get_activity_state() ->
+    get(rdbms_activity_state).
 
-additional_action_key(Type, Level) -> 
-    {?MODULE, additional, Type, Level}.
+put_activity_state(#rdbms_activity{} = State) ->
+    put(rdbms_activity_state, State);
+put_activity_state(Other) ->
+    exit({bad_activity_state, Other}).
 
+erase_activity_state() ->
+    erase(rdbms_activity_state).
 
-transaction_level() ->
-    [L|_] = get(trans_level_key()),
-    L.
-
-get_transaction_levels() ->
-    case get(trans_level_key()) of
-	undefined ->
-	    exit(no_transaction);
-	L ->
-	    L
-    end.
-
-pop_transaction_level() ->
-    Key = trans_level_key(),
-    [H|T] = get(Key),
-    put(Key, T).
-
-trans_level_key() ->
-    {?MODULE, trans_levels}.
-
-
-additional_action(Type) ->
-    Actions = get_actions(Type),
-    do_run_actions(Actions, Type).
-
-%% used to trigger registered commit/rollback actions
-%%
-additional_action(Type, Level) ->
-    Key = additional_action_key(Type, Level),
-    case get(Key) of
-	[] -> ok;
-	Funs when list(Funs) ->
-	    erase(Key),
-	    lists:foreach(fun(F) ->
-				  catch_run(F, Type) 
-			  end, lists:reverse(Funs))
-    end.
-
-do_run_actions([{Key, Funs}|T], Type) ->
-    erase(Key),
-    lists:foreach(fun(F) ->
-			  catch_run(F, Type)
-		  end, lists:reverse(Funs)),
-    do_run_actions(T, Type);
-do_run_actions([], Type) ->
-    ok.
 
 catch_run(F, Type) ->
     case catch F() of
@@ -619,247 +722,200 @@ catch_run(F, Type) ->
     end.
 
 
-%% Clean up outer transaction -- and all its inner transactions.
-cleanup_transaction() ->
-    Actions = get_actions(),
-    [erase(Key) || {Key, _} <- Actions],
-    erase(trans_level_key()).
-
-%% Clean up inner transaction
-cleanup_transaction(Level) ->
-    Actions = get_all_actions(Level),
-    [erase(Key) || {Key, _} <- Actions],
-    pop_transaction_level().
-
-
-get_actions() ->
-    [{K, V} || {K = {?MODULE,additional,_,_}, V} <- get()].
-
-get_actions(Type) ->
-    [{K, V} || {K = {?MODULE,additional,T,_}, V} <- get(),
-               T == Type].
-
-get_all_actions(Level) ->
-    [{K, V} || {K = {?MODULE,additional,_,L}, V} <- get(),
-               L == Level].
-
-
 %%%----------------------------------------------------------------------
 %%% #3.3.1   Code for RDBMS verification functions.
 %%%----------------------------------------------------------------------
 
 
-%% verify_write(Tab, Record)
-%% This is called in order to verify a mnesia:write(Record)
-%% It triggers verification of e.g. type, bounds, and referential integrity
-%%
-%% NOTE: mnesia:write/1 may actually be translated to a normal function call.
-%% This is a dirty trick which should probably never be used.
-%%
-verify_write(Tab, Rec) when record(Rec, rdbms_obj) ->
-    verify_record(Rec#rdbms_obj.name, rdbms_obj_to_record(Rec), write);
-verify_write(Tab, Rec) ->
-    verify_record(Tab, Rec, write).
+%%% verify_write(Tab, Rec) ->
+%%%     validate_rec(Tab, Rec, ?vmod).
+
+validate_rec(Tab, Rec, ?JIT_MODULE) ->
+    try ?JIT_MODULE:validate_rec(Tab, Rec)
+    catch
+	error:Reason ->
+	    erlang:error({Reason, erlang:get_stacktrace()})
+    end;
+validate_rec(Tab, Rec, {rdbms_verify, VRec}) ->
+    rdbms_verify:validate_rec(Tab, Rec, VRec).
+
+access_module(Tab, ?JIT_MODULE) ->
+    ?JIT_MODULE:module(Tab);
+access_module(Tab, {rdbms_verify, VRec}) ->
+    rdbms_verify:module(Tab, VRec).
+
+check_access(Tab, Obj, Mode, VMode) ->
+    rdbms_verify:check_access(acl(Tab, VMode), Mode, Obj, Tab).
+
+on_read(Tab, Objs, ?JIT_MODULE) ->
+    ?JIT_MODULE:on_read(Tab, Objs);
+on_read(Tab, Objs, {rdbms_verify,VRec}) ->
+    rdbms_verify:on_read(Objs, Tab, VRec).
+
+acl(Tab, ?JIT_MODULE) ->
+    ?JIT_MODULE:acl(Tab);
+acl(Tab, {rdbms_verify, VRec}) ->
+    rdbms_verify:acl(Tab, VRec).
+
+references(Tab, ?JIT_MODULE) ->
+    ?JIT_MODULE:references(Tab);
+references(Tab, {rdbms_verify, VRec}) ->
+    rdbms_verify:references(Tab, VRec).
+
+%%% rec_type(Tab, ?JIT_MODULE) ->
+%%%     ?JIT_MODULE:rec_type(Tab);
+%%% rec_type(Tab, {rdbms_verify, VRec}) ->
+%%%     rdbms_verify:rec_type(Tab, VRec).
+
+%%% acl(Tab, ?JIT_MODULE) ->
+%%%     ?JIT_MODULE:acl(Tab);
+%%% acl(Tab, {rdbms_verify, VRec}) ->
+%%%     rdbms_verify:acl(Tab, VRec).
+
+%%% global_types(?JIT_MODULE) ->
+%%%     ?JIT_MODULE:global_types();
+%%% global_types({rdbms_verify, #verify{is_schema_trans = IsSchemaTrans}}) ->
+%%%     if IsSchemaTrans ->
+%%% 	    rdbms_props:schema_global_types();
+%%%        true ->
+%%% 	    rdbms_props:global_types()
+%%%     end.
+
+
+
+attr_property(Tab, Attr, Prop, VMod) ->
+    attr_property(Tab, Attr, Prop, VMod, undefined).
+
+attr_property(Tab, Attr, Prop, ?JIT_MODULE, Default) ->
+    ?JIT_MODULE:attr_property(Tab, Attr, Prop, Default);
+attr_property(Tab, Attr, Prop, {_, #verify{attr_property = AP}}, Default) ->
+    AP(Tab, Attr, Prop, Default).
+
+
+table_info(Tab, InfoItem, ?JIT_MODULE) ->
+    ?JIT_MODULE:table_info(Tab, InfoItem);
+table_info(Tab, InfoItem, {_, #verify{table_info = TI}}) ->
+    TI(Tab, InfoItem).
+
+
+fetch_verification_module() ->
+    case get_activity_state() of
+	undefined ->
+	    {rdbms_verify, vrec(false)};
+	#rdbms_activity{verification_module = VMod} ->
+	    VMod
+    end.
+
+default_verification_module() ->
+    {rdbms_verify, vrec(false)}.
+
+verification_module() ->
+    IsSchemaTrans = is_schema_transaction(),
+    Mod = 
+	case IsSchemaTrans of
+	    true ->
+		{rdbms_verify, vrec(true)};
+	    false ->
+		Jit = ?JIT_MODULE,
+		case erlang:module_loaded(Jit) of
+		    true ->
+			Jit;
+		    false ->
+			{rdbms_verify, vrec(false)}
+		end
+	end,
+    {IsSchemaTrans, Mod}.
+
+is_schema_transaction() ->
+    case process_info(self(), initial_call) of
+	{_, {mnesia_schema, schema_coordinator, _}} ->
+	    true;
+	_ ->
+	    false
+    end.
+
+%%% IDEA: Two "verification modules": ?JIT_MODULE, and rdbms_verify.
+%%% rdbms_verify takes a verification record containing funs to access
+%%% metadata. These funs are different depending on whether the transaction
+%%% is a schema transaction or a normal transaction. 
+
+%%%
+
+vrec(_IsSchemaTrans = false) ->
+    {Tid,Ts} = get_tid_ts(),
+    #verify{is_schema_trans = false,
+	    tab_property = fun(Tab, P, Default) ->
+				   rdbms_props:table_property(Tab, P, Default)
+			   end,
+	    attr_property = fun(Tab, A, P, Def) ->
+				    rdbms_props:attr_property(Tab, A, P, Def)
+			    end,
+	    global_property = fun(P, Def) ->
+				      rdbms_props:global_property(P, Def)
+			      end,
+	    table_info = fun(Tab, I) ->
+				 mnesia:table_info(Tid, Ts, Tab, I)
+			 end};
+vrec(_IsSchemaTrans = true) ->
+    #verify{is_schema_trans = true,
+	    tab_property = fun(Tab, P, Def) ->
+				   rdbms_props:schema_table_property(
+				     Tab, P, Def)
+			   end,
+	    attr_property = fun(Tab, Attr, P, Def) ->
+				    rdbms_props:schema_attr_property(
+				      Tab, Attr, P, Def)
+			    end,
+	    global_property = fun(P, Def) ->
+				      rdbms_props:schema_global_property(
+					P, Def)
+			      end,
+	    table_info = fun(Tab, I) ->
+				 rdbms_props:schema_table_info(Tab, I)
+			 end}.
+
+get_tid_ts() ->
+    case get(mnesia_activity_state) of
+	undefined ->
+	    {{async,self()}, non_transaction};
+	{_, Tid, Ts} ->
+	    {Tid, Ts}
+    end.
+
+get_module(Tab) ->
+    case mnesia:table_info(Tab, frag_properties) of
+	[] ->
+	    mnesia;
+	[_|_] ->
+	    mnesia_frag
+    end.
 
 
 %% verify_delete(Tab, Key, DelF)
 %% This is called in order to verify a mnesia:delete({Tab, Key})
 %% It triggers verification of referential integrity.
 %%
-verify_delete(Tab, Key) ->
-    Objs = read(Tab, Key),
-    verify_delete1(Objs, Tab).
+%%% verify_delete(Tab, Key) ->
+%%%     verify_delete(Tab, Key, ?vmod).
 
-verify_delete1([Obj|Objs], Tab) ->
-    verify_delete_object(Tab, Obj),
-    verify_delete1(Objs, Tab);
-verify_delete1([], _) ->
-    ok.
+%%% verify_delete(Tab, Key, VMod) ->
+%%%     Objs = read(Tab, Key, VMod),
+%%%     foreach(fun(Obj) -> verify_delete_object(Tab, Obj, VMod) end, Objs).
+
 
 
 %% verify_delete_object(Tab, Obj)
 %% Similar to verify_delete(), but for delete_object/1
 %%
-verify_delete_object(Tab, Obj) when record(Obj, rdbms_obj) ->
-    verify_delete_object(Tab, rdbms_obj_to_record(Obj));
-verify_delete_object(Tab, Obj) ->
-    Attrs = attributes(Tab),
-    case all_references(Attrs, Tab, Obj, delete) of
-	[] ->
-	    ok;
-	Refs ->
-	    inspect_references(Refs, Tab, Obj, delete)
-    end.
-%     verify_delete_object1(Attrs, Tab, Obj).
-
-% verify_delete_object1([Attr|Attrs], Tab, Obj) ->
-%     check_references(Tab, Attr, Obj, delete),
-%     verify_delete_object1(Attrs, Tab, Obj);
-% verify_delete_object1([], _, _) ->
-%     ok.
+%%% verify_delete_object(Tab, Obj) when record(Obj, rdbms_obj) ->
+%%%     verify_delete_object(Tab, rdbms_obj_to_record(Obj));
+%%% verify_delete_object(Tab, Obj) ->
+%%%     verify_delete_object(Tab, Obj, ?vmod).
 
 
-
-verify_record(Tab, Rec, Why) ->
-    do_verify(attributes(Tab), Rec, Tab, Why),
-    callback_verify(Rec, Why).
-
-
-
-do_verify([Attr|As], Rec, Tab, Why) ->
-    Val = attribute_value(Tab, Attr, Rec),
-    verify_attribute(Val, {Tab, Attr}, Why),
-    maybe_check_references(Tab, Attr, Val, Rec, Why),
-    do_verify(As, Rec, Tab, Why);
-do_verify([], _, _, _) ->
-    ok.
-
-maybe_check_references(Tab, Attr, Val, Rec, scan) -> ok;
-maybe_check_references(Tab, Attr, Val, Rec, write) ->
-    check_references(Tab, Attr, Val, Rec, write).
-
-%% check that a specific attribute is of the right type etc.
-%% if NULL, verify that it's not a required attribute.
-%%
-verify_attribute(Val, Attr) ->
-    verify_attribute(Val, Attr, write).
-
-
-verify_attribute(Val, Attr, scan) ->
-    if Val == ?NULL -> ok;
-       true ->
-	    Type = type(Attr),
-	    verify_type(Val, Type, Attr)
-    end;
-verify_attribute(?NULL, Attr, Why) ->
-    case required(Attr) of
-	true -> 
-	    exit({required_attribute, Attr});
-	_ ->
-	    ok
-    end;
-verify_attribute(Val, Attr, Why) ->
-    Type = type(Attr),
-    ?dbg("Type of ~p (~p) defined as ~p~n", [Attr, Val, Type]),
-    verify_type(Val, Type, Attr),
-    verify_bounds(Val, Attr).
-
-
-
-%% callback_verify(Record, Why)
-%% This allows a user to register his own verification trigger for a certain
-%% record. This trigger function should call mnesia:abort() if verification
-%% fails.
-%%
-callback_verify(Rec, scan) ->
-    ok;
-callback_verify(Rec, Why) ->
-    Tab = element(1, Rec),
-    case table_property(Tab, verify) of
-	undefined ->
-	    ok;
-	F ->
-	    F(Rec)
-    end.
-
-%% verify_type(Value, TypeInfo, AttrInfo)
-%%
-%% AttrInfo is for a more descriptive abort reason.
-%%
-verify_type(?NULL, Attr) -> ok;
-verify_type(Val, Attr) ->
-    verify_type(Val, type(Attr), Attr).
-
-    
-
-verify_type(X, {record, Rec}, _) when tuple(X) ->
-    verify_write(Rec, X);
-verify_type(X, {compound, _}, _) -> 
-    %% compound attributes are normally not included in the attributes() return
-    %% value (This whole issue needs more work), so we shouldn't arrive here...
-    ok;  % verify components individually
-verify_type(X, {tuples,Arity,KeyPos}, Attr) ->
-    verify_tuples_type(X, Arity, {{tuples,Arity,KeyPos}, Attr});
-verify_type(X, term, _) -> ok;
-verify_type(X, list, _) when list(X) -> ok;
-verify_type(X, tuple, _) when tuple(X) -> ok;
-verify_type(X, atom, _) when atom(X) -> ok;
-verify_type(X, string, Attr) ->
-    verify_string(X, Attr);
-verify_type(X, text, Attr) ->
-    if atom(X) -> ok;
-       list(X) -> 
-	    verify_string(X, Attr);
-       true ->
-	    violation(type, {X, text, Attr})
-    end;
-verify_type(X, number, _) when integer(X) -> ok;
-verify_type(X, number, _) when float(X) -> ok;
-verify_type(X, integer, _) when integer(X) -> ok;
-verify_type(X, float, _) when float(X) -> ok;
-verify_type({Node, {MS,S,US}}, oid, _) 
-when atom(Node), integer(MS), integer(S), integer(US) ->
-    ?dbg("valid oid~n", []),
-    ok;
-verify_type(X, any, _) -> ok;
-verify_type(X, undefined, Attr) ->
-    ?dbg("Type information missing for ~p.~n", [Attr]),
-    ok;
-verify_type(X, {apply, M,F}, _) -> M:F(X);
-verify_type(X, F, _) when function(F) -> F(X);
-verify_type(X, Other, Attr) ->
-    violation(type, {X, Other, Attr}).
-
-
-%% verify_bounds(Value, TypeInfo, AttrInfo)
-%%
-%% Checks boundary conditions:
-%%   {inclusive, Min, Max} |
-%%   {exclusive, Min, Max} |
-%%   F(Value) when function(F)
-%%
-%% AttrInfo is for a more descriptive abort reason.
-%%
-
-verify_bounds(Val, Attr) ->
-    verify_bounds(Val, bounds(Attr), Attr).
-
-
-verify_bounds(X, {inclusive, {Min, Max}}, _) when X >= Min, X =< Max ->
-    ok;
-verify_bounds(X, {exclusive, {Min, Max}}, _) when X > Min, X < Max ->
-    ok;
-verify_bounds(X, undefined, _) ->
-    ok;
-verify_bounds(X, F, _) when function(F) -> 
-    F(X);
-verify_bounds(X, Other, Attr) ->
-    violation(bounds, {X, Other, Attr}).
-
-
-%% verify_string(List, AttrInfo)
-%%
-%% Checks that List contains only printable characters.
-%% (this means that list_to_binary(List) will work.
-%%
-%% AttrInfo is for a more descriptive abort reason.
-%%
-verify_string(List, Attr) ->
-    case catch list_to_binary(List) of
-	{'EXIT', _} ->
-	    violation(type, {List, string, Attr});
-	_ -> ok
-    end.
-
-verify_tuples_type([H|T], Arity, AttrInfo) when tuple(H) ->
-    if size(H) == Arity ->
-	    verify_tuples_type(T, Arity, AttrInfo);
-       true ->
-	    violation(arity, {H, AttrInfo})
-    end;
-verify_tuples_type([], _, _) -> ok;
-verify_tuples_type([H|_], Arity, AttrInfo) ->
-    violation(type, {H, AttrInfo}).
+verify_delete_object(Tab, Obj, VMod) ->
+    check_access(Tab, Obj, delete, VMod),
+    check_references(Tab, Obj, delete, VMod).
 
 
 %% violation(Which, Data)
@@ -896,107 +952,118 @@ violation(Which, Data) ->
 %% RefActions : {Match, DeleteAction : Action, UpdateAction : Action}
 %% Match  : handling of null values - partial | full
 %% Action : referential action - 
-%%		no_action | cascade | set_default | set_null | return
+%%		no_action | cascade | set_default | set_null
 %%
-references(Attr) ->
-    attr_property(Attr, references).
 
-
-% check_references(Tab, Attr, Obj, Context) ->
-%     case references({Tab, Attr}) of
-% 	undefined ->
-% 	    [];
-% 	Refs ->
-% 	    Val = attribute_value(Tab, Attr, Obj),
-% 	    follow_refs(Refs, Val, Context, Tab, Attr)
-%     end.
-
-all_references(Attrs, Tab, Obj, Context) ->
-    lists:foldr(
-      fun(Attr, Acc) ->
-	      case references({Tab, Attr}) of
-		  undefined ->
-		      Acc;
-		  Refs ->
-		      Val = attribute_value(Tab, Attr, Obj),
-		      [{Attr, Val, Refs}|Acc]
-	      end
-      end, [], Attrs).
-
-%% in case we've already fetched the value.
-check_references(Tab, Attr, Val, Obj, Context) ->
-    case references({Tab, Attr}) of
-	undefined ->
-	    [];
-	Refs ->
-	    ?dbg("follow refs for ~p (~p)~n", [{Tab,Attr}, Val]),
-	    follow_refs(Refs, Val, Context, Tab, Attr)
+check_references(Tab, Rec, Context, VMod) ->
+    case references(Tab, VMod) of
+	[] ->
+	    true;
+	[_|_] = Refs ->
+	    Log = get_refs_log(),
+	    foreach(
+	      fun({How, What, Refs1}) ->
+		      Values =
+			  case How of
+			      attr ->
+				  [attribute_value(Tab, What, Rec, VMod)];
+			      index ->
+				  rdbms_index:index_values(
+				    Tab,What,Rec,VMod);
+			      eval ->
+				  {Mod, Fun, Arg} = What,
+				  Mod:Fun(Rec, Arg)
+			  end,
+		      foreach(
+			fun({_Tab2, _Attr2, {_,_,ignore}})
+			   when Context==write ->
+				true;
+			   ({_Tab2, _Attr2, {_,ignore,_}})
+			   when Context==delete ->
+				true;
+			   ({Tab2, Attr2, Actions}) ->
+				do_follow_refs(
+				  Tab2,Attr2,Actions,
+				  Tab, How, What, Values, Context,
+				  Log, VMod)
+			end, Refs1)
+	      end, Refs),
+	    true
     end.
 
-%% If the related Action says 'ignore', do not follow the reference.
-%%
-follow_refs([{Tab2, Attr2, {_,ignore,_}}|Refs], Val, delete, Tab1, Attr1) ->
-    follow_refs(Refs, Val, delete, Tab1, Attr1);
-follow_refs([{Tab2, Attr2, {_,_,ignore}}|Refs], Val, write, Tab1, Attr1) ->
-    follow_refs(Refs, Val, write, Tab1, Attr1);
-follow_refs([{Tab2, Attr2, Actions}|Refs], Val, Context, Tab1, Attr1) ->
+do_follow_refs(Tab2, {via_index, Ix}=Via, Actions,
+	       _Tab, _How, _What, Values, Context, Log, VMod) ->
+    {Tid, Ts} = get_mnesia_transaction_data(),
+    Objs = lists:flatmap(
+	    fun(Value) ->
+		    index_read(Tid, Ts, Tab2, Value, Ix, write, VMod)
+	    end, Values),
+    perform_ref_actions(
+      Actions, Objs, Context, Tab2, Via, Values, Log, VMod);
+do_follow_refs(Tab2, Attr2, Actions,
+	       Tab, How, What, Values, Context, Log, VMod) ->
     {Match, _, _} = Actions,
-    Objs = ref_match(Tab2, Attr2, Match, Val, Tab1, Attr1),
-    Objs1 = perform_ref_actions(Actions, Objs, Context, Tab2, Attr2, Val),
-    Objs1 ++ follow_refs(Refs, Val, Context, Tab1, Attr1);
-follow_refs([], _, _, _, _) ->
-    [].
+    Objs = ref_match(Tab2, Attr2, Match, Values, Tab, How, What, VMod),
+    perform_ref_actions(
+      Actions, Objs, Context, Tab2, Attr2, Values, Log, VMod).
 
 
-inspect_references(Refs, Tab, Obj, delete) ->
-    %% to avoid a possible endless loop, delete Obj first
-    do_delete_object(Tab, Obj),
-    lists:foldl(
-      fun({Attr,Val, Refs1}, Acc) ->
-	      follow_refs(Refs1, Val, delete, Tab, Attr) ++ Acc
-      end, [], Refs).
+%%% inspect_references(Refs, Tab, Obj, delete, VMod) ->
+%%%     %% to avoid a possible endless loop, delete Obj first
+%%%     do_delete_object(Tab, Obj, VMod),
+%%%     foreach(
+%%%       fun({Attr, Refs1}) ->
+%%% 	      foreach(
+%%% 		fun({_Tab2, _Attr2, {_
+%%% 		fun({Attr,Val, Refs1}) ->
+%%% 			do_follow_refs(
+%%% 			follow_refs(Refs1, Val, delete, Tab, Attr) ++ Acc
+%%% 		end, [], Refs1)
+%%%       end, Refs).
 
 
-perform_ref_actions(_, Objs, read, _, _, _) -> Objs;
-perform_ref_actions(Actions, Objs, delete, Tab2, Attr2, Val) ->
+%%% perform_ref_actions(_, Objs, read, _, _, _, Acc, _) ->
+%%%     lists:foldl(fun(O, A) -> [O|A] end, Acc, Objs);
+perform_ref_actions(Actions, Objs, delete, Tab2, Attr2, Val, Log, VMod) ->
     {_Match, OnDelete, _OnUpdate} = Actions,
     case OnDelete of
 	cascade ->
-	    [delete_object(Tab2, Obj) || Obj <- Objs],
-	    Objs;
+	    foreach(
+	      fun(Obj) ->
+		      log_ref(Tab2, Obj, delete, Log),
+		      delete_object(Tab2, Obj, VMod)
+	      end, Objs),
+	      true;
 	set_null ->
-	    cascade_update(Objs, Tab2, Attr2, ?NULL);
+	    cascade_update(Objs, Tab2, Attr2, ?NULL, Log, VMod);
 	set_default ->
-	    cascade_update(Objs, Tab2, Attr2, default({Tab2, Attr2}));
-	return ->
-	    %% This means we only return related objects - don't touch
-	    Objs;
+	    cascade_update(Objs, Tab2, Attr2,
+			   default(Tab2, Attr2, VMod), Log, VMod);
 	no_action ->
 	    if Objs == [] ->
 		    [];
 	       true ->
-		    exit({ref_integrity, {delete, [Tab2,Attr2,Val]}})
+		    violation(ref_integrity, {delete, [Tab2,Attr2,Val]})
 	    end
     end;
-perform_ref_actions(Actions, Objs, write, Tab2, Attr2, Val) ->
+perform_ref_actions(Actions, Objs, write, Tab2, Attr2, Val, Log, VMod) ->
     {_Match, _OnDelete, OnUpdate} = Actions,
     case OnUpdate of
 	cascade ->
-	    cascade_update(Objs, Tab2, Attr2, Val);
+	    cascade_update(Objs, Tab2, Attr2, Val, Log, VMod);
 	set_null ->
-	    cascade_update(Objs, Tab2, Attr2, ?NULL);
+	    cascade_update(Objs, Tab2, Attr2, ?NULL, Log, VMod);
 	set_default ->
-	    cascade_update(Objs, Tab2, Attr2, default({Tab2, Attr2}));
-	return ->
-	    Objs;
+	    cascade_update(Objs, Tab2, Attr2,
+			   default(Tab2, Attr2, VMod), Log, VMod);
 	no_action ->
 	    %% here we should probably also use the MATCH condition...
 	    %% but since MATCH only matters for composite values, we skip it
 	    %% for now.
 	    if Objs == [] ->
-		    exit({ref_integrity, {write, [Tab2, Attr2, Val]}});
+		    violation(ref_integrity, {write, [Tab2, Attr2, Val]});
 	       true ->
-		    Objs
+		    true
 	    end
     end.
 
@@ -1009,24 +1076,40 @@ perform_ref_actions(Actions, Objs, write, Tab2, Attr2, Val) ->
 %% - thus the (Match : full | partial) stuff
 %% For a more exhaustive explanation, see the SQL Standard
 %%
-ref_match(Tab2, Attr2, Match, Val, Tab1, Attr1) when atom(Attr2) ->
-    fetch_objects(Tab2, Attr2, Val);
-ref_match(Tab2, Attr2, Match, Val,
-	  Tab1, Attr1) when tuple(Attr2), size(Attr2) == size(Val) ->
-    Wild = table_info(Tab2, wild_pattern),
-    Objs = match_object(Tab2, Wild),
-    AttrL = [attribute_position(Tab2, A) || A <- tuple_to_list(Attr2)],
-    ValL = tuple_to_list(Val),
-    case {has_nulls(ValL), Match} of
-	{all, _} ->     Objs;
-	{some, full} -> [];
-	{some, []} ->   Objs;
-	_ ->       ref_compound_match(Objs, AttrL, ValL)
-    end;
-ref_match(Tab2, AttrF, _, Val, _, _) when function(AttrF) ->
-    Wild = table_info(Tab2, wild_pattern),
-    Objs = match_object(Tab2, Wild),
-    ref_fun_match(Objs, AttrF, Val).
+ref_match(Tab2, Attr2, _Match, Val, _Tab1, _H, _W, VMod) when atom(Attr2) ->
+    fetch_objects(Tab2, Attr2, Val, VMod);
+ref_match(Tab2, Attr2, Match, Vals,
+	  _Tab1, _H, _W, VMod) when is_list(Attr2) ->
+    Wild = table_info(Tab2, wild_pattern, VMod),
+    Objs = match_object(Tab2, Wild, VMod),
+    AttrL = [attribute_position(Tab2, A, VMod) || A <- Attr2],
+    lists:flatmap(
+      fun(V) ->
+	      ValL = tuple_to_list(V),
+	      case {has_nulls(ValL), Match} of
+		  {all, partial} -> Objs;
+		  {some, full} ->   Objs;
+		  _ ->       ref_compound_match(Objs, AttrL, ValL)
+	      end
+      end, Vals);
+ref_match(Tab2, AttrF, _, Vals, _, _, _, VMod) when function(AttrF) ->
+    %% TODO optimize. Check whether something more efficient than full
+    %% linear search is possible (e.g. if target is a bag table.)
+    Wild = table_info(Tab2, wild_pattern, VMod),
+    Objs = match_object(Tab2, Wild, VMod),
+    lists:foldl(
+      fun(Obj, Acc) ->
+	      lists:foldl(
+		fun(Val, Acc1) ->
+			case AttrF(Obj, Val) of
+			    true ->
+				[Obj|Acc1];
+			    false ->
+				Acc1
+			end
+		end, Acc, Vals)
+      end, [], Objs).
+
 
 
 ref_compound_match([O|Objs], Attrs, Vals) ->
@@ -1051,37 +1134,75 @@ match_compound_obj(_, _, _) -> true.
 %% We allow for a 'fun' version of match
 %% F(Object) should return true or false.
 %%
-ref_fun_match([Obj|Objs], F, Value) ->
-    case F(Obj, Value) of
-	true -> [Obj|ref_fun_match(Objs, F, Value)];	    
-	false -> ref_fun_match(Objs, F, Value)
-    end;
-ref_fun_match([], _, _) -> [].
+%%% ref_fun_match([Obj|Objs], F, Value) ->
+%%%     case F(Obj, Value) of
+%%% 	true -> [Obj|ref_fun_match(Objs, F, Value)];	    
+%%% 	false -> ref_fun_match(Objs, F, Value)
+%%%     end;
+%%% ref_fun_match([], _, _) -> [].
 
 
 
 %% has_nulls([Value]) -> none | all | some
 %% This function tells whether a list of values contains nulls.
 %%
-has_nulls([?NULL|Vals]) -> has_nulls(Vals, all);
-has_nulls([_|Vals]) -> has_nulls(Vals, none);
-has_nulls([]) -> all.
+has_nulls([_|_] = Vals) ->
+    Res = lists:foldl(fun(X, {_,Miss}) when X==?NULL  -> {true,Miss};
+			 (X, {Hit, _}) when X=/=?NULL -> {Hit,true}
+		      end, {false, false}, Vals),
+    case Res of
+	{true, true} -> some;
+	{true, false} -> all;
+	{false,true} -> none
+    end.
+%%% has_nulls([?NULL|Vals]) -> has_nulls(Vals, all);
+%%% has_nulls([_|Vals]) -> has_nulls(Vals, none);
+%%% has_nulls([]) -> all.
 
-has_nulls([?NULL|T], all) -> has_nulls(T, all);
-has_nulls([?NULL|T], none) -> has_nulls(T, some);
-has_nulls([_|T], all) -> has_nulls(T, some);
-has_nulls([_|T], Acc) -> has_nulls(T, Acc);
-has_nulls([], Acc) -> Acc.
+%%% has_nulls([?NULL|T], all) -> has_nulls(T, all);
+%%% has_nulls([?NULL|T], none) -> has_nulls(T, some);
+%%% has_nulls([_|T], all) -> has_nulls(T, some);
+%%% has_nulls([_|T], Acc) -> has_nulls(T, Acc);
+%%% has_nulls([], Acc) -> Acc.
 
 
 %% cascade_update(...)
 %%
 %% Used in connection with referential integrity checks
 %% set_default | set_null | (cascading update)
-cascade_update(Objs, Tab, Attr, Value) ->
-    Attrs = table_info(Tab, attributes),
+cascade_update(Objs, Tab, Attr, Value, Log, VMod) ->
+    Attrs = table_info(Tab, attributes, VMod),
     Pos = pos(Attrs, Attr, 2, Tab),
-    [write(Tab, setelement(Pos, Obj, Value)) || Obj <- Objs].
+    foreach(
+      fun(Obj) ->
+	      log_ref(Tab, Obj, write, Log),
+	      write(Tab, setelement(Pos, Obj, Value), VMod)
+      end, Objs).
+
+
+new_refs_log() ->
+    ets:new(refs_log, [set]).
+
+
+get_refs_log() ->
+    case get_activity_state() of
+	#rdbms_activity{refs_logs = [Log|_]} ->
+	    Log;
+	#rdbms_activity{refs_logs = []} = A ->
+	    Log = new_refs_log(),
+	    put_activity_state(A#rdbms_activity{refs_logs = [Log]}),
+	    Log
+    end.
+
+log_ref(Tab, Obj, Op, Log) when Op==write; Op==delete ->
+    Key = element(2, Obj),
+    case ets:insert_new(Log, {{Tab, Key, Op}}) of
+	false ->
+	    mnesia:abort({cyclical_reference, {Op, [Tab, Key]}});
+	true ->
+	    true
+    end.
+
     
 
 %%% ==========================================================
@@ -1094,156 +1215,134 @@ cascade_update(Objs, Tab, Attr, Value) ->
 %%% For all attributes where a value is not provided, specified defaults
 %%% will be inserted.
 %%% ==========================================================
-make_object(Tab) ->
-    make_object(Tab, []).
+%%% make_object(Tab) ->
+%%%     make_object(Tab, []).
 
-make_object(Tab, Values) when atom(Tab) ->
-    AttrNames = attributes(Tab),
-    Attrs = [{N, type({Tab,N}), default({Tab,N})} || N <- AttrNames],
-    replace_values(Values, #rdbms_obj{name = Tab, attributes = Attrs});
-make_object(Data, Values) ->
-    case is_rdbms_obj(Data) of
-	true -> replace_values(Values, Data);  % no need to convert
-	false ->
-	    replace_values(Values, record_to_rdbms_obj(Data))
-    end.
+%%% make_object(Tab, Values) when atom(Tab) ->
+%%%     VMod = ?vmod,
+%%%     AttrNames = table_info(Tab, attributes, VMod),
+%%%     Attrs = [{N, table_info({Tab,N}, type, VMod),
+%%% 	      table_info({Tab,N}, default, VMod)} || N <- AttrNames],
+%%%     replace_values(Values, #rdbms_obj{name = Tab, attributes = Attrs});
+%%% make_object(Data, Values) ->
+%%%     case is_rdbms_obj(Data) of
+%%% 	true -> replace_values(Values, Data);  % no need to convert
+%%% 	false ->
+%%% 	    replace_values(Values, record_to_rdbms_obj(Data))
+%%%     end.
 
 make_simple_form(Tab) ->
-    make_simple_form(Tab, []).
-
-make_simple_form(Tab, Values) ->
-    AttrNames = attributes(Tab),
-    Content = lists:foldr(
-		fun(N, Acc) ->
-			[{N, describe_attribute(Tab, N, Values), []}|Acc]
-		end, [], AttrNames),
-    {Tab, [], Content}.
-
-describe_attribute(Tab, Attr, Values) ->
-    Id = {Tab, Attr},
-    Default = default(Id),
-    [{value, get_opt(Attr, Values, Default)},
-     {type, type(Id)},
-     {key_type, key_type(Id)},
-     {required, required(Id)},
-     {bounds, bounds(Id)},
-     {default, default(Id)}].
-    
-		      
-%%% ==========================================================
-%%% make_record(atom() | record() | rdbms_obj()) -> record()
-%%%
-%%% For all attributes where a value is not provided, specified defaults
-%%% will be inserted.
-%%% ==========================================================
-make_record(Name) when atom(Name) ->
-    default_record(Name);
-make_record(Data) ->
-    case is_record(Data) of
-	true -> Data;
-	false ->
-	    rdbms_obj_to_record(Data)
+    VMod = ?vmod,
+    case attributes(Tab, VMod) of
+	undefined -> 
+	    mnesia:abort({no_exists, Tab, simple_form});
+	AttrNames ->
+	    Props = table_info(Tab, user_properties, VMod),
+	    Refs = proplists:get_value(references, Props, []),
+	    Acl = proplists:get_value(acl, Props, []),
+	    RecType = proplists:get_value(rec_type, Props, []),
+	    TypeDefs = [{T,D} || {{typedef,T},D} <- Props],
+		Content = [{attrs, [], 
+			foldr(
+			  fun(N, Acc) ->
+				  [{N, describe_attribute(Tab, N, VMod) ++
+				    [{references,
+				      describe_references(N, Refs)}], []}|Acc]
+			  end, [], AttrNames)},
+			   {acl, [], Acl},
+			   {rec_type, [], RecType},
+			   {typedefs, [], TypeDefs},
+			   {external_copies, [],
+			    table_info(Tab, external_copies, VMod)}],
+	    {Tab, describe_generic_attributes(Tab, VMod), Content}
     end.
 
-is_rdbms_obj(X) when record(X, rdbms_obj) -> 
-    %% At this point, we verify that the struct is valid. If it's not, 
-    %% we EXIT - because it is most likely meant to be a valid struct.
-    ok = verify_type(X#rdbms_obj.attributes, {tuples, 3, 1}, 
-		     {rdbms_obj, attributes}),
-    true;
-is_rdbms_obj(_) -> false.
+describe_attribute(Tab, Attr, VMod) ->
+    [
+     {type, attr_property(Tab, Attr, type, VMod)},
+     {key_type, key_type(Tab, Attr, VMod)},
+     {default, attr_property(Tab, Attr, default, VMod)}].
 
-is_record(X) when record(X, rdbms_obj) ->
-    %% well, this is technically a record, but not the kind we're after
-    false;
-is_record(X) when tuple(X) ->
-    Tab = element(1, X),
-    ok = verify_record(Tab, X, scan),
-    true.
-    
-record_to_rdbms_obj(X) ->
-    Tab = element(1, X),
-    AttrNames = attributes(Tab),
-    Attrs = [{N, type({Tab,N}), attribute_value(Tab, N, X)} ||
-		N <- AttrNames],
-    #rdbms_obj{name = Tab, attributes = Attrs}.
+%%% describe_global_type(Attr, VMod) ->
+%%%     [{What, global_property({attr, Attr, What}, VMod)} ||
+%%% 	What <- [type, key_type, required, bounds, default, references]].
 
-rdbms_obj_to_record(X) ->
-    Tab = X#rdbms_obj.name,
-    AttrNames = attributes(Tab),
-    Vals = match_attributes(AttrNames, X#rdbms_obj.attributes, Tab),
-    list_to_tuple([Tab|Vals]).
-
-match_attributes([H|T], Attrs, Tab) ->
-    case lists:keysearch(H, 1, Attrs) of
-	{value, {_,_,V}} -> 
-	    [V|match_attributes(T, Attrs, Tab)];
+describe_generic_attributes(Tab, VMod) ->
+    [{A, table_info(Tab, A, VMod)} || A <- [record_name,
+					    attributes,
+					    ram_copies,
+					    disc_copies,
+					    disc_only_copies,
+					    local_content,
+					    index,
+					    snmp]].
+describe_references(Name, Refs) ->    
+    case lists:keysearch(Name, 1, Refs) of
+	{value, {_, R}} ->
+	    describe_references(R);
 	false ->
-	    [default({Tab,H})|match_attributes(T, Attrs, Tab)]
-    end;
-match_attributes([], _, _) ->
-    [].
+	    []
+    end.
 
-replace_values([{Key, Val}|T], Obj) ->
-    Attrs = replace_val(Key, Obj#rdbms_obj.attributes, Val),
-    replace_values(T, Obj#rdbms_obj{attributes = Attrs});
-replace_values([], Obj) ->
-    Obj.
-
-replace_val(Key, [{Key, Type, _OldVal}|T], Val) ->
-    [{Key, Type, Val}|T];
-replace_val(Key, [H|T], Val) ->
-    [H|replace_val(Key, T, Val)].
+describe_references(Refs) ->
+    lists:map(
+      fun({Tab, Attr, Action}) ->
+	      {Match, OnDelete, OnUpdate} = Action,
+	      {Tab, Attr, [{match, Match},
+			   {update, OnUpdate},
+			   {delete, OnDelete}]}
+	      end, Refs).
     
-%% attribute_value(Tab, Attr, Object)
+%% attribute_value(Tab, Attr, Object, VMod)
 %%
 %% This is used to figure out the value of an attribute.
 %% Needed since the attribute could be compound.
-attribute_value(Tab, Attr, Object) ->
-    case type({Tab, Attr}) of
-	{compound, SubAttrs} ->
-	    [element(attribute_position(Tab, A), Object) || A <- SubAttrs];
-	_ ->
-	    element(attribute_position(Tab, Attr), Object)
-    end.
+attribute_value(Tab, SubAttrs, Object, VMod) when is_list(SubAttrs) ->
+    [element(attribute_position(Tab, A, VMod), Object) ||
+	A <- SubAttrs];
+attribute_value(Tab, Attr, Object, VMod) when is_atom(Attr) ->
+    element(attribute_position(Tab, Attr, VMod), Object).
 
 
 %%
 %% type ::= atom | list | tuple | string | number | integer | float |
 %%          any | term | record
 %%          
-type(Attr) ->
-    attr_property(Attr, type).
+%%% type(Attr) ->
+%%%     attr_property(Attr, type).
 
 
-access(Type, Attr) -> undefined.
+%%% access(_Type, _Attr) -> undefined.
 
 %%
 %% required ::= true | false
 %% 
-required(Attr) ->
-    case type(Attr) of
-	oid ->
-	    %% We enforce required==true for attributes of type oid.
-	    true;
-	_ ->
-	    case attr_property(Attr, required) of
-		undefined ->
-		    false;
-		Other ->
-		    Other
-	    end
-    end.
+%%% required(Attr) ->
+%%%     case type(Attr) of
+%%% 	oid ->
+%%% 	    %% We enforce required==true for attributes of type oid.
+%%% 	    true;
+%%% 	_ ->
+%%% 	    case attr_property(Attr, required) of
+%%% 		undefined ->
+%%% 		    false;
+%%% 		Other ->
+%%% 		    Other
+%%% 	    end
+%%%     end.
 
 %%
 %% default ::= Value
 %% 
-default(Attr) ->
-    case attr_property(Attr, default) of
+%%% default(Tab, Attr) ->
+%%%     default(Tab, Attr, ?vmod).
+
+default(Tab, Attr, VMod) ->
+    case attr_property(Tab, Attr, default, VMod) of
 	undefined ->
-	    case type(Attr) of
+	    case attr_property(Tab, Attr, type, VMod) of
 		{record, Rec} ->
-		    default_record(Rec);
+		    default_record(Rec, VMod);
 		oid ->
 		    {node(), erlang:now()};
 		_ ->
@@ -1252,8 +1351,8 @@ default(Attr) ->
 	Val -> Val
     end.
 
-default_record(Tab) ->
-    Defs = [default({Tab, Attr}) || Attr <- attributes(Tab)],
+default_record(Tab, VMod) ->
+    Defs = [default(Tab, Attr, VMod) || Attr <- attributes(Tab, VMod)],
     list_to_tuple([Tab|Defs]).
 
 %% position(Attribute, Record) -> integer()
@@ -1261,33 +1360,27 @@ default_record(Tab) ->
 %% Note that compound attributes have no position
 %% position(CompoundAttr) will result in exit({invalid_attribute, ...})
 %%
-position(Attr, Rec) ->
-    pos(attributes(Rec), Attr, 1, Rec).
+%%% position(Attr, Rec) ->
+%%%     pos(attributes(Rec), Attr, 1, Rec).
 
-pos([Attr|_], Attr, N, Tab) ->
+pos([Attr|_], Attr, N, _Tab) ->
     N;
 pos([_|T], Attr, N, Tab) ->
     pos(T, Attr, N+1, Tab);
 pos([], Attr, _, Tab) ->
-    exit({invalid_attribute, {Tab, Attr}}).
-
-%% attribute(Position, Record)
-attribute(Pos, Rec) ->
-    lists:nth(Pos, attributes(Rec)).
-%%
-%% bounds ::= {Mode, Min, Max}, Mode ::= inclusive | exclusive
-%% 
-bounds(Attr) ->
-    attr_property(Attr, bounds).
+    violation(type, {invalid_attribute, {Tab, Attr}}).
 
 %%
 %% attrs ::= [attr]
 %% -- list of attrs in correct order
 %% 
-attributes(Tab) ->
-    case catch table_info(Tab, attributes) of
+%%% attributes(Tab) ->
+%%%     attributes(Tab, ?vmod).
+
+attributes(Tab, VMod) ->
+    case catch table_info(Tab, attributes, VMod) of
 	{'EXIT', _} ->
-	    global_property({record, Tab, attributes});
+	    global_property({record, Tab, attributes}, VMod);
 	Attrs when list(Attrs) ->
 	    Attrs
     end.
@@ -1297,71 +1390,45 @@ attributes(Tab) ->
 %% where
 %%    LogicalAttributes ::= [{Attr, compound, [SubAttr]}]
 %%
-all_attributes(Tab) ->
-    PhysicalAttrs = attributes(Tab),
-    case catch table_info(Tab, user_properties) of
-	{'EXIT', _} ->
-	    {PhysicalAttrs, []};
-	Props ->
-	    CompoundAttrs = 
-		[{A, {compound, Sub}} || 
-		    {{attr,A,type},{compound,Sub}} <- Props],
-	    {PhysicalAttrs, CompoundAttrs}
-    end.
+%%% all_attributes(Tab) ->
+%%%     VMod = ?vmod,
+%%%     PhysicalAttrs = attributes(Tab, VMod),
+%%%     case catch table_info(Tab, user_properties, VMod) of
+%%% 	{'EXIT', _} ->
+%%% 	    {PhysicalAttrs, []};
+%%% 	Props ->
+%%% 	    CompoundAttrs = 
+%%% 		[{A, {compound, Sub}} || 
+%%% 		    {{attr,A,type},{compound,Sub}} <- Props],
+%%% 	    {PhysicalAttrs, CompoundAttrs}
+%%%     end.
 
 
 
 
-attribute_position(Tab, Attr) ->
-    pos(attributes(Tab), Attr, 2, Tab).
+attribute_position(Tab, Attr, VMod) ->
+    pos(table_info(Tab, attributes, VMod), Attr, 2, Tab).
 
-
-
-action_on_delete(Rec) ->
-    case table_property(Rec, action_on_delete) of
-	undefined ->
-	    default;
-	Other ->
-	    Other
-    end.
-action_on_read(Rec) ->
-    case table_property(Rec, action_on_read) of
-	undefined ->
-	    default;
-	Other ->
-	    Other
-    end.
-action_on_write(Rec) ->
-    case table_property(Rec, action_on_write) of
-	undefined ->
-	    default;
-	Other ->
-	    Other
-    end.
-
-
-%% key_type(Tab, Attribute)
+%% key_type(Tab, Attribute, VMod)
 %% This checks whether Attribute of Tab is a key, and if so, which type of key
 %% Possible return values are:
 %% - primary    - the primary (unique) key
 %% - secondary  - non-unique key (has an index attached to it)
 %% - {compound, Sub} - compound attribute (may contain keys)
 %% - attribute  - not a key
-key_type({Tab, Attr}) ->
-    key_type(Tab, Attr).
-
-key_type(Tab, Attr) ->
-    case attr_property({Tab, Attr}, key_type) of
+key_type(Tab, Attr, VMod) ->
+    case attr_property(Tab, Attr, key_type, VMod) of
 	undefined ->
-	    case type({Tab, Attr}) of
+	    case attr_property(Tab, Attr, type, VMod) of
 		{compound, SubAttrs} ->
 		    {compound, SubAttrs};
 		_ ->
-		    Apos = attribute_position(Tab, Attr),
+		    Apos = attribute_position(Tab, Attr, VMod),
 		    case (Apos == ?KEYPOS) of
 			true -> primary;
 			false -> 
-			    case table_info(Tab, index) of
+			    case table_info(Tab, index, VMod) of
+				%% TODO - also check extended indexes
 				[] -> attribute;
 				Ix ->
 				    case lists:member(Apos, Ix) of
@@ -1377,187 +1444,15 @@ key_type(Tab, Attr) ->
     end.
 
 
-attr_property({Tab, Attr}, Prop) ->
-    case catch mnesia:read_table_property(Tab, {attr, Attr, Prop}) of
-	{'EXIT', _} ->
-	    global_property({attr, Attr, Prop});
-	{_, Value} -> Value
-    end;
-attr_property(Attr, Prop) ->
-    global_property({attr, Attr, Prop}).
-
-
-table_property(Tab, Prop) ->
-    case catch mnesia:read_table_property(Tab, {tab, Tab, Prop}) of
-	{'EXIT', _} -> undefined;
-	{_, Value} -> Value
-    end.
-
-global_property(Prop) ->
-    case catch mnesia:read_table_property(schema, Prop) of
-	{'EXIT', _} -> undefined;
-	{_, Value} -> Value
-    end.
-		    
-
-set_property(Key, Value) ->
-    F = fun() ->
-		do_set_property(Key, Value)
-	end,
-    mnesia_schema:schema_transaction(F).
-
-do_set_property({Class, Key, Type}, Value) ->
-    {Tab, LookupKey} = val_key({Class, Key, Type}),
-    ?dbg("write_table_prop(~p, ~p)~n", [Tab, {LookupKey, Value}]),
-    write_property(Tab, {LookupKey, Value});
-do_set_property({Class, Key}, Opts) when list(Opts) ->
-    lists:foreach(
-      fun({Type, Value}) ->
-	      do_set_property({Class, Key, Type}, Value)
-      end, Opts).
-
-
-val_key({attr, {Tab, Attr}, Type}) ->	  {Tab, {attr, Attr, Type}};
-val_key({attr, Attr, Type}) ->		  {schema, {attr, Attr, Type}};
-val_key({record, Rec, Type}) ->           {schema, {record, Rec, Type}};
-val_key({tab, Tab, Type}) ->              {Tab, {tab, Type}}.
-
-
-%% verify_table_properties(Properties, TableName) -> [Property]
-%%
-%% This function returns a list of properties (supposedly verified)
-%% that is meant to be specified in a create_table(TableName, Options) call.
-%% 
-%% Currently, not that much verification takes place here; we make an attempt
-%% to verify the referential integrity details. EXIT if we see something odd.
-%%
-verify_table_properties([{{attr, Attr, references}, Refs}|Props], Tab) ->
-    Refs1 = check_ref_props(Tab, Attr, Refs),
-    [{{attr, Attr, references}, Refs1}|verify_table_properties(Props, Tab)];
-verify_table_properties([{{attr, {Tab,Attr}, Type}, Value}|Props], Tab) ->
-    [{{attr, Attr, Type}, Value}|verify_table_properties(Props, Tab)];
-verify_table_properties(
-  [{{attr, Attr, Type}, Value}|Props], Tab) when atom(Attr)->
-    [{{attr, {Tab, Attr}, Type}, Value}|verify_table_properties(Props, Tab)];
-verify_table_properties([{{tab, Tab, Type}, Value}|Props], Tab) ->
-    [{{tab, Type}, Value}|verify_table_properties(Props, Tab)];
-verify_table_properties([], _) ->
-    [].
-
-
-write_property(Tab, {{attr, Attr, drop_references}, Refs}) ->
-    case references({Tab,Attr}) of
-	[] ->
-	    ok;
-	OldRefs ->
-	    case [{T,A,RA} || {T,A,RA} <- OldRefs,
-			      {T1,A1} <- Refs,
-			      {T,A} == {T1,A1}] of
-		[] ->
-		    ok;
-		DelRefs ->
-		    NewRefs = OldRefs -- DelRefs,
-		    do_write_property(Tab, {{attr,Attr,references}, NewRefs})
-	    end
-    end;
-write_property(Tab, {{attr, Attr, add_references}, Refs}) ->
-    Refs1 = check_ref_props(Tab, Attr, Refs),
-    Refs2 = case references({Tab,Attr}) of
-		undefined ->
-		    Refs1;
-		OldRefs ->
-		    merge_refs(Refs1, OldRefs)
-	    end,
-    do_write_property(Tab, {{attr,Attr,references}, Refs2});
-write_property(Tab, {{attr, Attr, references}, Refs}) ->
-    ?dbg("referential property~n", []),
-    Refs1 = check_ref_props(Tab, Attr, Refs),
-    do_write_property(Tab, {{attr,Attr,references}, Refs1});
-write_property(Tab, Prop) ->
-    do_write_property(Tab, Prop).
-
-do_write_property(Tab, Prop) ->
-    mnesia_schema:do_write_table_property(Tab, Prop).
+%%% attr_property(Tab, Attr, Prop) ->
+%%%     rdbms_props:attr_property(Tab, Attr, Prop).
 
 
 
-merge_refs(R1, R2) ->
-    merge_refs(R1, R2, []).
-
-merge_refs([{Tab,Attr,Actions}=R|Refs], Old, Acc) ->
-    case [{T,A,RA} || {T,A,RA} <- Old,
-		      T == Tab,
-		      A == Attr] of
-	[] ->
-	    merge_refs(Refs, Old, [R|Acc]);
-	[R] ->
-	    %% duplicate -- not a problem
-	    merge_refs(Refs, Old, Acc);
-	[{_,_,As}] ->
-	    exit({reference_conflict, {Tab,Attr,Actions,As}})
-    end;
-merge_refs([], Old, Acc) ->
-    Old ++ lists:reverse(Acc).
-	    
-
-%% Referential integrity rules are stored as metadata in the following way:
-%% {attr, {Tab, Attr}, [{Tab2, Attr2, RefActions}]}, where
-%% Tab    : the referencing table
-%% Attr   : the referencing attribute
-%% Tab2   : the referenced table
-%% Attr2  : the referenced attribute(s) - 
-%%          atom() | {atom()} | function(Object, Value)
-%% RefActions : {Match, DeleteAction : Action, UpdateAction : Action}
-%% Match  : handling of null values - partial | full
-%% Action : referential action - 
-%%		no_action | cascade | set_default | set_null | return | ignore
-
-check_ref_props(Tab, Attr, [P|Props]) ->
-    [check_ref_prop(Tab, Attr, P)|check_ref_props(Tab, Attr, Props)];
-check_ref_props(_, _, []) -> [].
-
-check_ref_prop(Tab, Attr, {Tab2, Attr2, RefActions}) ->
-    ?dbg("check_ref_prop(~p, ~p,~p)~n", [Tab,Attr, {Tab2, Attr2, RefActions}]),
-    Actions = check_ref_actions(RefActions),
-    {Tab2, Attr2, Actions}.
-
-check_ref_actions({Match, DelActions, UpdateActions}) ->
-    ?dbg("check_ref_actions(~p)~n", [{Match, DelActions, UpdateActions}]),
-    valid_match_option(Match),
-    valid_delete_option(DelActions),
-    valid_update_option(UpdateActions),
-    {Match, DelActions, UpdateActions};
-check_ref_actions(RefActions) when list(RefActions) ->
-    ?dbg("check_ref_actions(~p)~n", [RefActions]),
-    Match = get_opt(match, RefActions, []),
-    DelActions = get_opt(delete, RefActions, no_action),
-    UpdateActions = get_opt(update, RefActions, no_action),
-    valid_match_option(Match),
-    valid_delete_option(DelActions),
-    valid_update_option(UpdateActions),
-    {Match, DelActions, UpdateActions}.
-
-valid_match_option(Match) ->
-    valid_option(match, Match, [full, partial, []]).
-valid_delete_option(DelActions) ->
-    valid_option(delete, DelActions, 
-		 [no_action, cascade, set_default, set_null, return, ignore]).
-valid_update_option(UpdateActions) ->
-    valid_option(update, UpdateActions, 
-		 [no_action, cascade, set_default, set_null, return, ignore]).
-
-
-valid_option(Context, Opt, Valid) ->
-    case lists:member(Opt, Valid) of
-	true -> ok;
-	false ->
-	    exit({invalid_option, {Context, Opt}})
-    end.
-
-get_opt(Key, [{Key, Val}|_], _) -> Val;
-get_opt(Key, [H|T], Default) -> get_opt(Key, T, Default);
-get_opt(_, [], Default) -> Default.
-    
+global_property(Prop, ?JIT_MODULE) ->
+    ?JIT_MODULE:global_property(Prop);
+global_property(Prop, {_, #verify{global_property = GP}}) ->
+    GP(Prop).
 
 
 get_mnesia_transaction_data() ->
@@ -1565,7 +1460,7 @@ get_mnesia_transaction_data() ->
         {_, ActivityId, Opaque} ->
            {ActivityId, Opaque};
         _ -> 
-	    mnesia:abort(no_transaction)
+	    abort(no_transaction)
     end.
 
 %%%----------------------------------------------------------------------

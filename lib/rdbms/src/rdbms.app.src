@@ -5,9 +5,23 @@
   {vsn, "%VSN%"},
   {modules, [
 	     rdbms,
+	     rdbms_codegen,
+	     rdbms_frag,
+	     rdbms_groups,
 	     rdbms_import_server,
+	     rdbms_index,
+	     rdbms_index_load,
+	     rdbms_log,
+	     rdbms_mailmerge,
+	     rdbms_ms,
+	     rdbms_ms_expr,
+	     rdbms_props,
+	     rdbms_rofs,
 	     rdbms_types,
-	     rdbms_mailmerge
+	     rdbms_verify,
+	     rdbms_wsearch,
+	     rdbms_wsearch_idx,
+	     rdbms_wsearch_porter
 	    ]},
   {registered, []},
   {applications, [kernel, stdlib, mnesia]}]}.

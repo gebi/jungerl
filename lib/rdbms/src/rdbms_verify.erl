@@ -235,6 +235,11 @@ check_type({'not', T}, X) ->
     not(check_type(T, X));
 check_type({O,V}, X) when O=='==';O=='=/=';O=='<';O=='>';O=='>=';O=='=<' ->
     erlang:O(X,V);
+check_type(oid, {Nd, {Ms,S,Us}})
+  when is_atom(Nd), is_integer(Ms), is_integer(S), is_integer(Us),
+       Ms >= 0, S >= 0, Us >= 0 ->
+    %% c.f. {node(), erlang:now()}
+    true;
 check_type(_, _) ->
     false.
     

@@ -1,2 +1,0 @@
-Those files are only needed if you are using a version of Erlang prior to R7B.
-Move them to the src/ directory before compilation if you need them.

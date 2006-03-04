@@ -14,6 +14,19 @@ IP Connectivity and Control Nodes
 Changes
 -------
 
+Changes since 1.5
+
+- Almost a complete re-write
+- Added JIT-compilation of integrity checking code
+- Parameterized indexes
+- Patches to mnesia that introduce hooks into the transaction handling
+- Re-organized the type system, new API
+- Added support for fragmented tables
+- Added access control
+- Added support for user-defined table types in mnesia 
+- Added a word-stem indexing library (not yet fully functional)
+- Removed things like action_on_read, action_on_write
+
 Changes since 1.3 (1.4 was an experiment never released.)
 
 - A bug that could lead to endless loops during cascading delete has

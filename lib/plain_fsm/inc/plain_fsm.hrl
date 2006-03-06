@@ -6,6 +6,6 @@
 %%% Created : 29 Jan 2004 by Ulf Wiger <ulf.wiger@ericsson.com>
 %%%-------------------------------------------------------------------
 
--compile({parse_transform, plain_fsm}).
+-compile({parse_transform, plain_fsm_xform}).
 
 

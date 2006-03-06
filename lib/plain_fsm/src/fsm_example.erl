@@ -25,8 +25,11 @@
 %%%   have exactly one argument -- the 'State'.
 %%%
 -export([spawn_link/0]).
--compile(export_all).
+-export([data_vsn/0, code_change/3]).
 -include("plain_fsm.hrl").
+
+%% needed because they are called via hibernate()
+-export([a/1, b/1]).
 
 data_vsn() ->
     5.
@@ -40,6 +43,8 @@ spawn_link() ->
 
 
 idle(S) ->
+    %% Pseudo-calls to plain_fsm:extended_receive can only occur in 
+    %% functions with arity 1 (the single argument being used as the state.)
     plain_fsm:extended_receive(
       receive
 	  a ->
@@ -58,7 +63,7 @@ a(S) ->
     receive
 	b ->
 	    io:format("going to state b~n", []),
-	    plain_fsm:hibernate(?MODULE,b,[S]);
+	    eventually_b(S);
 	idle ->
 	    io:format("going to state idle~n", []),
 	    idle(S)
@@ -80,7 +85,10 @@ b(S) ->
 	    idle(S)
     end.
 
-code_change(OldVsn, State, Extra) ->
+code_change(_OldVsn, _State, _Extra) ->
     {ok, {newstate, data_vsn()}}.
  
-	     
+%%% Calls to hibernate can be anywhere in the code.	     
+eventually_b(S) ->
+    plain_fsm:hibernate(?MODULE,b,[S]).
+

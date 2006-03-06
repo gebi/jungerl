@@ -13,7 +13,7 @@ all: all-subdirs
 
 # Commented out since the new edoc is not yet in jungerl. See the README
 #docs:
-#	erl -noshell -pa $(EDOCDIR) -pz $(STOOLSDIR) -pz $(XMERLDIR) -run edoc_run application "'$(APPNAME)'" '"."' '$(DOC_OPTS)' -s erlang halt
+	erl -noshell -pa $(EDOCDIR) -pz $(STOOLSDIR) -pz $(XMERLDIR) -run edoc_run application "'$(APPNAME)'" '"."' '$(DOC_OPTS)' -s erlang halt
 
 all-subdirs:
 	@for dir in $(SUBDIRS); do \

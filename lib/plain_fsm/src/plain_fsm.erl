@@ -8,11 +8,11 @@
 %%% the License for the specific language governing rights and limitations
 %%% under the License.
 %%%
-%%% The Original Code is plain_fsm-0.4.
+%%% The Original Code is plain_fsm-0.7.
 %%%
-%%% The Initial Developer of the Original Code is Ericsson Telecom
-%%% AB. Portions created by Ericsson are Copyright (C), 1998, Ericsson
-%%% Telecom AB. All Rights Reserved.
+%%% The Initial Developer of the Original Code is Ericsson AB.
+%%% Portions created by Ericsson are Copyright (C), 2006, Ericsson AB.
+%%% All Rights Reserved.
 %%%
 %%% Contributor(s): ______________________________________.
 
@@ -23,171 +23,174 @@
 %%% Created : 29 Jan 2004 by Ulf Wiger <ulf.wiger@ericsson.com>
 %%%-------------------------------------------------------------------
 
-%% @doc A behaviour/support library for writing plain Erlang FSMs.
-%% 
-%% <p>This module implements an OTP behaviour for writing plain Erlang FSMs,
-%% alleviating a long-standing gripe of mine that the OTP behaviours, for all
-%% their power, force programmers into a coding style that is very much 
-%% different from that taught in the Basic Erlang Course (or the book, or
-%% online tutorials, ...) -- the type of programming that made us want to 
-%% use Erlang in the first place.</p>
-%%
-%% <p>Only in my old age have I begun to understand fully what a sacrifice
-%% this is. See <a href="pots/index.html">
-%% Programming Models for Concurrency </a> for a detailed discussion of 
-%% the issues involved.</p>
-%%
-%% <p>The requirements that drove us away from plain Erlang programming
-%% in the first place were:
-%% <ul>
-%%  <li><b>The need to support <i>system messages</i></b> to control upgrade,
-%%    state inspection, shutdown, etc. The plain_fsm library solves this in a 
-%%    reasonable way, I think.</li>
-%%  <li><b>The need for debugging support</b>. The debugging support in
-%%    e.g. gen_server is, I believe, rendered obsolete by the new powerful
-%%    trace support (and dbg) in later versions of OTP.</li>
-%%  <li>In the case of gen_server, <b>reducing the need to reinvent the 
-%%    wheel</b>, a valid point, but more so for e.g. the client side of 
-%%    gen_server:call(). In a protocol state machine, the only thing that 
-%%    really needs reusing is the handling of system messages.</li>
-%% </ul>
-%% </p>
-%%
-%% <p>However, the behaviours provided by OTP for FSM programming, 
-%% <code>gen_server</code> and <code>gen_fsm</code> (<code>gen_server</code>
-%% is perhaps a more common choice than <code>gen_fsm</code>), both have the
-%% distinct drawback that you cannot normally start with a classic Erlang design
-%% and then migrate to a behaviour without significant code rewrite. In 
-%% addition, the two behaviours are semantically different from the classic
-%% Erlang design</p>
-%%
-%% <h2>Using plain_fsm</h2>
-%%
-%% <p>First, write your state machine without worrying about OTP system
-%% messages. Once you're happy with it, figure out where you really want 
-%% to handle system messages. Normally, it will suffice to do it in a fairly
-%% stable state. </p>
-%% 
-%% <p>In the states where you want to handle system messages, you have 
-%% three choices:</p>
-%% 
-%% <h3>(A) Insert the system messages in the receive clause:</h3>
-%% 
-%% <pre>
-%% idle(S) ->
-%%    Parent = plain_fsm:info(parent),
-%%    receive
-%%       {system, From, Req} ->
-%%          plain_fsm:handle_system_msg(From, Req, S, fun(S1) -> idle(S1) end);
-%%       {'EXIT', Parent, Reason} ->
-%%          plain_fsm:parent_EXIT(Reason, S);
-%%       ... %% your original code here
-%%    end.
-%% </pre>
-%%
-%% <p>This has the advantage that everyone can understand what's going on.
-%% The part that plain_fsm.erl helps you with is the set of functions
-%% <code>system_code_change()</code>, <code>system_continue()</code>,
-%% <code>system_shutdown()</code>, <code>format_status()</code>, which
-%% are required callbacks when you handle system messages directly.</p>
-%%
-%% <h3>(B) Handle system messages and unknown messages together:</h3>
-%% 
-%% <pre>
-%% idle(S) ->
-%%    Parent = plain_fsm:info(parent),
-%%    receive
-%%       ... %% your original code here
-%%       Msg ->
-%%          plain_fsm:handle_msg(Msg, State, fun(S1) -> idle(S1) end)
-%%    end.
-%% </pre>
-%%
-%% <p>This is quite convenient if the receive statement already has a 
-%% 'catch-all' clause, discarding unknown messages. 
-%% <code>plain_fsm:handle_msg/3</code> will handle system messages properly
-%% and ignore any other message.</p>
-%%
-%% <h3>(C) Write a pseudo wrapper function around your receive clause:</h3>
-%%
-%% <pre>
-%% idle(S) ->
-%%    plain_fsm:extended_receive(
-%%       receive
-%%          ... %% your original code
-%%       end).
-%% </pre>
-%%
-%% <p>The function <code>plain_fsm:extended_receive/1</code> is replaced 
-%% in a <i>parse_transform</i> into something that looks very much like
-%% the previous program (A). The code, as it reads, requires the reader to
-%% know that the transformation takes place, otherwise the semantics
-%% would be confusing (you cannot solve the problem using a real function
-%% that way.) On the plus side, this is a fairly small violation of both
-%% the original code and Erlang's semantics.</p>
-%%
-%% <p><i>Note that for this to work, you must include "plain_fsm.hrl"
-%% in your module.</i></p>
-%%
-%% <h4>Example</h4>
-%% <p>In the module <a href="../src/fsm_example.erl">fsm_example.erl</a>
-%% (included in the plain_fsm package), we choose to handle system
-%% messages in the idle state. The example code is runnable, and supports
-%% suspend, resume, status inspection, and code change.</p>
-%% <p>Imagine that the code initially looked like this:</p>
-%% <pre>
-%% idle(S) ->
-%%     receive
-%% 	a ->
-%% 	    io:format("going to state a~n", []),
-%% 	    a(S);
-%% 	b ->
-%% 	    io:format("going to state b~n", []),
-%% 	    b(S)
-%%     after 10000 ->
-%% 	    io:format("timeout in idle~n", []),
-%% 	    idle(S)
-%%     end).
-%% </pre>
-%%
-%% <p>The change required to handle system messages is as follows:</p>
-%% <pre>
-%% idle(S) ->
-%%     {@link extended_receive/1. plain_fsm:extended_receive}(
-%%       receive
-%%           a ->
-%%               io:format("going to state a~n", []),
-%%               a(S);
-%%           b ->
-%%               io:format("going to state b~n", []),
-%%               b(S)
-%%       after 10000 ->
-%%               io:format("timeout in idle~n", []),
-%%               idle(S)
-%%       end).
-%% </pre>
-%%
-%% <p>In addition, we change the start function from, in this case:</p>
-%% <pre>
-%% spawn_link() ->
-%%     spawn_link(fun() ->
-%%                        process_flag(trap_exit, true),
-%%                        idle(mystate)
-%%                end).
-%% </pre>
-%% <p>Is changed into:</p>
-%% <pre>
-%% spawn_link() ->
-%%     {@link spawn_link/2. plain_fsm:spawn_link}(?MODULE, fun() ->
-%%                                           process_flag(trap_exit,true),
-%%                                           idle(mystate)
-%%                                   end).
-%% </pre>
-%% <p>See also {@link spawn/2. spawn/2} and {@link spawn_opt/3. spawn_opt/3}
-%% for information on other possible start functions.</p>
-%% <p>To be fully compliant, you also need to supply a code_change/3 function.
-%% See {@link behaviour_info/1. behaviour_info/1} for details.</p>
-%% @end
+%%% @doc A behaviour/support library for writing plain Erlang FSMs.
+%%% 
+%%% <p>This module implements an OTP behaviour for writing plain Erlang FSMs,
+%%% alleviating a long-standing gripe of mine that the OTP behaviours, for all
+%%% their power, force programmers into a coding style that is very much 
+%%% different from that taught in the Basic Erlang Course (or the book, or
+%%% online tutorials, ...) -- the type of programming that made us want to 
+%%% use Erlang in the first place.</p>
+%%%
+%%% <p>Only in my old age have I begun to understand fully what a sacrifice
+%%% this is. See <a href="pots/index.html">
+%%% Programming Models for Concurrency </a> for a detailed discussion of 
+%%% the issues involved.</p>
+%%%
+%%% <p>The requirements that drove us away from plain Erlang programming
+%%% in the first place were:
+%%% <ul>
+%%%  <li><b>The need to support <i>system messages</i></b> to control upgrade,
+%%%    state inspection, shutdown, etc. The plain_fsm library solves this in a 
+%%%    reasonable way, I think.</li>
+%%%  <li><b>The need for debugging support</b>. The debugging support in
+%%%    e.g. gen_server is, I believe, rendered obsolete by the new powerful
+%%%    trace support (and dbg) in later versions of OTP.</li>
+%%%  <li>In the case of gen_server, <b>reducing the need to reinvent the 
+%%%    wheel</b>, a valid point, but more so for e.g. the client side of 
+%%%    gen_server:call(). In a protocol state machine, the only thing that 
+%%%    really needs reusing is the handling of system messages.</li>
+%%% </ul>
+%%% </p>
+%%%
+%%% <p>However, the behaviours provided by OTP for FSM programming, 
+%%% <code>gen_server</code> and <code>gen_fsm</code> (<code>gen_server</code>
+%%% is perhaps a more common choice than <code>gen_fsm</code>), both have the
+%%% distinct drawback that you cannot normally start with a classic
+%%% Erlang design and then migrate to a behaviour without significant
+%%% code rewrite. In addition, the two behaviours are semantically different
+%%% from the classic Erlang design</p>
+%%%
+%%% <h2>Using plain_fsm</h2>
+%%%
+%%% <p>First, write your state machine without worrying about OTP system
+%%% messages. Once you're happy with it, figure out where you really want 
+%%% to handle system messages. Normally, it will suffice to do it in a fairly
+%%% stable state. A good rule of thumb is that the top-level state machine
+%%% should handle system messages, while the transient (sub-) states 
+%%% shouldn't</p>
+%%% 
+%%% <p>In the states where you want to handle system messages, you have 
+%%% three choices:</p>
+%%% 
+%%% <h3>(A) Insert the system messages in the receive clause:</h3>
+%%% 
+%%% <pre>
+%%% idle(S) ->
+%%%    Parent = plain_fsm:info(parent),
+%%%    receive
+%%%       {system, From, Req} ->
+%%%          plain_fsm:handle_system_msg(
+%%%              From, Req, S, fun(S1) -> idle(S1) end);
+%%%       {'EXIT', Parent, Reason} ->
+%%%          plain_fsm:parent_EXIT(Reason, S);
+%%%       ... %% your original code here
+%%%    end.
+%%% </pre>
+%%%
+%%% <p>This has the advantage that everyone can understand what's going on.
+%%% The part that plain_fsm.erl helps you with is the set of functions
+%%% <code>system_code_change()</code>, <code>system_continue()</code>,
+%%% <code>system_shutdown()</code>, <code>format_status()</code>, which
+%%% are required callbacks when you handle system messages directly.</p>
+%%%
+%%% <h3>(B) Handle system messages and unknown messages together:</h3>
+%%% 
+%%% <pre>
+%%% idle(S) ->
+%%%    Parent = plain_fsm:info(parent),
+%%%    receive
+%%%       ... %% your original code here
+%%%       Msg ->
+%%%          plain_fsm:handle_msg(Msg, State, fun(S1) -> idle(S1) end)
+%%%    end.
+%%% </pre>
+%%%
+%%% <p>This is quite convenient if the receive statement already has a 
+%%% 'catch-all' clause, discarding unknown messages. 
+%%% <code>plain_fsm:handle_msg/3</code> will handle system messages properly
+%%% and ignore any other message.</p>
+%%%
+%%% <h3>(C) Write a pseudo wrapper function around your receive clause:</h3>
+%%%
+%%% <pre>
+%%% idle(S) ->
+%%%    plain_fsm:extended_receive(
+%%%       receive
+%%%          ... %% your original code
+%%%       end).
+%%% </pre>
+%%%
+%%% <p>The function <code>plain_fsm:extended_receive/1</code> is replaced 
+%%% in a <i>parse_transform</i> into something that looks very much like
+%%% the previous program (A). The code, as it reads, requires the reader to
+%%% know that the transformation takes place, otherwise the semantics
+%%% would be confusing (you cannot solve the problem using a real function
+%%% that way.) On the plus side, this is a fairly small violation of both
+%%% the original code and Erlang's semantics.</p>
+%%%
+%%% <p><i>Note that for this to work, you must include "plain_fsm.hrl"
+%%% in your module.</i></p>
+%%%
+%%% <h4>Example</h4>
+%%% <p>In the module <a href="../src/fsm_example.erl">fsm_example.erl</a>
+%%% (included in the plain_fsm package), we choose to handle system
+%%% messages in the idle state. The example code is runnable, and supports
+%%% suspend, resume, status inspection, and code change.</p>
+%%% <p>Imagine that the code initially looked like this:</p>
+%%% <pre>
+%%% idle(S) ->
+%%%     receive
+%%% 	a ->
+%%% 	    io:format("going to state a~n", []),
+%%% 	    a(S);
+%%% 	b ->
+%%% 	    io:format("going to state b~n", []),
+%%% 	    b(S)
+%%%     after 10000 ->
+%%% 	    io:format("timeout in idle~n", []),
+%%% 	    idle(S)
+%%%     end).
+%%% </pre>
+%%%
+%%% <p>The change required to handle system messages is as follows:</p>
+%%% <pre>
+%%% idle(S) ->
+%%%     {@link extended_receive/1. plain_fsm:extended_receive}(
+%%%       receive
+%%%           a ->
+%%%               io:format("going to state a~n", []),
+%%%               a(S);
+%%%           b ->
+%%%               io:format("going to state b~n", []),
+%%%               b(S)
+%%%       after 10000 ->
+%%%               io:format("timeout in idle~n", []),
+%%%               idle(S)
+%%%       end).
+%%% </pre>
+%%%
+%%% <p>In addition, we change the start function from, in this case:</p>
+%%% <pre>
+%%% spawn_link() ->
+%%%     spawn_link(fun() ->
+%%%                        process_flag(trap_exit, true),
+%%%                        idle(mystate)
+%%%                end).
+%%% </pre>
+%%% <p>Is changed into:</p>
+%%% <pre>
+%%% spawn_link() ->
+%%%     {@link spawn_link/2. plain_fsm:spawn_link}(?MODULE, fun() ->
+%%%                                           process_flag(trap_exit,true),
+%%%                                           idle(mystate)
+%%%                                   end).
+%%% </pre>
+%%% <p>See also {@link spawn/2. spawn/2} and {@link spawn_opt/3. spawn_opt/3}
+%%% for information on other possible start functions.</p>
+%%% <p>To be fully compliant, you also need to supply a code_change/3 function.
+%%% See {@link behaviour_info/1. behaviour_info/1} for details.</p>
+%%% @end
 
 
 
@@ -196,7 +199,9 @@
 %%% Functions to be used for starting the state machine:
 -export([spawn/2,
 	 spawn_link/2,
-	 spawn_opt/3]).
+	 spawn_opt/3,    % (Mod, StartF, Opts)
+	 spawn_opt/4,    % (Node, Mod, StartF, Opts)
+	 start_opt/4]).  % (Mod, InitF, Timeout, Opts)
 
 %%% Functions to be called from within the state machine:
 -export([extended_receive/1,
@@ -207,9 +212,6 @@
 	 store_name/1,
 	 info/1]).
 
-%%% Used to transform the dummy function plain_fsm:recv() into something
-%%% useful.
--export([parse_transform/2]).
 
 %%% Linter callback
 -export([behaviour_info/1]).
@@ -238,86 +240,105 @@
 
 %%% ================ Internal functions ==================
 
-%% @spec behaviour_info(atom()) -> term()
-%% @doc Defines which functions this behaviour expects to be exported from
-%% the user's callback module. plain_fsm requires only code_change/3 to
-%% be present. The semantics of <code>Mod:code_change/3</code> are as follows:
-%% <pre>
-%%   code_change(OldVsn, State, Extra) -> {ok, NewState}.
-%% </pre>
-%% <p>The above code is just like it would look like in a gen_server callback
-%% module.</p>
-%% <pre>
-%%   code_change(OldVsn, State, Extra) -> {ok, NewState, Options}.
-%% </pre>
-%% <p>where <code>Options</code> may be any of </p>
-%% <ul>
-%%  <li><code>{mod, module()}</code>, allowing you to switch callback
-%%   modules during a code change.</li>
-%%  <li><code>{name, name()}</code>, allowing you to rename the process
-%%   (note that you have to handle name registration yourself.)</li>
-%%  <li><code>{cont, atom() | function(1)}</code>, allowing you to provide
-%%   another continuation (point of entry into your own code after the 
-%%   code change.)</li>
-%% </ul>
-%% @end
+%%% @spec behaviour_info(atom()) -> term()
+%%% @doc Defines which functions this behaviour expects to be exported from
+%%% the user's callback module. plain_fsm requires only code_change/3 to
+%%% be present. The semantics of <code>Mod:code_change/3</code> are as follows:
+%%% <pre>
+%%%   code_change(OldVsn, State, Extra) -> {ok, NewState}.
+%%% </pre>
+%%% <p>The above code is just like it would look like in a gen_server callback
+%%% module.</p>
+%%% <pre>
+%%%   code_change(OldVsn, State, Extra) -> {ok, NewState, Options}.
+%%% </pre>
+%%% <p>where <code>Options</code> may be any of </p>
+%%% <ul>
+%%%  <li><code>{mod, module()}</code>, allowing you to switch callback
+%%%   modules during a code change.</li>
+%%%  <li><code>{name, name()}</code>, allowing you to rename the process
+%%%   (note that you have to handle name registration yourself.)</li>
+%%%  <li><code>{cont, atom() | function(1)}</code>, allowing you to provide
+%%%   another continuation (point of entry into your own code after the 
+%%%   code change.)</li>
+%%% </ul>
+%%% @end
 behaviour_info(callbacks) ->
     [{code_change, 3}, {data_vsn, 0}];
 behaviour_info(_Other) ->
     undefined.
 
 
-%% @spec spawn(Mod::atom(), StartF::function()) -> pid()
-%% @doc Equivalent to <code>proc_lib:spawn(StartF)</code>. This function also 
-%% initializes the plain_fsm meta-data.
-%% @end
+%%% @spec spawn(Mod::atom(), StartF::function()) -> pid()
+%%% @doc Equivalent to <code>proc_lib:spawn(StartF)</code>. This function also 
+%%% initializes the plain_fsm meta-data.
+%%% @end
 spawn(Mod, StartF) ->
     ?MODULE:spawn_opt(Mod, StartF, []).
 
-%% @spec spawn_link(Mod::atom(), StartF::function()) -> pid()
-%% @doc Equivalent to <code>proc_lib:spawn_link(StartF)</code>. 
-%% This function also initializes the plain_fsm meta-data.
-%% @end
+%%% @spec spawn_link(Mod::atom(), StartF::function()) -> pid()
+%%% @doc Equivalent to <code>proc_lib:spawn_link(StartF)</code>. 
+%%% This function also initializes the plain_fsm meta-data.
+%%% @end
 spawn_link(Mod, StartF) ->
     ?MODULE:spawn_opt(Mod, StartF, [link]).
 
-%% @spec spawn_opt(Mod::atom(), StartF::function(), Opts::list()) -> pid()
-%% @doc Equivalent to <code>proc_lib:spawn_opt(StartF, Opts)</code>. 
-%% This function also initializes the plain_fsm meta-data.
-%% @end
+%%% @spec spawn_opt(Mod::atom(), StartF::function(), Opts::list()) -> pid()
+%%% @doc Equivalent to <code>proc_lib:spawn_opt(StartF, Opts)</code>. 
+%%% This function also initializes the plain_fsm meta-data.
+%%% @end
 spawn_opt(Mod, StartF, Opts) when function(StartF) ->
     proc_lib:spawn_opt(fun() ->
 			       init(Mod, StartF)
 		       end, Opts).
 
-%% @spec store_name(Name::term()) -> ok
-%%
-%% @doc stores an internal name for the FSM 
-%%      (for <code>sys:get_status()</code>).
-%% This can be used if the FSM were started as an anonymous process
-%% (the only kind currently supported).
-%% Note that this function does not register the name. The name stored
-%% is the one that shows up in sys:get_status/1. No restriction is made
-%% here regarding the data type.
-%% @end
+
+%%% @spec spawn_opt(Node::atom(),Mod::atom(),StartF::function(),Opts::list()) -> pid()
+%%% @doc Equivalent to <code>proc_lib:spawn_opt(Node, StartF, Opts)</code>. 
+%%% This function also initializes the sysFsm meta-data.
+%%% @end
+spawn_opt(Node, Mod, StartF, Opts) when function(StartF) ->
+    proc_lib:spawn_opt(Node, fun() ->
+                                     init(Mod, StartF)
+                             end, Opts).
+
+start_opt(Mod, InitF, Timeout, Opts) when is_function(InitF, 0) ->
+    Parent = self(),
+    Pid = proc_lib:spawn_opt(fun() ->
+				     sync_init(Mod, InitF, Parent)
+			     end, Opts),
+    sync_wait(Pid, Timeout).
+
+
+
+%%% @spec store_name(Name::term()) -> ok
+%%%
+%%% @doc stores an internal name for the FSM 
+%%%      (for <code>sys:get_status()</code>).
+%%% This can be used if the FSM were started as an anonymous process
+%%% (the only kind currently supported).
+%%% Note that this function does not register the name. The name stored
+%%% is the one that shows up in sys:get_status/1. No restriction is made
+%%% here regarding the data type.
+%%% @end
 store_name(Name) ->
     #info{sys = Sys} = I = get({?MODULE, info}),
     put({?MODULE,info}, I#info{sys = Sys#sys{name = Name}}),
     ok.
 
 
-%% @spec info(What::atom()) -> term()
-%%  What = debug | name | mod | parent
-%% @doc retrieves meta-data for the plain_fsm process.
-%%  <p>Description of available meta-data:</p>
-%%   <pre>
-%%     debug : See the manual for sys.erl
-%%     name  : Internal name, normally the same as the registered name.
-%%             initially undefined, can be set via plain_fsm:store_name/1.
-%%     mod   : Name of the callback module.
-%%     parent: The pid() of the parent process.
-%%   </pre>
-%% @end
+%%% @spec info(What::atom()) -> term()
+%%%  What = debug | name | mod | parent
+%%% @doc retrieves meta-data for the plain_fsm process.
+%%%  <p>Description of available meta-data:</p>
+%%%   <pre>
+%%%     debug : See the manual for sys.erl
+%%%     name  : Internal name, normally the same as the registered name.
+%%%             initially undefined, can be set via plain_fsm:store_name/1.
+%%%     mod   : Name of the callback module.
+%%%     parent: The pid() of the parent process.
+%%%   </pre>
+%%% @end
 info(What) ->
     case get({?MODULE,info}) of
 	undefined ->
@@ -332,91 +353,94 @@ info(What) ->
     end.
 
 
-%% @spec extended_receive(Expr) -> VOID
-%%
-%% @doc Virtual function used to wrap receive clauses.
-%% <p>This function cannot be called directly, but is intended as a syntactic
-%% wrapper around a receive clause. It will be transformed at compile time
-%% to a set of receive patterns handling system messages and parent termination
-%% according to the OTP rules. The transform requires that the surrounding
-%% function has exactly one argument (the "State" or "Loop Data".)</p>
-%% <p>To trigger the parse_transform, include the file 
-%% <code>plain_fsm.hrl</code> (found in <code>plain_fsm/inc/</code>) in
-%% your module, and the Erlang compiler must be able to find the module 
-%% <code>plain_fsm.beam</code>. If <code>erlc</code> is used, this is
-%% accomplished by adding <code>-pa .../plain_fsm/ebin</code> to the 
-%% <code>erlc</code> command.</p>
-%% @end
+%%% @spec extended_receive(Expr) -> VOID
+%%%
+%%% @doc Virtual function used to wrap receive clauses.
+%%% <p>This function cannot be called directly, but is intended as a syntactic
+%%% wrapper around a receive clause. It will be transformed at compile time
+%%% to a set of receive patterns handling system messages and parent
+%%% termination according to the OTP rules. The transform requires that
+%%% the surrounding function has exactly one argument (the "State" or 
+%%% "Loop Data".)</p>
+%%% <p>To trigger the parse_transform, include the file 
+%%% <code>plain_fsm.hrl</code> (found in <code>plain_fsm/inc/</code>) in
+%%% your module, and the Erlang compiler must be able to find the module 
+%%% <code>plain_fsm_xform.beam</code>. If <code>erlc</code> is used, this is
+%%% accomplished by adding <code>-pa .../plain_fsm/ebin</code> to the 
+%%% <code>erlc</code> command.</p>
+%%% @end
 extended_receive(_Expr) ->
     exit(cannot_be_called_directly).
 
-%% @spec hibernate(M::atom(), F::atom(), A::[IntState]) -> NEVER_RETURNS
-%%
-%% @doc Virtual function used to wrap a call to the BIF erlang:hibernate/3.
-%% <p>This function cannot be called directly, but translates to the call
-%% <code>erlang:hibernate(plain_fsm,wake_up,[data_vsn(),Module,M,F,A])</code>
-%% where <code>Module:data_vsn()</code> and <code>Module:code_change/3</code>
-%% are expected to exist (the parse_transform will add and export the function 
-%% <code>data_vsn() -&lt; 0</code>, if it doesn't already exist.)</p>
-%% <p>The function <code>plain_fsm:wake_up/5</code> will begin by calling
-%% <code>Module:data_vsn()</code>, and if it is the same as before, simply
-%% call <code>apply(M,F,A)</code>. Otherwise, <code>Module:code_change(OldVsn,
-%% IntState, hibernate)</code> will be called first. This allows a plain_fsm
-%% behaviour module to be "bootstrapped" to a new version during hibernation.</p>
-%% @end
+%%% @spec hibernate(M::atom(), F::atom(), A::[IntState]) -> NEVER_RETURNS
+%%%
+%%% @doc Virtual function used to wrap a call to the BIF erlang:hibernate/3.
+%%% <p>This function cannot be called directly, but translates to the call
+%%% <code>erlang:hibernate(plain_fsm,wake_up,[data_vsn(),Module,M,F,A])</code>
+%%% where <code>Module:data_vsn()</code> and <code>Module:code_change/3</code>
+%%% are expected to exist (the parse_transform will add and export the
+%%% function <code>data_vsn() -&lt; 0</code>, if it doesn't already exist.)</p>
+%%% <p>The function <code>plain_fsm:wake_up/5</code> will begin by calling
+%%% <code>Module:data_vsn()</code>, and if it is the same as before, simply
+%%% call <code>apply(M,F,A)</code>. Otherwise, <code>Module:code_change(OldVsn,
+%%% IntState, hibernate)</code> will be called first. This allows a plain_fsm
+%%% behaviour module to be "bootstrapped" to a new version during hibernation.
+%%% </p>
+%%% @end
 hibernate(_M, _F, _A) ->
     exit(cannot_be_called_directly).
 
 wake_up(OldVsn, Module, M, F, [S] = A) ->
     case Module:data_vsn() of
 	OldVsn ->
-% 	    io:format("waking up, same code version.~n"
-% 		      "messages: ~p~n", [process_info(self(), messages)]),
+%%% 	    io:format("waking up, same code version.~n"
+%%% 		      "messages: ~p~n", [process_info(self(), messages)]),
 	    apply(M, F, A);
 	_NewVsn ->
-% 	    io:format("waking up, new code version - will call code_change().~n"
-% 		      "messages: ~p~n"
-% 		      "OldState = ~p~n", [process_info(self(), messages), S]),
+%%%  	    io:format("waking up, new code version - "
+%%% 		      "will call code_change().~n"
+%%%  		      "messages: ~p~n"
+%%%  		      "OldState = ~p~n", [process_info(self(), messages), S]),
 	    {ok, S1} = Module:code_change(OldVsn, S, hibernate),
-% 	    io:format("New state = ~p~n", [S1]),
+%%% 	    io:format("New state = ~p~n", [S1]),
 	    apply(M, F, [S1])
     end.
 
 
-%% @spec parent_EXIT(Reason, State) -> EXIT
-%%
-%% @doc Handles parent termination properly.
-%% <p>This function is called when the parent of a plain_fsm instance dies.
-%% The OTP rules state that the child should die with the same reason
-%% as the parent (especially in the case of Reason='shutdown'.)</p>
-%% @end
+%%% @spec parent_EXIT(Reason, State) -> EXIT
+%%%
+%%% @doc Handles parent termination properly.
+%%% <p>This function is called when the parent of a plain_fsm instance dies.
+%%% The OTP rules state that the child should die with the same reason
+%%% as the parent (especially in the case of Reason='shutdown'.)</p>
+%%% @end
 parent_EXIT(Reason, _State) ->
     %% no callback - don't know if there should be one...
     exit(Reason).
 
 
-%% @spec handle_system_msg(Req, From, State, Cont::cont()) -> NEVER_RETURNS
-%%
-%% @doc Called when the process receives a system message.
-%% <p>This function never returns. If the program handles system messages 
-%% explicitly, this function can be called to handle them in the plain_fsm
-%% way. Example:</p>
-%% <pre>
-%% idle(S) ->
-%%   receive
-%%      {system, From, Req} ->
-%%          plain_fsm:handle_system_msg(From, Req, S, fun(S1) ->
-%%                                                           idle(S1)
-%%                                                    end);
-%%      ...
-%%   end.
-%% </pre>
-%% <p>The <code>Cont</code> argument should be either a fun with one argument
-%% (the new state), which jumps back into the user code in the proper place,
-%% or it can be the name of a function (in this case, 'idle'). In the latter
-%% case, the function in question must be exported; in the former case, this
-%% is not necessary.</p>
-%% @end
+%%% @spec handle_system_msg(Req, From, State, Cont::cont()) -> NEVER_RETURNS
+%%%
+%%% @doc Called when the process receives a system message.
+%%% <p>This function never returns. If the program handles system messages 
+%%% explicitly, this function can be called to handle them in the plain_fsm
+%%% way. Example:</p>
+%%% <pre>
+%%% idle(S) ->
+%%%   receive
+%%%      {system, From, Req} ->
+%%%          plain_fsm:handle_system_msg(From, Req, S, fun(S1) ->
+%%%                                                           idle(S1)
+%%%                                                    end);
+%%%      ...
+%%%   end.
+%%% </pre>
+%%% <p>The <code>Cont</code> argument should be either a fun with one argument
+%%% (the new state), which jumps back into the user code in the proper place,
+%%% or it can be the name of a function (in this case, 'idle'). In the latter
+%%% case, the function in question must be exported; in the former case, this
+%%% is not necessary.</p>
+%%% @end
 handle_system_msg(Req, From, State, Cont) ->
     #info{parent = Parent, debug = Debug, sys = Sys} = I =
 	get({?MODULE, info}),
@@ -426,35 +450,35 @@ handle_system_msg(Req, From, State, Cont) ->
 			  {Sys1, State}).
 
 
-%% @spec handle_msg(Msg, State, Cont::cont()) -> NEVER_RETURNS
-%%
-%% @doc Called in a "catch-all" clause within a receive statement.
-%% <p>This function never returns. It will handle system messages
-%% properly and ignore anything else.
-%% Example:</p>
-%% <pre>
-%% idle(S) ->
-%%   receive
-%%      ...
-%%      Msg ->
-%%          plain_fsm:handle_msg(Msg, S, fun(S1) ->
-%%                                                idle(S1)
-%%                                       end)
-%%   end.
-%% </pre>
-%%
-%% <p>Note that this function should <i>only</i> be used if it is known
-%% to be safe to discard unknown messages. In most state machines there should
-%% be at least <i>one</i> state where unknown messages are discarded; in 
-%% these states, the handle_msg/3 function can be a convenient way to 
-%% handle both unknown messages and system messages.</p>
-%%
-%% <p>The <code>Cont</code> argument should be either a fun with one argument
-%% (the new state), which jumps back into the user code in the proper place,
-%% or it can be the name of a function (in this case, 'idle'). In the latter
-%% case, the function in question must be exported; in the former case, this
-%% is not necessary.</p>
-%% @end
+%%% @spec handle_msg(Msg, State, Cont::cont()) -> NEVER_RETURNS
+%%%
+%%% @doc Called in a "catch-all" clause within a receive statement.
+%%% <p>This function never returns. It will handle system messages
+%%% properly and ignore anything else.
+%%% Example:</p>
+%%% <pre>
+%%% idle(S) ->
+%%%   receive
+%%%      ...
+%%%      Msg ->
+%%%          plain_fsm:handle_msg(Msg, S, fun(S1) ->
+%%%                                                idle(S1)
+%%%                                       end)
+%%%   end.
+%%% </pre>
+%%%
+%%% <p>Note that this function should <i>only</i> be used if it is known
+%%% to be safe to discard unknown messages. In most state machines there should
+%%% be at least <i>one</i> state where unknown messages are discarded; in 
+%%% these states, the handle_msg/3 function can be a convenient way to 
+%%% handle both unknown messages and system messages.</p>
+%%%
+%%% <p>The <code>Cont</code> argument should be either a fun with one argument
+%%% (the new state), which jumps back into the user code in the proper place,
+%%% or it can be the name of a function (in this case, 'idle'). In the latter
+%%% case, the function in question must be exported; in the former case, this
+%%% is not necessary.</p>
+%%% @end
 handle_msg({system, From, Req}, State, Cont) ->
     handle_system_msg(Req, From, State, Cont);
 handle_msg(_Other, State, Cont) ->
@@ -462,11 +486,11 @@ handle_msg(_Other, State, Cont) ->
     continue(State, Cont).
     
 
-%% @hidden
-%% @spec system_continue(Parent, Debug, IntState) -> USER_CODE
-%%
-%% @doc Internal export; handles the jump back into user code.
-%%
+%%% @hidden
+%%% @spec system_continue(Parent, Debug, IntState) -> USER_CODE
+%%%
+%%% @doc Internal export; handles the jump back into user code.
+%%%
 system_continue(Parent, Debug, IntState) ->
     #info{} = I = get({?MODULE, info}),
     {#sys{cont = Cont} = Sys, State} = IntState,
@@ -483,22 +507,23 @@ continue(State, Cont) when atom(Cont) ->
     Mod:Cont(State).
 
 
-%% @hidden
-%% @spec system_terminate(Reason, Parent, Debug, IntState) -> EXIT
-%%
-%% @doc Internal export; called if the process is ordered to terminate e g 
-%% during upgrade.
-%%
+%%% @hidden
+%%% @spec system_terminate(Reason, Parent, Debug, IntState) -> EXIT
+%%%
+%%% @doc Internal export; called if the process is ordered to terminate e g 
+%%% during upgrade.
+%%%
 system_terminate(Reason, _Parent, _Debug, _State) ->
     exit(Reason).
 
 
-%% @hidden
-%% @spec system_code_change(IntState, Module, OldVsn, Extra) -> {ok,NewIntState}
-%%
-%% @doc Internal export; called in order to change into a newer version of 
-%% the callback module.
-%%
+%%% @hidden
+%%% @spec system_code_change(IntState, Module, OldVsn, Extra) ->
+%%%          {ok,NewIntState}
+%%%
+%%% @doc Internal export; called in order to change into a newer version of 
+%%% the callback module.
+%%%
 system_code_change(IntState, Module, OldVsn, Extra) ->
     {Sys,State} = IntState,
     case apply(Module, code_change, [OldVsn, State, Extra]) of
@@ -510,19 +535,19 @@ system_code_change(IntState, Module, OldVsn, Extra) ->
     end.
 
 
-%% @hidden
-%% @spec format_status(Opt, StatusData) -> term()
-%%
-%% @doc Internal export; called as a result of a call to sys:get_status(FSM).
-%% <p>It is possible to provide a function, <code>format_status/2</code>,
-%% in the callback module. If such a function is exported, it will be called
-%% as <code>Mod:format_status(Opt, [ProcessDictionary, State])</code>, and
-%% should return a <code>[{string(), term()}]</code> tuple list.</p>
-%% <p>This behaviour is borrowed from gen_server.erl. Unfortunately, both
-%% the Mod:format_status/2 callback required by sys.erl, and the optional
-%% Mod:format_status/2 callback supported by gen_server.erl are undocumented.
-%% </p>
-%% @end
+%%% @hidden
+%%% @spec format_status(Opt, StatusData) -> term()
+%%%
+%%% @doc Internal export; called as a result of a call to sys:get_status(FSM).
+%%% <p>It is possible to provide a function, <code>format_status/2</code>,
+%%% in the callback module. If such a function is exported, it will be called
+%%% as <code>Mod:format_status(Opt, [ProcessDictionary, State])</code>, and
+%%% should return a <code>[{string(), term()}]</code> tuple list.</p>
+%%% <p>This behaviour is borrowed from gen_server.erl. Unfortunately, both
+%%% the Mod:format_status/2 callback required by sys.erl, and the optional
+%%% Mod:format_status/2 callback supported by gen_server.erl are undocumented.
+%%% </p>
+%%% @end
 format_status(Opt, StatusData) ->
     [PDict, SysState, Parent, Debug, IntState] = StatusData,
     {#sys{mod = Mod, name = Name}, State} = IntState,
@@ -560,6 +585,17 @@ init(Mod, StartF) ->
     StartF().
 
 
+sync_init(Mod, InitF, Parent) ->
+    case init(Mod, InitF) of
+	{reply, Reply, ContF} when is_function(ContF, 0) ->
+	    proc_lib:init_ack(Parent, Reply),
+	    ContF();
+	{noreply, ContF} when is_function(ContF, 0) ->
+	    ContF();
+	Other ->
+	    erlang:error({start_error, Other})
+    end.
+
 
 process_options(Opts, Sys) ->
     lists:foldl(
@@ -581,589 +617,28 @@ parent() ->
     end.
 
 
-
-
-%%% @hidden
-%%% Here's the parse transform code
-
-parse_transform(Forms, _Options) ->
-    Forms1 = maybe_add_vsn_f(forms(Forms)),
-    erase(plain_fsm_transform_module),
-    Forms1.
-
-
-%% forms(Fs) -> lists:map(fun (F) -> form(F) end, Fs).
-
-forms([F0|Fs0]) ->
-    F1 = form(F0),
-    Fs1 = forms(Fs0),
-    [F1|Fs1];
-forms([]) -> [].
-
-
-%% -type form(Form) -> Form.
-form({attribute,_Line,module,Mod} = Form) ->
-    put(plain_fsm_transform_module, Mod),
-    Form;
-form({function,Line,Name0,Arity0,Clauses0}) ->
-    {Name,Arity,Clauses} = function(Name0, Arity0, Clauses0),
-    {function,Line,Name,Arity,Clauses};
-form(F) ->
-    F.
-
-%% -type function(atom(), integer(), [Clause]) -> {atom(),integer(),[Clause]}.
-function(Name, Arity, Clauses0) ->
-    Clauses1 = clauses(Clauses0, Name),
-    {Name,Arity,Clauses1}.
-
-
-%% -type clauses([Clause]) -> [Clause].
-clauses([C0|Cs], Function) ->
-    C1 = clause(C0, Function),
-    [C1|clauses(Cs, Function)];
-clauses([], _) -> [].
-
-
-%% -type clause(Clause) -> Clause.
-clause({clause,Line,H0,Guard,B0}, Function) ->
-    {B1, H1} = exprs(B0, H0, Function),
-    {clause,Line,H1,Guard,B1}.
-
-exprs(Es, H, Function) ->
-    exprs(Es, [], H, Function).
-
-exprs([E|Es], EAcc, H, Function) ->
-    case expr(E, H, Function) of
-	{E1, H1} when is_tuple(E1) ->
-	    exprs(Es, [E1|EAcc], H1, Function);
-	{Es1, H1} when is_list(Es1) ->
-	    exprs(Es, lists:reverse(Es1) ++ EAcc, H1, Function)
-    end;
-exprs([], EAcc, H, _Function) ->
-    {lists:reverse(EAcc), H}.
-
-
-expr({call,Line,{remote,_,{atom,_,?MODULE},{atom,_,extended_receive}},
-      [{'receive',Line1,RecvClauses}]}, Head, Function) ->
-    %% extended_receive/1 - no timeout
-    ExtendedClauses = extend_recv(RecvClauses, Line1, Function),
-    E1 = [get_parent_expr(Line1),
-	  {'receive', Line, ExtendedClauses}],
-    {E1, fix_head(Head)};
-expr({call,Line,{remote,_,{atom,_,?MODULE},{atom,_,extended_receive}},
-      [{'receive',Line1,RecvClauses, TO, TOExprs}]}, Head, Function) ->
-    %% extended_receive/1 with timeout
-    ExtendedClauses = extend_recv(RecvClauses, Line1, Function),
-    E1 = [get_parent_expr(Line1),
-	  {'receive', Line, ExtendedClauses, TO, TOExprs}],
-    {E1, fix_head(Head)};
-expr(E, H, _) ->
-    E1 = expr(E),
-    {E1, H}.
-
-expr({call,L1,{remote,L2,{atom,L3,?MODULE},{atom,L4,hibernate}},
-      [M, F, A]}) ->
-    L5 = ?line(M),
-    Module = get(plain_fsm_transform_module),
-    {call,L1,{remote,L2,{atom,L3,erlang},{atom,L4,hibernate}},
-	  [{atom,L5,?MODULE},{atom,L5,wake_up},
-	   {cons,L5,{call,L5,{atom,L5,data_vsn},[]},
-	    {cons,L5,{atom,L5,Module},
-	     {cons,?line(M),M,
-	      {cons,?line(F),F,
-	       {cons, ?line(A),A,
-		{nil,?line(A)}}}}}}]};
-%% The following clauses copied from erl_id_trans.erl
-%%
-expr({var,Line,V}) -> {var,Line,V};
-expr({integer,Line,I}) -> {integer,Line,I};
-expr({float,Line,F}) -> {float,Line,F};
-expr({atom,Line,A}) -> {atom,Line,A};
-expr({string,Line,S}) -> {string,Line,S};
-expr({char,Line,C}) -> {char,Line,C};
-expr({nil,Line}) -> {nil,Line};
-expr({cons,Line,H0,T0}) ->
-    H1 = expr(H0),
-    T1 = expr(T0),                              %They see the same variables
-    {cons,Line,H1,T1};
-expr({lc,Line,E0,Qs0}) ->
-    Qs1 = lc_quals(Qs0),
-    E1 = expr(E0),
-    {lc,Line,E1,Qs1};
-expr({tuple,Line,Es0}) ->
-    Es1 = expr_list(Es0),
-    {tuple,Line,Es1};
-%%expr({struct,Line,Tag,Es0}) ->
-%%    Es1 = pattern_list(Es0),
-%%    {struct,Line,Tag,Es1};
-expr({record_index,Line,Name,Field0}) ->
-    Field1 = expr(Field0),
-    {record_index,Line,Name,Field1};
-expr({record,Line,Name,Inits0}) ->
-    Inits1 = record_inits(Inits0),
-    {record,Line,Name,Inits1};
-expr({record_field,Line,Rec0,Name,Field0}) ->
-    Rec1 = expr(Rec0),
-    Field1 = expr(Field0),
-    {record_field,Line,Rec1,Name,Field1};
-expr({record,Line,Rec0,Name,Upds0}) ->
-    Rec1 = expr(Rec0),
-    Upds1 = record_updates(Upds0),
-    {record,Line,Rec1,Name,Upds1};
-expr({record_field,Line,Rec0,Field0}) ->
-    Rec1 = expr(Rec0),
-    Field1 = expr(Field0),
-    {record_field,Line,Rec1,Field1};
-expr({block,Line,Es0}) ->
-    %% Unfold block into a sequence.
-    Es1 = exprs(Es0),
-    {block,Line,Es1};
-expr({'if',Line,Cs0}) ->
-    Cs1 = icr_clauses(Cs0),
-    {'if',Line,Cs1};
-expr({'case',Line,E0,Cs0}) ->
-    E1 = expr(E0),
-    Cs1 = icr_clauses(Cs0),
-    {'case',Line,E1,Cs1};
-expr({'receive',Line,Cs0}) ->
-    Cs1 = icr_clauses(Cs0),
-    {'receive',Line,Cs1};
-expr({'receive',Line,Cs0,To0,ToEs0}) ->
-    To1 = expr(To0),
-    ToEs1 = exprs(ToEs0),
-    Cs1 = icr_clauses(Cs0),
-    {'receive',Line,Cs1,To1,ToEs1};
-expr({'try',Line,Es0,Scs0,Ccs0}) ->
-    Es1 = exprs(Es0),
-    Scs1 = icr_clauses(Scs0),
-    Ccs1 = icr_clauses(Ccs0),
-    {'try',Line,Es1,Scs1,Ccs1};
-expr({'fun',Line,Body}) ->
-    case Body of
-        {clauses,Cs0} ->
-            Cs1 = fun_clauses(Cs0),
-            {'fun',Line,{clauses,Cs1}};
-        {function,F,A} ->
-            {'fun',Line,{function,F,A}};
-        {function,M,F,A} ->                     %This is an error in lint!
-            {'fun',Line,{function,M,F,A}}
-    end;
-expr({call,Line,F0,As0}) ->
-    %% N.B. If F an atom then call to local function or BIF, if F a
-    %% remote structure (see below) then call to other module,
-    %% otherwise apply to "function".
-    F1 = expr(F0),
-    As1 = expr_list(As0),
-    {call,Line,F1,As1};
-expr({'catch',Line,E0}) ->
-    %% No new variables added.
-    E1 = expr(E0),
-    {'catch',Line,E1};
-expr({'query', Line, E0}) ->
-    %% lc expression
-    E = expr(E0),
-    {'query', Line, E};
-expr({match,Line,P0,E0}) ->
-    E1 = expr(E0),
-    P1 = pattern(P0),
-    {match,Line,P1,E1};
-expr({bin,Line,Fs}) ->
-    Fs2 = pattern_grp(Fs),
-    {bin,Line,Fs2};
-expr({op,Line,Op,A0}) ->
-    A1 = expr(A0),
-    {op,Line,Op,A1};
-expr({op,Line,Op,L0,R0}) ->
-    L1 = expr(L0),
-    R1 = expr(R0),                              %They see the same variables
-    {op,Line,Op,L1,R1};
-%% The following are not allowed to occur anywhere!
-expr({remote,Line,M0,F0}) ->
-    M1 = expr(M0),
-    F1 = expr(F0),
-    {remote,Line,M1,F1}.
-
-
-
-%% -type expr_list([Expression]) -> [Expression].
-%%  These expressions are processed "in parallel" for purposes of variable
-%%  definition etc.
-
-expr_list([E0|Es]) ->
-    E1 = expr(E0),
-    [E1|expr_list(Es)];
-expr_list([]) -> [].
-
-%% -type record_inits([RecordInit]) -> [RecordInit].
-%%  N.B. Field names are full expressions here but only atoms are allowed
-%%  by the *linter*!.
-
-record_inits([{record_field,Lf,{atom,La,F},Val0}|Is]) ->
-    Val1 = expr(Val0),
-    [{record_field,Lf,{atom,La,F},Val1}|record_inits(Is)];
-record_inits([{record_field,Lf,{var,La,'_'},Val0}|Is]) ->
-    Val1 = expr(Val0),
-    [{record_field,Lf,{var,La,'_'},Val1}|record_inits(Is)];
-record_inits([]) -> [].
-
-%% -type record_updates([RecordUpd]) -> [RecordUpd].
-%%  N.B. Field names are full expressions here but only atoms are allowed
-%%  by the *linter*!.
-
-record_updates([{record_field,Lf,{atom,La,F},Val0}|Us]) ->
-    Val1 = expr(Val0),
-    [{record_field,Lf,{atom,La,F},Val1}|record_updates(Us)];
-record_updates([]) -> [].
-
-%% -type icr_clauses([Clause]) -> [Clause].
-
-icr_clauses([C0|Cs]) ->
-    C1 = clause(C0),
-    [C1|icr_clauses(Cs)];
-icr_clauses([]) -> [].
-
-%% -type lc_quals([Qualifier]) -> [Qualifier].
-%%  Allow filters to be both guard tests and general expressions.
-
-lc_quals([{generate,Line,P0,E0}|Qs]) ->
-    E1 = expr(E0),
-    P1 = pattern(P0),
-    [{generate,Line,P1,E1}|lc_quals(Qs)];
-lc_quals([E0|Qs]) ->
-    E1 = expr(E0),
-    [E1|lc_quals(Qs)];
-lc_quals([]) -> [].
-
-%% -type fun_clauses([Clause]) -> [Clause].
-
-fun_clauses([C0|Cs]) ->
-    C1 = clause(C0),
-    [C1|fun_clauses(Cs)];
-fun_clauses([]) -> [].
-
-%% -type clause(Clause) -> Clause.
-
-clause({clause,Line,H0,G0,B0}) ->
-    H1 = head(H0),
-    G1 = guard(G0),
-    B1 = exprs(B0),
-    {clause,Line,H1,G1,B1}.
-
-%% -type head([Pattern]) -> [Pattern].
-
-head(Ps) -> patterns(Ps).
-
-%% -type patterns([Pattern]) -> [Pattern].
-%%  These patterns are processed "sequentially" for purposes of variable
-%%  definition etc.
-
-patterns([P0|Ps]) ->
-    P1 = pattern(P0),
-    [P1|patterns(Ps)];
-patterns([]) -> [].
-
-%% -type pattern(Pattern) -> Pattern.
-%%  N.B. Only valid patterns are included here.
-
-string_to_conses([], _Line, Tail) ->
-    Tail;
-string_to_conses([E|Rest], Line, Tail) ->
-    {cons, Line, {integer, Line, E}, string_to_conses(Rest, Line, Tail)}.
-
-pattern({var,Line,V}) -> {var,Line,V};
-pattern({match,Line,L0,R0}) ->
-    L1 = pattern(L0),
-    R1 = pattern(R0),
-    {match,Line,L1,R1};
-pattern({integer,Line,I}) -> {integer,Line,I};
-pattern({char,Line,C}) -> {char,Line,C};
-pattern({float,Line,F}) -> {float,Line,F};
-pattern({atom,Line,A}) -> {atom,Line,A};
-pattern({string,Line,S}) -> {string,Line,S};
-pattern({nil,Line}) -> {nil,Line};
-pattern({cons,Line,H0,T0}) ->
-    H1 = pattern(H0),
-    T1 = pattern(T0),
-    {cons,Line,H1,T1};
-pattern({tuple,Line,Ps0}) ->
-    Ps1 = pattern_list(Ps0),
-    {tuple,Line,Ps1};
-%%pattern({struct,Line,Tag,Ps0}) ->
-%%    Ps1 = pattern_list(Ps0),
-%%    {struct,Line,Tag,Ps1};
-pattern({record,Line,Name,Pfs0}) ->
-    Pfs1 = pattern_fields(Pfs0),
-    {record,Line,Name,Pfs1};
-pattern({record_index,Line,Name,Field0}) ->
-    Field1 = pattern(Field0),
-    {record_index,Line,Name,Field1};
-%% record_field occurs in query expressions
-pattern({record_field,Line,Rec0,Name,Field0}) ->
-    Rec1 = expr(Rec0),
-    Field1 = expr(Field0),
-    {record_field,Line,Rec1,Name,Field1};
-pattern({record_field,Line,Rec0,Field0}) ->
-    Rec1 = expr(Rec0),
-    Field1 = expr(Field0),
-    {record_field,Line,Rec1,Field1};
-pattern({bin,Line,Fs}) ->
-    Fs2 = pattern_grp(Fs),
-    {bin,Line,Fs2};
-pattern({op,_Line,'++',{nil,_},R}) ->
-    pattern(R);
-pattern({op,_Line,'++',{cons,Li,{char,C2,I},T},R}) ->
-    pattern({cons,Li,{char,C2,I},{op,Li,'++',T,R}});
-pattern({op,_Line,'++',{cons,Li,{integer,L2,I},T},R}) ->
-    pattern({cons,Li,{integer,L2,I},{op,Li,'++',T,R}});
-pattern({op,_Line,'++',{string,Li,L},R}) ->
-    pattern(string_to_conses(L, Li, R));
-pattern({op,Line,Op,A}) ->
-    {op,Line,Op,A};
-pattern({op,Line,Op,L,R}) ->
-    {op,Line,Op,L,R}.
-
-pattern_grp([{bin_element,L1,E1,S1,T1} | Fs]) ->
-    S2 = case S1 of
-             default ->
-                 default;
-             _ ->
-                 expr(S1)
-         end,
-    T2 = case T1 of
-             default ->
-                 default;
-             _ ->
-                 bit_types(T1)
-         end,
-    [{bin_element,L1,expr(E1),S2,T2} | pattern_grp(Fs)];
-pattern_grp([]) ->
-    [].
-
-bit_types([]) ->
-    [];
-bit_types([Atom | Rest]) when atom(Atom) ->
-    [Atom | bit_types(Rest)];
-bit_types([{Atom, Integer} | Rest]) when atom(Atom), integer(Integer) ->
-    [{Atom, Integer} | bit_types(Rest)].
-
-
-
-%% -type pattern_list([Pattern]) -> [Pattern].
-%%  These patterns are processed "in parallel" for purposes of variable
-%%  definition etc.
-
-pattern_list([P0|Ps]) ->
-    P1 = pattern(P0),
-    [P1|pattern_list(Ps)];
-pattern_list([]) -> [].
-
-%% -type pattern_fields([Field]) -> [Field].
-%%  N.B. Field names are full expressions here but only atoms are allowed
-%%  by the *linter*!.
-
-pattern_fields([{record_field,Lf,{atom,La,F},P0}|Pfs]) ->
-    P1 = pattern(P0),
-    [{record_field,Lf,{atom,La,F},P1}|pattern_fields(Pfs)];
-pattern_fields([{record_field,Lf,{var,La,'_'},P0}|Pfs]) ->
-    P1 = pattern(P0),
-    [{record_field,Lf,{var,La,'_'},P1}|pattern_fields(Pfs)];
-pattern_fields([]) -> [].
-
-%% -type guard([GuardTest]) -> [GuardTest].
-
-guard([G0|Gs]) when list(G0) ->
-    [guard0(G0) | guard(Gs)];
-guard(L) ->
-    guard0(L).
-
-guard0([G0|Gs]) ->
-    G1 =  guard_test(G0),
-    [G1|guard0(Gs)];
-guard0([]) -> [].
-
-guard_test(Expr={call,Line,{atom,La,F},As0}) ->
-    case erl_internal:type_test(F, length(As0)) of
-        true -> 
-            As1 = gexpr_list(As0),
-            {call,Line,{atom,La,F},As1};
-        _ ->
-            gexpr(Expr)
-    end;
-guard_test(Any) ->
-    gexpr(Any).
-
-%% Before R9, there were special rules regarding the expressions on
-%% top level in guards. Those limitations are now lifted, why a special clause
-%% for the toplevel expressions is no longer needed.
-%% -type gexpr(GuardExpr) -> GuardExpr.
-
-gexpr({var,Line,V}) -> {var,Line,V};
-gexpr({integer,Line,I}) -> {integer,Line,I};
-gexpr({char,Line,C}) -> {char,Line,C};
-gexpr({float,Line,F}) -> {float,Line,F};
-gexpr({atom,Line,A}) -> {atom,Line,A};
-gexpr({string,Line,S}) -> {string,Line,S};
-gexpr({nil,Line}) -> {nil,Line};
-gexpr({cons,Line,H0,T0}) ->
-    H1 = gexpr(H0),
-    T1 = gexpr(T0),                             %They see the same variables
-    {cons,Line,H1,T1};
-gexpr({tuple,Line,Es0}) ->
-    Es1 = gexpr_list(Es0),
-    {tuple,Line,Es1};
-gexpr({record_index,Line,Name,Field0}) ->
-    Field1 = gexpr(Field0),
-    {record_index,Line,Name,Field1};
-gexpr({record_field,Line,Rec0,Name,Field0}) ->
-    Rec1 = gexpr(Rec0),
-    Field1 = gexpr(Field0),
-    {record_field,Line,Rec1,Name,Field1};
-gexpr({record,Line,Name,Inits0}) ->
-    Inits1 = grecord_inits(Inits0),
-    {record,Line,Name,Inits1};
-gexpr({call,Line,{atom,La,F},As0}) ->
-    case erl_internal:guard_bif(F, length(As0)) of
-        true -> As1 = gexpr_list(As0),
-                {call,Line,{atom,La,F},As1}
-    end;
-% Guard bif's can be remote, but only in the module erlang...
-gexpr({call,Line,{remote,La,{atom,Lb,erlang},{atom,Lc,F}},As0}) ->
-    case erl_internal:guard_bif(F, length(As0)) or
-         erl_internal:arith_op(F, length(As0)) or 
-         erl_internal:comp_op(F, length(As0)) or
-         erl_internal:bool_op(F, length(As0)) of
-        true -> As1 = gexpr_list(As0),
-                {call,Line,{remote,La,{atom,Lb,erlang},{atom,Lc,F}},As1}
-    end;
-gexpr({bin,Line,Fs}) ->
-    Fs2 = pattern_grp(Fs),
-    {bin,Line,Fs2};
-gexpr({op,Line,Op,A0}) ->
-    case erl_internal:arith_op(Op, 1) or 
-         erl_internal:bool_op(Op, 1) of
-        true -> A1 = gexpr(A0),
-                {op,Line,Op,A1}
-    end;
-gexpr({op,Line,Op,L0,R0}) ->
-    case erl_internal:arith_op(Op, 2) or
-          erl_internal:bool_op(Op, 2) or 
-          erl_internal:comp_op(Op, 2) of
-        true ->
-            L1 = gexpr(L0),
-            R1 = gexpr(R0),                     %They see the same variables
-            {op,Line,Op,L1,R1}
+%%% Copied from proc_lib.erl
+%%%
+sync_wait(Pid, Timeout) ->
+    receive
+        {ack, Pid, Return} ->
+            Return;
+        {'EXIT', Pid, Reason} ->
+            {error, Reason}
+    after Timeout ->
+            unlink(Pid),
+            exit(Pid, kill),
+            flush(Pid),
+            {error, timeout}
     end.
 
-%% -type gexpr_list([GuardExpr]) -> [GuardExpr].
-%%  These expressions are processed "in parallel" for purposes of variable
-%%  definition etc.
 
-gexpr_list([E0|Es]) ->
-    E1 = gexpr(E0),
-    [E1|gexpr_list(Es)];
-gexpr_list([]) -> [].
+flush(Pid) ->
+    receive
+        {'EXIT', Pid, _} ->
+            true
+    after 0 ->
+            true
+    end.
 
-grecord_inits([{record_field,Lf,{atom,La,F},Val0}|Is]) ->
-    Val1 = gexpr(Val0),
-    [{record_field,Lf,{atom,La,F},Val1}|grecord_inits(Is)];
-grecord_inits([{record_field,Lf,{var,La,'_'},Val0}|Is]) ->
-    Val1 = gexpr(Val0),
-    [{record_field,Lf,{var,La,'_'},Val1}|grecord_inits(Is)];
-grecord_inits([]) -> [].
-
-%% -type exprs([Expression]) -> [Expression].
-%%  These expressions are processed "sequentially" for purposes of variable
-%%  definition etc.
-
-exprs([E0|Es]) ->
-    E1 = expr(E0),
-    [E1|exprs(Es)];
-exprs([]) -> [].
-
-
-
-%% end copy from erl_id_trans
-
-
-fix_head([{match,_L1,{var,_L2,'__FSM_State'},_}] = Head) ->
-    Head;
-fix_head([Pattern]) ->
-    Line = element(2, Pattern),
-    [{match, Line, {var,Line,'__FSM_State'}, Pattern}].
-
-get_parent_expr(L) ->
-    {match,L,
-     {var,L,'__FSM_Parent'},
-     {call,L,{remote,L,{atom,L,?MODULE},{atom,L,info}},[{atom,L,parent}]}}.
-
-extend_recv(Cs, L, Function) ->
-    [{clause,L,
-      [{tuple,L,[{atom,L,'EXIT'},
-		 {var, L, '__FSM_Parent'},
-		 {var, L, '__FSM_Reason'}]}],
-      [],
-      [{call, L, {remote, L,
-		  {atom, L, ?MODULE},
-		  {atom, L, parent_EXIT}},
-	[{var, L, '__FSM_Reason'},
-	 {var, L, '__FSM_State'}]}]
-     },
-     {clause,L,
-      [{tuple,L,[{atom,L,system},
-                 {var, L,'__FSM_From'},
-                 {var, L,'__FSM_Req'}]}],
-      [],
-      [{call, L, {remote, L,
-                  {atom, L, ?MODULE},
-                  {atom, L, handle_system_msg}},
-        [{var, L, '__FSM_Req'},
-         {var, L, '__FSM_From'},
-         {var, L, '__FSM_State'},
-         {'fun', L, {clauses, [{clause, L, [{var,L,'__FSM_Sx'}], [],
-                                [{call, L, {atom,L,Function},
-                                  [{var,L,'__FSM_Sx'}]}]}]}}
-        ]}
-      ]} | icr_clauses(Cs)].
-
-
-maybe_add_vsn_f(Forms) ->
-    {Pre, Fns} = lists:splitwith(
-		   fun(F) when tuple(F), element(1,F) == function ->
-			   false;
-		      (_) ->
-			   true
-		   end, Forms),
-    Line = element(2,hd(lists:reverse(Pre))),
-    %%
-    Pre1 = case is_exported(data_vsn, 0, Forms) of
-	       true ->
-		   Pre;
-	       false ->
-		   Pre ++ [{attribute,Line,export,[{data_vsn,0}]}]
-	   end,
-    FunExists = 
-	lists:any(fun({function,_Line,data_vsn,0,_Clauses}) ->
-			  true;
-		     (_) ->
-			  false
-		  end, Fns),
-    Fns1 = 
-	case FunExists of
-	    true ->
-		Fns;
-	    false ->
-		[{eof,LastLine}|RevFns] = lists:reverse(Fns),
-		lists:reverse([{eof,LastLine+2},
-			       {function,LastLine,data_vsn,0,
-				[{clause,LastLine,[],[],[{integer,LastLine+1,0}]}]} | RevFns])
-	end,
-    Pre1 ++ Fns1.
-
-is_exported(Fun, Arity, Forms) ->
-    lists:any(fun({attribute,_,compile,export_all}) ->
-		      true;
-		 ({attribute,_,export,Exports}) ->
-		      lists:member({Fun,Arity}, Exports);
-		 (_) ->
-		      false
-	      end, Forms).
+%%% end copy from proc_lib.erl

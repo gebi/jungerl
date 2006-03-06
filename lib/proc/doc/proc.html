@@ -1,0 +1,698 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Module proc</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body bgcolor="white">
+
+<h1>Module proc</h1>
+Flexible Local Process Registry.
+<p>Copyright © Ericsson AB 2005 All rights reserved.
+  
+   The information in this document is the property of Ericsson. Except
+   as specifically authorized in writing by Ericsson, the receiver of
+   this document shall keep the information contained herein
+   confidential and shall protect the same in whole or in part from
+   disclosure and dissemination to third parties. Disclosure and
+   disseminations to the receivers employees shall only be made on a
+   strict need to know basis.</p>
+<ul><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>
+<p><b>Behaviours:</b> <a href="gen_server.html"><tt>gen_server</tt></a>.</p>
+
+<h2><a name="description">Description</a></h2><p>Flexible Local Process Registry</p>
+  
+    <p>This application supports local registration of processes using any
+    erlang term. Furthermore, each process can register by several
+    different names at the same time.</p>
+  
+    <h2>Semantics:</h2> <p><code>proc</code> works with unique <code>names</code> and
+    non-unique <code>properties</code>.  </p><p>A name can be any erlang term
+    (except a pid or '_'), and each process can register itself under many
+    different unique names.
+    A <code>property</code> can be any term (except '_'), and must be unique
+    within a process, but several processes can register the same
+     property.</p>
+    <p>Furthermore, there are "fold" and "select"
+    functions to allow for efficient iteration over names or properties in the
+    process registry.</p>
+    <p>Many of the operations to access names and properties rely on
+    the semantics given by <a href="http://www.erlang.org/edoc/doc/stdlib/doc/ets.html"><code>//stdlib/ets</code></a>, and this is often
+    mentioned in the interface documentation. This means that it is
+    safe to assume that the functions conform to the search semantics
+    of ordered_set ets tables. However, it is <i>not</i> safe to assume
+    anything about whether the data in fact resides in ets tables, and
+    if so, what those tables are called, or indeed how the data is
+    represented internally.</p>
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1"><tr><td valign="top"><a href="#add_counter-2">add_counter/2</a></td><td>Publish a counter property for the current process.</td></tr>
+<tr><td valign="top"><a href="#add_counter-3">add_counter/3</a></td><td>Publish a counter property on behalf of <code>Process</code>.</td></tr>
+<tr><td valign="top"><a href="#add_property-1">add_property/1</a></td><td>Publish a property of the current process.</td></tr>
+<tr><td valign="top"><a href="#add_property-2">add_property/2</a></td><td>Publish a property on behalf of another process.</td></tr>
+<tr><td valign="top"><a href="#await_reg-1">await_reg/1</a></td><td>Request to be notified when someone registers as <code>Name</code>.</td></tr>
+<tr><td valign="top"><a href="#clear_await_reg-1">clear_await_reg/1</a></td><td>Cancel waiting for notification of process registration of a
+   given name.</td></tr>
+<tr><td valign="top"><a href="#del_counter-1">del_counter/1</a></td><td>Un-publish a counter property for the current process.</td></tr>
+<tr><td valign="top"><a href="#del_counter-2">del_counter/2</a></td><td>Un-publish a counter property on behalf of <code>Process</code>.</td></tr>
+<tr><td valign="top"><a href="#del_property-1">del_property/1</a></td><td>Un-publishes the property <code>Property</code> for the current process.</td></tr>
+<tr><td valign="top"><a href="#del_property-2">del_property/2</a></td><td>Un-publish the property <code>Property</code> on behalf of <code>Process</code>.</td></tr>
+<tr><td valign="top"><a href="#enable_i-0">enable_i/0</a></td><td/></tr>
+<tr><td valign="top"><a href="#first-1">first/1</a></td><td>Analogous to <a href="ets.html#first-1"><code>ets:first/1</code></a>.</td></tr>
+<tr><td valign="top"><a href="#fold_names-3">fold_names/3</a></td><td>Similar to <a href="lists.html#foldl-3"><code>lists:foldl/3</code></a>, but based on a list of select
+   patterns, identifying a sub-set of unique names.</td></tr>
+<tr><td valign="top"><a href="#fold_names-4">fold_names/4</a></td><td>Like <a href="#fold_names-3"><code>fold_names/3</code></a>, but works in batches of <code>Limit</code> objects
+   at a time, in order to improve memory characteristics.</td></tr>
+<tr><td valign="top"><a href="#fold_names-5">fold_names/5</a></td><td>Like <a href="#fold_names-4"><code>fold_names/4</code></a>, but applies a "Regulator function"
+   after each batch of objects before proceeding with the next one.</td></tr>
+<tr><td valign="top"><a href="#fold_properties-3">fold_properties/3</a></td><td>Similar to <a href="http://www.erlang.org/edoc/doc/stdlib/doc/lists.html#foldl-3"><code>//stdlib/lists:foldl/3</code></a>, but based on a
+   select pattern on <code>Property</code>, identifying a sub-set of
+   published properties.</td></tr>
+<tr><td valign="top"><a href="#fold_properties-4">fold_properties/4</a></td><td>Like <a href="#fold_properties-3"><code>fold_properties/3</code></a>, but works in batches of <code>Limit</code>
+   objects at a time, in order to improve raw performance.</td></tr>
+<tr><td valign="top"><a href="#fold_properties-5">fold_properties/5</a></td><td>Like <a href="#fold_properties-4"><code>fold_properties/4</code></a>, but applies a "Regulator function"
+   after each batch of objects before proceeding with the next one.</td></tr>
+<tr><td valign="top"><a href="#guards-1">guards/1</a></td><td>Expand a list of <code>select</code> guards, allowing for the pseudo guard
+   <code>is_counter</code>.</td></tr>
+<tr><td valign="top"><a href="#i-1">i/1</a></td><td>Like <a href="c.html#i-0"><code>c:i/0</code></a>, but allows for filtering output with
+   <code>proc</code> names and properties.</td></tr>
+<tr><td valign="top"><a href="#info-1">info/1</a></td><td>Like <code>process_info(PidOfProcess)</code>, but with added
+        proc-related attributes.</td></tr>
+<tr><td valign="top"><a href="#info-2">info/2</a></td><td>Like <code>process_info(PidOfProcess, Attr)</code> but accepts some
+        additional attributes.</td></tr>
+<tr><td valign="top"><a href="#is_counter-1">is_counter/1</a></td><td>Check whether <code>Property</code> is a counter property.</td></tr>
+<tr><td valign="top"><a href="#is_counter-2">is_counter/2</a></td><td>Check whether <code>Propery</code> registered under <code>Process</code> is a counter
+   property.</td></tr>
+<tr><td valign="top"><a href="#is_property-1">is_property/1</a></td><td>Returns <code>true</code> if <code>Property</code> is a published property of the current
+   process.</td></tr>
+<tr><td valign="top"><a href="#is_property-2">is_property/2</a></td><td>Check whether Property is in fact a property registered with Process.</td></tr>
+<tr><td valign="top"><a href="#last-1">last/1</a></td><td>Analogous to <a href="ets.html#last-1"><code>ets:last/1</code></a>.</td></tr>
+<tr><td valign="top"><a href="#next-2">next/2</a></td><td>Analogous to <a href="ets.html#next-2"><code>ets:next/2</code></a>.</td></tr>
+<tr><td valign="top"><a href="#pids-1">pids/1</a></td><td>Returns all pids for which a property <code>Property</code> is published.</td></tr>
+<tr><td valign="top"><a href="#pids-2">pids/2</a></td><td>Similar to <a href="#pids-1"><code>pids/1</code></a>, but also allowing select guards.</td></tr>
+<tr><td valign="top"><a href="#previous-2">previous/2</a></td><td>Analogous to <a href="ets.html#previous-2"><code>ets:previous/2</code></a>.</td></tr>
+<tr><td valign="top"><a href="#properties_by_pid-1">properties_by_pid/1</a></td><td>Lists all properties for a given process.</td></tr>
+<tr><td valign="top"><a href="#properties_by_pid-2">properties_by_pid/2</a></td><td>Lists all properties for a given process that match the pattern
+    KeyPat.</td></tr>
+<tr><td valign="top"><a href="#properties_by_pid-3">properties_by_pid/3</a></td><td>Like <a href="#properties_by_pid-2"><code>properties_by_pid/2</code></a>, but with an added list of guards.</td></tr>
+<tr><td valign="top"><a href="#read_counter-1">read_counter/1</a></td><td>Read the value of a counter property for the current process.</td></tr>
+<tr><td valign="top"><a href="#read_counter-2">read_counter/2</a></td><td>Read the value of a counter property published by <code>Process</code>.</td></tr>
+<tr><td valign="top"><a href="#reg-1">reg/1</a></td><td>Register a unique <code>Name</code>.</td></tr>
+<tr><td valign="top"><a href="#replace_property-2">replace_property/2</a></td><td>Equivalent to del_property(OldProperty), add_property(NewProperty),
+   but much more efficient.</td></tr>
+<tr><td valign="top"><a href="#replace_property-3">replace_property/3</a></td><td>Replace <code>OldProperty</code> with <code>NewProperty</code> on behalf of <code>Process</code>.</td></tr>
+<tr><td valign="top"><a href="#select-1">select/1</a></td><td>Analogous to <a href="ets.html#select-1"><code>ets:select/1</code></a>.</td></tr>
+<tr><td valign="top"><a href="#select_fold_properties-3">select_fold_properties/3</a></td><td>Like <a href="#fold_properties-3"><code>fold_properties/3</code></a> but more flexible as it allows
+   for combining several patterns into one query.</td></tr>
+<tr><td valign="top"><a href="#select_fold_properties-4">select_fold_properties/4</a></td><td>Like <a href="#select_fold_properties-3"><code>select_fold_properties/3</code></a>, but works in batches of <code>Limit</code>
+   objects at a time, in order to improve raw performance.</td></tr>
+<tr><td valign="top"><a href="#select_fold_properties-5">select_fold_properties/5</a></td><td>Like <a href="#select_fold_properties-4"><code>select_fold_properties/4</code></a>, but applies a
+   "Regulator function"
+   after each batch of objects before proceeding with the next one.</td></tr>
+<tr><td valign="top"><a href="#select_names-1">select_names/1</a></td><td>Returns <code>{Name,Pid}</code> objects one at a time based on
+   a given selection of all registered unique names.</td></tr>
+<tr><td valign="top"><a href="#select_names-2">select_names/2</a></td><td>Like <a href="#select_names-1"><code>select_names/1</code></a>, but works in batches of <code>Limit</code>
+   objects at a time, in order to improve raw performance.</td></tr>
+<tr><td valign="top"><a href="#select_pattern-1">select_pattern/1</a></td><td>Helper function to generate select patterns from the more
+   intuitive patterns <code>Property</code> (or <code>Name</code>, as it works equally for names).</td></tr>
+<tr><td valign="top"><a href="#select_pattern-2">select_pattern/2</a></td><td>As <a href="#select_pattern-1"><code>select_pattern/1</code></a>, but with the option to add Guard
+   expressions.</td></tr>
+<tr><td valign="top"><a href="#select_properties-1">select_properties/1</a></td><td>Returns <code>{Property,Pid}</code> objects one at a time based on
+   a given selection of all registered instances of <code>Key</code>.</td></tr>
+<tr><td valign="top"><a href="#select_properties-2">select_properties/2</a></td><td>Like <a href="#select_properties-1"><code>select_properties/1</code></a> but works in batches of <code>Limit</code>
+   objects at a time in order to improve raw performance.</td></tr>
+<tr><td valign="top"><a href="#send-2">send/2</a></td><td>Analogous to <code>Name ! Msg</code>, except that send({Node,Dest}, Msg)
+   will be interpreted as 'send to the local process registered as
+   {Node, Dest}'.</td></tr>
+<tr><td valign="top"><a href="#set_access-1">set_access/1</a></td><td>Control the ability of Processes to perform certain functions
+    on behalf of the current process.</td></tr>
+<tr><td valign="top"><a href="#start_link-0">start_link/0</a></td><td>Starts the proc server.</td></tr>
+<tr><td valign="top"><a href="#unreg-1">unreg/1</a></td><td>Unregister <code>Name</code>.</td></tr>
+<tr><td valign="top"><a href="#update_counter-2">update_counter/2</a></td><td>Update the counter attribute of a counter property.</td></tr>
+<tr><td valign="top"><a href="#update_counter-3">update_counter/3</a></td><td>Update counter attribute on behalf of <code>Process</code>.</td></tr>
+<tr><td valign="top"><a href="#where-1">where/1</a></td><td>Analogous to <code>erlang:whereis(Name)</code>.</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3><a name="add_counter-2">add_counter/2</a></h3>
+<p><tt>add_counter(Name, InitialValue::integer()) -&gt; true</tt></p>
+<p>Publish a counter property for the current process.
+   <p>Counter properties behave as normal properties with
+      the following exceptions:</p>
+   <ul>
+   <li>A counter property has an integer value attached, which can be
+       updated using <a href="#update_counter-2"><code>update_counter/2</code></a></li>
+   <li>Counter properties cannot be replaced using
+       <a href="#replace_property-2"><code>replace_property/2</code></a></li>
+   </ul></p>
+
+<h3><a name="add_counter-3">add_counter/3</a></h3>
+<p><tt>add_counter(Process, Name, InitialValue::integer()) -&gt; true</tt></p>
+<p>Publish a counter property on behalf of <code>Process</code>.
+   <p>This function is allowed only if permission to add counters
+   has been given through <code>Process</code> calling <a href="#grant_access-2"><code>grant_access/2</code></a>.</p>
+   <p>If permission to add counters has not been given, this function
+   exits with <code>access</code>.</p></p>
+
+<h3><a name="add_property-1">add_property/1</a></h3>
+<p><tt>add_property(Property::term()) -&gt; true</tt></p>
+<p>Publish a property of the current process.
+   <p>If <code>Property</code> is already published for the current process,
+   this function exits with badarg.</p>
+  
+   <p>This operation can be viewed as publishing the meta-data <code>Property</code>
+   as part of the interface of the process. Several processes may publish
+   the same property. The process can be found (as part of a group)
+   through this property, using one of the functions <a href="#fold_properties-3"><code>fold_properties/3</code></a>, <a href="#pids-1"><code>pids/1</code></a>, et al.</p></p>
+
+<h3><a name="add_property-2">add_property/2</a></h3>
+<p><tt>add_property(Process, Property) -&gt; true</tt></p>
+<p>Publish a property on behalf of another process.
+   <p>Adding properties on behalf of another process is only
+   allowed if the other process has called <a href="#set_access-1"><code>set_access/1</code></a>,
+   giving this process the proper rights to act as proxy.</p>
+   <p><code>Process</code> can be either a <code>pid()</code> or a registered name.</p></p>
+
+<h3><a name="await_reg-1">await_reg/1</a></h3>
+<p><tt>await_reg(Pid::Name) -&gt; {already_registered, pid()} | Reg</tt></p>
+<p>Request to be notified when someone registers as <code>Name</code>.
+   <p>If <code>Name</code> is already registered, the function returns
+   with the value <code>{already_registered, Pid}</code>. Otherwise, it returns
+   a "reference" (not necessarily of type <code>reference()</code>) that can be used
+   to recognize a future message.</p>
+   <p>When some process <code>P</code> registers as <code>Name</code>, a message on the form
+   <code>{sysProgReg, Ref, reg, Name, Pid}</code> is sent to each waiting process
+   (note that Ref will be different for each waiting process.)</p></p>
+
+<h3><a name="clear_await_reg-1">clear_await_reg/1</a></h3>
+<p><tt>clear_await_reg(Ref) -&gt; true</tt></p>
+<p>Cancel waiting for notification of process registration of a
+   given name.
+   <p>This function exits with <code>badarg</code> if Ref does not appear to be
+   a valid reference returned by <a href="#await_reg-1"><code>await_reg/1</code></a>; otherwise returns
+   <code>true</code>.</p></p>
+
+<h3><a name="del_counter-1">del_counter/1</a></h3>
+<p><tt>del_counter(Name) -&gt; true</tt></p>
+<p>Un-publish a counter property for the current process.
+  </p>
+
+<h3><a name="del_counter-2">del_counter/2</a></h3>
+<p><tt>del_counter(Process, Name) -&gt; true</tt></p>
+<p>Un-publish a counter property on behalf of <code>Process</code>.
+   <p>This function is allowed only if permission to delete counters
+   has been given through <code>Process</code> calling <a href="#grant_access-2"><code>grant_access/2</code></a>.</p>
+   <p>If permission to delete counters has not been given, this function
+   exits with <code>access</code>.</p></p>
+
+<h3><a name="del_property-1">del_property/1</a></h3>
+<p><tt>del_property(Property) -&gt; true</tt></p>
+<p>Un-publishes the property <code>Property</code> for the current process.
+   <p>If there is no published property <code>Property</code>
+   (see <a href="#add_property-1"><code>add_property/1</code></a>), for the current process, the function
+    exits with <code>badarg</code>.</p></p>
+
+<h3><a name="del_property-2">del_property/2</a></h3>
+<p><tt>del_property(Process, Property) -&gt; true</tt></p>
+<p>Un-publish the property <code>Property</code> on behalf of <code>Process</code>.
+   <p>This function is allowed only if permission to delete properties
+   has been given through <code>Process</code> calling <a href="#grant_access-2"><code>grant_access/2</code></a>.</p>
+   <p>If permission to delete properties has not been given, this function
+   exits with <code>access</code>.</p></p>
+
+<h3><a name="enable_i-0">enable_i/0</a></h3>
+<tt>enable_i() -&gt; term()
+</tt>
+
+<h3><a name="first-1">first/1</a></h3>
+<p><tt>first(Type::names | properties) -&gt; Key | '$end_of_table'</tt></p>
+<p>Analogous to <a href="ets.html#first-1"><code>ets:first/1</code></a>.
+   <p>The tables corresponding to <code>names</code> and <code>properties</code> both have
+   <code>ordered_set</code> semantics.</p></p>
+
+<h3><a name="fold_names-3">fold_names/3</a></h3>
+<p><tt>fold_names(Fun::function(), Acc, Patterns) -&gt; NewAcc</tt></p>
+<p>Similar to <a href="lists.html#foldl-3"><code>lists:foldl/3</code></a>, but based on a list of select
+   patterns, identifying a sub-set of unique names.
+   <p>For each matching name, a call is made to
+   <pre>Fun({Name1,Pid1}, Acc1)</pre>, which is expected to
+   return <code>NewAcc</code>.</p>
+   <p><code>Patterns</code> is a list of match specifications on the same form as
+   that used by <a href="ets.html#select_delete-2"><code>ets:select_delete/2</code></a> and <a href="ets.html#select_count-2"><code>ets:select_count/2</code></a>,
+   that is:</p>
+   <pre>
+     * Patterns = [MatchFunction] | '_'
+     * MatchFunction = {MatchHead, [Guard], [Result]}
+     * MatchHead = "Pattern as in ets:match"
+     * Guard = {"Guardtest name", ...}
+     * Result = true (if object is to be included)
+   </pre>
+   <p>The following expression would return a
+   list of all registered unique names together with the processes
+   that registered them:</p>
+   <pre>
+   proc:fold_names(fun(X,Acc) -&gt; [X|Acc] end, [], [{'_',[],[true]}])
+   </pre>
+   <p>For convenience, the special pattern '_' is also allowed. It is
+   expanded to <code>[{'_',[],[true]}]</code>.</p>
+   <p>This function is equivalent to <code>fold_names(Fun,Acc,Patterns,100)</code>,
+   (see <a href="#fold_names-5"><code>fold_names/5</code></a>.)</p></p>
+
+<h3><a name="fold_names-4">fold_names/4</a></h3>
+<p><tt>fold_names(Fun, Acc, Patterns, Limit::integer()) -&gt; NewAcc</tt></p>
+<p>Like <a href="#fold_names-3"><code>fold_names/3</code></a>, but works in batches of <code>Limit</code> objects
+   at a time, in order to improve memory characteristics.
+   <p><code>fold_names/3</code> uses a default limit of 1 object at a time.</p>
+   <p>This function is equivalent to
+   <code>fold_names(Fun,Acc,Patterns,Limit,fun(_) -&gt; true end)</code>,
+   (see <a href="#fold_names-5"><code>fold_names/5</code></a>.)</p></p>
+
+<h3><a name="fold_names-5">fold_names/5</a></h3>
+<p><tt>fold_names(Fun::function(), Acc, Patterns, Limit::integer(), Regulator::function()) -&gt; NewAcc</tt></p>
+<p>Like <a href="#fold_names-4"><code>fold_names/4</code></a>, but applies a "Regulator function"
+   after each batch of objects before proceeding with the next one.
+   <p>The <code>Regulator</code> function is expected to take the current accumulator
+   as an argument and return either <code>true</code> (in which case processing
+   continues), or <code>false</code> (in which case the <code>fold_names/5</code> function breaks
+   and returns the current accumulator.</p></p>
+
+<h3><a name="fold_properties-3">fold_properties/3</a></h3>
+<p><tt>fold_properties(Fun::function(), Acc, Property) -&gt; NewAcc</tt></p>
+<p>Similar to <a href="http://www.erlang.org/edoc/doc/stdlib/doc/lists.html#foldl-3"><code>//stdlib/lists:foldl/3</code></a>, but based on a
+   select pattern on <code>Property</code>, identifying a sub-set of
+   published properties.
+   <p>For each matching key, a call is made to
+   <pre>Fun({Property1,Pid1}, Acc1)</pre>, which is expected to
+   return <code>NewAcc</code>. Note that, as in <a href="#pids-1"><code>pids/1</code></a>, <code>Property</code>
+   can be select a pattern. The following expression would return a
+   list of all published instances of <code>Property</code> together with the processes
+   that registered them:</p>
+   <pre>
+   proc:fold_properties(fun(X,Acc) -&gt; [X|Acc] end, [], '_')
+   </pre>
+   <p>This function is equivalent to <code>fold_properties(Fun,Acc,Property,1)</code>,
+   (see <a href="#fold_properties-4"><code>fold_properties/4</code></a>.) See also <a href="#select_pattern-1"><code>select_pattern/1</code></a>.</p></p>
+
+<h3><a name="fold_properties-4">fold_properties/4</a></h3>
+<p><tt>fold_properties(Fun::function(), Acc, Properties::Key, Limit::integer()) -&gt; NewAcc</tt></p>
+<p>Like <a href="#fold_properties-3"><code>fold_properties/3</code></a>, but works in batches of <code>Limit</code>
+   objects at a time, in order to improve raw performance.
+   <p><code>fold_properties/3</code> uses a default limit of 1 object at a time.</p>
+   <p>This function is equivalent to
+   <code>fold_properties(Fun,Acc,Property,Limit,fun(_) -&gt; true end)</code>,
+   (see <a href="#fold_properties-5"><code>fold_properties/5</code></a>.) See also <a href="#select_pattern-1"><code>select_pattern/1</code></a>.</p></p>
+
+<h3><a name="fold_properties-5">fold_properties/5</a></h3>
+<p><tt>fold_properties(Fun::function(), Acc, Property, Limit::integer(), Regulator::function()) -&gt; NewAcc</tt></p>
+<p>Like <a href="#fold_properties-4"><code>fold_properties/4</code></a>, but applies a "Regulator function"
+   after each batch of objects before proceeding with the next one.
+   <p>The <code>Regulator</code> function is expected to take the current accumulator
+   as an argument and return either <code>true</code> (in which case processing
+   continues), or <code>false</code> (in which case the <code>fold_properties/5</code> function
+   breaks and returns the current accumulator. See also
+   <a href="#select_pattern-1"><code>select_pattern/1</code></a>.</p></p>
+
+<h3><a name="guards-1">guards/1</a></h3>
+<p><tt>guards(Gs::List) -&gt; NewList</tt></p>
+<p>Expand a list of <code>select</code> guards, allowing for the pseudo guard
+   <code>is_counter</code>.
+   <p>How counter properties can be distinguished from regular properties
+   internally is not defined in the proc interface. Using this function,
+   it is however possible to specify a guard test, <code>is_counter</code>, which will
+   expand to a legal guard. The <code>is_counter</code> test can be combined with the
+   standard logical operators, <code>not</code>, <code>and</code>, <code>or</code>, <code>orelse</code>, <code>andalso</code>,
+   and <code>xor</code>.</p>
+   <p>Example:</p>
+   <pre>
+   proc:select_properties(
+       [{'_', proc:guards([{'not', is_counter}]), [true]}]).
+   </pre>
+   <p>will list all published properties that are not counters.</p></p>
+
+<h3><a name="i-1">i/1</a></h3>
+<p><tt>i(Options::Option) -&gt; ok</tt>
+<ul><li><tt>Option = help | [{Op, Type, Patterns}]</tt></li><li><tt>Op = i | x</tt></li><li><tt>Type = names | properties</tt></li></ul></p>
+<p>Like <a href="c.html#i-0"><code>c:i/0</code></a>, but allows for filtering output with
+   <code>proc</code> names and properties.
+   <p>Usage: <code>i([{i | x, names | properties, Patterns}])</code>.<br>
+   calls <code>c:i(Processes)</code> for a subset of all running processes.
+   <code>{i, Type, Pattern}</code> specifies by name or property which processes
+   to include. <code>{x, Type, Pattern}</code> specifies which processes to
+   exclude from the listing. If no <code>{i,T,P}</code> tuples are specified,
+   all processes are included per default, then reduced by the
+   <code>{x,T,P}</code> patterns. Multiple tuples are allowed.
+   <code>Pattern</code> is a match specification where the result head is <code>true</code>.</p>
+   <p>Note that currently, using <a href="ets.html#fun2ms-1"><code>ets:fun2ms/1</code></a> may have severe impact
+   on performance if there is a large number of registered names or
+   keys.</p></p>
+
+<h3><a name="info-1">info/1</a></h3>
+<p><tt>info(NameOrPid::Process) -&gt; [{Tag, Info}] | undefined</tt></p>
+<p>Like <code>process_info(PidOfProcess)</code>, but with added
+        proc-related attributes.
+   <p>This function calls <code>process_info(PidOfProcess)</code>, and adds to the
+   result the following info items:</p>
+   <ul>
+     <li><code>{pid, pid()}</code> -- the pid of the process</li>
+     <li><code>{names, Names}</code> -- all unique proc names
+                              registered by the process</li>
+     <li><code>{properties, Props}</code> -- all non-unique properties</li>
+   </ul></p>
+
+<h3><a name="info-2">info/2</a></h3>
+<p><tt>info(NameOrPid::Process, Attr) -&gt; {Attr, Info}</tt></p>
+<p>Like <code>process_info(PidOfProcess, Attr)</code> but accepts some
+        additional attributes.
+   <p>All attributes supported by <a href="erlang.html#process_info-2"><code>erlang:process_info/2</code></a> are
+   supported by this function. In addition, the following attributes are
+   handled:</p>
+   <ul>
+     <li><code>pid</code> -- the pid of the process (mainly here for symmetry)</li>
+     <li><code>names</code> -- all unique names registered in proc by <code>Process</code></li>
+     <li><code>properties</code> -- all non-unique properties of <code>Process</code></li>
+   </ul></p>
+
+<h3><a name="is_counter-1">is_counter/1</a></h3>
+<p><tt>is_counter(Property) -&gt; true | false</tt></p>
+<p>Check whether <code>Property</code> is a counter property.
+   <p>Counter properties are created through <a href="#add_counter-2"><code>add_counter/2</code></a>, and
+   behave as normal properties with the following exceptions:</p>
+   <ul>
+   <li>A counter property has an integer value attached, which can be
+       updated using <a href="#update_counter-2"><code>update_counter/2</code></a></li>
+   <li>Counter properties cannot be replaced using
+       <a href="#replace_property-2"><code>replace_property/2</code></a></li>
+   </ul></p>
+
+<h3><a name="is_counter-2">is_counter/2</a></h3>
+<p><tt>is_counter(Pid::Process, Property) -&gt; true | false</tt></p>
+<p>Check whether <code>Propery</code> registered under <code>Process</code> is a counter
+   property.
+   <p><code>Process</code> can be either a pid or a registered name.</p></p>
+
+<h3><a name="is_property-1">is_property/1</a></h3>
+<p><tt>is_property(Property) -&gt; true | false</tt></p>
+<p>Returns <code>true</code> if <code>Property</code> is a published property of the current
+   process.</p>
+
+<h3><a name="is_property-2">is_property/2</a></h3>
+<p><tt>is_property(Pid::Process, Property) -&gt; true | false</tt></p>
+<p>Check whether Property is in fact a property registered with Process.
+   <p><code>Process</code> can be either a pid or a registered name.</p></p>
+
+<h3><a name="last-1">last/1</a></h3>
+<p><tt>last(Type::names | properties) -&gt; Key | '$end_of_table'</tt></p>
+<p>Analogous to <a href="ets.html#last-1"><code>ets:last/1</code></a>.
+   <p>The tables corresponding to <code>names</code> and <code>properties</code> both have
+   <code>ordered_set</code> semantics.</p></p>
+
+<h3><a name="next-2">next/2</a></h3>
+<p><tt>next(Type::names | properties, Prev::Key) -&gt; Key | '$end_of_table'</tt></p>
+<p>Analogous to <a href="ets.html#next-2"><code>ets:next/2</code></a>.
+   <p>The tables corresponding to <code>names</code> and <code>properties</code> both have
+   <code>ordered_set</code> semantics. The key format of the <code>properties</code> table is
+   <code>{Property, Pid}</code>, while the key format of the <code>names</code> table is
+   simply the name. Note that <code>names</code> and <code>properties</code> are not likely
+   the physical names of the actual tables.</p></p>
+
+<h3><a name="pids-1">pids/1</a></h3>
+<p><tt>pids(Property) -&gt; [pid()]</tt></p>
+<p>Returns all pids for which a property <code>Property</code> is published.
+   <p>To be more precise, <code>Property</code> can be any pattern that would be
+   accepted by <a href="http://www.erlang.org/edoc/doc/stdlib/doc/ets.html#select-2"><code>//stdlib/ets:select/2</code></a>, e.g. '_'</p>
+   <p>If one imagines an <code>ordered_set ets</code> table <code>Tab</code> where all properties
+   are stored on the form <code>{{Property,Pid},1}</code>, then calling
+   this function is equivalent to calling
+   <pre>ets:select(Tab, [{{{Property,'$1'},'_'}, [], ['$1']}]).</pre></p>
+   <p>Note that this is also true as regards performance. If the <code>Key</code>
+   pattern is unbound, the operation will be a linear search.</p></p>
+
+<h3><a name="pids-2">pids/2</a></h3>
+<p><tt>pids(Property, Guards::list()) -&gt; [pid()]</tt></p>
+<p>Similar to <a href="#pids-1"><code>pids/1</code></a>, but also allowing select guards.
+   <p>If one imagines an <code>ordered_set ets</code> table <code>Tab</code> where all non-unique
+   keys are stored on the form <code>{{Property,Pid},1}</code>, then calling
+   this function is equivalent to calling
+   <pre>ets:select(Tab, [{{{Property,'$1'},'_'}, Guards, ['$1']}]).</pre>
+   </p>
+   <p>Note that this is also true as regards performance. If the <code>Property</code>
+   pattern is unbound, the operation will be a linear search.</p></p>
+
+<h3><a name="previous-2">previous/2</a></h3>
+<p><tt>previous(Type::names | properties, Next::Key) -&gt; Key | '$end_of_table'</tt></p>
+<p>Analogous to <a href="ets.html#previous-2"><code>ets:previous/2</code></a>.
+   <p>The tables corresponding to <code>names</code> and <code>properties</code> both have
+   <code>ordered_set</code> semantics. The key format of the <code>properties</code> table is
+   <code>{Property, Pid}</code>, while the key format of the <code>names</code> table is
+   simply the name. Note that <code>names</code> and <code>properties</code> are not likely
+   the physical names of the actual tables.</p></p>
+
+<h3><a name="properties_by_pid-1">properties_by_pid/1</a></h3>
+<p><tt>properties_by_pid(P::pid()) -&gt; [Property]</tt></p>
+<p>Lists all properties for a given process.
+  </p>
+
+<h3><a name="properties_by_pid-2">properties_by_pid/2</a></h3>
+<p><tt>properties_by_pid(P::pid(), KeyPat) -&gt; [Property]</tt></p>
+<p>Lists all properties for a given process that match the pattern
+    KeyPat.
+   <p>Equivalend to <code>properties_by_pid(P, KeyPat, [])</code>.</p></p>
+
+<h3><a name="properties_by_pid-3">properties_by_pid/3</a></h3>
+<p><tt>properties_by_pid(P::pid(), KeyPat, Guards) -&gt; [Property]</tt></p>
+<p>Like <a href="#properties_by_pid-2"><code>properties_by_pid/2</code></a>, but with an added list of guards.
+   <p>The Guards list may be one returned from the function <a href="#guards-1"><code>guards/1</code></a>.
+   </p></p>
+
+<h3><a name="read_counter-1">read_counter/1</a></h3>
+<p><tt>read_counter(Name) -&gt; integer()</tt></p>
+<p>Read the value of a counter property for the current process.
+  </p>
+
+<h3><a name="read_counter-2">read_counter/2</a></h3>
+<p><tt>read_counter(Pid::Process, Name) -&gt; integer()</tt></p>
+<p>Read the value of a counter property published by <code>Process</code>.
+  </p>
+
+<h3><a name="reg-1">reg/1</a></h3>
+<p><tt>reg(Pid::Name) -&gt; true</tt></p>
+<p>Register a unique <code>Name</code>. Returns <code>true</code> or exits.
+   <p>This function differs from <code>erlang:register(Name,Pid)</code> in
+   the following ways:</p>
+   <ul>
+    <li>Pid is implicit: always the current process.</li>
+    <li>Name can be any term (except a pid or '_'), not just an atom.</li>
+    <li>A process can be registered under several unique names.</li>
+   </ul></p>
+
+<h3><a name="replace_property-2">replace_property/2</a></h3>
+<p><tt>replace_property(OldProp::OldProperty, NewProperty) -&gt; true</tt></p>
+<p>Equivalent to del_property(OldProperty), add_property(NewProperty),
+   but much more efficient.
+   <p>If <code>OldProperty</code> is not a published property of the current process
+   (see <a href="#add_property-1"><code>add_property/1</code></a>), the function exits with <code>badarg</code>.</p>
+   <p>One could use properties as a "published process dictionary",
+   e.g. by replacing <code>put(Tag,Value)</code> with
+   <code>proc:add_property({Tag,Value})</code>, and <code>get(Tag)</code> with (roughly)
+   <code>proc:properties_by_pid(self(),Tag)</code>.
+   While this would be somewhat less efficient than the built-in process
+   dictionary, it has the advantage of allowing other processes to key
+   on process meta-data in a much more efficient and disciplined way than
+   <code>{_,Dict} = process_info(Pid,dictionary), lists:keysearch(Tag,1,Dict)</code>
+   (Which makes no distinction between public and private data, and therefore
+   is rightfully frowned upon, and hopefully never attempted.)"</p>
+   <p><i>Note:</i> This function does not work on counter properties.</p></p>
+
+<h3><a name="replace_property-3">replace_property/3</a></h3>
+<p><tt>replace_property(Process, OldProperty, NewProperty) -&gt; true</tt></p>
+<p>Replace <code>OldProperty</code> with <code>NewProperty</code> on behalf of <code>Process</code>.
+   <p>This function is allowed only if permission to replace properties
+   has been given through <code>Process</code> calling <a href="#grant_access-2"><code>grant_access/2</code></a>.</p>
+   <p>If permission to replace properties has not been given, this function
+   exits with <code>access</code>.</p></p>
+
+<h3><a name="select-1">select/1</a></h3>
+<p><tt>select(Continuation) -&gt; {[Obj], NewContinuation} | '$end_of_table'</tt></p>
+<p>Analogous to <a href="ets.html#select-1"><code>ets:select/1</code></a>.
+   <p>This function is intended to be called with a <code>Continuation</code>
+   returned from <a href="#select_names-1"><code>select_names/1</code></a> or <a href="#select_properties-2"><code>select_properties/2</code></a>.</p></p>
+
+<h3><a name="select_fold_properties-3">select_fold_properties/3</a></h3>
+<p><tt>select_fold_properties(Fun, Acc, Patterns) -&gt; NewAcc</tt></p>
+<p>Like <a href="#fold_properties-3"><code>fold_properties/3</code></a> but more flexible as it allows
+   for combining several patterns into one query.
+   <p><code>Patterns</code> is composed as for <a href="#select_properties-1"><code>select_properties/1</code></a>.</p></p>
+
+<h3><a name="select_fold_properties-4">select_fold_properties/4</a></h3>
+<p><tt>select_fold_properties(Fun, Acc, Patterns, Limit) -&gt; NewAcc</tt></p>
+<p>Like <a href="#select_fold_properties-3"><code>select_fold_properties/3</code></a>, but works in batches of <code>Limit</code>
+   objects at a time, in order to improve raw performance.
+   <p><code>select_fold_properties/3</code> uses a default limit of 1 object at a
+   time.</p>
+   <p>This function is equivalent to
+   <code>select_fold_properties(Fun,Acc,Patterns,Limit,fun(_) -&gt; true end)</code>,
+   (see <a href="#select_fold_properties-5"><code>select_fold_properties/5</code></a>.)</p></p>
+
+<h3><a name="select_fold_properties-5">select_fold_properties/5</a></h3>
+<p><tt>select_fold_properties(Fun::function(), Acc, Patterns::Property, Limit::integer(), Regulator::function()) -&gt; NewAcc</tt></p>
+<p>Like <a href="#select_fold_properties-4"><code>select_fold_properties/4</code></a>, but applies a
+   "Regulator function"
+   after each batch of objects before proceeding with the next one.
+   <p>The <code>Regulator</code> function is expected to take the current accumulator
+   as an argument and return either <code>true</code> (in which case processing
+   continues), or <code>false</code> (in which case the <code>select_fold_properties/5</code>
+   function breaks and returns the current accumulator.</p></p>
+
+<h3><a name="select_names-1">select_names/1</a></h3>
+<p><tt>select_names(Patterns) -&gt; {Objs, Continuation} | '$end_of_table'</tt></p>
+<p>Returns <code>{Name,Pid}</code> objects one at a time based on
+   a given selection of all registered unique names.
+   <p><code>Patterns</code> can be written as follows:</p>
+   <pre>
+     * Patterns = [MatchFunction] | '_'
+     * MatchFunction = {MatchHead, [Guard], [Result]}
+     * MatchHead = "Pattern as in ets:match"
+     * Guard = {"Guardtest name", ...}
+     * Result = true (if object is to be included)
+   </pre>
+   <p>or generated using <a href="#select_pattern-1"><code>select_pattern/1</code></a> or
+   <a href="#select_pattern-2"><code>select_pattern/2</code></a>.</p>
+   <p>The function is <i>almost</i> equivalent to
+   <code>ets:select(Tab,Patterns, 100)</code> on an <code>ordered_set</code> table <code>Tab</code>
+    with the following representation:</p>
+   <pre>{{Key, Value}, Pid}</pre>
+   <p>The difference compared to <code>ets:select/3</code> is the <code>Result</code> expression.
+   In this function, <code>Result</code> is expected to be 'true' for those
+   objects that are to be included.</p>
+   <p>For convenience, the special pattern '_' is accepted,
+   and expanded to <code>[{'_', [], [true]}]</code>.</p>
+   <p>Any other patterns are ignored.</p>
+   <p>The <code>Continuation</code> returned can be used when calling <a href="#select-1"><code>select/1</code></a>
+   in order to continue processing.</p></p>
+
+<h3><a name="select_names-2">select_names/2</a></h3>
+<p><tt>select_names(Patterns0::Patterns, Limit) -&gt; {Objs, Continuation} | '$end_of_table'</tt></p>
+<p>Like <a href="#select_names-1"><code>select_names/1</code></a>, but works in batches of <code>Limit</code>
+   objects at a time, in order to improve raw performance.
+  </p>
+
+<h3><a name="select_pattern-1">select_pattern/1</a></h3>
+<p><tt>select_pattern(What) -&gt; Patterns</tt></p>
+<p>Helper function to generate select patterns from the more
+   intuitive patterns <code>Property</code> (or <code>Name</code>, as it works equally for names).
+   <p>The return value from this function can be used in e.g.
+   <a href="#select_properties-1"><code>select_properties/1</code></a>, <a href="#select_properties-2"><code>select_properties/2</code></a>,
+   <a href="#select_fold_properties-3"><code>select_fold_properties/3</code></a>,
+   <a href="#select_fold_properties-4"><code>select_fold_properties/4</code></a> or <a href="#select_fold_properties-5"><code>select_fold_properties/5</code></a>,
+   or similarly, <a href="#select_names-1"><code>select_names/1</code></a>, <a href="#select_names-2"><code>select_names/2</code></a>,
+   <a href="#select_fold_names-3"><code>select_fold_names/3</code></a>, <a href="#select_fold_names-4"><code>select_fold_names/4</code></a>, or
+   <a href="#select_fold_names-5"><code>select_fold_names/5</code></a>.</p>
+   <p><code>Patterns</code> is a list of match specifications on the same form as
+   that used by <a href="http://www.erlang.org/edoc/doc/stdlib/doc/ets.html#select_delete-2"><code>//stdlib/ets:select_delete/2</code></a> and
+   <a href="http://www.erlang.org/edoc/doc/stdlib/doc/ets.html#select_count-2"><code>//stdlib/ets:select_count/2</code></a>,
+   that is:</p>
+   <pre>
+     * Patterns = [MatchFunction] | '_'
+     * MatchFunction = {MatchHead, [Guard], [Result]}
+     * MatchHead = "Pattern as in ets:match"
+     * Guard = {"Guardtest name", ...}
+     * Result = true (if object is to be included)
+   </pre></p>
+
+<h3><a name="select_pattern-2">select_pattern/2</a></h3>
+<p><tt>select_pattern(What, Guards) -&gt; Patterns</tt></p>
+<p>As <a href="#select_pattern-1"><code>select_pattern/1</code></a>, but with the option to add Guard
+   expressions.
+  </p>
+
+<h3><a name="select_properties-1">select_properties/1</a></h3>
+<p><tt>select_properties(Patterns) -&gt; {Objs, Continuation} | '$end_of_table'</tt></p>
+<p>Returns <code>{Property,Pid}</code> objects one at a time based on
+   a given selection of all registered instances of <code>Key</code>.
+   <p><code>Patterns</code> can be written as follows:</p>
+   <pre>
+     * Patterns = [MatchFunction] | '_'
+     * MatchFunction = {MatchHead, [Guard], [Result]}
+     * MatchHead = "Pattern as in ets:match"
+     * Guard = {"Guardtest name", ...}
+     * Result = true (if object is to be included)
+   </pre>
+   <p>or generated using <a href="#select_pattern-1"><code>select_pattern/1</code></a> or
+   <a href="#select_pattern-2"><code>select_pattern/2</code></a>.</p>
+   <p>For convenience, the special pattern '_' is also accepted.
+   It expands to <code>[{'_', [], [true]}]</code>.</p>
+   <p>The <code>Continuation</code> returned can be used when calling <a href="#select-1"><code>select/1</code></a>
+   in order to continue processing.</p></p>
+
+<h3><a name="select_properties-2">select_properties/2</a></h3>
+<p><tt>select_properties(Patterns0::Patterns, Limit::integer()) -&gt; {Objs, Continuation} | '$end_of_table'</tt></p>
+<p>Like <a href="#select_properties-1"><code>select_properties/1</code></a> but works in batches of <code>Limit</code>
+   objects at a time in order to improve raw performance.
+  </p>
+
+<h3><a name="send-2">send/2</a></h3>
+<p><tt>send(Pid::Name, Msg) -&gt; Msg</tt></p>
+<p>Analogous to <code>Name ! Msg</code>, except that send({Node,Dest}, Msg)
+   will be interpreted as 'send to the local process registered as
+   {Node, Dest}'. If Name is a pid, this function will send the message
+   to the process with process identifier Name (recall that it is not
+   possible to register a pid as a unique name in proc.)</p>
+
+<h3><a name="set_access-1">set_access/1</a></h3>
+<p><tt>set_access(Access::[{Action, Processes, Ops}]) -&gt; true</tt>
+<ul><li><tt>Action = grant | revoke</tt></li><li><tt>Ops = [Op]</tt></li><li><tt>Op = add_property | replace_property | del_property | properties | add_counter | update_counter | del_counter | counters</tt></li></ul></p>
+<p>Control the ability of Processes to perform certain functions
+    on behalf of the current process.
+   <p><code>Op</code> must be one of</p>
+   <ul>
+    <li><code>add_property</code></li>
+    <li><code>replace_property</code></li>
+    <li><code>del_property</code></li>
+    <li><code>properties</code> (perform all operations on properties)</li>
+    <li><code>add_counter</code></li>
+    <li><code>update_counter</code></li>
+    <li><code>del_counter</code></li>
+    <li><code>counters</code> (perform all operations on counters)</li>
+   </ul>
+   <p><code>Processes</code> is a list of registered names and/or pids.</p>
+   <p>Example:</p><pre>
+   set_access([{grant, ["foo","bar"], [update_counter]},
+               {revoke, ["baz"], [properties]}])</pre>
+   <p>Allows the processes registered as <code>"foo"</code> and <code>"bar"</code> to update
+   counters, and makes sure that <code>"baz"</code> is no longer able to add, delete
+   or replace properties.</p></p>
+
+<h3><a name="start_link-0">start_link/0</a></h3>
+<p><tt>start_link() -&gt; {ok, pid()}</tt></p>
+<p>Starts the proc server.
+   <p><code>proc</code> assumes that the <code>proc_tabs</code> module is available, and that
+   the <code>proc_tabs</code> process is running.</p></p>
+
+<h3><a name="unreg-1">unreg/1</a></h3>
+<p><tt>unreg(Name) -&gt; true</tt></p>
+<p>Unregister <code>Name</code>
+   <p>This function exits if <code>Name</code> isn't registered to the current
+   process.</p></p>
+
+<h3><a name="update_counter-2">update_counter/2</a></h3>
+<p><tt>update_counter(Name, Incr) -&gt; integer()</tt></p>
+<p>Update the counter attribute of a counter property.
+   <p>This function only works on counter properties. The <code>Incr</code> argument
+   is passed as-is to <a href="http://www.erlang.org/edoc/doc/stlib/doc/ets.html#update_counter-3"><code>//stlib/ets:update_counter/3</code></a>.
+   If a complex option, such as <code>{Pos, Incr}</code> is used,
+   <code>Pos</code> must be equal to 2.</p></p>
+
+<h3><a name="update_counter-3">update_counter/3</a></h3>
+<p><tt>update_counter(Process, Name, Value::Incr) -&gt; integer()</tt></p>
+<p>Update counter attribute on behalf of <code>Process</code>.
+   <p>This function is allowed only if permission to update counters
+   has been given through <code>Process</code> calling <a href="#grant_access-2"><code>grant_access/2</code></a>.</p>
+   <p>If permission to update counters has not been given, this function
+   exits with <code>access</code>.</p></p>
+
+<h3><a name="where-1">where/1</a></h3>
+<p><tt>where(Name) -&gt; pid() | undefined</tt></p>
+<p>Analogous to <code>erlang:whereis(Name)</code>
+  </p>
+</body>
+</html>

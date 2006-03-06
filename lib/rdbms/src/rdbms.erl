@@ -101,6 +101,9 @@
 -export([fetch_verification_module/0,
 	 default_verification_module/0]). % for remote procedure calls
 
+
+-export([patch_mnesia/0]).
+
 %%% extra retrieval functions
 %%%-export([fetch_objects/3]).	% (Tab, SelectAttr, SelectKey)
 
@@ -130,6 +133,46 @@
 %%%----------------------------------------------------------------------
 %%% #3.1   CODE FOR EXPORTED INTERFACE FUNCTIONS
 %%%----------------------------------------------------------------------
+
+
+patch_mnesia() ->
+    application:load(mnesia),
+    {ok,Ms} = application:get_key(mnesia, modules),
+    ToPatch = Ms -- [mnesia, mnesia_controller, mnesia_frag,
+		     mnesia_lib, mnesia_loader, mnesia_log,
+		     mnesia_schema, mnesia_tm],
+    OrigDir = filename:join(code:lib_dir(mnesia), "ebin"),
+    lists:foreach(
+      fun(M) ->
+	      F = filename:join(
+		    OrigDir,atom_to_list(M) ++ code:objfile_extension()),
+	      {ok,{_M,[{abstract_code,{raw_abstract_v1,Forms}}]}} = 
+		  beam_lib:chunks(F, [abstract_code]),
+	      [_|TailF] = Forms,
+	      io:format("Transforming ~p ... ", [M]),
+	      NewTailF = transform_mod(TailF),
+	      {ok, Module, Bin} = compile:forms(NewTailF, []),
+	      io:format("ok.~n", []),
+	      case code:load_binary(Module, foo, Bin) of
+		  {module, Module} ->
+		      ok;
+		  Error ->
+		      erlang:error({Error,Module})
+	      end
+      end, ToPatch).
+
+transform_mod(Fs) ->
+    lists:map(fun({attribute,L,record,{cstruct,Flds}}) ->
+		      {attribute,L,record,{cstruct, insert_attr(Flds)}};
+		 (X) -> X
+	      end, Fs).
+
+insert_attr([{record_field,L,{atom,_,load_order},_} = H|T]) ->
+    [{record_field,L,{atom,L,external_copies}, {nil,L}},H|T];
+insert_attr([H|T]) ->
+    [H|insert_attr(T)];
+insert_attr([]) ->
+    [].
 
 
 %%%----------------------------------------------------------------------

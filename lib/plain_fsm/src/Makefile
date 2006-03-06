@@ -1,8 +1,10 @@
 include ../../../support/include.mk
 
-ERLC_FLAGS += -I ../inc
+ERLC_FLAGS += -pa ../ebin -I ../inc
 
-all: $(ERL_OBJECTS)
+all: ../ebin/plain_fsm_xform.beam \
+     ../ebin/plain_fsm.beam \
+     ../ebin/fsm_example.beam
 
 clean:
 	-rm $(ERL_OBJECTS)

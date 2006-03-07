@@ -32,9 +32,9 @@
 -define(default_timeout, ?t:minutes(1)).
 -define(application, rdbms).
 
--define(MNESIA_RECOMPILED, "/.../mnesia-4.2.3ext/ebin").
--define(MNESIA_PATCH_PATH, "$JUNGERL/lib/rdbms/mnesia-patches/ebin").
--define(RDBMS_PATH, "$JUNGERL/lib/rdbms/ebin").
+-define(MNESIA_RECOMPILED, "/home/etxuwig/wrk/erlang/mnesia-4.2.3ext/ebin").
+-define(MNESIA_PATCH_PATH, "/home/etxuwig/wrk/blogorum/patches").
+-define(RDBMS_PATH, "/home/etxuwig/wrk/blogorum/lib/rdbms-1.991/ebin").
 
 -export([
 	 all/1,
@@ -58,6 +58,9 @@
 	 rdbms_indexes/1,
 	 rdbms_refs_cascade/1,
 	 rdbms_refs_lookup/1,
+	 rdbms_ix_ix/1,
+	 rdbms_ix_vals/1,
+	 rdbms_ix_list/1,
 	 rdbms_ix/1,
 	 rdbms_ix_load/1,
 	 rdbms_add_ix/1,
@@ -104,7 +107,8 @@ rdbms_references(suite) ->
 rdbms_indexes(doc) ->
     [];
 rdbms_indexes(suite) ->
-    [rdbms_ix, rdbms_ix_load, rdbms_add_ix, rdbms_unique_ix].
+    [rdbms_ix_ix, rdbms_ix_list, rdbms_ix_vals,
+     rdbms_ix, rdbms_ix_load, rdbms_add_ix, rdbms_unique_ix].
 
 rdbms_basic(doc) ->
     [];
@@ -139,7 +143,7 @@ install_schema(Config) when is_list(Config) ->
 
 start_trace() ->
     dbg:tracer(),
-    dbg:tpl(rdbms_index,[{'_',[],[{message,{return_trace}}]}]),
+    dbg:tpl(rdbms,ix_vals,[{'_',[],[{message,{return_trace}}]}]),
 %%    dbg:tpl(mnesia_loader,[{'_',[],[{message,{return_trace}}]}]),
 %%    dbg:tpl(mnesia_log,[{'_',[],[{message,{return_trace}}]}]),
 %%    dbg:tpl(ets,insert,[{'_',[],[{message,{return_trace}}]}]),
@@ -423,10 +427,106 @@ rdbms_refs_lookup(Config) when is_list(Config) ->
 		end),
     ok.
 
+rdbms_ix_ix(doc) ->
+    [];
+rdbms_ix_ix(Config) when is_list(Config) ->
+%%%    ?line start_trace(),
+    ?line {atomic,ok} = rdbms:create_table(
+			  ix_ix,
+			  [{disc_copies, [node()]},
+			   {attributes, [key, value]},
+			   {rdbms, 
+			    [
+			     {indexes, 
+			      [{{value,ix},rdbms,ix,[],[{type,ordered}]}]}
+			    ]}
+			  ]),
+    ?line mnesia:wait_for_tables([ix_ix], 30000),
+    OldLevel = mnesia:set_debug_level(trace),
+    ?line trans(fun() ->
+			mnesia:write({ix_ix, 1, a}),
+			mnesia:write({ix_ix, 2, b}),
+			mnesia:write({ix_ix, 3, b})
+		end),
+    ?line trans(fun() ->
+			[{ix_ix,1,a}] = 
+			    mnesia:index_read(ix_ix,a,{value,ix}),
+			[{ix_ix,2,b},{ix_ix,3,b}] =
+			    mnesia:index_read(ix_ix,b,{value,ix})
+		end),
+    mnesia:set_debug_level(OldLevel),
+    ok.
+
+rdbms_ix_list(doc) ->
+    [];
+rdbms_ix_list(Config) when is_list(Config) ->
+%%%    ?line start_trace(),
+    ?line {atomic,ok} = rdbms:create_table(
+			  ix_list,
+			  [{disc_copies, [node()]},
+			   {attributes, [key, value]},
+			   {rdbms, 
+			    [
+			     {indexes, 
+			      [{{value,ix},rdbms,ix_list,[],[{type,ordered}]}]}
+			    ]}
+			  ]),
+    ?line mnesia:wait_for_tables([ix_list], 30000),
+    OldLevel = mnesia:set_debug_level(trace),
+    ?line trans(fun() ->
+			mnesia:write({ix_list, 1, [a,b,c]}),
+			mnesia:write({ix_list, 2, [c,d,e]}),
+			mnesia:write({ix_list, 3, [c,d,e]})
+		end),
+    ?line trans(fun() ->
+			[{ix_list,1,[a,b,c]}] = 
+			    mnesia:index_read(ix_list,a,{value,ix}),
+			[{ix_list,1,[a,b,c]}, 
+			 {ix_list,2,[c,d,e]},{ix_list,3,[c,d,e]}] =
+			    mnesia:index_read(ix_list,c,{value,ix}),
+			[{ix_list,2,[c,d,e]},{ix_list,3,[c,d,e]}] =
+			    mnesia:index_read(ix_list,d,{value,ix})
+		end),
+    mnesia:set_debug_level(OldLevel),
+    ok.
+
+rdbms_ix_vals(doc) ->
+    [];
+rdbms_ix_vals(Config) when is_list(Config) ->
+%%%    ?line start_trace(),
+    ?line {atomic,ok} = rdbms:create_table(
+			  ix_vals,
+			  [{disc_copies, [node()]},
+			   {attributes, [key, v1,v2,v3]},
+			   {rdbms, 
+			    [
+			     {indexes, 
+			      [{{1,vals},rdbms,ix_vals,[3,4,5],
+				[{type,ordered}]}]}
+			    ]}
+			  ]),
+    ?line mnesia:wait_for_tables([ix_vals], 30000),
+    ?line start_trace(),
+    OldLevel = mnesia:set_debug_level(trace),
+    ?line trans(fun() ->
+			mnesia:write({ix_vals, 1, a,b,c}),
+			mnesia:write({ix_vals, 2, b,c,d}),
+			mnesia:write({ix_vals, 3, b,c,d})
+		end),
+    ?line trans(fun() ->
+			[{ix_vals,1,a,b,c}] = 
+			    mnesia:index_read(ix_vals,[a,b,c],{1,vals}),
+			[{ix_vals,2,b,c,d},{ix_vals,3,b,c,d}] =
+			    mnesia:index_read(ix_vals,[b,c,d],{1,vals})
+		end),
+    mnesia:set_debug_level(OldLevel),
+    ok.
+
 rdbms_ix(doc) ->
     [];
 rdbms_ix(Config) when is_list(Config) ->
 %%%    ?line start_trace(),
+    ?line dbg:stop(),
     ?line {atomic,ok} = rdbms:create_table(
 			  ix1,
 			  [{disc_copies, [node()]},

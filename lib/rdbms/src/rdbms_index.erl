@@ -81,13 +81,14 @@ read(Tid, Ts, Tab, Key, {_Pos,_Tag}=Index, LockKind, VMod)
 	case Ix#index.type of
 	    ordered ->
 		Pat = select_pattern(Ix, Key),
-		rdbms:select(Tid, Ts, IxTab, Pat, LockKind, VMod);
+		rdbms:do_select(Tid, Ts, IxTab, Pat, LockKind, VMod);
 	    weighted ->
 		%% we support weighted indexes here, but we throw away
 		%% the weights
 		Pat = select_pattern(Ix, Key),
 		[O || {O,_} <- 
-			  rdbms:select(Tid, Ts, IxTab, Pat, LockKind, VMod)];
+			  rdbms:do_select(
+			    Tid, Ts, IxTab, Pat, LockKind, VMod)];
 	    T when T==bag; T==set ->
 		IxObjs = rdbms:read(Tid, Ts, IxTab, Key, LockKind, VMod),
 		[Oid || #ix{oid = Oid} <- IxObjs]
@@ -112,10 +113,10 @@ w_read(Tid, Ts, Tab, Key, {_Pos,_Tag}=Index, LockKind, VMod)
 		%% introduce dummy weights
 		Pat = select_pattern(Ix, Key),
 		[{O,1} ||
-		    O <- rdbms:select(Tid, Ts, IxTab, Pat, LockKind, VMod)];
+		    O <- rdbms:do_select(Tid, Ts, IxTab, Pat, LockKind, VMod)];
 	    weighted ->
 		Pat = select_pattern(Ix, Key),
-		rdbms:select(Tid, Ts, IxTab, Pat, LockKind, VMod);
+		rdbms:do_select(Tid, Ts, IxTab, Pat, LockKind, VMod);
 	    bag ->
 		%% introduce dummy weights
 		IxObjs = rdbms:read(Tid, Ts, IxTab, Key, LockKind, VMod),

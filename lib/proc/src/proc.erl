@@ -1,21 +1,29 @@
+%%%
+%%% The contents of this file are subject to the Erlang Public License,
+%%% Version 1.0, (the "License"); you may not use this file except in
+%%% compliance with the License. You may obtain a copy of the License at
+%%% http://www.erlang.org/license/EPL1_0.txt
+%%%
+%%% Software distributed under the License is distributed on an "AS IS"
+%%% basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
+%%% the License for the specific language governing rights and limitations
+%%% under the License.
+%%%
+%%% The Original Code is proc-1.0.
+%%%
+%%% The Initial Developer of the Original Code is Ericsson AB
+%%% Portions created by Ericsson are Copyright (C), 2006, Ericsson AB
+%%% All Rights Reserved.
+%%%
+%%% Contributor(s): ______________________________________.
+
 %%%----------------------------------------------------------------------
 %%% #0.    BASIC INFORMATION
 %%%----------------------------------------------------------------------
-%%% %CCaseFile:	proc.erl %
-%%% %CCaseRev:	/main/R1A/16 %
-%%% %CCaseDate  %
-%%% %CCaseDocNo:	102/190 55-CNA 113 33 Ux %
-%%%
-%%% @copyright Ericsson AB 2005 All rights reserved.  
+%%% File:	proc.erl
+%%% Author       : Ulf Wiger <ulf.wiger@ericsson.com>
+%%% Description  : Flexible Local Process Registry
 %%% 
-%%% The information in this document is the property of Ericsson. Except
-%%% as specifically authorized in writing by Ericsson, the receiver of
-%%% this document shall keep the information contained herein
-%%% confidential and shall protect the same in whole or in part from
-%%% disclosure and dissemination to third parties. Disclosure and
-%%% disseminations to the receivers employees shall only be made on a
-%%% strict need to know basis.
-%%% @end
 %%%----------------------------------------------------------------------
 
 %%% @doc Flexible Local Process Registry 

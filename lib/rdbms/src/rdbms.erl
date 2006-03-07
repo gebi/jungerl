@@ -68,8 +68,10 @@
 	 register_commit_action/1,	% (function/0)
 	 register_rollback_action/1]).	% (function/0)
 
+%% utility functions
 -export([null_value/0]).
 -export([mk_oid/2]).
+-export([ix/2, ix_list/2, ix_vals/2]).
 
 %%% Update - Mnesia access module callbacks
 -export([lock/4,
@@ -702,6 +704,30 @@ null_value() -> ?NULL.
 
 mk_oid(_Tab, _Attr) ->
     {node(), erlang:now()}.
+
+
+%%% ix(Value, [])
+%%% 
+%%% indexing callback, can be used if all you want is the value of 
+%%% a single attribute (much like mnesia's built-in indexes, but
+%%% here you can get ordered indexes, unique indexes, etc.)
+ix(Value, []) ->
+    [Value].
+
+%%% ix_list(Value, [])
+%%% 
+%%% indexing callback, if the attribute is a list of values, and each
+%%% value in the list is to be used as index values.
+ix_list(Val, []) when is_list(Val) ->
+    Val.
+
+%%% ix_vals(Object, PosList)
+%%%
+%%% indexing callback, similar to the snmp oids. The 2nd argument
+%%% must be a list of attribute position integers, and the 1st arg
+%%% must be a tuple (normally the whole object)
+ix_vals(Obj, PosList) ->
+    [[element(P,Obj) || P <- PosList]].
 
 %% if functions are called during a transaction which have side-effects,
 %% these functions may be used to "commit" or "undo" the effect.

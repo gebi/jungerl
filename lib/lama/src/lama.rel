@@ -2,9 +2,8 @@
 %%% kernel ver 2.10.10 == Erlang (BEAM) emulator version 5.4.10
 %%%
 
-{release, {"lama","1.0"}, {erts, "5.4.10"},
- [{kernel,"2.10.11"},
-  {stdlib,"1.13.10"},
-  {sasl,  "2.1"},
-  {mnesia, "4.2.3", none}     % mnesia_lib:is_string/1 is being used by lama. 
+{release, {"lama","1.0"}, {erts, "5.4.12"},
+ [{kernel,"2.10.12"},
+  {stdlib,"1.13.11"},
+  {sasl,  "2.1.1"}
  ]}.

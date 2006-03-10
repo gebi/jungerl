@@ -9,13 +9,13 @@
 <h1>Module lama_syslog_h</h1>
 This module implements a syslog event handler for error_logger.
 <ul><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>
-<p><b>Version:</b>  $Rev: 283 $
-             $LastChangedDate: 2005-11-07 16:27:46 -0500 (Mon, 07 Nov 2005) $
+<p><b>Version:</b>  $Rev: 464 $
+             $LastChangedDate: 2006-02-02 20:59:48 -0500 (Thu, 02 Feb 2006) $
    ``
    Example message as seen in the syslog file:
    Mar 19 21:26:44 10.231.12.2 n@spider:test[0.45.0]: [ALERT] Test msg
    '''</p>
-<p><b>Behaviour:</b> <a href="gen_event.html"><tt>gen_event</tt></a>.</p>
+<p><b>Behaviours:</b> <a href="gen_event.html"><tt>gen_event</tt></a>.</p>
 <p><b>Authors:</b> Serge Aleynikov (<a href="mailto:serge@hq.idt.net"><tt>serge@hq.idt.net</tt></a>).</p>
 
 <h2><a name="description">Description</a></h2>This module implements a syslog event handler for error_logger.
@@ -25,6 +25,7 @@ This module implements a syslog event handler for error_logger.
 <tr><td valign="top"><a href="#handle_event-2">handle_event/2</a></td><td/></tr>
 <tr><td valign="top"><a href="#handle_info-2">handle_info/2</a></td><td/></tr>
 <tr><td valign="top"><a href="#init-1">init/1</a></td><td/></tr>
+<tr><td valign="top"><a href="#is_string-1">is_string/1</a></td><td/></tr>
 <tr><td valign="top"><a href="#log-4">log/4</a></td><td/></tr>
 <tr><td valign="top"><a href="#start_link-1">start_link/1</a></td><td/></tr>
 <tr><td valign="top"><a href="#stop-0">stop/0</a></td><td>Remore alarm handler.</td></tr>
@@ -52,6 +53,10 @@ This module implements a syslog event handler for error_logger.
 
 <h3><a name="init-1">init/1</a></h3>
 <tt>init(Options) -&gt; term()
+</tt>
+
+<h3><a name="is_string-1">is_string/1</a></h3>
+<tt>is_string(T) -&gt; term()
 </tt>
 
 <h3><a name="log-4">log/4</a></h3>

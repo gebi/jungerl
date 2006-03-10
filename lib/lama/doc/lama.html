@@ -9,9 +9,9 @@
 <h1>Module lama</h1>
 This module implements LAMA - Log and Alarm Management Applicaiton.
 <ul><li><a href="#description">Description</a></li><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>
-<p><b>Version:</b> $Rev: 358 $
-            $LastChangedDate: 2006-01-05 20:37:25 -0500 (Thu, 05 Jan 2006) $</p>
-<p><b>Behaviour:</b> <a href="application.html"><tt>application</tt></a>.</p>
+<p><b>Version:</b> $Rev: 540 $
+            $LastChangedDate: 2006-02-23 16:36:33 -0500 (Thu, 23 Feb 2006) $</p>
+<p><b>Behaviours:</b> <a href="application.html"><tt>application</tt></a>.</p>
 <p><b>Authors:</b> Serge Aleynikov (<a href="mailto:serge@hq.idt.net"><tt>serge@hq.idt.net</tt></a>).</p>
 
 <h2><a name="description">Description</a></h2>This module implements LAMA - Log and Alarm Management Applicaiton.
@@ -42,8 +42,11 @@ This module implements LAMA - Log and Alarm Management Applicaiton.
 
 <h2><a name="index">Function Index</a></h2>
 <table width="100%" border="1"><tr><td valign="top"><a href="#add_alarm_trap-3">add_alarm_trap/3</a></td><td>Add an alarm to trap mapping to the internal #state.alarm_map list.</td></tr>
+<tr><td valign="top"><a href="#bytestring_to_hexstring-1">bytestring_to_hexstring/1</a></td><td>Converts a byte string to a list of hexadecimal digits
+       (one byte will be represented as two hex digits).</td></tr>
 <tr><td valign="top"><a href="#check_alarm-2">check_alarm/2</a></td><td>Based on the return value of Fun set or clear an Alarm.</td></tr>
 <tr><td valign="top"><a href="#clear_alarm-1">clear_alarm/1</a></td><td>Clear alarm that was previously set by set_alarm/1.</td></tr>
+<tr><td valign="top"><a href="#create_release_file-2">create_release_file/2</a></td><td>Create a release file given a release template file.</td></tr>
 <tr><td valign="top"><a href="#get_alarms-0">get_alarms/0</a></td><td>Get currently active alarms.</td></tr>
 <tr><td valign="top"><a href="#get_app_env-3">get_app_env/3</a></td><td>Fetch a value of the application's environment variable <code>Key</code>.</td></tr>
 <tr><td valign="top"><a href="#get_app_env-4">get_app_env/4</a></td><td>Fetch a value of the application's environment variable <code>Key</code>.</td></tr>
@@ -58,6 +61,8 @@ This module implements LAMA - Log and Alarm Management Applicaiton.
 <tr><td valign="top"><a href="#get_opt-2">get_opt/2</a></td><td>Fetch the Option's value from the <code>Options</code> list.</td></tr>
 <tr><td valign="top"><a href="#get_opt-3">get_opt/3</a></td><td>Same as get_opt/2, but instead of throwing an error, it returns
        a <code>Default</code> value if the <code>Opt</code> is not in the <code>Options</code> list.</td></tr>
+<tr><td valign="top"><a href="#hexstring_to_bytestring-1">hexstring_to_bytestring/1</a></td><td>Converts a hex string to a list of integers.</td></tr>
+<tr><td valign="top"><a href="#is_string-1">is_string/1</a></td><td>Returns true if S is a string.</td></tr>
 <tr><td valign="top"><a href="#os_path-1">os_path/1</a></td><td>Perform replacement of environment variable values in the OsPath.</td></tr>
 <tr><td valign="top"><a href="#set_alarm-1">set_alarm/1</a></td><td>Set alarm.</td></tr>
 <tr><td valign="top"><a href="#start-0">start/0</a></td><td>Start LAMA application.</td></tr>
@@ -77,6 +82,11 @@ This module implements LAMA - Log and Alarm Management Applicaiton.
   Same as <a href="lama_alarm_h.html#add_alarm_trap-3"><code>lama_alarm_h:add_alarm_trap/3</code></a>.</p>
 <p><b>See also:</b> <a href="lama_alarm_h.html#add_alarm_trap-3">lama_alarm_h:add_alarm_trap/3</a>.</p>
 
+<h3><a name="bytestring_to_hexstring-1">bytestring_to_hexstring/1</a></h3>
+<p><tt>bytestring_to_hexstring(ByteString::list()) -&gt; string()</tt></p>
+<p>Converts a byte string to a list of hexadecimal digits
+       (one byte will be represented as two hex digits).</p>
+
 <h3><a name="check_alarm-2">check_alarm/2</a></h3>
 <p><tt>check_alarm(Fun::function(), Alarm::<a href="#type-alarm">alarm()</a>) -&gt; ok</tt>
 <ul><li><tt>Fun = () -&gt; <a href="#type-boolean">boolean()</a></tt></li><li><tt><a name="type-alarm">alarm()</a> = <a href="lama_alarm_h.html#type-alarm">lama_alarm_h:alarm()</a></tt></li></ul></p>
@@ -88,6 +98,23 @@ This module implements LAMA - Log and Alarm Management Applicaiton.
 <p>Clear alarm that was previously set by set_alarm/1. This function
        is equivalent to <a href="lama_alarm_h.html#clear_alarm-1"><code>lama_alarm_h:clear_alarm/1</code></a>.</p>
 <p><b>See also:</b> <a href="#check_alarm-2">check_alarm/2</a>, <a href="lama_alarm_h.html#clear_alarm-1">lama_alarm_h:clear_alarm/1</a>.</p>
+
+<h3><a name="create_release_file-2">create_release_file/2</a></h3>
+<p><tt>create_release_file(TemplateRelFile, OutRelFile) -&gt; ok</tt>
+<ul><li><tt>TemplateRelFile = <a href="#type-filename">filename()</a></tt></li><li><tt>OutRelFile = <a href="#type-filename">filename()</a></tt></li></ul></p>
+<p>Create a release file given a release template file.  The
+       release template file should have the same structure as the
+       release file.  This function will ensure that latest
+       application versions are included in the release.  It will
+       also ensure that the latest erts version is specified in
+       the release file.  Note that both arguments may contain the
+       ".rel" extension, however the actual TemplateRelFile must
+       have a ".rel" extension.  The TemplateRelFile doesn't need
+       to contain application version numbers - an empty string will
+       do: <code>{kernel, ""}</code>.  This function will populate
+       the version number with current version of the application.
+  <pre>  Example:
+    lama:create_release_file(".drp.template.rel", "./ebin/drp.rel").</pre></p>
 
 <h3><a name="get_alarms-0">get_alarms/0</a></h3>
 <p><tt>get_alarms() -&gt; Alarms</tt>
@@ -121,14 +148,14 @@ This module implements LAMA - Log and Alarm Management Applicaiton.
 <p><tt>get_app_options(App::atom(), DefOptions::<a href="#type-options">options()</a>, TypedOptions::<a href="#type-typed_options">typed_options()</a>) -&gt; Options::<a href="#type-options">options()</a></tt></p>
 <p>Look up TypedOptions in the environment. If not found use defaults
        in the DefOptions list, and if not found there, use the default
-       values from a TypedOption's tuple: {_Key, DefaultValue, _Type}.
+       value from a TypedOption's tuple: {_Key, DefaultValue, _Type}.
   <pre>  Example:
-     start_application(StartOptions) -&gt;
+     start_application(StartArgs) -&gt;
          get_app_options(test, StartArgs, [{file, "bar", string}]),
          ... .
  
-     start_application([])              -&gt;   [{file, "bar"}].
-     start_application([{file, "foo"}]) -&gt;   [{file, "foo"}].
+     start_application([])              -&gt;   [{file, "bar"}]
+     start_application([{file, "foo"}]) -&gt;   [{file, "foo"}]
  
      If application's environment had {file, "zzz"}, than this tuple
      would've been returned instead.</pre></p>
@@ -152,6 +179,14 @@ This module implements LAMA - Log and Alarm Management Applicaiton.
 <p>Same as get_opt/2, but instead of throwing an error, it returns
        a <code>Default</code> value if the <code>Opt</code> is not in the <code>Options</code> list.</p>
 <p><b>See also:</b> <a href="#get_app_env-4">get_app_env/4</a>, <a href="#get_app_env-5">get_app_env/5</a>, <a href="#get_opt-2">get_opt/2</a>.</p>
+
+<h3><a name="hexstring_to_bytestring-1">hexstring_to_bytestring/1</a></h3>
+<p><tt>hexstring_to_bytestring(HexString::list()) -&gt; list()</tt></p>
+<p>Converts a hex string to a list of integers.</p>
+
+<h3><a name="is_string-1">is_string/1</a></h3>
+<p><tt>is_string(S::term()) -&gt; <a href="#type-boolean">boolean()</a></tt></p>
+<p>Returns true if S is a string.</p>
 
 <h3><a name="os_path-1">os_path/1</a></h3>
 <p><tt>os_path(OsPath::string()) -&gt; Path::string()</tt></p>

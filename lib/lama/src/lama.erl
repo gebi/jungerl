@@ -21,8 +21,8 @@
 %%% @type typed_options() = [ TypedOption::typed_option() ]
 %%% @type typed_option()  = {Option::atom(), Value::term(), ExpType::expected_type()}
 %%% @author   Serge Aleynikov <serge@hq.idt.net>
-%%% @version $Rev: 363 $
-%%%          $LastChangedDate: 2006-01-11 17:52:44 -0500 (Wed, 11 Jan 2006) $
+%%% @version $Rev: 540 $
+%%%          $LastChangedDate: 2006-02-23 16:36:33 -0500 (Thu, 23 Feb 2006) $
 %%% @end
 %%%------------------------------------------------------------------------
 %%% Created 20-Mar-2003
@@ -44,12 +44,14 @@
          get_app_env/3, get_app_env/4,
          get_app_opt/3, get_app_opt/4,
          get_app_options/3, get_app_options2/3,
-         get_opt/2, get_opt/3, os_path/1, throw_error/3]).
+         get_opt/2, get_opt/3, os_path/1, is_string/1,
+         bytestring_to_hexstring/1, hexstring_to_bytestring/1,
+         throw_error/3, create_release_file/2]).
 
 %% Internal exports
 -export([start/2, stop/1, init/1, get_app/0]).
 
--import(mnesia_lib, [is_string/1]).
+-include_lib("sasl/src/systools.hrl").
 
 %%------------------------------------------------------------------------
 %% @spec start() -> ok | {error, Reason}
@@ -231,15 +233,15 @@ get_app_opt(App, Key, Default, ExpectedType) ->
 %%
 %% @doc Look up TypedOptions in the environment. If not found use defaults
 %%      in the DefOptions list, and if not found there, use the default
-%%      values from a TypedOption's tuple: {_Key, DefaultValue, _Type}.
+%%      value from a TypedOption's tuple: {_Key, DefaultValue, _Type}.
 %% ```
 %% Example:
-%%    start_application(StartOptions) ->
+%%    start_application(StartArgs) ->
 %%        get_app_options(test, StartArgs, [{file, "bar", string}]),
 %%        ... .
 %%
-%%    start_application([])              ->   [{file, "bar"}].
-%%    start_application([{file, "foo"}]) ->   [{file, "foo"}].
+%%    start_application([])              ->   [{file, "bar"}]
+%%    start_application([{file, "foo"}]) ->   [{file, "foo"}]
 %%
 %%    If application's environment had {file, "zzz"}, than this tuple
 %%    would've been returned instead.
@@ -361,6 +363,53 @@ os_path(OsPath) ->
         end,
     filename:join([F(W) || W <- List]).
 
+%%------------------------------------------------------------------------
+%% @spec is_string(S::term()) -> boolean()
+%% @doc Returns true if S is a string.
+%% @end
+%%------------------------------------------------------------------------
+is_string(S) ->
+    lama_syslog_h:is_string(S).
+
+%%------------------------------------------------------------------------
+%% @spec bytestring_to_hexstring(ByteString::list()) -> string()
+%% @doc Converts a byte string to a list of hexadecimal digits
+%%      (one byte will be represented as two hex digits).
+%% @end
+%%------------------------------------------------------------------------
+bytestring_to_hexstring(ByteString) ->
+    HexString = bytestring_to_hexstring(ByteString, []),
+    lists:reverse(HexString).
+
+bytestring_to_hexstring([], Acc) ->
+    Acc;
+bytestring_to_hexstring([B |Rest], Acc) ->
+    [C1, C2] = int_to_hex(B),
+    bytestring_to_hexstring(Rest,[C2, C1| Acc]).
+
+int_to_hex(B) when is_integer(B), B < 256, B >= 0 ->
+    [code_character(B div 16), code_character(B rem 16)].
+
+code_character(N) when N < 10 -> $0 + N;
+code_character(N)             -> $a + (N - 10).
+
+%%------------------------------------------------------------------------
+%% @spec hexstring_to_bytestring(HexString::list()) -> list()
+%% @doc Converts a hex string to a list of integers.
+%% @end
+%%------------------------------------------------------------------------
+hexstring_to_bytestring(HexString) ->
+    hexstring_to_bytestring(HexString, []).
+hexstring_to_bytestring([], Acc) ->
+    lists:reverse(Acc);
+hexstring_to_bytestring([H1, H2 |Rest], Acc) ->
+    I = hex_to_int(H1) bsl 4 + hex_to_int(H2),
+    hexstring_to_bytestring(Rest, [I | Acc]).
+
+hex_to_int(H) when H >= $a -> 10 + H - $a;
+hex_to_int(H) when H >= $A -> 10 + H -$A;
+hex_to_int(H)              -> H - $0.
+
 %%%-----------------------------------------------------------------
 %%% Internal functions
 %%%-----------------------------------------------------------------
@@ -413,4 +462,95 @@ is_string(Tag, S) ->
     false -> throw_error(Tag, S, not_a_string)
     end.
 
+%%-------------------------------------------------------------------
+%% @spec create_release_file(TemplateRelFile, OutRelFile) -> ok
+%%          TemplateRelFile = filename()
+%%          OutRelFile      = filename()
+%% @doc Create a release file given a release template file.  The
+%%      release template file should have the same structure as the
+%%      release file.  This function will ensure that latest
+%%      application versions are included in the release.  It will
+%%      also ensure that the latest erts version is specified in 
+%%      the release file.  Note that both arguments may contain the
+%%      ".rel" extension, however the actual TemplateRelFile must 
+%%      have a ".rel" extension.  The TemplateRelFile doesn't need
+%%      to contain application version numbers - an empty string will
+%%      do: <code>{kernel, ""}</code>.  This function will populate
+%%      the version number with current version of the application.
+%% ```
+%% Example: 
+%%   lama:create_release_file(".drp.template.rel", "./ebin/drp.rel").
+%% '''
+%% @end
+%%-------------------------------------------------------------------
+create_release_file(TemplateRelFile, OutRelFile) ->
+    Rel = get_release(TemplateRelFile),
+    OutFileName = filename:join(filename:dirname(OutRelFile), 
+                                filename:basename(OutRelFile,".rel")++".rel"),
+    case file:open(OutFileName, [write]) of
+    {ok, FD} ->
+        io:format(FD, "%%%~n"
+                      "%%% This file is automatically generated from ~s.rel~n"
+                      "%%%~n~n", [TemplateRelFile]),
+        io:format(FD, "{release, {~p, ~p}, {erts, ~p},~n  [~n~s  ]~n}.~n", 
+                  [Rel#release.name, Rel#release.vsn, 
+                   Rel#release.erts_vsn, 
+                   format_list(Rel#release.applications)]),
+        file:close(FD);
+    {error, Reason} ->
+        throw({error, file:format_error(Reason)})
+    end.
+    
+get_release(Filename) ->
+    File = filename:basename(Filename, ".rel"),
+    Dir  = [filename:dirname(Filename) | code:get_path()],
+    {ok, Release} = systools_make:read_release(File, Dir),
+    case systools_make:get_release(File, Dir) of
+    {ok, Rel, _, _} ->
+        Rel#release{erts_vsn = erlang:system_info(version)};
+    {error,systools_make,List} ->
+        NewList =
+            lists:foldl(fun({error_reading,{Mod,{not_found,AppFile}}}, {Ok, Err}) ->
+                            {Ok, [{not_found, {Mod, AppFile}} | Err]};
+                        ({error_reading,{Mod,{no_valid_version, 
+                                {{"should be",_}, {"found file", _, Vsn}}}}}, {Ok, Err}) ->
+                            {[{Mod, Vsn} | Ok], Err}
+                        end, {[],[]}, List),
+        case NewList of 
+        {ModVsn, []} ->
+            substitute_versions(Release, ModVsn);
+        {_, ErrMod} ->
+            throw({error, ErrMod})
+        end
+    end.
 
+substitute_versions(Release, [])     -> Release;
+substitute_versions(Release, [{Mod, Vsn} | Tail]) ->
+    Apps = Release#release.applications,
+    case lists:keysearch(Mod, 1, Apps) of
+    {value, {Mod, _Vsn, Type}} ->
+        NewApps = lists:keyreplace(Mod, 1, Apps, {Mod, Vsn, Type});
+    false ->
+        NewApps = Apps
+    end,
+    substitute_versions(Release#release{applications = NewApps,
+                                        erts_vsn     = erlang:system_info(version)}, Tail).
+
+format_list(A) ->
+    {LN, LV} =
+        lists:foldl(fun({N,V,_}, {L1, L2}) ->
+                        {max(L1, length(atom_to_list(N))), 
+                         max(L2, length(V))}
+                    end, {0,0}, A),
+    format_list(A, [], {LN, LV}).
+format_list([], [$\n, $, | Acc], _) ->
+    lists:reverse([$\n | Acc]);
+format_list([{App,Vsn,permanent} | Tail], Acc, {LN, _LA} = Len) ->
+    Str = lists:flatten(io_lib:format("    {~-*w, ~s},~n", [LN, App, [$"]++Vsn++[$"]])),
+    format_list(Tail, lists:reverse(Str) ++ Acc, Len);
+format_list([{App,Vsn,Type} | Tail], Acc, {LN, LA} = Len) ->
+    Str = lists:flatten(io_lib:format("    {~-*w, ~-*s, ~p},~n", [LN, App, LA+2, [$"]++Vsn++[$"], Type])),
+    format_list(Tail, lists:reverse(Str) ++ Acc, Len).
+
+max(X,Y) when X > Y -> X;
+max(_,Y)            -> Y.

@@ -3,8 +3,8 @@
 %%%------------------------------------------------------------------------
 %%% @doc This module implements a syslog event handler for error_logger.
 %%% @author   Serge Aleynikov <serge@hq.idt.net>
-%%% @version  $Rev: 283 $
-%%%           $LastChangedDate: 2005-11-07 16:27:46 -0500 (Mon, 07 Nov 2005) $
+%%% @version  $Rev: 464 $
+%%%           $LastChangedDate: 2006-02-02 20:59:48 -0500 (Thu, 02 Feb 2006) $
 %%% ``
 %%% Example message as seen in the syslog file:
 %%% Mar 19 21:26:44 10.231.12.2 n@spider:test[0.45.0]: [ALERT] Test msg
@@ -28,9 +28,8 @@
          code_change/3, terminate/2]).
 
 %% Internal and Debug exports
--export([get_def_options/0, get_state/0, test/0]).
+-export([get_def_options/0, is_string/1, get_state/0, test/0]).
 
--import(mnesia_lib, [is_string/1]).
 -import(http_util,  [to_upper/1]).
 
 -record(state, {host,         % Destination host for syslog messages
@@ -383,9 +382,9 @@ do_log(S, Host, {Indent, Pid, Facility, Priority, Header, Format, Args}) ->
         Str when list(Str) -> Str;
         _ -> io_lib:format("~p - ~p~n", [Format,Args])
         end,
-    Hdr = io_lib:format("<~w>~s ~s:~w[~s]: [~s] ",
+    Hdr = io_lib:format("<~w>~s ~w[~s]: [~s] ",
                 [encode_facility(Facility) bor encode_priority(Priority),
-                 timestamp(log), atom_to_list(node()), Indent, format_pid(Pid),
+                 timestamp(log), Indent, format_pid(Pid),
                  Header]),
     Packet = one_line(?FLAT(Hdr ++ Msg)),
     %io:format("~s", [Packet]),
@@ -397,10 +396,21 @@ type_to_header(Type) ->
 format_pid(Pid) ->
     [L] = io_lib:format("~w", [Pid]),
     case Pid of
-    Pid when is_pid(Pid) -> format_pid2(L);
-    _ -> L
+    Pid when is_pid(Pid) ->        % Pid is given in the form: <X.Y.Z>
+        atom_to_list(node(Pid)) ++ format_pid2(L);
+    Pid when is_atom(Pid) ->       % Pid is given in the form: 'registered_name'
+        case whereis(Pid) of
+        undefined ->
+            atom_to_list(node()) ++ "," ++ L;
+        PidNum ->
+            atom_to_list(node(PidNum)) ++ "," ++ L
+        end;
+    _ ->                           % What else?
+        io_lib:format("~w,~s", [node(), L])
     end.
-format_pid2([$< | T]) -> format_pid2(T);
+format_pid2([$< | T]) ->
+    [$. | Tail] = lists:dropwhile(fun(C) -> C /= $. end, T),
+    [$, | format_pid2(Tail)];
 format_pid2([C,  $>]) -> [C];
 format_pid2([C  | T]) -> [C | format_pid2(T)].
 
@@ -540,6 +550,13 @@ string_p1([H|T]) when list(H) ->
 string_p1([]) -> true;
 string_p1(_) ->  false.
 
+%%----------------------------------------------------------------------
+is_string([H|T]) when is_integer(H), 0 < H, H < 256 ->
+    is_string(T);
+is_string([]) -> true;
+is_string(_)  -> false.
+
+
 one_line([]) ->
   [$\n];
 one_line([$ ,$ |Rest]) ->
@@ -607,5 +624,3 @@ test() ->
     ?NOTICE("Logger info: ~p~n", [test107]),
     %
     ok.
-
-

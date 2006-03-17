@@ -662,7 +662,8 @@ parse_response(Data, #state{reply_buffer=Acc, reqs=Reqs,
 		    %% response.
 		    send_async_headers(ReqId, StreamTo, StatCode, Headers_1),
 		    do_trace("Recvd a status code of ~p. Ignoring and waiting for a proper response~n", [StatCode]),
-		    parse_response(Data_1, State_1);
+		    parse_response(Data_1, State_1#state{recvd_headers = [],
+							 status = get_header});
 		_ when StatCode == "204";
 		       StatCode == "304" ->
 		    %% No message body is expected for these Status Codes.

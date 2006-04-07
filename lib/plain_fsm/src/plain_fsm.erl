@@ -231,7 +231,7 @@
 %%% (the #sys{} record is the one being embedded...)
 %%%
 -record(sys, {cont,mod,name}).
--record(info, {parent = parent(),
+-record(info, {parent,
 	       debug = [],
 	       sys = #sys{}}).
 
@@ -288,8 +288,9 @@ spawn_link(Mod, StartF) ->
 %%% This function also initializes the plain_fsm meta-data.
 %%% @end
 spawn_opt(Mod, StartF, Opts) when function(StartF) ->
+    ParentPid = self(),
     proc_lib:spawn_opt(fun() ->
-			       init(Mod, StartF)
+			       init(Mod, StartF, ParentPid)
 		       end, Opts).
 
 
@@ -298,8 +299,9 @@ spawn_opt(Mod, StartF, Opts) when function(StartF) ->
 %%% This function also initializes the sysFsm meta-data.
 %%% @end
 spawn_opt(Node, Mod, StartF, Opts) when function(StartF) ->
+    ParentPid = self(),
     proc_lib:spawn_opt(Node, fun() ->
-                                     init(Mod, StartF)
+                                     init(Mod, StartF, ParentPid)
                              end, Opts).
 
 start_opt(Mod, InitF, Timeout, Opts) when is_function(InitF, 0) ->
@@ -578,15 +580,15 @@ format_status(Opt, StatusData) ->
 
 %%% ================ Internal functions ==================
 
-init(Mod, StartF) ->
-    I = #info{},
+init(Mod, StartF, ParentPid) when is_pid(ParentPid) ->
+    I = #info{parent = ParentPid},
     Sys = I#info.sys,
     put({?MODULE, info}, I#info{sys = Sys#sys{mod = Mod}}),
     StartF().
 
 
 sync_init(Mod, InitF, Parent) ->
-    case init(Mod, InitF) of
+    case init(Mod, InitF, Parent) of
 	{reply, Reply, ContF} when is_function(ContF, 0) ->
 	    proc_lib:init_ack(Parent, Reply),
 	    ContF();
@@ -607,14 +609,6 @@ process_options(Opts, Sys) ->
 	      S#sys{name = Name}
       end, Sys, Opts).
 
-
-parent() ->
-    case get('$ancestors') of
-        [Parent|_] ->
-            Parent;
-        _ ->
-            []
-    end.
 
 
 %%% Copied from proc_lib.erl

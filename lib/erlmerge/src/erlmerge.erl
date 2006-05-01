@@ -7,7 +7,7 @@
 
 %% External exports
 -export([run/0]).
--export([url/1]).
+-export([url/2]).
 
 -export([get_all_app_files/0, parse_app_info/2]).
 
@@ -44,9 +44,11 @@
 	  elib_dir,
 	  dryrun,
 	  update,
-	  url,
-	  proxy,
-	  make_used
+	  url,	% url location for sync info
+	  proxy,	% http proxy for url
+	  url_timeout,	% timeout when connecting to url
+	  make_used,	% make program used when building erlmerge
+	  black_and_white	% no colour in printouts
 	  }).
 
 -record(s, {}).
@@ -72,7 +74,9 @@ get_opts() ->
 	     update   = list2bool(os:getenv("EM_UPDATE"), false),
 	     url      = get_opts_safe_getenv("EM_URL"),
 	     proxy      = get_opts_safe_getenv("EM_PROXY"),
-	     make_used      = get_opts_safe_getenv("MAKE_USED_FOR_ERLMERGE")}.
+	     url_timeout      = get_opts_safe_getenv("EM_URL_TIMEOUT"),
+	     make_used      = get_opts_safe_getenv("EM_MAKE_USED"),
+	     black_and_white   = list2bool(os:getenv("EM_BLACK_AND_WHITE"), false)}.
 
 get_opts_safe_getenv( Env_var ) ->
 	case os:getenv( Env_var ) of
@@ -84,8 +88,8 @@ get_opts_safe_getenv( Env_var ) ->
 
 
 exec(sync, P) ->
-    #options{url=Url, proxy=Proxy} = P,
-    case url(Url, Proxy) of
+    #options{url=Url, proxy=Proxy, url_timeout=Timeout} = P,
+    case url(Url, Proxy, Timeout) of
 	{ok, File} ->
 	    ElibDir = P#options.elib_dir,
 	    SyncFname = sync_fname( ElibDir ),
@@ -99,8 +103,7 @@ exec(sync, P) ->
     end;
 %%%
 exec(search, P) ->
-    Args = P#options.args,
-    ElibDir = P#options.elib_dir,
+    #options{args=Args, elib_dir=ElibDir, black_and_white=Bw} = P,
     Opts = db_ropts(),
     db_open(db_fname(ElibDir), Opts),
     LcaseWhat = lcase(Args),
@@ -112,14 +115,14 @@ exec(search, P) ->
 	end,
     L = dets:foldl(F, [], ?DB_NAME),
     db_close(),
-    print(lists:keysort(#app.name, L));
+    print(lists:keysort(#app.name, L), not Bw);
 %%%
 exec(delete, P) ->
-    Args = l2a(P#options.args),
-    ElibDir = P#options.elib_dir,
+    #options{args=Args_atom, elib_dir=ElibDir, black_and_white=Bw} = P,
+    Args = l2a(Args_atom),
     Opts = db_wopts(),
     db_open(db_fname(ElibDir), Opts),
-    delete(Args),
+    delete(Args, not Bw),
     db_close();
 %%%
 exec(install, P0) ->
@@ -200,21 +203,23 @@ install(P) ->
 %%% Fetch packages if needed.
 %%% Finally, install everything.
 analyse_versions(P, Apps) ->
+    #options{dryrun=Dryrun, black_and_white=Bw} = P,
+    In_colour = not Bw,
     Uapps = update_apps(P, Apps),
     case catch not_installed(Uapps) of
 	{not_found, {App, Vsn}} ->
-	    io:format(green("~nDependency check failed~n~n"), []),
-	    io:format(green("Missing Application: ~p-~s~n"), [App, Vsn]),
+	    io:format(green("~nDependency check failed~n~n", In_colour), []),
+	    io:format(green("Missing Application: ~p-~s~n", In_colour), [App, Vsn]),
 	    [];
 	[] ->
-	    io:format(green("~nNothing to merge~n~n"), []),
+	    io:format(green("~nNothing to merge~n~n", In_colour), []),
 	    [];
-	L when P#options.dryrun == false ->
+	L when Dryrun == false ->
 	    L;
-	L when P#options.dryrun == true ->
+	L when Dryrun == true ->
 	    io:format(green("~nThese are the packages that I would merge"
-			    ", in order:~n~n"),[]),
-	    F = fun(A) -> install_reason(A) end,
+			    ", in order:~n~n", In_colour),[]),
+	    F = fun(A) -> install_reason(A, In_colour) end,
 	    lists:foreach(F, L),
 	    []
     end.
@@ -242,22 +247,23 @@ update_apps(_, Apps) ->
 %%%  [ U ] <App>-<Newvsn> [<OldVsn>]  % Update to newer version
 %%%  [  R] <App>-<NewVsn>             % Rebuild due to updated deps
 %%%
-install_reason(A) ->
+install_reason(A, In_colour) ->
     {ok, [Z]} = db_lookup(A#app.name),
     case have_newer_version(Z) of
 	{true, A} ->
 	    Name = a2l(A#app.name),
-	    io:format(green("[ ")++cyan("U")++green(" ] ~s-~s")++
-		      blue(" [~s]~n"),
+	    io:fwrite(green("[ ", In_colour)++cyan("U", In_colour)++
+	    	green(" ] ~s-~s", In_colour)++blue(" [~s]~n", In_colour),
 		      [Name, A#app.vsn, Z#app.vsn]);
 	false ->
 	    case changed_cdeps(A) of
 		true ->
-		    io:format(green("[  ")++yellow("R")++green("] ~s-~s~n"),
+		    io:fwrite(green("[  ", In_colour)++yellow("R", In_colour)++
+		    	green("] ~s-~s~n", In_colour),
 			      [a2l(A#app.name), A#app.vsn]);
 		false ->
 		    %% Must be a new application!
-		    io:format(green("[")++"N"++green("  ] ~s-~s~n"),
+		    io:fwrite(green("[", In_colour)++"N"++green("  ] ~s-~s~n", In_colour),
 			      [a2l(A#app.name), A#app.vsn])
 	    end
     end.
@@ -306,9 +312,11 @@ distfiles(ElibDir) ->
     filename:join( [erlmerge_db_directory(ElibDir), "distfiles"] ).
 
 %%% the name suggest something more than just a printout...
-rm_fetched(_P, _Fetched, NotFetched) -> 
+rm_fetched(P, _Fetched, NotFetched) -> 
+    #options{black_and_white=Bw} = P,
+    In_colour = not Bw,
     F = fun(A) ->
-		io:format(green("Failed to retrieve:")++" ~s.....", [A#app.loc])
+		io:format(green("Failed to retrieve:", In_colour)++" ~s.....", [A#app.loc])
 	end,
     lists:foreach(F, NotFetched).
 
@@ -414,16 +422,16 @@ analyse_deps([], _) ->
     true.
 
 
-print(L) ->
-    F = fun(A, Acc) -> 
-		Str = "\n"++green("Name: ")++ a2l(A#app.name) ++"\n"++
-		    green("Version: ")++ A#app.vsn ++"\n"++
-		    green("Description: ")++ A#app.desc ++"\n"++
-		    green("Installed: ")++ a2l(A#app.installed) ++"\n",
-		[Str|Acc]
+print(L, In_colour) ->
+	F = fun(A) ->
+		#app{name=Name, vsn=Vsn, desc=Desc, installed=Installed} = A,
+		io:fwrite("~n~s~p~n~s~s~n~s~s~n~s~p~n",
+			[green("Name: ", In_colour), Name,
+			green("Version: ", In_colour), Vsn,
+			green("Description: ", In_colour), Desc,
+			green("Installed: ", In_colour), Installed])
 	end,
-    Str = lists:foldl(F, [], L),
-    io:format("~s~n", [Str]).
+	lists:foreach(F, L).
 
 
 %%% Remove information about non-installed applications.
@@ -436,10 +444,14 @@ clean_db() ->
     Apps = dets:foldl(F, [], ?DB_NAME),
     db_del_objects(Apps).
 
-green(Str)  -> start_colour(green) ++ Str ++ stop_colour(green).
-yellow(Str) -> start_colour(yellow) ++ Str ++ stop_colour(yellow).
-blue(Str)   -> start_colour(blue) ++ Str ++ stop_colour(blue).
-cyan(Str)   -> start_colour(cyan) ++ Str ++ stop_colour(cyan).
+green(Str, false)  -> Str;
+green(Str, true)  -> start_colour(green) ++ Str ++ stop_colour(green).
+yellow(Str, false) -> Str;
+yellow(Str, true) -> start_colour(yellow) ++ Str ++ stop_colour(yellow).
+blue(Str, false) -> Str;
+blue(Str, true)   -> start_colour(blue) ++ Str ++ stop_colour(blue).
+cyan(Str, false) -> Str;
+cyan(Str, true)   -> start_colour(cyan) ++ Str ++ stop_colour(cyan).
 
 %%% Find out by running 'od -c' on the emerge output
 start_colour(green)  -> [27,91,51,50,109];  % 8#33 $[ $3 $2 $m
@@ -469,16 +481,16 @@ dump(App) ->
 	    io:format("Application: ~p~n~p~n", [App, Val])
     end.
 
-delete(App) ->
+delete(App, In_colour) ->
     case db_lookup(App) of
 	false ->
-	    io:format("Application: ~p not found~n", [App]);
+	    io:fwrite("Application: ~p not found~n", [App]);
 	{ok, [#app{installed = false}]} ->
-	    io:format("Application: ~p not installed~n", [App]);
+	    io:fwrite("Application: ~p not installed~n", [App]);
 	{ok, [Val]} ->
 	    rm_all( code:lib_dir(App) ),
 	    db_insert(Val#app{installed = false}),
-	    io:format(green("Deleted application: ")++"~p~n", [App])
+	    io:fwrite(green("Deleted application: ", In_colour)++"~p~n", [App])
     end.
 
 %%% We assume Str is in lower case
@@ -498,11 +510,10 @@ lcase(C) when C>=$A, C=<$Z -> C + 32;
 lcase(C)                   -> C.
 
 
-url(Url) ->
+url(Url, Timeout) ->
     Headers = [],
     Request = {Url, Headers},
-    Timeout = 5000,
-    case http:request(get, Request, [{timeout, Timeout}], []) of
+    case http:request(get, Request, [{timeout, Timeout*1000}], []) of
 	{ok, {{_, 200, _}, _Hdrs, L}} ->
 	    {ok, L};
 	{error, _Reason} = Error ->
@@ -511,12 +522,12 @@ url(Url) ->
 	    {error, Else}
     end.
 
-url( Url, [] ) ->
-	url( Url );
-url( Url, Proxy ) ->
+url( Url, [], Timeout ) ->
+	url( Url, Timeout );
+url( Url, Proxy, Timeout ) ->
 	Options = [{proxy, {url_proxy(Proxy), ["localhost"]}}],
 	ok = http:set_options( Options ),
-	url( Url ).
+	url( Url, Timeout ).
 
 url_proxy( Proxy ) ->
 	case regexp:split( Proxy, ":" ) of
@@ -669,26 +680,30 @@ fetch_tar_balls_and_install(P, L) ->
     end.
 
 fetch_tar_balls(P, [H|T], Fetched, NotFetched) ->
+    #options{black_and_white=Bw} = P,
+    In_colour = not Bw,
     Location = H#app.loc,
     Fname = fname(H#app.loc),
     case is_already_fetched(P, Fname) of
 	true ->
-	    io:format(green("already retrieved:")++" ~s~n", [Fname]),
+	    io:fwrite(green("already retrieved:", In_colour)++" ~s~n", [Fname]),
 	    fetch_tar_balls(P, T, [H|Fetched], NotFetched);
 	false ->
-	    #options{proxy=Proxy} = P,
-	    case url(Location, Proxy) of
+	    #options{proxy=Proxy, url_timeout=Timeout, black_and_white=Bw} = P,
+	    case url(Location, Proxy, Timeout) of
 		{ok, File} ->
-		    io:format(green("retrieved:")++" ~s~n", [Location]),
+		    io:fwrite(green("retrieved:", In_colour)++" ~s~n", [Location]),
 		    ElibDir = P#options.elib_dir,
 		    PathName = filename:join( [distfiles(ElibDir), Fname] ),
 		    file:write_file(PathName, l2b(File)),
 		    fetch_tar_balls(P, T, [H|Fetched], NotFetched);
 		{error, econnrefused} ->
-		    io:format(green("Unable to connect with:")++" ~p~n", [Location]),
+		    io:format(green("Unable to connect with:", In_colour)++" ~p~n",
+		    	[Location]),
 		    fetch_tar_balls(P, T, Fetched, [H|NotFetched]);
 		Else ->
-		    io:format(green("failed to retrieve:")++" ~p, got: ~p~n", [Location, Else]),
+		    io:fwrite(green("failed to retrieve:", In_colour)++" ~p, got: ~p~n",
+		    	[Location, Else]),
 		    fetch_tar_balls(P, T, Fetched, [H|NotFetched])
 	    end
     end;
@@ -697,7 +712,8 @@ fetch_tar_balls(_P, [], Fetched, NotFetched) ->
      NotFetched}.
 
 unpack_and_make(P, Fetched) ->
-	#options{elib_dir=ElibDir, make_used=Make} = P,
+	#options{elib_dir=ElibDir, make_used=Make, black_and_white=Bw} = P,
+	In_colour = not Bw,
 	{ok, Current_directory} = file:get_cwd(),
 	%% work in the lib directory
 	ok = file:set_cwd( ElibDir ),
@@ -705,12 +721,12 @@ unpack_and_make(P, Fetched) ->
 		Fname = fname( Loc ),
 		PathName = filename:join( [distfiles( ElibDir ), Fname] ),
 		%% Unpack the tar-ball
-		io:fwrite( green("unpacking:")++" ~s.....", [Fname] ),
+		io:fwrite( green("unpacking:", In_colour)++" ~s.....", [Fname] ),
 		Application = lists:concat([Name,"-",Vsn]),
 		case is_untar_ok( PathName ) of
 		true ->
 		    %% Run make
-		    Installed = is_make_ok( Application, Make ),
+		    Installed = is_make_ok( Application, Make, In_colour ),
 		    db_insert( App#app{installed = Installed} );
 		false ->
 		    io:fwrite( "failed unpacking: ~s.....", [Fname] )
@@ -719,7 +735,7 @@ unpack_and_make(P, Fetched) ->
 	lists:foreach( Fun, Fetched ),
 	%% back to original directory
 	ok = file:set_cwd( Current_directory ),
-	io:fwrite( green("finished!")++"~n" ).
+	io:fwrite( green("finished!", In_colour)++"~n" ).
 
 is_untar_ok( Tarfile ) ->
 	case erl_tar:extract( Tarfile, [compressed]) of
@@ -730,11 +746,11 @@ is_untar_ok( Tarfile ) ->
 		false
 	end.
 
-is_make_ok( Application, Make ) ->
+is_make_ok( Application, Make, In_colour ) ->
 	{ok, Current_directory} = file:get_cwd(),
 	%% work in the application directory
 	ok = file:set_cwd(Application),
-	io:fwrite( green("compiling:")++" ~s.....", [Application] ),
+	io:fwrite( green("compiling:", In_colour)++" ~s.....", [Application] ),
 	Result = case filelib:is_regular( "Emakefile" ) of
 		true ->	% Emakefile exists as regular file. use erlang make.
 			case make:all() of

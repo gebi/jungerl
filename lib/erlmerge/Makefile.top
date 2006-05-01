@@ -15,8 +15,8 @@ all: script
 
 script: bin/erlmerge
 	@(cp config/erlmerge.sh $<; \
-	  echo 'MAKE_USED_FOR_ERLMERGE='`which $(MAKE)` >> $<; \
-	  echo 'export MAKE_USED_FOR_ERLMERGE' >> $<; \
+	  echo 'EM_MAKE_USED='`which $(MAKE)` >> $<; \
+	  echo 'export EM_MAKE_USED' >> $<; \
 	  echo 'ERL_LIB_DIR='$(ERL_LIB_DIR) >> $<; \
 	  echo 'export ERL_LIB_DIR' >> $<; \
 	  echo '${ERL} -noshell -pa' $(TARGETDIR)/ebin '-s erlmerge run' >> $<; \

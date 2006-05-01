@@ -46,6 +46,10 @@ This will store the sync info in:
 Those that are located behind a firewall/proxy should do:
 erlmerge -z <proxy>:<port> sync
 
+If the connection times out before the information has been transfered,
+try to increase the timeout by doing:
+erlmerge -t 30 sync
+
 
 Search the DB again and look for 'eldap' and 'eradius'
 They should not be installed.
@@ -67,4 +71,20 @@ application esmb may end up as a directory:
 
 Which will make it available when you start your
 Erlang node/shell.
+
+If you installed erlmerge somewhere else (see ''erlmerge_install_top'')
+you might have to add this lib directory to the erlang search path upon
+startup. See ''-pa <Directory>'' in the man page for erl.
+
+
+Note for developers: erlmerge will use an ''Emakefile'' if present in
+the top level directory of an application. If the application is
+written in erlang only, an ''Emakefile'' with the following contents
+would compile and install all modules:
+
+{'src/*', [{outdir, ebin}]}.
+
+It is assumed that the application has the same Basic File Structure as
+''base-1.0'' shown in:
+http://www.trapexit.org/docs/howto/release_handling_tutorial.html.
 

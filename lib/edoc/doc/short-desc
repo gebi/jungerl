@@ -1,1 +1,1 @@
-EDoc lets you write the documentation of an Erlang program as comments in the source code, using Javadoc-style tags and XHTML markup.
+EDoc lets you write the documentation of an Erlang program as comments in the source code, using Javadoc-style tags and XHTML markup. Note that the latest version of the syntax_tools application is nowadays part of the standard Erlang/OTP distribution. The Jungerl version is frozen.

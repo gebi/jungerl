@@ -1,1 +1,1 @@
-XML processing tools for Erlang
+XML processing tools for Erlang. Note that xmerl is nowadays part of the standard Erlang/OTP distribution. The official development point for xmerl is http://sowap.sourceforge.net/developer.html.

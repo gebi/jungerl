@@ -1,4 +1,4 @@
-include /home/etxuwig/jungerl/support/include.mk
+include ../../../support/include.mk
 
 #ERLC_FLAGS += -I ../include
 

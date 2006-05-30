@@ -1,3 +1,14 @@
+2006-05-15  Mats Cronqvist  <locmacr@mwlx084>
+
+	* src/distel.erl (Module): behaviour of int:meta changed in R10B-10.
+	edb now understands the new, and (hopefully) the old as well.
+
+	new feature; you can attach to a process that exited in
+	interpreted code and inspect the stack (just as if you're in a
+	break)
+
+	fixed bug when trying to do c:l/1 on a string
+	
 2005-06-07  Mats Cronqvist  <locmacr@mwlx084>
 
 	* elisp/derl.el (derl-cookie): made derl-cookie writable

@@ -207,7 +207,7 @@ handle_info({{send_req, [Url, Headers, Method,
 			      State_1#state{status = get_header,
 					    cur_req = NewReq};
 			  _ ->
-			      State_1#state{cur_req = NewReq}
+			      State_1
 		      end,
 	    case StreamTo of
 		undefined ->

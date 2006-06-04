@@ -16,7 +16,7 @@ ERLC_FLAGS+=-W $(DEBUG) -I $(YAWS_INC_DIR)
 EMULATOR=beam
 
 
-MODULES = yfront wblog ymnesia wraplog
+MODULES = yfront wblog ymnesia wraplog ehtml javascript
 
 EBIN = ../ebin
 EBIN_FILES = $(MODULES:%=$(EBIN)/%.$(EMULATOR)) $(EBIN)/yfront.app

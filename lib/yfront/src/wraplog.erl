@@ -22,7 +22,8 @@
 -module(wraplog).
 
 %% External exports
--export([start/1, start/3]).
+-export([start/1, start/3, 
+	 start_sup_handler/1, start_sup_handler/3]).
 
 %% gen_event callbacks
 -export([init/1, handle_event/2, handle_call/2, handle_info/2, 
@@ -47,6 +48,38 @@ start(LogFile) ->
 %%%      This will create a file: <i>/tmp/mywraplog.1</i>
 start(LogFile, LogSize, NoLogFiles) ->
     error_logger:add_report_handler(?MODULE, {LogFile, LogSize, NoLogFiles}).
+
+%%% @doc Start the specified wraplog; supervised.
+%%%
+%%% Use this way of starting the wraplog if you are running
+%%% a gen_server. You will then get events if the error_handler
+%%% crashes. 
+%%%
+%%% Example:
+%%% <pre>
+%%% handle_info({gen_event_EXIT, wraplog, Reason}, S) ->
+%%%     case get(restarted) of
+%%%        10 ->
+%%%            {stop, Reason, S};
+%%%        N0 ->
+%%%            N = if N0 == undefined -> 1;
+%%%                   true            -> N0 + 1
+%%%                end,
+%%%            {LogFile, LogSize, NoLogFiles}  = get(wraplog_args),
+%%%            wraplog:start_sup_handler(LogFile, LogSize, NoLogFiles),
+%%%            error_logger:info_msg("Restarted disk_log error logger "
+%%%                                  "(Reason=~p)~n", [Reason]),
+%%%            put(restarted, N),
+%%%            {noreply, S}
+%%%     end; 
+%%%</pre>
+%%%
+start_sup_handler(LogFile) ->
+    start_sup_handler(LogFile, ?LOG_SIZE, ?NO_LOG_FILES).
+
+start_sup_handler(LogFile, LogSize, NoLogFiles) ->
+    gen_event:add_sup_handler(error_logger, ?MODULE,
+			      {LogFile, LogSize, NoLogFiles}).
 
 %%% @private
 init({LogFile, LogSize, NoLogFiles}) ->

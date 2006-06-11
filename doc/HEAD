@@ -53,7 +53,7 @@ style="width: 800px; height: 60px;">
 <div id=navbar style=" text-align: center;">
  -- 
 <a href="http://sourceforge.net/projects/jungerl">project page</a>-- 
-<a href="http://cvs.sourceforge.net/cgi-bin/viewcvs.cgi/jungerl/">cvs browser</a>-- 
+<a href="http://jungerl.cvs.sourceforge.net/jungerl/">cvs browser</a>-- 
 <a href="http://www.bluetail.com/wiki/showPage?node=home">erlang wiki</a>--
 
 </div>

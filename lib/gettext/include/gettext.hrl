@@ -7,6 +7,14 @@
 
 -define(TXT2(S, Lang), gettext:key2str(S, Lang)).
 
+
+%%%
+%%% IO-Format strings are handled by this macro
+%%%
+-define(FTXT(S, A), lists:flatten(io_lib:format(?TXT(S),A))).
+
+-define(FTXT2(S, A, Lang), lists:flatten(io_lib:format(?TXT(S, Lang),A))).
+
 %%%
 %%% In case the string is used in a javascript context,
 %%% we need to take care of quotes.

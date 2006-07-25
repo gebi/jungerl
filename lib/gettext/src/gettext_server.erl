@@ -3,8 +3,6 @@
 %%% Author  : Torbjorn Tornkvist <tobbe@bluetail.com>
 %%% Desc.   : Internationalization support.
 %%% Created : 28 Oct 2003 by Torbjorn Tornkvist <tobbe@bluetail.com>
-%%%
-%%% $Id$
 %%%-------------------------------------------------------------------
 -module(gettext_server).
 
@@ -16,7 +14,8 @@
 %%--------------------------------------------------------------------
 %% External exports
 -export([start/0, start_link/0, start/1, start_link/1, key2str/2,
-	 store_pofile/2, all_lang/0, lang2cset/1]).
+	 store_pofile/2, all_lang/0, lang2cset/1, recreate_db/0,
+	 reload_custom_lang/1, unload_custom_lang/1]).
 
 %% Default callback functions
 -export([custom_dir/0]).
@@ -78,6 +77,15 @@ lang2cset(Lang) ->
 store_pofile(Lang, File) when binary(File) ->
     gen_server:call(?SERVER, {store_pofile, Lang, File}, infinity).
 
+reload_custom_lang(Lang) ->
+    gen_server:call(?SERVER, {reload_custom_lang, Lang}, infinity).
+
+unload_custom_lang(Lang) ->
+    gen_server:call(?SERVER, {unload_custom_lang, Lang}, infinity).
+
+recreate_db() ->
+    gen_server:call(?SERVER, recreate_db, infinity).
+
 all_lang() ->    
     L = dets:match(gettext_db, {{header_info, '$1'}, '_'}),
     [hd(X) || X <- L].
@@ -97,9 +105,7 @@ all_lang() ->
 init(CallBackMod0) ->
     CallBackMod = get_callback_mod(CallBackMod0),
     GettextDir = get_gettext_dir(CallBackMod),
-    Fname = filename:join(GettextDir, "gettext_db.dets"),
-    filelib:ensure_dir(Fname), 
-    Cache = init_db_table(GettextDir, Fname),
+    Cache = create_db(GettextDir),
     {ok, #state{cache       = Cache, 
 		cbmod       = CallBackMod,
 		gettext_dir = GettextDir}}.
@@ -160,7 +166,27 @@ handle_call({store_pofile, Lang, File}, _From, State) ->
 	    {reply, ok, State#state{cache = NewCache}};
 	Else ->
 	    {reply, Else, State}
-    end.
+    end;
+%%
+handle_call({reload_custom_lang, Lang}, _From, State) ->
+    GettextDir = State#state.gettext_dir,
+    case do_reload_custom_lang(GettextDir, Lang) of
+	ok   -> {reply, ok, State};
+	Else -> {reply, Else, State}
+    end;
+%%
+handle_call({unload_custom_lang, Lang}, _From, State) ->
+    GettextDir = State#state.gettext_dir,
+    {reply, do_unload_custom_lang(GettextDir, Lang), State};
+%%
+handle_call(recreate_db, _From, State) ->
+    GettextDir = State#state.gettext_dir,
+    Fname = filename:join(GettextDir, "gettext_db.dets"),
+    dets:close(?TABLE_NAME),
+    file:delete(Fname),
+    create_db(GettextDir, Fname),
+    {reply, ok, State}.
+
 	    
 
 %%--------------------------------------------------------------------
@@ -203,6 +229,31 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%--------------------------------------------------------------------
 
+create_db(GettextDir) ->
+    Fname = filename:join(GettextDir, "gettext_db.dets"),
+    create_db(GettextDir, Fname).
+
+create_db(GettextDir, Fname) ->
+    filelib:ensure_dir(Fname), 
+    init_db_table(GettextDir, Fname).
+
+
+do_unload_custom_lang(GettextDir, Lang) ->
+    Fname = filename:join([GettextDir, "lang", "custom", Lang, "gettext.po"]),
+    case filelib:is_file(Fname) of
+	true ->
+	    dets:match_delete(gettext_db, {{'_',Lang},'_'}),
+	    ok;
+	false ->
+	    {error, "no lang"}
+    end.
+
+do_reload_custom_lang(GettextDir, Lang) ->
+    dets:match_delete(gettext_db, {{'_',Lang},'_'}),
+    Dir = filename:join([GettextDir, "lang", "custom", Lang]),
+    Fname = filename:join([Dir, "gettext.po"]), 
+    insert_po_file(Lang, Fname),
+    ok.
 
 do_store_pofile(Lang, File, GettextDir, Cache) ->
     Dir = filename:join([GettextDir, "lang", "custom", Lang]),
@@ -281,6 +332,7 @@ create_cache() ->
 
 
 create_and_populate(GettextDir, TableFile) ->
+    ?elog("TableFile = ~p~n", [TableFile]),
     %% Need to create and populate the DB.
     {ok, _} = dets:open_file(?TABLE_NAME,
 			     [{file, TableFile},

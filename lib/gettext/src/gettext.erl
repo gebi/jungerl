@@ -1,16 +1,30 @@
--module(gettext).
--compile(export_all).
 %%%----------------------------------------------------------------------
 %%% Created:  27 Oct 2003 by tobbe@bluetail.com
 %%% Function: Tools for multi-lingual capabilities,
 %%%           similar to GNU gettext.
-%%%
-%%% $Id$
 %%%----------------------------------------------------------------------
--export([key2str/1, parse_po/1, lc2lang/1,
-	 parse_po_bin/1, all_lang/0, key2str/2]).
+-module(gettext).
+
+-export([key2str/1, parse_po/1, lc2lang/1, quotes/1,
+	 parse_po_bin/1, all_lang/0, key2str/2, all_lcs/0,
+	 reload_custom_lang/1, unload_custom_lang/1,
+	 recreate_db/0]).
 
 -include("gettext.hrl").
+
+
+
+reload_custom_lang(Lang) ->
+    gettext_server:reload_custom_lang(Lang).
+
+unload_custom_lang(Lang) ->
+    gettext_server:unload_custom_lang(Lang).
+
+all_lcs() ->
+    gettext_server:all_lang().
+
+recreate_db() ->
+    gettext_server:recreate_db().
 
 
 %%% --------------------------------------------------------------------

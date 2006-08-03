@@ -60,8 +60,10 @@ while [ -n "$1" ]
   esac
   shift
 done
-if [ -z "$TARG" ]; then 
+if [ -z "$TARG" -a -n "$detach" ]; then 
     usage; 
+elif [ -z "$TARG" ]; then
+    START=""
 else
     START="$START $TARG"
 fi

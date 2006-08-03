@@ -29,9 +29,14 @@
 
 -compile(export_all).
 
--define(L2B(X), list_to_binary(X)).
--define(A2L, atom_to_list).
--define(L2A, list_to_atom).
+l2b(X) -> list_to_binary(X).
+l2a(L) -> list_to_atom(L).
+     
+to_list(X) when is_binary(X) -> binary_to_list(X);
+to_list(X) when is_integer(X)-> integer_to_list(X);
+to_list(X) when is_float(X)  -> float_to_list(X);
+to_list(X) when is_atom(X)   -> atom_to_list(X);
+to_list(X) when is_list(X)   -> X.		%Assumed to be a string
 
 %% ----------------------------------------------------------------------
 %% RPC entry point, adapting the group_leader protocol.
@@ -50,7 +55,7 @@ rpc_entry(M, F, A) ->
     apply(M,F,A).
 
 gl_name(Pid) ->
-    list_to_atom(flatten(io_lib:format("distel_gl_for_~p", [Pid]))).
+    l2a(flatten(io_lib:format("distel_gl_for_~p", [Pid]))).
 
 gl_proxy(GL) ->
     receive
@@ -73,7 +78,7 @@ gl_proxy(GL) ->
 %% srcdir is dirname(EmacsBuffer); we check that the buffer contains Mod.erl
 %% emacs will set File = "" to indicate that we don't want to mess with path
 reload_module(Mod, File) ->
-    case c:l(?L2A(Mod)) of
+    case c:l(l2a(Mod)) of
 	{error,R} ->
 	    case Mod == basename(File,".erl") of
 		true ->
@@ -83,7 +88,7 @@ reload_module(Mod, File) ->
 			    [] -> {error, R};
 			    [Beam|_] -> 
 				code:add_patha(dirname(Beam)),
-				c:l(?L2A(Mod))
+				c:l(l2a(Mod))
 			end;
 		false ->
 		    {error,R}
@@ -135,7 +140,7 @@ find_source(Mod) ->
 
 %% Ret: {true, AbsName} | false
 guess_source_file(Mod, BeamFName) ->
-    Erl = ?A2L(Mod) ++ ".erl",
+    Erl = to_list(Mod) ++ ".erl",
     Dir = dirname(BeamFName),
     TryL = src_from_beam(BeamFName) ++
 	[Dir ++ "/" ++ Erl,
@@ -187,7 +192,7 @@ iformat_pid(Pid) ->
 name(Pid) ->
     case process_info(Pid, registered_name) of
         {registered_name, Regname} ->
-            atom_to_list(Regname);
+            to_list(Regname);
         _ ->
             io_lib:format("~p", [Pid])
     end.
@@ -198,14 +203,14 @@ initial_call(Pid) ->
 
 reductions(Pid) ->
     {reductions, NrReds} = process_info(Pid, reductions),
-    integer_to_list(NrReds).
+    to_list(NrReds).
 
 messages(Pid) ->
     {messages, MsgList} = process_info(Pid, messages),
-    integer_to_list(length(MsgList)).
+    to_list(length(MsgList)).
 
 iformat(A1, A2, A3, A4) ->
-    list_to_binary(io_lib:format("~-21s ~-33s ~12s ~8s~n",
+    l2b(io_lib:format("~-21s ~-33s ~12s ~8s~n",
                                  [A1,A2,A3,A4])).
 
 %% ----------------------------------------------------------------------
@@ -231,7 +236,7 @@ process_info_item(Pid, Item) ->
 process_summary(Pid) ->
     Text = [io_lib:format("~-20w: ~w~n", [Key, Value])
             || {Key, Value} <- [{pid, Pid} | process_info(Pid)]],
-    list_to_binary(Text).
+    l2b(Text).
 
 %% Returns: Summary : binary()
 %%
@@ -263,7 +268,7 @@ tracer_loop(Tracer, Tracee) ->
                    element(1, Trace) == trace,
                    element(2, Trace) == Tracee ->
             Msg = tracer_format(Trace),
-            Tracer ! {trace_msg, list_to_binary(Msg)}
+            Tracer ! {trace_msg, l2b(Msg)}
     end,
     tracer_loop(Tracer, Tracee).
 
@@ -342,7 +347,7 @@ fprof_process_info(Info) ->
     fmt("  ???: ~p~n", [Info]).
 
 fprof_tag({M,F,A}) when integer(A) ->
-    list_to_atom(flatten(io_lib:format("~p:~p/~p", [M,F,A])));
+    l2a(flatten(io_lib:format("~p:~p/~p", [M,F,A])));
 fprof_tag({M,F,A}) when list(A) ->
     fprof_tag({M,F,length(A)});
 fprof_tag(Name) when  atom(Name) ->
@@ -370,10 +375,8 @@ fprof_beamfile(_)                  -> undefined.
 
 fmt(X, A) -> l2b(io_lib:format(X, A)).
 
-l2b(X) -> list_to_binary(X).
-
 pad(X, A) when atom(A) ->
-    pad(X, atom_to_list(A));
+    pad(X, to_list(A));
 pad(X, S) when length(S) < X ->
     S ++ lists:duplicate(X - length(S), $ );
 pad(_X, S) ->
@@ -566,7 +569,8 @@ attach_loop(Att = #attach{emacs=Emacs, meta=Meta}) ->
 	    %% someone else) set a break here
 	    ?MODULE:attach_loop(Att);
 	{Meta,{re_entry, Mod, Func}} -> 
-	    Emacs ! {message, list_to_binary("re_entry "++Mod++Func)},
+	    Msg = "re_entry "++to_list(Mod)++to_list(Func),
+	    Emacs ! {message, l2b(Msg)},
 	    ?MODULE:attach_loop(Att);
 	{Meta, _X} ->
 	    %%io:fwrite("distel:attach_loop OTHER meta: ~p~n", [_X]),
@@ -642,8 +646,6 @@ stack_pos(#attach{stack={Pos,_Max}}) -> Pos.
 modules(Prefix) ->
 %  FIXME: have to decide which approach is better - all loaded or all in path
 %         i, of course, prefer all in path (mbj)
-%    Modnames = [atom_to_list(Mod) || {Mod, _Filename} <- code:all_loaded()],
-%    {ok, lists:filter(fun(M) -> lists:prefix(Prefix, M) end, Modnames)}.
     Dirs = code:get_path(),
     {ok, sort(foldl(fun(Dir, Acc) -> fm_dir(Dir, Prefix, Acc) end, [], Dirs))}.
 
@@ -664,13 +666,6 @@ fm_dir(Dir, Prefix, Acc) ->
 functions(Mod, _Prefix) ->
 %  FIXME: have to decide which approach is better - all loaded or all in path
 %         i, of course, prefer all in path (mbj)
-%    case catch Mod:module_info(exports) of
-%        {'EXIT', _} ->
-%            {error, fmt("Can't call module_info/1 on ~p", [Mod])};
-%        List when list(List) ->
-%            Fns = [atom_to_list(Fun) || {Fun, _Arity} <- List],
-%            {ok, ordsets:to_list(ordsets:from_list(Fns))}
-%    end.
     case beamfile(Mod) of
 	{ok, BeamFile} ->
 	    case get_exports(BeamFile) of
@@ -752,7 +747,7 @@ describe(M, F, A) ->
 
 %% Converts strings to binaries, for Emacs
 fdoc_binaryify({ok, Matches}) ->
-    {ok, [{M, F, A, list_to_binary(Doc)} || {M, F, A, Doc} <- Matches]};
+    {ok, [{M, F, A, l2b(Doc)} || {M, F, A, Doc} <- Matches]};
 fdoc_binaryify(Other) -> Other.
 
 %% ----------------------------------------------------------------------
@@ -770,12 +765,12 @@ fdoc_binaryify(Other) -> Other.
 %% Return: [Arglist]
 %% Arglist = [string()]
 get_arglists(ModName, FunName) when list(ModName), list(FunName) ->
-    arglists(list_to_atom(ModName), FunName).
+    arglists(l2a(ModName), FunName).
 
 arglists(Mod, Fun) ->
     case get_abst_from_debuginfo(Mod) of
 	{ok, Abst} ->
-	    case fdecls(?L2A(Fun), Abst) of
+	    case fdecls(l2a(Fun), Abst) of
 		[] -> error;
 		Fdecls -> map(fun derive_arglist/1, Fdecls)
 	    end;
@@ -853,7 +848,7 @@ read_abst(Beam) ->
 derive_arglist(Fdecl) ->
     Cs = clauses(Fdecl),
     Args = merge_args(map(fun clause_args/1, Cs)),
-    map(fun thing_to_list/1, Args).
+    map(fun to_list/1, Args).
 
 clauses({function, _Line, _Name, _Arity, Clauses}) -> Clauses.
 clause_args({clause, _Line, Args, _Guard, _Body}) ->
@@ -864,11 +859,11 @@ clause_args({clause, _Line, Args, _Guard, _Body}) ->
 %% string (meaning a type-description), or another atom (meaning a
 %% variable name).
 argname({var, _Line, V}) ->
-    case atom_to_list(V) of
+    case to_list(V) of
 	"_"++_ -> unknown;
 	_      -> V
     end;
-argname({Type, _Line, _})          -> atom_to_list(Type)++"()";
+argname({Type, _Line, _})          -> to_list(Type)++"()";
 argname({nil, _Line})              -> "list()";
 argname({cons, _Line, _Car, _Cdr}) -> "list()";
 argname({match, _Line, LHS, _RHS}) -> argname(LHS);
@@ -889,7 +884,7 @@ best_arg(unknown, A2)          -> A2;
 best_arg(A1, unknown)          -> A1;
 best_arg(A1, A2) when atom(A1),atom(A2) ->
     %% ... and the longer the variable name the better
-    case length(?A2L(A2)) > length(?A2L(A1)) of
+    case length(to_list(A2)) > length(to_list(A1)) of
 	true -> A2;
 	false -> A1
     end;
@@ -902,13 +897,8 @@ transpose([[]|_]) ->
 transpose(L) ->
     [[hd(X) || X <- L] | transpose([tl(X) || X <- L])].
 
-thing_to_list(X) when integer(X) -> integer_to_list(X);
-thing_to_list(X) when float(X)	 -> float_to_list(X);
-thing_to_list(X) when atom(X)	 -> atom_to_list(X);
-thing_to_list(X) when list(X)	 -> X.		%Assumed to be a string
-
 get_arglist_from_forms(Funs, Forms) ->
-    map(fun({Fun, Arity}) -> src_args(Forms, ?L2A(Fun), Arity) end, Funs).
+    map(fun({Fun, Arity}) -> src_args(Forms, l2a(Fun), Arity) end, Funs).
 
 src_args(_, _, 0) -> [];
 src_args([{tree,function,_,{function,{tree,atom,_,Func}, Clauses}} = H | T],
@@ -918,7 +908,7 @@ src_args([{tree,function,_,{function,{tree,atom,_,Func}, Clauses}} = H | T],
 	    ArgsL0 = [Args || {tree, clause, _, {clause,Args,_,_}} <- Clauses],
 	    ArgsL1 = [map(fun argname/1, Args) || Args <- ArgsL0],
 	    Args = merge_args(ArgsL1),
-	    map(fun thing_to_list/1, Args);
+	    map(fun to_list/1, Args);
 	_ ->
 	    src_args(T, Func, Arity)
     end;
@@ -942,7 +932,7 @@ beam_disasm_atoms(AtomTabBin) ->
     disasm_atoms(B).
 
 disasm_atoms(AtomBin) ->
-    disasm_atoms(binary_to_list(AtomBin),1).
+    disasm_atoms(to_list(AtomBin),1).
 
 disasm_atoms([Len|Xs],N) ->
     {AtomName,Rest} = get_atom_name(Len,Xs),
@@ -964,7 +954,7 @@ beam_disasm_exports(ExpTabBin, Atoms) ->
     disasm_exports(B,Atoms).
 
 disasm_exports(Bin,Atoms) ->
-    resolve_exports(collect_exports(binary_to_list(Bin)),Atoms).
+    resolve_exports(collect_exports(to_list(Bin)),Atoms).
 
 collect_exports([F3,F2,F1,F0,A3,A2,A1,A0,_L3,_L2,_L1,_L0|Exps]) ->
     [{i32([F3,F2,F1,F0]),  % F = function (atom ID)
@@ -989,7 +979,7 @@ i32([X1,X2,X3,X4]) ->
 
 get_int(B) ->
     {I, B1} = split_binary(B, 4),
-    {i32(binary_to_list(I)), B1}.
+    {i32(to_list(I)), B1}.
 %%-----------------------------------------------------------------------
 %% END Code snitched from beam_disasm.erl
 %%-----------------------------------------------------------------------
@@ -1106,7 +1096,7 @@ ts(F) ->
 refresh_dir({Dir, Mods}) ->
     case file:list_dir(Dir) of
 	{ok, Files} ->
-	    FsMods0 = [{?L2A(basename(F, ".beam")), ts(Dir++"/"++F)} ||
+	    FsMods0 = [{l2a(basename(F, ".beam")), ts(Dir++"/"++F)} ||
 			  F <- Files,
 			  lists:suffix(".beam", F)],
 	    FsMods = lists:keysort(1, FsMods0),

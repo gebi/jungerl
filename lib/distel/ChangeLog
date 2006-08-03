@@ -1,3 +1,15 @@
+2006-08-03  Mats Cronqvist  <locmacr@mwlx084>
+
+	* src/distel.erl (Module): had problems in guess_source_file/2;
+	1st arg was assumed to be atom, but could be atom or list.
+	wound up creating 3 functions;
+	
+	l2a/1 - list_to_atom
+	l2b/1 - list_to_binary
+	to_list - *_to_list
+
+	and use them consistently.
+	
 2006-05-15  Mats Cronqvist  <locmacr@mwlx084>
 
 	* src/distel.erl (Module): behaviour of int:meta changed in R10B-10.

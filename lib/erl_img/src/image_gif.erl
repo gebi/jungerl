@@ -9,7 +9,7 @@
 
 -include("api.hrl").
 
--define(debug, true).
+%% -define(debug, true).
 -include("dbg.hrl").
 
 -import(lists, [reverse/1]).
@@ -485,7 +485,7 @@ write_blocks(Fd, Bin, Pos, Size) ->
     if Sz > 255 ->
 	    <<_:Pos/binary, Block:255/binary, _/binary>> = Bin,
 	    file:write(Fd, <<255, Block/binary>>),
-	    write_blocks(Fd, Bin, Pos+25, Size);
+	    write_blocks(Fd, Bin, Pos+255, Size);
        true ->
 	    <<_:Pos/binary, Block:Sz/binary, _/binary>> = Bin,
 	    file:write(Fd, <<Sz, Block/binary>>),

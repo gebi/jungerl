@@ -1,7 +1,7 @@
 
 EBIN = ../ebin
 ERLC = erlc
-ERLC_FLAGS = -I../include -pa /usr/local/lib/erlang/lib/erlgtk-0.9.7/ebin
+ERLC_FLAGS = -I../include
 
 OBJS = 	$(EBIN)/image_bmp.beam \
 	$(EBIN)/image_x_xpixmap.beam \
@@ -13,15 +13,16 @@ OBJS = 	$(EBIN)/image_bmp.beam \
 	$(EBIN)/video_mpeg.beam \
 	$(EBIN)/exif.beam \
 	$(EBIN)/lzw.beam \
-	$(EBIN)/zlib.beam \
 	$(EBIN)/erl_img.beam
 
-#	$(EBIN)/erl_img_show.beam
 
+debug: ERLC_FLAGS += -Ddebug
 
-# $(EBIN)/photo.beam 
 
 all:	$(OBJS)
+
+debug: all
+
 
 $(OBJS): ../include/erl_img.hrl
 

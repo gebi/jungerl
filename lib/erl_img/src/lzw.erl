@@ -28,8 +28,6 @@
 
 -include("erl_img.hrl").
 
--define(debug, true).
-
 -include("dbg.hrl").
 
 -record(z,
@@ -57,22 +55,14 @@ read_bits_msb(Bin, Offs, Len) ->
 read_bits_lsb(Bin, Offs, Len) ->
     Offs1  = Offs+Len,
     B0     = Offs  div 8,
-    B1     = Offs1 div 8,
+    B1     = (Offs1-1) div 8,
     R0     = Offs  rem 8,
-    R1     = Offs1 rem 8,
-    ?dbg("b0=~w,r0=~w b1=~w,r1=~w\n", [B0,R0,B1,R1]),
-    if R0 == 0, R1 == 0 ->
-	    BL = (B1 - B0)*8,
-	    ?dbg("blen=~w\n", [BL]),
-	    <<_:B0/binary,BCode:BL/little-unsigned-integer,_/binary>> = Bin,
-	    {BCode,Offs1};
-       true ->
-	    BL = ((B1 - B0)+1)*8,
-	    ?dbg("blen=~w\n", [BL]),
-	    <<_:B0/binary,BCode:BL/little-unsigned-integer,_/binary>> = Bin,
-	    Code = (BCode bsr R0) band ((1 bsl Len)-1),
-	    {Code,Offs1}
-    end.
+    ?dbg("b0=~w,r0=~w b1=~w\n", [B0,R0,B1]),
+    BL = ((B1 - B0)+1),
+    ?dbg("blen=~w\n", [BL]),
+    <<_:B0/binary,BCode:BL/little-unsigned-integer-unit:8,_/binary>> = Bin,
+    Code = (BCode bsr R0) band ((1 bsl Len)-1),
+    {Code,Offs1}.
 
 %% least significant bits and bytes first 
 read_bits_LSB(Bin, Offs, Len) ->
@@ -456,7 +446,7 @@ rbits8(Code) ->
 rbits(Code, Len) ->
     rbits(Code, Len, 0).
 
-rbits(Code, 0, Acc) -> 
+rbits(_Code, 0, Acc) -> 
     Acc;
 rbits(Code, Len, Acc) when Len >= 8 ->
     rbits(Code bsr 8, Len - 8,
@@ -502,7 +492,7 @@ comp0(Bin,Stripe,BitLen,Z,Build) ->
     comp1(Bin,0,Stripe,[],Z#z.startlen,Z#z.first,Z,NBuild).
 
 
-comp1(<<>>,CC,Stripe,Omega,BitLen,Count,Z,Build) ->
+comp1(<<>>,_CC,_Stripe,Omega,BitLen,_Count,Z,Build) ->
     Code = ?get_lzw(Omega),
     NBuild =  write(Code, BitLen, Build),
     {TotBitLen,Codes, Acc} = write(Z#z.eoi, BitLen, NBuild),
@@ -576,7 +566,7 @@ write(Code, CLen, {Totlen, List, Acc}) ->
             {Totlen+CLen,[{CLen,Code}|List], Acc}
     end.
 
-buildbin([{L,C}]) ->
+buildbin([{_L,C}]) ->
     <<C>>;
 buildbin([{L1, C1},{L2,C2}]) ->
     <<C1:L1, C2:L2>>;

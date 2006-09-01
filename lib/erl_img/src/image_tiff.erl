@@ -24,8 +24,8 @@
 -define(MM, 16#4D4D).  %% big-endian
 -define(MAGIC, 42).
 
-magic(<<?II:16,?MAGIC:16/little,Offset:32/little,_/binary>>) -> true;
-magic(<<?MM:16,?MAGIC:16/big,Offset:32/big,_/binary>>) -> true;
+magic(<<?II:16,?MAGIC:16/little,_Offset:32/little,_/binary>>) -> true;
+magic(<<?MM:16,?MAGIC:16/big,_Offset:32/big,_/binary>>) -> true;
 magic(_) -> false.
 
 mime_type() -> "image/tiff".
@@ -72,7 +72,7 @@ read_info(Fd) ->
     end.
 		    
 
-write_info(Fd, IMG) ->
+write_info(_Fd, _IMG) ->
     ok.
 
 read(Fd, IMG) ->
@@ -110,8 +110,8 @@ read(Fd,IMG, RowFun, St0) ->
     end.
 
 
-read_strips(Fd,PIX,RowFun,St0,Ri,Rs,
-	    BytesPerRow,Compression, Predict, Fill, [], []) ->
+read_strips(_Fd,PIX,_RowFun,St0,_Ri,_Rs,
+	    _BytesPerRow,_Compression, _Predict, _Fill, [], []) ->
     {ok, PIX#erl_pixmap { pixels = St0 }};
 read_strips(Fd,PIX,RowFun,St0,Ri,Rs,
 	    BytesPerRow,Compression, Predict, Fill,
@@ -159,11 +159,11 @@ split_strip(PIX,Strip,RowWidth,RowFun,St0,Ri,Rs) ->
     end.
 
 
-write(Fd,IMG) ->
+write(_Fd,_IMG) ->
     ok.
 
 %% Image info collector functions
-collect_fun(Fd, T, St) ->
+collect_fun(_Fd, T, St) ->
     Key = decode_tag(T#tiff_entry.tag),
     Value = T#tiff_entry.value,
     As = [{Key,Value} | St#erl_image.attributes],
@@ -198,7 +198,7 @@ collect_fun(Fd, T, St) ->
     end.
 
 
-dump_fun(Fd, T, St) ->
+dump_fun(_Fd, T, St) ->
     Key = decode_tag(T#tiff_entry.tag),
     io:format("~s ~s ~w\n", [Key,T#tiff_entry.type,T#tiff_entry.value]),
     St.
@@ -256,7 +256,7 @@ scan_ifd_bin(Bin, IFD, Offset, Endian, Callback, St) ->
 	    Error
     end.
 
-scan_ifd(Fd, IFD, 0, Endian, Callback, St) ->
+scan_ifd(_Fd, _IFD, 0, _Endian, _Callback, St) ->
     {ok,St};
 scan_ifd(Fd, IFD, Offset, Endian, Callback,St) ->
     file:position(Fd, Offset),
@@ -522,23 +522,23 @@ decode_value(double,big,I,<<V:64/big-float,VT/binary>>) ->
     [V|decode_value(double,big,I-1,VT)];
 
 %% Any endian single fields
-decode_value(sbyte,Endian,N,Bin) ->
+decode_value(sbyte,_Endian,N,Bin) ->
     <<V:N/binary,_/binary>> = Bin,
     map(fun(I) when I >= 16#80 -> I - 16#100;
 	   (I) -> I
 	end, binary_to_list(V));
 
 
-decode_value(byte,Endian,N,Bin) ->
+decode_value(byte,_Endian,N,Bin) ->
     <<V:N/binary,_/binary>> = Bin,
     binary_to_list(V);
-decode_value(ascii,Endian,N,Bin) ->
+decode_value(ascii,_Endian,N,Bin) ->
     <<V:N/binary,_/binary>> = Bin,
     decode_strings(binary_to_list(V));
-decode_value(undefined,Endian,N,Bin) ->
+decode_value(undefined,_Endian,N,Bin) ->
     <<V:N/binary,_/binary>> = Bin,
     V;
-decode_value(unknown,Endian,N,Bin) ->
+decode_value(unknown,_Endian,_N,Bin) ->
     Bin.
 
 

@@ -15,8 +15,9 @@
 -export([read_file_info/1]).
 -export([read/2, write/2]).
 -export([load/1, save/1, save/2, to_binary/1]).
--export([attribute/2, attribute/3]).
-
+-export([attribute/2, attribute/3, set_attribute/3]).
+-export([extensions/1]).
+-export([write_info/3]).
 -export([hex32/1, hex16/1, hex8/1]).
 
 hex32(X) ->
@@ -41,17 +42,17 @@ magic([Type|Ts], Bin) ->
 	true -> {true, Type };
 	false -> magic(Ts, Bin)
     end;
-magic([], Bin) -> 
+magic([], _Bin) -> 
     false.
 
 
 %% Read file mtime information
-file_info(File, IMG) ->
+file_info(File, _IMG) ->
     case file:read_file_info(File) of
 	{ok, Info} when Info#file_info.type == regular,
 			Info#file_info.size > 0 ->
 	    {ok, {Info#file_info.mtime,Info#file_info.size}};
-	{ok, Other} ->
+	{ok, _Other} ->
 	    {error, bad_file};
 	Error ->
 	    Error
@@ -104,7 +105,7 @@ read_file_info(File) ->
 	    case magic_info(File) of
 		{ok,IMG} ->
 		    {ok,IMG#erl_image { mtime = MTime,
-				      size = Size}};
+					size = Size}};
 		Error ->
 		    Error
 	    end;
@@ -142,7 +143,7 @@ save(File, IMG) ->
 to_binary(IMG) ->
     case file:open(<<>>, [ram, binary, write]) of
 	{ok,Fd} ->
-	    Res = write(Fd, IMG),
+	    ok = write(Fd, IMG),
 	    case ram_file:get_file_close(Fd) of
 		{ok, Data} ->
 		    {ok,Data};
@@ -183,7 +184,16 @@ attribute(IMG, Key, Default) ->
 	{value, {_, Value}} -> Value;
 	false -> Default
     end.
-	     
+
+set_attribute(IMG, Key, Value) ->	     
+    As = IMG#erl_image.attributes, 
+    As1 = case lists:keysearch(Key, 1, As) of
+	      false -> [{Key,Value}|As];
+	      {value,_} ->
+		  lists:keyreplace(Key, 1, As, {Key,Value})
+	  end,
+    IMG#erl_image { attributes = As1 }.
+	    
 
 dir_info(Dir) ->
     case file:list_dir(Dir) of
@@ -197,13 +207,8 @@ dir_list([File|Fs], Dir) ->
     case read_file_info(filename:join(Dir, File)) of
 	{ok,IMG} ->
 	    [IMG|dir_list(Fs, Dir)];
-	Error ->
+	_Error ->
 	    dir_list(Fs, Dir)
     end;
-dir_list([], Dir) ->
+dir_list([], _Dir) ->
     [].
-
-		    
-
-
-

@@ -57,9 +57,8 @@ read_bits_lsb(Bin, Offs, Len) ->
     B0     = Offs  div 8,
     B1     = (Offs1-1) div 8,
     R0     = Offs  rem 8,
-    ?dbg("b0=~w,r0=~w b1=~w\n", [B0,R0,B1]),
     BL = ((B1 - B0)+1),
-    ?dbg("blen=~w\n", [BL]),
+    ?dbg("blen=~w,b0=~w,r0=~w b1=~w\n", [BL,B0,R0,B1]),
     <<_:B0/binary,BCode:BL/little-unsigned-integer-unit:8,_/binary>> = Bin,
     Code = (BCode bsr R0) band ((1 bsl Len)-1),
     {Code,Offs1}.
@@ -140,14 +139,12 @@ decomp(S, Read, MinCodeSize, NextFn) ->
 
 
 
-decomp(S,Read,PrevCode,Count,BitLen,Z,Acc) 
-  when Count == Z#z.next ->
-    ?dbg("NEXT BITLEN=~p\n", [BitLen+1]),
-    NextCode = (Z#z.nextfn)(BitLen+1),
-    decomp(S, Read, PrevCode, Count, BitLen+1,
+decomp(S,Read,PrevCode,Count,BitLen,Z,Acc) when BitLen<12,Count == Z#z.next ->
+    NextBitLen = BitLen+1,
+    ?dbg("NEXT BITLEN=~p\n", [NextBitLen]),
+    NextCode = (Z#z.nextfn)(NextBitLen),
+    decomp(S, Read, PrevCode, Count, NextBitLen,
 	   Z#z { next = NextCode }, Acc);
-
-	   
 decomp(S,Read,PrevCode,Count,BitLen,Z,Acc) ->
     {NewCode,NS} = Read(BitLen,S),
     ?dbg("read: ~w/~w count=~w\n", [NewCode, BitLen,Count]),
@@ -169,12 +166,12 @@ decomp(S,Read,PrevCode,Count,BitLen,Z,Acc) ->
 			   Z#z { next = NextCode }, [Str|Acc])
 	    end;
        true ->
-	    ?dbg("CODE:~p\n",[NewCode]),
+	    ?dbg("CODE: prev=~p new=~p\n",[PrevCode,NewCode]),
             case ?get_lzw(NewCode) of
-                undefined when Count == NewCode ->
+                undefined ->
                     OldStr = [H|_] = ?get_lzw(PrevCode),
                     NewStr = OldStr ++ [H],
-                    ?add_lzw(Count, NewStr),
+                    ?add_lzw(NewCode, NewStr),
 		    decomp(NS,Read,NewCode,Count+1,BitLen,Z,[NewStr|Acc]);
 		Str = [H|_]->
                     ?add_lzw(Count, ?get_lzw(PrevCode) ++ [H]),

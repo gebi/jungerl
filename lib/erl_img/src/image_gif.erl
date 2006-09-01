@@ -309,8 +309,7 @@ read_palette(Fd, 1, Pixel) ->
 rd_palette(Bin, Map, 0) -> 
     reverse(Map);
 rd_palette(<<R:8,G:8,B:8, Bin/binary>>, Map, I) ->
-    rd_palette(Bin, [{R bsl 8,G bsl 8,B bsl 8} | Map], I-1).
-
+    rd_palette(Bin, [{R,G,B} | Map], I-1).
 
 
 
@@ -352,7 +351,7 @@ write_palette(Fd, Map, Pixel) ->
 
 wr_palette(Fd, _, 0) -> ok;
 wr_palette(Fd, [{R,G,B}|Map], I) ->
-    file:write(Fd, <<(R bsr 8):8, (G bsr 8):8, (B bsr 8):8>>),
+    file:write(Fd, <<R:8, G:8, B:8>>),
     wr_palette(Fd, Map, I-1);
 wr_palette(Fd, [], I) ->
     file:write(Fd, <<0:8, 0:8, 0:8>>),

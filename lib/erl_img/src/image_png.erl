@@ -123,8 +123,8 @@ scan_info(Fd, IMG, false, ?pHYs, Length) ->
     end;
 scan_info(_Fd, IMG, false, ?IEND, 0) ->
     {ok, IMG};
-scan_info(Fd, IMG, false, Type, Length) ->
-    ?dbg("~s skipped=~p\n", [Type,Length]),
+scan_info(Fd, IMG, false, _Type, Length) ->
+    ?dbg("~s skipped=~p\n", [_Type,Length]),
     skip_chunk(Fd, Length),
     scan_info(Fd, IMG, false).
 

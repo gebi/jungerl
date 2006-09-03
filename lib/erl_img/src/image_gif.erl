@@ -92,11 +92,10 @@ write_info(Fd, IMG) ->
 read(Fd,IMG,RowFun,St0) ->
     file:position(Fd, 6),
     case file:read(Fd, 7) of
-	{ok, <<Width:16/little, Hight:16/little,
-	      Map:1, Cr:3, Sort:1, Pix:3,
+	{ok, <<_Width:16/little, _Hight:16/little,
+	      Map:1, _Cr:3, Sort:1, Pix:3,
 	      Background:8,
 	      AspectRatio:8>>} ->
-	    ColorRes = Cr+1,
 	    Palette = read_palette(Fd, Map, Pix+1),
 	    ?dbg("sizeof(palette)=~p Map=~w, Cr=~w, Sort=~w, Pix=~w\n", 
 		 [length(Palette),Map,Cr,Sort,Pix]),
@@ -173,7 +172,7 @@ read_extension(Fd, IMG,RowFun,St0,As) ->
 	    read_ctl(Fd, IMG,RowFun,St0,As);
 	{ok,<<?TXT_EXTENSION>>} ->
 	    read_txt(Fd, IMG,RowFun,St0,As);
-	{ok, Unknown} ->
+	{ok, _} ->
 	    read_blocks(Fd), %% skip
 	    read_data(Fd, IMG,RowFun,St0,As)
     end.
@@ -216,7 +215,7 @@ read_txt(Fd, IMG,RowFun,St0,As) ->
     ?dbg("Text block\n",[]),
     case read_block(Fd) of
 	{ok, <<GridLeft:16/little, GridTop:16/little,
-	       GridWidth:16/little, GridHeight:16/little,
+	       _GridWidth:16/little, _GridHeight:16/little,
 	       CellWidth:8, CellHeight:8,
 	      Foreground:8, Background:8>>} ->
 	    case read_blocks(Fd) of
@@ -296,7 +295,7 @@ read_blocks(Fd,Acc) ->
 
 
 
-read_palette(Fd, 0, Pixel) -> 
+read_palette(_Fd, 0, _Pixel) -> 
     undefined;
 read_palette(Fd, 1, Pixel) ->
     Sz = (1 bsl Pixel),
@@ -306,7 +305,7 @@ read_palette(Fd, 1, Pixel) ->
     end.
 
 
-rd_palette(Bin, Map, 0) -> 
+rd_palette(_Bin, Map, 0) -> 
     reverse(Map);
 rd_palette(<<R:8,G:8,B:8, Bin/binary>>, Map, I) ->
     rd_palette(Bin, [{R,G,B} | Map], I-1).
@@ -349,7 +348,7 @@ write(Fd, IMG) ->
 write_palette(Fd, Map, Pixel) ->
     wr_palette(Fd, Map, (1 bsl Pixel)).
 
-wr_palette(Fd, _, 0) -> ok;
+wr_palette(_Fd, _, 0) -> ok;
 wr_palette(Fd, [{R,G,B}|Map], I) ->
     file:write(Fd, <<R:8, G:8, B:8>>),
     wr_palette(Fd, Map, I-1);
@@ -374,7 +373,7 @@ write_pixmaps(Fd, IMG, [Pm|Pms]) ->
 		      TransparentColor:8>>),
     write_image(Fd, Pm),
     write_pixmaps(Fd, IMG, Pms);
-write_pixmaps(Fd, IMG, []) ->
+write_pixmaps(_Fd, _IMG, []) ->
     ok.
 
 
@@ -454,10 +453,10 @@ collect_raw([{Ri,Row} | Rows], Width, Height,Acc) when Ri < Height ->
 		Row
 	end,
     collect_raw(Rows, Width, Height, [R | Acc]);
-collect_raw([{Ri,Row} | Rows], Width, Height, Acc) ->
+collect_raw([{_Ri,_Row} | Rows], Width, Height, Acc) ->
     %% ignore line out of range
     collect_raw(Rows, Width, Height, Acc);
-collect_raw([], Width, Height, Acc) ->
+collect_raw([], _Width, _Height, Acc) ->
     list_to_binary(reverse(Acc)).
 
 collect_interlaced([{Ri,Row}|Rows],Width,Height,R1,R2,R3,R4) ->
@@ -471,7 +470,7 @@ collect_interlaced([{Ri,Row}|Rows],Width,Height,R1,R2,R3,R4) ->
 	6 -> collect_interlaced(Rows,Width,Height,R1,R2,[Row|R3],R4);
 	7 -> collect_interlaced(Rows,Width,Height,R1,R2,R3,[Row|R4])
     end;
-collect_interlaced([],Width,Height,R1,R2,R3,R4) ->
+collect_interlaced([],_Width,_Height,R1,R2,R3,R4) ->
     list_to_binary([reverse(R1),reverse(R2),reverse(R3),reverse(R4)]).
 
     
@@ -510,7 +509,7 @@ read_pixels(Fd,Pix0,RowFun,St0,Width,Height,Interlaced) ->
 	    Error
     end.
 
-read_image(Fd, LZWCodeSize, Width, Height) ->
+read_image(Fd, LZWCodeSize, _Width, _Height) ->
     case read_blocks(Fd) of
 	{ok,Bin} ->
 	    ?dbg("LZWCodeSize=~p compressed=~p\n", [LZWCodeSize, size(Bin)]),
@@ -548,10 +547,10 @@ interlaced_data(Bin,Pix,RowFun,St0,Width,Height) ->
     {St1,Bin1} = raster_data(Bin, Pix,RowFun,St0, Height,0,8, Width),
     {St2,Bin2} = raster_data(Bin1,Pix,RowFun,St1, Height,4,8, Width),
     {St3,Bin3} = raster_data(Bin2,Pix,RowFun,St2, Height,2,4, Width),
-    {St4,Bin4} = raster_data(Bin3,Pix,RowFun,St3, Height,1,2, Width),
+    {St4,_Bin4} = raster_data(Bin3,Pix,RowFun,St3, Height,1,2, Width),
     {ok, Pix#erl_pixmap{ pixels = St4 }}.
 
-raster_data(Bin,Pix,RowFun,St,Height,Ri,Rs,Width) when Ri >= Height ->
+raster_data(Bin,_Pix,_RowFun,St,Height,Ri,_Rs,_Width) when Ri >= Height ->
     {St, Bin};
 raster_data(Bin,Pix,RowFun,St0,Height,Ri,Rs,Width) ->
     <<Row:Width/binary, Bin1/binary>> = Bin,

@@ -1,0 +1,98 @@
+﻿<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.50727</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{8155F56B-4925-406C-8619-7D0E57DD7FE1}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Otp</RootNamespace>
+    <AssemblyName>Otp</AssemblyName>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.configuration" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="AbstractConnection.cs" />
+    <Compile Include="AbstractNode.cs" />
+    <Compile Include="Erlang\Atom.cs" />
+    <Compile Include="Erlang\BigInteger.cs" />
+    <Compile Include="Erlang\Binary.cs" />
+    <Compile Include="Erlang\Boolean.cs" />
+    <Compile Include="Erlang\Byte.cs" />
+    <Compile Include="Erlang\Char.cs" />
+    <Compile Include="Erlang\CloneObject.cs" />
+    <Compile Include="Erlang\DecodeException.cs" />
+    <Compile Include="Erlang\Double.cs" />
+    <Compile Include="Erlang\ErlangException.cs" />
+    <Compile Include="Erlang\Exit.cs" />
+    <Compile Include="Erlang\Int.cs" />
+    <Compile Include="Erlang\List.cs" />
+    <Compile Include="Erlang\Long.cs" />
+    <Compile Include="Erlang\Object.cs" />
+    <Compile Include="Erlang\Pid.cs" />
+    <Compile Include="Erlang\Port.cs" />
+    <Compile Include="Erlang\RangeException.cs" />
+    <Compile Include="Erlang\Ref.cs" />
+    <Compile Include="Erlang\Short.cs" />
+    <Compile Include="Erlang\String.cs" />
+    <Compile Include="Erlang\Tuple.cs" />
+    <Compile Include="Erlang\UInt.cs" />
+    <Compile Include="Erlang\UShort.cs" />
+    <Compile Include="GenericQueue.cs" />
+    <Compile Include="Link.cs" />
+    <Compile Include="Links.cs" />
+    <Compile Include="OtpAuthException.cs" />
+    <Compile Include="OtpConnection.cs" />
+    <Compile Include="OtpCookedConnection.cs" />
+    <Compile Include="OtpEpmd.cs" />
+    <Compile Include="OtpException.cs" />
+    <Compile Include="OtpExternal.cs" />
+    <Compile Include="OtpInputStream.cs" />
+    <Compile Include="OtpLocalNode.cs" />
+    <Compile Include="OtpMbox.cs" />
+    <Compile Include="OtpMsg.cs" />
+    <Compile Include="OtpNode.cs" />
+    <Compile Include="OtpNodeStatus.cs" />
+    <Compile Include="OtpOutputStream.cs" />
+    <Compile Include="OtpPeer.cs" />
+    <Compile Include="OtpSelf.cs" />
+    <Compile Include="OtpServer.cs" />
+    <Compile Include="OtpSystem.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="SupportClass.cs" />
+    <Compile Include="Test.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+  </ItemGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

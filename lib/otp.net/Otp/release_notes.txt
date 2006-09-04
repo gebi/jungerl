@@ -1,6 +1,20 @@
 Release notes
 -------------
 
+V 0.3, September 2006 / Paul Shaffer
+------------------------------------
+Some fixes and VS projects have been contributed by Paul, mainly to support R11B.
+
+1. modified abstractnode.cs, abstractconnection.cs to support extended ports and sids.
+
+2. Fixed lack of double parsing in double.cs. Code much simpler than the java version.
+
+3. moved erlang password to app.config file.  This is easier for .net programmers,
+but I left the old code in place, commented out.
+
+
+
+
 V 0.2, May 2004 / Vlad Dumitrescu
 ---------------------------------
 

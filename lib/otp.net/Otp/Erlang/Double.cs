@@ -49,7 +49,9 @@ namespace Otp.Erlang
 		**/
 		public Double(OtpInputStream buf)
 		{
-			this.d = buf.read_double();
+            this.d = buf.read_double();
+            
+            //System.Diagnostics.Debug.WriteLine("Double: " + this.d );
 		}
 		
 		/*
@@ -89,7 +91,7 @@ namespace Otp.Erlang
 		**/
 		public override System.String ToString()
 		{
-			return "" + d;
+			return d.ToString();
 		}
 		
 		/*

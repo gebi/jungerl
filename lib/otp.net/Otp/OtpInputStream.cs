@@ -342,30 +342,25 @@ namespace Otp
 				throw new Erlang.DecodeException("Value cannot be represented as float: " + d);
 			return f;
 		}
-		/*
-		* Read an Erlang float from the stream.
-		*
-		* @return the float value, as a double.
-		* 
-		* @exception Erlang.DecodeException if the next term in the
-		* stream is not a float.
-		**/
-		public virtual double read_double()
+        /*
+        * Read an Erlang float from the stream.
+        *
+        * @return the float value, as a double.
+        * 
+        * @exception Erlang.DecodeException if the next term in the
+        * stream is not a float.
+        *
+        **/
+        public virtual double read_double()
 		{
 			return getFloatOrDouble();
 		}
 
 		private double getFloatOrDouble()
 		{
-			double val = 0.0;
-			int epos;
-			int exp;
-			byte[] strbuf = new byte[31];
-			System.String str;
-			int tag;
 			
 			// parse the stream
-			tag = this.read1();
+			int tag = this.read1();
 			if (tag == OtpExternal.versionTag)
 			{
 				tag = this.read1();
@@ -377,34 +372,27 @@ namespace Otp
 			}
 			
 			// get the string
+			byte[] strbuf = new byte[31];
 			this.readN(strbuf);
-			char[] tmpChar;
-			tmpChar = new char[strbuf.Length];
-			strbuf.CopyTo(tmpChar, 0);
-			str = new System.String(tmpChar);
 			
-			// find the exponent prefix 'e' in the string
-			epos = str.IndexOf((System.Char) 'e', 0);
-			
-			if (epos < 0)
-			{
-				throw new Erlang.DecodeException("Invalid float format: '" + str + "'");
-			}
-			
-			// remove the sign from the exponent, if positive
-			System.String estr = str.Substring(epos + 1).Trim();
-			
-			if (estr.Substring(0, (1) - (0)).Equals("+"))
-			{
-				estr = estr.Substring(1);
-			}
-			
-			// now put the mantissa and exponent together
-			exp = System.Int32.Parse(estr);
-			//UPGRADE_TODO: The equivalent in .NET for Class java.math.BigDecimal will be considered in a future release.;
-//			val = new BigDecimal(str.Substring(0, (epos) - (0))).movePointRight(exp);
-			
-			return val;
+            char[] tmpChar = new char[strbuf.Length];
+            strbuf.CopyTo(tmpChar, 0);
+            System.String str = new System.String(tmpChar);
+            //System.Diagnostics.Debug.WriteLine("getFloatOrDouble: str = " + str);
+
+            double parsedValue = 0.0;
+
+            try
+            {
+                // Easier than the java version.
+                parsedValue = System.Double.Parse(str);
+            }
+            catch
+            {
+                throw new Erlang.DecodeException("Error parsing float format: '" + str + "'");
+            }
+            return parsedValue;
+
 		}
 		
 		/*
@@ -933,6 +921,8 @@ namespace Otp
 				this.read1();
 				tag = this.peek();
 			}
+
+            //System.Diagnostics.Debug.WriteLine("read_any: tag = " + tag);
 
 			switch (tag)
 			{

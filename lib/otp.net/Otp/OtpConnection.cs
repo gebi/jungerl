@@ -15,9 +15,12 @@
 * 
  * Converted from Java to C# by Vlad Dumitrescu (vlad_Dumitrescu@hotmail.com)
 */
+
+using System;
+using System.Diagnostics;
+
 namespace Otp
 {
-	using System;
 
 	/*
 	* Maintains a connection between a C# process and a remote Erlang,
@@ -502,7 +505,8 @@ namespace Otp
 		{
 			
 			Erlang.Object msg = receive();
-			
+            Debug.WriteLine("receiveRPC: " + msg.ToString());
+
 			if (msg is Erlang.Tuple)
 			{
 				Erlang.Tuple t = (Erlang.Tuple) msg;

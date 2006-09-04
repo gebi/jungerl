@@ -1,0 +1,3 @@
+The lisperl code is (C) 2004 Vlad Dumitrescu and is released "as-is", with no warranty and
+may be modified or used in any kind of application if proper credit is given to
+the author(s).

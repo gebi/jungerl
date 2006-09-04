@@ -1,3 +1,9 @@
+2006-09-04  Mats Cronqvist  <locmacr@mwlx084>
+
+	* src/distel.erl (Module): reload_module/2; 1st arg assumed to be
+	sting, could be atom or string.  resolved by creating to_atom/1
+	and to_bin/1. got rid of l2a/1 and l2b/1.
+
 2006-08-03  Mats Cronqvist  <locmacr@mwlx084>
 
 	* src/distel.erl (Module): had problems in guess_source_file/2;

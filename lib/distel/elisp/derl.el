@@ -215,6 +215,8 @@ gen_digest() function:
   (or derl-cookie
       (with-temp-buffer
 	(insert-file-contents (concat (getenv "HOME") "/.erlang.cookie"))
+	(while (search-forward "\n" nil t)
+	  (replace-match ""))
 	(buffer-string))))
 
 ;; ------------------------------------------------------------

@@ -8,7 +8,7 @@
 %%
 
 -module(pgsql).
--export([connect/4]).
+-export([connect/1, connect/4, connect/5]).
 
 -export([squery/2, 
 	 pquery/3, 
@@ -16,13 +16,22 @@
 	 prepare/3, unprepare/2, 
 	 execute/3]).
 
-%% Connect routine. Might be insufficient for your needs because I dont
-%% know about your needs.
+
 connect(Host, Database, User, Password) ->
-    {ok, Db} = pgsql_proto:run([{database, Database},
-				{host, Host},
-				{user, User},
-				{password, Password}]),
+    connect([{database, Database},
+           {host, Host},
+           {user, User},
+           {password, Password}]).
+
+connect(Host, Database, User, Password, Port) ->
+    connect([{database, Database},
+           {host, Host},
+           {user, User},
+           {port, Port},
+           {password, Password}]).
+
+connect(Options) ->
+    {ok, Db} = pgsql_proto:run(Options),
     %% Receive startup params or error.
     receive
 	{pgsql_error, Reason} ->

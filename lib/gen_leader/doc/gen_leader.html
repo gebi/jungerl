@@ -6,26 +6,35 @@
 </head>
 <body bgcolor="white">
 <h1>Module gen_leader</h1>
-Leader election behaviour.<ul><li><a href="#description">Description</a></li><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul><p><b>Authors:</b> Ulf Wiger (<a href="mailto:ulf.wiger@ericsson.com"><tt>ulf.wiger@ericsson.com</tt></a>), Thomas Arts (<a href="mailto:thomas.arts@ituniv.se"><tt>thomas.arts@ituniv.se</tt></a>).</p>
-<h2><a name="description">Description</a></h2>Leader election behaviour.
-  <p>This application implements a leader election behaviour modeled after
-  gen_server. This behaviour intends to make it reasonably
-  straightforward to implement a fully distributed server with
-  master-slave semantics.</p>
-  <p>The gen_leader behaviour supports nearly everything that gen_server
-  does (some functions, such as multicall() and the internal timeout,
-  have been removed), and adds a few callbacks and API functions to
-  support leader election etc.</p>
-  <p>Also included is an example program, a global dictionary, based
-  on the modules gen_leader and dict. The callback implementing the
-  global dictionary is called 'test_cb', for no particularly logical
-  reason.</p>
+Leader election behavior.<ul><li><a href="#description">Description</a></li><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul><p><b>Authors:</b> Hans Svensson (<a href="mailto:hanssv@cs.chalmers.se"><tt>hanssv@cs.chalmers.se</tt></a>), Thomas Arts (<a href="mailto:thomas.arts@ituniv.se"><tt>thomas.arts@ituniv.se</tt></a>), Ulf Wiger (<a href="mailto:ulf.wiger@ericsson.com"><tt>ulf.wiger@ericsson.com</tt></a>).</p>
+<h2><a name="description">Description</a></h2>Leader election behavior.
+   <p>This application implements a leader election behavior modeled after
+   gen_server. This behavior intends to make it reasonably
+   straightforward to implement a fully distributed server with
+   master-slave semantics.</p>
+   <p>The gen_leader behavior supports nearly everything that gen_server
+   does (some functions, such as multicall() and the internal timeout,
+   have been removed), and adds a few callbacks and API functions to
+   support leader election etc.</p>
+   <p>Also included is an example program, a global dictionary, based
+   on the modules gen_leader and dict. The callback implementing the
+   global dictionary is called 'test_cb', for no particularly logical
+   reason.</p>
+   <p><b>New version:</b> The internal leader election algorithm was faulty
+   and has been replaced with a new version based on a different leader
+   election algorithm. As a consequence of this the query functions
+   <tt>alive</tt> and <tt>down</tt> can no longer be provided.
+   The new algorithm also make use of an incarnation parameter, by
+   default written to disk in the function <tt>incarnation</tt>. This
+   implies that only one <tt>gen_leader</tt> per node is permitted, if
+   used in a diskless environment, <tt>incarnation</tt> must be adapted.
+   </p>
 <h2><a name="types">Data Types</a></h2>
 
 <h3><a name="type-callerRef">callerRef()</a></h3>
 <p><tt>callerRef() = {pid(), reference()}</tt></p>
 <p>See gen_server.
- </p>
+  </p>
 
 <h3><a name="type-election">election()</a></h3>
 <p><tt>election() = tuple()</tt></p>
@@ -44,15 +53,13 @@ Leader election behaviour.<ul><li><a href="#description">Description</a></li><li
 <p>See gen_server.</p>
 
 <h2><a name="index">Function Index</a></h2>
-<table width="100%" border="1"><tr><td valign="top"><a href="#alive-1">alive/1</a></td><td>Returns a list of live nodes (candidates and workers).</td></tr>
-<tr><td valign="top"><a href="#call-2">call/2</a></td><td>Equivalent to <code>gen_server:call/2</code>, but with a slightly
+<table width="100%" border="1"><tr><td valign="top"><a href="#call-2">call/2</a></td><td>Equivalent to <code>gen_server:call/2</code>, but with a slightly
   different exit reason if something goes wrong.</td></tr>
 <tr><td valign="top"><a href="#call-3">call/3</a></td><td>Equivalent to <code>gen_server:call/3</code>, but with a slightly
   different exit reason if something goes wrong.</td></tr>
 <tr><td valign="top"><a href="#candidates-1">candidates/1</a></td><td>Returns a list of known candidates.</td></tr>
 <tr><td valign="top"><a href="#cast-2">cast/2</a></td><td><p>Equivalent to <tt>gen_server:cast / 2</tt>.</p>
 </td></tr>
-<tr><td valign="top"><a href="#down-1">down/1</a></td><td>Returns a list of candidates currently not running.</td></tr>
 <tr><td valign="top"><a href="#leader_call-2">leader_call/2</a></td><td>Makes a call (similar to <code>gen_server:call/2</code>) to the
   leader.</td></tr>
 <tr><td valign="top"><a href="#leader_call-3">leader_call/3</a></td><td>Makes a call (similar to <code>gen_server:call/3</code>) to the
@@ -68,20 +75,15 @@ Leader election behaviour.<ul><li><a href="#description">Description</a></li><li
 
 <h2><a name="functions">Function Details</a></h2>
 
-<h3><a name="alive-1">alive/1</a></h3>
-<p><tt>alive(E::<a href="#type-election">election()</a>) -> [<a href="#type-node">node()</a>]</tt></p>
-<p>Returns a list of live nodes (candidates and workers).
- </p>
-
 <h3><a name="call-2">call/2</a></h3>
-<p><tt>call(Name::<a href="#type-serverRef">serverRef()</a>, Request::Request) -> term()</tt></p>
+<p><tt>call(Name::<a href="#type-serverRef">serverRef()</a>, Request) -&gt; term()</tt></p>
 <p>Equivalent to <code>gen_server:call/2</code>, but with a slightly
   different exit reason if something goes wrong. This function calls
   the <code>gen_leader</code> process exactly as if it were a gen_server
   (which, for practical purposes, it is.)</p>
 
 <h3><a name="call-3">call/3</a></h3>
-<p><tt>call(Name::<a href="#type-serverRef">serverRef()</a>, Request::Request, Timeout::integer()) -> Reply</tt>
+<p><tt>call(Name::<a href="#type-serverRef">serverRef()</a>, Request, Timeout::integer()) -&gt; Reply</tt>
 <ul><li><tt>Reply = term()</tt></li></ul></p>
 <p>Equivalent to <code>gen_server:call/3</code>, but with a slightly
   different exit reason if something goes wrong. This function calls
@@ -89,22 +91,17 @@ Leader election behaviour.<ul><li><a href="#description">Description</a></li><li
   (which, for practical purposes, it is.)</p>
 
 <h3><a name="candidates-1">candidates/1</a></h3>
-<p><tt>candidates(E::<a href="#type-election">election()</a>) -> [<a href="#type-node">node()</a>]</tt></p>
+<p><tt>candidates(E::<a href="#type-election">election()</a>) -&gt; [<a href="#type-node">node()</a>]</tt></p>
 <p>Returns a list of known candidates.
  </p>
 
 <h3><a name="cast-2">cast/2</a></h3>
-<tt>cast(Name, Request) -> term()
+<tt>cast(Name, Request) -&gt; term()
 </tt><p>Equivalent to <tt>gen_server:cast / 2</tt>.</p>
 
 
-<h3><a name="down-1">down/1</a></h3>
-<p><tt>down(E::<a href="#type-election">election()</a>) -> [<a href="#type-node">node()</a>]</tt></p>
-<p>Returns a list of candidates currently not running.
- </p>
-
 <h3><a name="leader_call-2">leader_call/2</a></h3>
-<p><tt>leader_call(Name::<a href="#type-name">name()</a>, Request::term()) -> Reply</tt>
+<p><tt>leader_call(Name::<a href="#type-name">name()</a>, Request::term()) -&gt; Reply</tt>
 <ul><li><tt>Reply = term()</tt></li></ul></p>
 <p>Makes a call (similar to <code>gen_server:call/2</code>) to the
   leader. The call is forwarded via the local gen_leader instance, if
@@ -114,7 +111,7 @@ Leader election behaviour.<ul><li><a href="#description">Description</a></li><li
   same default timeout as e.g. <code>gen_server:call/2</code>.</p></p>
 
 <h3><a name="leader_call-3">leader_call/3</a></h3>
-<p><tt>leader_call(Name::<a href="#type-name">name()</a>, Request::term(), Timeout::integer()) -> Reply</tt>
+<p><tt>leader_call(Name::<a href="#type-name">name()</a>, Request::term(), Timeout::integer()) -&gt; Reply</tt>
 <ul><li><tt>Reply = term()</tt></li></ul></p>
 <p>Makes a call (similar to <code>gen_server:call/3</code>) to the
   leader. The call is forwarded via the local gen_leader instance, if
@@ -122,22 +119,22 @@ Leader election behaviour.<ul><li><a href="#description">Description</a></li><li
   leader dies while the request is outstanding.</p>
 
 <h3><a name="leader_cast-2">leader_cast/2</a></h3>
-<p><tt>leader_cast(Name::<a href="#type-name">name()</a>, Msg::term()) -> ok</tt></p>
+<p><tt>leader_cast(Name::<a href="#type-name">name()</a>, Msg::term()) -&gt; ok</tt></p>
 <p>Similar to <code>gen_server:cast/2</code> but will be forwarded to
   the leader via the local gen_leader instance.</p>
 
 <h3><a name="reply-2">reply/2</a></h3>
-<p><tt>reply(From::<a href="#type-callerRef">callerRef()</a>, Reply::term()) -> Void</tt></p>
+<p><tt>reply(From::<a href="#type-callerRef">callerRef()</a>, Reply::term()) -&gt; Void</tt></p>
 <p>Equivalent to <tt>gen_server:reply / 2</tt>.</p>
 
 
 <h3><a name="start-6">start/6</a></h3>
-<p><tt>start(Name::<a href="#type-node">node()</a>, CandidateNodes::[<a href="#type-node">node()</a>], Workers::[<a href="#type-node">node()</a>], Mod::atom(), Arg::Arg, Options::list()) -> {ok, pid()}</tt></p>
+<p><tt>start(Name::<a href="#type-node">node()</a>, CandidateNodes::[<a href="#type-node">node()</a>], Workers::[<a href="#type-node">node()</a>], Mod::atom(), Arg, Options::list()) -&gt; {ok, pid()}</tt></p>
 <p>Starts a gen_leader process without linking to the parent.
  </p>
 
 <h3><a name="start_link-6">start_link/6</a></h3>
-<p><tt>start_link(Name::atom(), CandidateNodes::[atom()], Workers::[atom()], Mod::atom(), Arg::Arg, Options::list()) -> {ok, pid()}</tt></p>
+<p><tt>start_link(Name::atom(), CandidateNodes::[atom()], Workers::[atom()], Mod::atom(), Arg, Options::list()) -&gt; {ok, pid()}</tt></p>
 <p>Starts a gen_leader process.
   <table>
    <tr><td>Name</td><td>The locally registered name of the process</td></tr>
@@ -155,7 +152,7 @@ Leader election behaviour.<ul><li><a href="#description">Description</a></li><li
   can be added at runtime.</p></p>
 
 <h3><a name="workers-1">workers/1</a></h3>
-<p><tt>workers(E::<a href="#type-election">election()</a>) -> [<a href="#type-node">node()</a>]</tt></p>
+<p><tt>workers(E::<a href="#type-election">election()</a>) -&gt; [<a href="#type-node">node()</a>]</tt></p>
 <p>Returns a list of known workers.
  </p>
 </body>

@@ -68,7 +68,7 @@ Example callback module for the gen_leader behaviour.<ul><li><a href="#descripti
 <h2><a name="functions">Function Details</a></h2>
 
 <h3><a name="code_change-4">code_change/4</a></h3>
-<p><tt>code_change(FromVsn::string(), OldState::term(), E::<a href="#type-election">election()</a>, Extra::term()) -> {ok, NState} | {ok, NState, NElection}</tt>
+<p><tt>code_change(FromVsn::string(), OldState::term(), E::<a href="#type-election">election()</a>, Extra::term()) -&gt; {ok, NState} | {ok, NState, NElection}</tt>
 <ul><li><tt>NState = <a href="#type-state">state()</a></tt></li><li><tt>NElection = <a href="#type-election">election()</a></tt></li></ul></p>
 <p>Similar to code_change/3 in a gen_server callback module, with
   the exception of the added argument E. <p>Note that is also possible
@@ -77,7 +77,7 @@ Example callback module for the gen_leader behaviour.<ul><li><a href="#descripti
  </p>
 
 <h3><a name="elected-2">elected/2</a></h3>
-<p><tt>elected(State::<a href="#type-state">state()</a>, E::<a href="#type-election">election()</a>) -> {ok, Broadcast, NState}</tt>
+<p><tt>elected(State::<a href="#type-state">state()</a>, E::<a href="#type-election">election()</a>) -&gt; {ok, Broadcast, NState}</tt>
 <ul><li><tt>Broadcast = <a href="#type-broadcast">broadcast()</a></tt></li><li><tt>NState = <a href="#type-state">state()</a></tt></li></ul></p>
 <p>Called by the leader it is elected leader, and each time a
   candidate recognizes the leader.
@@ -89,19 +89,19 @@ Example callback module for the gen_leader behaviour.<ul><li><a href="#descripti
   but doesn't have to be. This is up to the application.</p>
   <p>Example:</p>
   <pre>
-    elected(Dict, E) ->
+    elected(Dict, E) -&gt;
         {ok, Dict, Dict}.
   </pre></p>
 
 <h3><a name="from_leader-3">from_leader/3</a></h3>
-<p><tt>from_leader(Msg::term(), State::<a href="#type-state">state()</a>, E::<a href="#type-election">election()</a>) -> {ok, NState}</tt>
+<p><tt>from_leader(Msg::term(), State::<a href="#type-state">state()</a>, E::<a href="#type-election">election()</a>) -&gt; {ok, NState}</tt>
 <ul><li><tt>NState = <a href="#type-state">state()</a></tt></li></ul></p>
 <p>Called by each candidate in response to a message from the leader.
   <p>In this particular module, the leader passes an update function to be
   applied to the candidate's state.</p></p>
 
 <h3><a name="handle_DOWN-3">handle_DOWN/3</a></h3>
-<p><tt>handle_DOWN(Node::<a href="#type-node">node()</a>, State::<a href="#type-state">state()</a>, E::<a href="#type-election">election()</a>) -> {ok, NState} | {ok, Broadcast, NState}</tt>
+<p><tt>handle_DOWN(Node::<a href="#type-node">node()</a>, State::<a href="#type-state">state()</a>, E::<a href="#type-election">election()</a>) -&gt; {ok, NState} | {ok, Broadcast, NState}</tt>
 <ul><li><tt>Broadcast = <a href="#type-broadcast">broadcast()</a></tt></li><li><tt>NState = <a href="#type-state">state()</a></tt></li></ul></p>
 <p>Called by the leader when it detects loss of a candidate node.
   <p>If the function returns a <code>Broadcast</code> object, this will
@@ -109,7 +109,7 @@ Example callback module for the gen_leader behaviour.<ul><li><a href="#descripti
   <a href="#from_leader-3">from_leader/3</a>.</p></p>
 
 <h3><a name="handle_call-3">handle_call/3</a></h3>
-<p><tt>handle_call(Request::term(), From::<a href="#type-callerRef">callerRef()</a>, State::<a href="#type-state">state()</a>) -> {reply, Reply, NState} | {noreply, <a href="#type-state">state()</a>} | {stop, Reason, Reply, NState} | <a href="#type-commonReply">commonReply()</a></tt></p>
+<p><tt>handle_call(Request::term(), From::<a href="#type-callerRef">callerRef()</a>, State::<a href="#type-state">state()</a>) -&gt; {reply, Reply, NState} | {noreply, <a href="#type-state">state()</a>} | {stop, Reason, Reply, NState} | <a href="#type-commonReply">commonReply()</a></tt></p>
 <p>Equivalent to <code>Mod:handle_call/3</code> in a gen_server.
   <p>Note the difference in allowed return values. <code>{ok,NState}</code>
   and <code>{noreply,NState}</code> are synonymous.
@@ -119,13 +119,13 @@ Example callback module for the gen_leader behaviour.<ul><li><a href="#descripti
   <code>handle_info/2</code></p></p>
 
 <h3><a name="handle_cast-2">handle_cast/2</a></h3>
-<p><tt>handle_cast(Msg::term(), State::<a href="#type-state">state()</a>) -> <a href="#type-commonReply">commonReply()</a></tt></p>
+<p><tt>handle_cast(Msg::term(), State::<a href="#type-state">state()</a>) -&gt; <a href="#type-commonReply">commonReply()</a></tt></p>
 <p>Equivalent to <code>Mod:handle_call/3</code> in a gen_server,
   except (<b>NOTE</b>) for the possible return values.
  </p>
 
 <h3><a name="handle_info-2">handle_info/2</a></h3>
-<p><tt>handle_info(Msg::term(), State::<a href="#type-state">state()</a>) -> <a href="#type-commonReply">commonReply()</a></tt></p>
+<p><tt>handle_info(Msg::term(), State::<a href="#type-state">state()</a>) -&gt; <a href="#type-commonReply">commonReply()</a></tt></p>
 <p>Equivalent to <code>Mod:handle_info/3</code> in a gen_server,
   except (<b>NOTE</b>) for the possible return values.
   <p>This function will be called in response to any incoming message
@@ -134,7 +134,7 @@ Example callback module for the gen_leader behaviour.<ul><li><a href="#descripti
  </p>
 
 <h3><a name="handle_leader_call-4">handle_leader_call/4</a></h3>
-<p><tt>handle_leader_call(Msg::term(), From::<a href="#type-callerRef">callerRef()</a>, State::<a href="#type-state">state()</a>, E::<a href="#type-election">election()</a>) -> {reply, Reply, NState} | {reply, Reply, Broadcast, NState} | {noreply, <a href="#type-state">state()</a>} | {stop, Reason, Reply, NState} | <a href="#type-commonReply">commonReply()</a></tt>
+<p><tt>handle_leader_call(Msg::term(), From::<a href="#type-callerRef">callerRef()</a>, State::<a href="#type-state">state()</a>, E::<a href="#type-election">election()</a>) -&gt; {reply, Reply, NState} | {reply, Reply, Broadcast, NState} | {noreply, <a href="#type-state">state()</a>} | {stop, Reason, Reply, NState} | <a href="#type-commonReply">commonReply()</a></tt>
 <ul><li><tt>Broadcast = <a href="#type-broadcast">broadcast()</a></tt></li><li><tt>NState = <a href="#type-state">state()</a></tt></li></ul></p>
 <p>Called by the leader in response to a
   <a href="gen_leader.html#leader_call-2">leader_call()</a>.
@@ -143,10 +143,10 @@ Example callback module for the gen_leader behaviour.<ul><li><a href="#descripti
   <a href="#from_leader-3">from_leader/3</a>.</p>
   <p>Example:</p>
   <pre>
-    handle_leader_call({store,F}, From, Dict, E) ->
+    handle_leader_call({store,F}, From, Dict, E) -&gt;
         NewDict = F(Dict),
         {reply, ok, {store, F}, NewDict};
-    handle_leader_call({leader_lookup,F}, From, Dict, E) ->
+    handle_leader_call({leader_lookup,F}, From, Dict, E) -&gt;
         Reply = F(Dict),
         {reply, Reply, Dict}.
   </pre>
@@ -158,18 +158,18 @@ Example callback module for the gen_leader behaviour.<ul><li><a href="#descripti
   and updates by the leader, which can lead to race conditions.</p></p>
 
 <h3><a name="handle_leader_cast-3">handle_leader_cast/3</a></h3>
-<p><tt>handle_leader_cast(Msg::term(), State::term(), E::<a href="#type-election">election()</a>) -> <a href="#type-commonReply">commonReply()</a></tt></p>
+<p><tt>handle_leader_cast(Msg::term(), State::term(), E::<a href="#type-election">election()</a>) -&gt; <a href="#type-commonReply">commonReply()</a></tt></p>
 <p>Called by the leader in response to a <a href="gen_leader.html#leader_cast-2">  leader_cast()</a>.
   <p><b>BUG:</b> This has not yet been implemented.</p></p>
 
 <h3><a name="init-1">init/1</a></h3>
-<p><tt>init(Arg::term()) -> {ok, State}</tt>
+<p><tt>init(Arg::term()) -&gt; {ok, State}</tt>
 <ul><li><tt>State = <a href="#type-state">state()</a></tt></li></ul></p>
 <p>Equivalent to the init/1 function in a gen_server.
  </p>
 
 <h3><a name="surrendered-3">surrendered/3</a></h3>
-<p><tt>surrendered(State::<a href="#type-state">state()</a>, Synch::<a href="#type-broadcast">broadcast()</a>, E::<a href="#type-election">election()</a>) -> {ok, NState}</tt>
+<p><tt>surrendered(State::<a href="#type-state">state()</a>, Synch::<a href="#type-broadcast">broadcast()</a>, E::<a href="#type-election">election()</a>) -&gt; {ok, NState}</tt>
 <ul><li><tt>NState = <a href="#type-state">state()</a></tt></li></ul></p>
 <p>Called by each candidate when it recognizes another instance as
   leader.
@@ -177,12 +177,12 @@ Example callback module for the gen_leader behaviour.<ul><li><a href="#descripti
   acknowledges a leader and receives a Synch message in return.</p>
   <p>Example:</p>
   <pre>
-   surrendered(OurDict, LeaderDict, E) ->
+   surrendered(OurDict, LeaderDict, E) -&gt;
        {ok, LeaderDict}.
   </pre></p>
 
 <h3><a name="terminate-2">terminate/2</a></h3>
-<p><tt>terminate(Reason::term(), State::<a href="#type-state">state()</a>) -> Void</tt></p>
+<p><tt>terminate(Reason::term(), State::<a href="#type-state">state()</a>) -&gt; Void</tt></p>
 <p>Equivalent to <code>terminate/2</code> in a gen_server callback
   module.
  </p>

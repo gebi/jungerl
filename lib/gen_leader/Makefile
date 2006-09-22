@@ -7,13 +7,14 @@ DOCDIR=doc
 EDOCDIR="../edoc/ebin"
 STOOLSDIR="../syntax_tools/ebin"
 XMERLDIR="../xmerl/ebin"
-DOC_OPTS=[{title,"Welcome to gen_leader"}]
+DOCDIR=doc
+DOC_OPTS=[{title,"Welcome to gen_leader"},{hidden,false},{private,false}]
 
-all: all-subdirs
+all: all-subdirs docs
 
-# Commented out since the new edoc is not yet in jungerl.
-#docs:
-#	erl -noshell -pa $(EDOCDIR) -pz $(STOOLSDIR) -pz $(XMERLDIR) -run edoc_run application "'$(APPNAME)'" '"."' '$(DOC_OPTS)' -s erlang halt
+
+docs:
+	erl -noshell -run edoc_run application "'$(APPNAME)'" '"."' '$(DOC_OPTS)' -s erlang halt
 
 all-subdirs:
 	@for dir in $(SUBDIRS); do \

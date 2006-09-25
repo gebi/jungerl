@@ -59,6 +59,7 @@ cache, give a prefix argument with C-u before using the command.
 \\[erl-find-source-unwind]		- Jump back from a function definition (multi-level).
 \\[erl-eval-expression]	- Evaluate an erlang expression from the minibuffer.
 \\[erl-reload-module]	- Reload an Erlang module.
+\\[erl-reload-modules]	- Reload all Erlang modules that are out of date.
 \\[fprof]	- Profile (with fprof) an expression from the minibuffer.
 \\[fprof-analyse]	- View profiler results from an \"fprof:analyse\" file.
 \\[erl-fdoc-describe]	- Describe a module or function with fdoc.
@@ -100,6 +101,7 @@ sequence. For general information about Emacs' online help, use
     ("\C-c\C-dm" edb-monitor)
     ("\C-c\C-d:" erl-eval-expression)
     ("\C-c\C-dL" erl-reload-module)
+    ("\C-c\C-dr" erl-reload-modules)
     ("\C-c\C-dp" fprof)
     ("\C-c\C-dP" fprof-analyse)
     ("\C-c\C-d." erl-find-source-under-point)

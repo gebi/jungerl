@@ -590,6 +590,13 @@ time it spent in subfunctions."
       s
     (concat s ".")))
 
+(defun erl-reload-modules (node)
+  "reload all out-of-date modules"
+  (interactive (list (erl-target-node)))
+  (erl-rpc (lambda (result) (message "load: %s" result)) nil 
+           node 'distel 'reload_modules ()))
+
+
 (defvar erl-reload-dwim nil
   "Do What I Mean when reloading beam files. If erl-reload-dwim is non-nil, 
 and the module cannot be found in the load path, we attempt to find the correct

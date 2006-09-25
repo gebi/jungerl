@@ -1,3 +1,10 @@
+2006-09-25  Mats Cronqvist  <locmacr@mwlx084>
+
+	* src/distel.erl: added erl-reload-modules. reloads all modules
+	that are out of date. compares time of compilation for the loaded
+	code and the code in the corresponding beam file.
+	* elisp/distel.el: bound erl-reload-modules to C-c C-d r.
+	
 2006-09-04  Mats Cronqvist  <locmacr@mwlx084>
 
 	* src/distel.erl (Module): reload_module/2; 1st arg assumed to be

@@ -23,7 +23,7 @@
          free_vars/1, free_vars/2,
          apropos/1, apropos/2, describe/3, describe/4]).
 
--export([reload_module/2]).
+-export([reload_module/2,reload_modules/0]).
 
 -export([gl_proxy/1, tracer_init/2, null_gl/0]).
 

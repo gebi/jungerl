@@ -29,6 +29,10 @@ CONTRIBUTIONS & CHANGE HISTORY
               prevent port number being included in the Host header when port
               80 is intended.
 
+12-10-2006 -  Chris Newcombe reported bug in dealing with requests where no 
+              body is expected in the response. The first request would succeed
+              and the next request would hang.
+
 Here are some usage examples. Enjoy!
 
 5> ibrowse:start().

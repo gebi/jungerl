@@ -5,39 +5,78 @@
 %%%----------------------------------------------------------------------
 -module(gettext).
 
--export([key2str/1, parse_po/1, lc2lang/1, quotes/1,
-	 parse_po_bin/1, all_lang/0, key2str/2, all_lcs/0,
-	 reload_custom_lang/1, unload_custom_lang/1,
-	 recreate_db/0]).
+-export([parse_po/1, lc2lang/1, quotes/1,
+	 parse_po_bin/1, all_lang/0, 
+	 key2str/1, key2str/2, key2str/3, 
+	 all_lcs/0, all_lcs/1,
+	 reload_custom_lang/1, reload_custom_lang/2,
+	 unload_custom_lang/1, unload_custom_lang/2,
+	 recreate_db/0, recreate_db/1,
+	 store_pofile/2, store_pofile/3, 
+	 lang2cset/1, lang2cset/2]).
 
 -include("gettext.hrl").
 
-
-
-reload_custom_lang(Lang) ->
-    gettext_server:reload_custom_lang(Lang).
-
-unload_custom_lang(Lang) ->
-    gettext_server:unload_custom_lang(Lang).
-
-all_lcs() ->
-    gettext_server:all_lang().
-
-recreate_db() ->
-    gettext_server:recreate_db().
-
+-define(DEFAULT_SERVER, gettext_server).
 
 %%% --------------------------------------------------------------------
-%%% This is the lookup routines.
+%%% This is the lookup routine.
 %%% --------------------------------------------------------------------
-
 %%% Hopefully, the surrounding code has done its job and
 %%% put the language to be used in the process dictionary.
 key2str(Key) -> 
-    gettext_server:key2str(Key, get(gettext_language)).
+    key2str(Key, get(gettext_language)).
 
-key2str(Key, Lang) -> 
-    gettext_server:key2str(Key, Lang).
+key2str(Key, Lang) when is_list(Key) -> 
+    key2str(?DEFAULT_SERVER, Key, Lang);
+key2str(Server, Key) when is_atom(Server) ->
+    key2str(Server, Key, get(gettext_language)).
+
+key2str(Server, Key, Lang) ->
+    gen_server:call(Server, {key2str, Key, Lang}, infinity).
+
+%%% --------------------------------------------------------------------
+
+reload_custom_lang(Lang) ->
+    reload_custom_lang(?DEFAULT_SERVER, Lang).
+
+reload_custom_lang(Server, Lang) ->
+    gen_server:call(Server, {reload_custom_lang, Lang}, infinity).
+
+unload_custom_lang(Lang) ->
+    unload_custom_lang(?DEFAULT_SERVER, Lang).
+
+unload_custom_lang(Server, Lang) ->
+    gen_server:call(Server, {unload_custom_lang, Lang}, infinity).
+
+all_lcs() ->
+    all_lcs(?DEFAULT_SERVER).
+
+all_lcs(Server) ->
+    gen_server:call(Server, all_lcs, infinity).
+
+
+recreate_db() ->
+    recreate_db(?DEFAULT_SERVER). 
+   
+recreate_db(Server) ->
+    gen_server:call(Server, recreate_db, infinity).
+
+%%--------------------------------------------------------------------
+
+store_pofile(Lang, File) when binary(File) ->
+    store_pofile(?DEFAULT_SERVER, Lang, File).
+
+store_pofile(Server, Lang, File) when binary(File) ->
+    gen_server:call(Server, {store_pofile, Lang, File}, infinity).
+
+%%--------------------------------------------------------------------
+
+lang2cset(Lang) ->
+    lang2cset(?DEFAULT_SERVER, Lang).
+
+lang2cset(Server, Lang) ->
+    gen_server:call(Server, {lang2cset, Lang}, infinity).
 
 
 %%% --------------------------------------------------------------------

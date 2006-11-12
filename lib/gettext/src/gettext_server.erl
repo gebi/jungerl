@@ -13,9 +13,9 @@
 
 %%--------------------------------------------------------------------
 %% External exports
--export([start/0, start_link/0, start/1, start_link/1, key2str/2,
-	 store_pofile/2, all_lang/0, lang2cset/1, recreate_db/0,
-	 reload_custom_lang/1, unload_custom_lang/1]).
+-export([start_link/0, start_link/1, start_link/2,
+	 start/0, start/1, start/2]).
+
 
 %% Default callback functions
 -export([custom_dir/0]).
@@ -30,7 +30,7 @@
 					[?MODULE, ?LINE | Y])).
 
 -define(SERVER, ?MODULE).
--define(TABLE_NAME, gettext_db).
+-define(TABLE_NAME, gettext_server_db).
 -define(KEY(Lang,Key), {Key,Lang}).
 -define(ENTRY(Lang, Key, Val), {?KEY(Lang,Key), Val}).
 
@@ -38,8 +38,9 @@
 -record(state, {
 	  cbmod = ?MODULE,   % callback module
 	  cache = [],        % list_of( #cache{} )
-	  gettext_dir        % Dir where all the data are stored
-	 }).
+	  gettext_dir,       % Dir where all the data are stored
+	  table_name = ?TABLE_NAME % If several gettext_servers start then
+	 }).                       % tables must have different names
 
 %%%
 %%% Hold info about the languages stored.
@@ -60,36 +61,23 @@ start_link() ->
     start_link(?MODULE).
 
 start_link(CallBackMod) ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, CallBackMod, []).
+    start_link(CallBackMod, ?SERVER).
+
+start_link(CallBackMod, Name) ->
+    gen_server:start_link({local, Name}, ?MODULE, [CallBackMod, Name],[]).
+
+%%--------------------------------------------------------------------
 
 start() ->
     start(?MODULE).
 
 start(CallBackMod) ->
-    gen_server:start({local, ?SERVER}, ?MODULE, CallBackMod, []).
+    start(CallBackMod, ?SERVER).
 
-key2str(Key, Lang) ->
-    gen_server:call(?SERVER, {key2str, Key, Lang}, infinity).
+start(CallBackMod, Name) ->
+    gen_server:start({local, Name}, ?MODULE, [CallBackMod, Name], []).
 
-lang2cset(Lang) ->
-    gen_server:call(?SERVER, {lang2cset, Lang}, infinity).
-
-store_pofile(Lang, File) when binary(File) ->
-    gen_server:call(?SERVER, {store_pofile, Lang, File}, infinity).
-
-reload_custom_lang(Lang) ->
-    gen_server:call(?SERVER, {reload_custom_lang, Lang}, infinity).
-
-unload_custom_lang(Lang) ->
-    gen_server:call(?SERVER, {unload_custom_lang, Lang}, infinity).
-
-recreate_db() ->
-    gen_server:call(?SERVER, recreate_db, infinity).
-
-all_lang() ->    
-    L = dets:match(gettext_db, {{header_info, '$1'}, '_'}),
-    [hd(X) || X <- L].
-
+    
 %%====================================================================
 %% Server functions
 %%====================================================================
@@ -102,13 +90,18 @@ all_lang() ->
 %%          ignore               |
 %%          {stop, Reason}
 %%--------------------------------------------------------------------
-init(CallBackMod0) ->
+init([CallBackMod0, Name]) ->
     CallBackMod = get_callback_mod(CallBackMod0),
     GettextDir = get_gettext_dir(CallBackMod),
-    Cache = create_db(GettextDir),
+    TableNameStr = atom_to_list(Name) ++ "_db",
+    TableName = list_to_atom(TableNameStr),
+    Cache = create_db(TableName, GettextDir),
     {ok, #state{cache       = Cache, 
 		cbmod       = CallBackMod,
-		gettext_dir = GettextDir}}.
+		gettext_dir = GettextDir,
+		table_name  = TableName}}.
+
+    
 
 %%%
 %%% The GETTEXT_CBMOD environment variable takes precedence!
@@ -149,7 +142,8 @@ custom_dir() ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
 handle_call({key2str, Key, Lang}, _From, State) ->
-    Reply = lookup(Lang, Key),
+    TableName = State#state.table_name,
+    Reply = lookup(TableName, Lang, Key),
     {reply, Reply, State};
 %%
 handle_call({lang2cset, Lang}, _From, State) ->
@@ -161,33 +155,42 @@ handle_call({lang2cset, Lang}, _From, State) ->
 %%
 handle_call({store_pofile, Lang, File}, _From, State) ->
     GettextDir = State#state.gettext_dir,
-    case do_store_pofile(Lang, File, GettextDir, State#state.cache) of
+    TableName  = State#state.table_name,
+    case do_store_pofile(TableName, Lang, File, GettextDir, State#state.cache) of
 	{ok, NewCache} ->
 	    {reply, ok, State#state{cache = NewCache}};
 	Else ->
 	    {reply, Else, State}
     end;
+
+handle_call(all_lcs, _From, State) ->
+    TableName = State#state.table_name,
+    Reply = all_lcs_internal(TableName),
+    {reply, Reply, State};
+
 %%
 handle_call({reload_custom_lang, Lang}, _From, State) ->
     GettextDir = State#state.gettext_dir,
-    case do_reload_custom_lang(GettextDir, Lang) of
+    TableName  = State#state.table_name,
+    case do_reload_custom_lang(TableName, GettextDir, Lang) of
 	ok   -> {reply, ok, State};
 	Else -> {reply, Else, State}
     end;
 %%
 handle_call({unload_custom_lang, Lang}, _From, State) ->
     GettextDir = State#state.gettext_dir,
-    {reply, do_unload_custom_lang(GettextDir, Lang), State};
+    TableName  = State#state.table_name,
+    {reply, do_unload_custom_lang(TableName, GettextDir, Lang), State};
 %%
 handle_call(recreate_db, _From, State) ->
     GettextDir = State#state.gettext_dir,
-    Fname = filename:join(GettextDir, "gettext_db.dets"),
-    dets:close(?TABLE_NAME),
+    TableName = State#state.table_name,
+    Fname = filename:join(GettextDir, atom_to_list(TableName) ++ "_db.dets"),
+    dets:close(TableName),
     file:delete(Fname),
-    create_db(GettextDir, Fname),
+    create_db(TableName, GettextDir, Fname),
     {reply, ok, State}.
 
-	    
 
 %%--------------------------------------------------------------------
 %% Function: handle_cast/2
@@ -229,50 +232,50 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%--------------------------------------------------------------------
 
-create_db(GettextDir) ->
-    Fname = filename:join(GettextDir, "gettext_db.dets"),
-    create_db(GettextDir, Fname).
+create_db(TableName, GettextDir) ->
+    Fname = filename:join(GettextDir,  atom_to_list(TableName) ++ ".dets"),
+    create_db(TableName, GettextDir, Fname).
 
-create_db(GettextDir, Fname) ->
+create_db(TableName, GettextDir, Fname) ->
     filelib:ensure_dir(Fname), 
-    init_db_table(GettextDir, Fname).
+    init_db_table(TableName, GettextDir, Fname).
 
 
-do_unload_custom_lang(GettextDir, Lang) ->
+do_unload_custom_lang(TableName, GettextDir, Lang) ->
     Fname = filename:join([GettextDir, "lang", "custom", Lang, "gettext.po"]),
     case filelib:is_file(Fname) of
 	true ->
-	    dets:match_delete(gettext_db, {{'_',Lang},'_'}),
+	    dets:match_delete(TableName, {{'_',Lang},'_'}),
 	    ok;
 	false ->
 	    {error, "no lang"}
     end.
 
-do_reload_custom_lang(GettextDir, Lang) ->
-    dets:match_delete(gettext_db, {{'_',Lang},'_'}),
+do_reload_custom_lang(TableName, GettextDir, Lang) ->
+    dets:match_delete(TableName, {{'_',Lang},'_'}),
     Dir = filename:join([GettextDir, "lang", "custom", Lang]),
     Fname = filename:join([Dir, "gettext.po"]), 
-    insert_po_file(Lang, Fname),
+    insert_po_file(TableName, Lang, Fname),
     ok.
 
-do_store_pofile(Lang, File, GettextDir, Cache) ->
+do_store_pofile(TableName, Lang, File, GettextDir, Cache) ->
     Dir = filename:join([GettextDir, "lang", "custom", Lang]),
     Fname = filename:join([Dir, "gettext.po"]), 
     filelib:ensure_dir(Fname), 
     case file:write_file(Fname, File) of
 	ok ->
 	    case lists:keymember(Lang, #cache.language, Cache) of
-		true  -> delete_lc(Lang);
+		true  -> delete_lc(TableName, Lang);
 		false -> false
 	    end,
-	    insert_po_file(Lang, Fname),
-	    {ok, [set_charset(#cache{language = Lang}) | Cache]};
+	    insert_po_file(TableName, Lang, Fname),
+	    {ok, [set_charset(TableName, #cache{language = Lang}) | Cache]};
 	_ ->
 	    {error, "failed to write PO file to disk"}
     end.
 
-set_charset(C) ->
-    case lookup(C#cache.language, ?GETTEXT_HEADER_INFO) of
+set_charset(TableName, C) ->
+    case lookup(TableName, C#cache.language, ?GETTEXT_HEADER_INFO) of
 	?GETTEXT_HEADER_INFO ->                   % nothing found...
 	    C#cache{charset = ?DEFAULT_CHARSET};  % fallback
 	Pfinfo ->
@@ -302,23 +305,23 @@ eat_dust([$\t|T]) -> eat_dust(T);
 eat_dust(T)       -> T.
 
 
-init_db_table(GettextDir, TableFile) ->
+init_db_table(TableName, GettextDir, TableFile) ->
     case filelib:is_regular(TableFile) of
 	false ->
-	    create_and_populate(GettextDir, TableFile);
+	    create_and_populate(TableName, GettextDir, TableFile);
 	true ->
 	    %% If the dets file is broken, dets may not be able to repair it 
 	    %% itself (it may be only half-written). So check and recreate 
 	    %% if needed instead.
-	    case open_dets_file(?TABLE_NAME, TableFile) of
-		ok -> create_cache();
-		_  -> create_and_populate(GettextDir, TableFile)
+	    case open_dets_file(TableName, TableFile) of
+		ok -> create_cache(TableName);
+		_  -> create_and_populate(TableName, GettextDir, TableFile)
 	    end
     end.
 
-create_cache() ->
+create_cache(TableName) ->
     F = fun(LC, Acc) ->
-		case lookup(LC, ?GETTEXT_HEADER_INFO) of
+		case lookup(TableName, LC, ?GETTEXT_HEADER_INFO) of
 		    ?GETTEXT_HEADER_INFO ->
 			%% nothing found...
 			?elog("Could not find header info for lang: ~s~n",[LC]),
@@ -328,20 +331,21 @@ create_cache() ->
 			[#cache{language = LC, charset = CS}|Acc]
 		end
 	end,
-    lists:foldl(F, [], all_lang()).
+    lists:foldl(F, [], all_lcs_internal(TableName)).
 
 
-create_and_populate(GettextDir, TableFile) ->
+
+create_and_populate(TableName, GettextDir, TableFile) ->
     ?elog("TableFile = ~p~n", [TableFile]),
     %% Need to create and populate the DB.
-    {ok, _} = dets:open_file(?TABLE_NAME,
+    {ok, _} = dets:open_file(TableName,
 			     [{file, TableFile},
 			      %% creating on disk, esp w auto_save,
 			      %% takes "forever" on flash disk
 			      {ram_file, true}]), 
-    L = populate_db(GettextDir),
-    dets:close(?TABLE_NAME),    % flush to disk
-    {ok, _} = dets:open_file(?TABLE_NAME, [{file, TableFile}]),
+    L = populate_db(TableName, GettextDir),
+    dets:close(TableName),    % flush to disk
+    {ok, _} = dets:open_file(TableName, [{file, TableFile}]),
     L.
 
 open_dets_file(Tname, Fname) ->
@@ -361,22 +365,22 @@ open_dets_file(Tname, Fname) ->
 %%%     definitions first since a custom language should be
 %%%     able to 'shadow' the the same predefined language.
 %%%
-populate_db(GettextDir) ->
-    L = insert_predefined(GettextDir, []), 
-    insert_custom(GettextDir, L).
+populate_db(TableName, GettextDir) ->
+    L = insert_predefined(TableName, GettextDir, []), 
+    insert_custom(TableName, GettextDir, L).
 
-insert_predefined(GettextDir, L) ->
+insert_predefined(TableName, GettextDir, L) ->
     Dir = filename:join([GettextDir, "lang", "default"]),
-    insert_data(Dir, L).
+    insert_data(TableName, Dir, L).
 
-insert_data(Dir, L) ->
+insert_data(TableName, Dir, L) ->
     case file:list_dir(Dir) of
 	{ok, Dirs} ->
 	    F = fun([$.|_], Acc)     -> Acc;  % ignore in a local inst. env.
 		   ("CVS" ++ _, Acc) -> Acc;  % ignore in a local inst. env.
 		   (LC, Acc)         ->
 			Fname = filename:join([Dir, LC, "gettext.po"]),
-			insert_po_file(LC, Fname),
+			insert_po_file(TableName, LC, Fname),
 			[#cache{language = LC} | Acc]
 		end,
 	    lists:foldl(F, L, Dirs);
@@ -384,33 +388,36 @@ insert_data(Dir, L) ->
 	    L
     end.
 
-insert_po_file(LC, Fname) ->
+insert_po_file(TableName, LC, Fname) ->
     case file:read_file_info(Fname) of
 	{ok, _} ->
-	    insert(LC, gettext:parse_po(Fname));
+	    insert(TableName, LC, gettext:parse_po(Fname));
 	_ ->
 	    ?elog("gettext_server: Could not read ~s~n", [Fname]),
 	    {error, "could not read PO file"}
     end.
 
-insert_custom(GettextDir, L) ->
+insert_custom(TableName, GettextDir, L) ->
     Dir = filename:join([GettextDir, "lang", "custom"]),
-    insert_data(Dir, L).
+    insert_data(TableName, Dir, L).
 
-insert(LC, L) ->
+insert(TableName, LC, L) ->
     F = fun({Key, Val}) ->
-		dets:insert(?TABLE_NAME, ?ENTRY(LC, Key, Val))
+		dets:insert(TableName, ?ENTRY(LC, Key, Val))
 	end,
     lists:foreach(F, L).
 
-lookup(Lang, Key) ->
-    case dets:lookup(?TABLE_NAME, ?KEY(Lang, Key)) of
+lookup(TableName, Lang, Key) ->
+    case dets:lookup(TableName, ?KEY(Lang, Key)) of
 	[]          -> Key;  
 	[{_,Str}|_] -> Str
     end.
     
 
-delete_lc(LC) ->
-    dets:match_delete(?TABLE_NAME, ?ENTRY(LC, '_', '_')).
+delete_lc(TableName, LC) ->
+    dets:match_delete(TableName, ?ENTRY(LC, '_', '_')).
     
 
+all_lcs_internal(TableName) ->
+    L = dets:match(TableName, {{header_info, '$1'}, '_'}),
+    [hd(X) || X <- L].

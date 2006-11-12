@@ -126,7 +126,7 @@ a translated gettext.po file.
 
 If you want add a translated PO-file you call the function:
 
-gettext_server:store_pofile(LanguageCode, BinPOfile)
+gettext:store_pofile(LanguageCode, BinPOfile)
 
 See the example section below.
 
@@ -210,7 +210,7 @@ undefined
 {ok,<<35,32,83,79,77,69,32,68,69,83,67,82,73,80,84,73,86,69,32,84,73,84,76,69,46,10,35,...>>}
 
 %% Store the translation
-6> gettext_server:store_pofile("swe", Bin).
+6> gettext:store_pofile("swe", Bin).
 ok
 
 %% Now look at that...nice !!
@@ -226,7 +226,7 @@ ok
 "Hello World"
 
 %% Get the character set used for a language.
-10> gettext_server:lang2cset("swe").
+10> gettext:lang2cset("swe").
 {ok,"iso-8859-1"}
 
 
@@ -243,7 +243,7 @@ If you run a Web application, it is important that you tell
 the Web browser what character set you are using. To support
 this, you can use the function: 
 
- gettext_server:lang2cset(LanguageCode)
+ gettext:lang2cset(LanguageCode)
 
 This way you can make sure that the browser can display your
 pages correctly. It is even possible to convert from the 
@@ -255,4 +255,33 @@ Cheers, Tobbe
 
 
 
+Changed 2006-11-12
+All API functions are now located in the gettext module, this
+breaks backwards compability, but makes maintanence easier.
+Example:
 
+ gettext_server:lang2cset(LanguageCode)
+
+is now:
+
+ gettext:lang2cset(LanguageCode)
+
+
+Added: 2006-11-12
+Running several applications
+============================
+
+In order to run several applications with diffent PO-files 
+at the same time a new possibility to start a named process
+(that creates an own ets-table) has been added. So there are
+now two variants of every function in the API, example :
+  gettext:lang2cset(LanguageCode)
+  gettext:lang2cset(Server, LanguageCode) 
+where server is a  registered process name that has been 
+started with:
+  gettext_server:start_link(CallBackMod, Name)
+or 
+ gettext_server:start(CallBackMod, Name)
+
+
+Cheers Mikael Karlsson

@@ -19,6 +19,10 @@
 %%%
 %%%          mkdict /usr/share/dict/* | packer /usr/lib/cracklib_dict
 %%%
+%%%       On Ubuntu/Debian, see the man page for cracklib. You'll
+%%%       probably need to set the environment variable CRACKLIB_DICTPATH
+%%%       to: CRACKLIB_DICTPATH=/var/cache/cracklib/cracklib_dict
+%%%
 %%%       See also:
 %%%
 %%%          http://gdub.wordpress.com/2006/08/26/using-cracklib-to-require-stronger-passwords/
@@ -33,7 +37,7 @@
 -include("../include/passwd_checker.hrl").
 
 
-cracklib_dict_path() -> "/usr/lib/cracklib_dict".   % FIXME hardcoded not very good...
+cracklib_dict_path() -> "/usr/lib/cracklib_dict". 
 
 %%%
 %%% @doc Textual error messages.
@@ -44,9 +48,17 @@ format(_)                   -> "not secure enough".
 
 %%%
 %%% @doc Check if the password is good enough.
+%%%      By setting the environment variable CRACKLIB_DICTPATH to the
+%%%      full path name + filename prefix of the cracklib dictionary 
+%%%      database, it will override the default in cracklib_dict_path/0.
 %%%
 check(Passwd) ->
-    check(Passwd, cracklib_dict_path()).
+    case os:getenv("CRACKLIB_DICTPATH") of
+	Path when list(Path) ->
+	    check(Passwd, Path);
+	_ ->
+	    check(Passwd, cracklib_dict_path())
+    end.
 
 %%%
 %%% @doc Check if the password is good enough. 

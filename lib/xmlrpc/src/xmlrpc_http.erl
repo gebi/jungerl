@@ -43,7 +43,8 @@
 
 %% Exported: handler/3
 
-handler(Socket, Timeout, Handler, State) ->
+handler(Socket, Timeout, Handler, State0) ->
+    State = add_peer_info(Socket, State0),
     case parse_request(Socket, Timeout) of
 	{ok, Header} ->
 	    ?DEBUG_LOG({header, Header}),
@@ -65,12 +66,32 @@ parse_request(Socket, Timeout) ->
 		["POST", _, "HTTP/1.1"] ->
 		    ?DEBUG_LOG({http_version, "1.1"}),
 		    parse_header(Socket, Timeout);
-		[Method, _, "HTTP/1.1"] -> {status, 501};
-		["POST", _, HTTPVersion] -> {status, 505};
+		[_Method, _, "HTTP/1.1"] -> {status, 501};
+		["POST", _, _HTTPVersion] -> {status, 505};
 		_ -> {status, 400}
 	    end;
 	{error, Reason} -> {error, Reason}
     end.
+
+%%% Add the peer Ip/Port info if possible.
+add_peer_info(Socket, State) ->
+    case xmlrpc:cbs_record(State) of
+	true ->
+	    case catch inet:peername(Socket) of
+		{ok, {Ip, Port}} ->
+		    xmlrpc:cbs_port(xmlrpc:cbs_ip(State, Ip), Port);
+		_ ->
+		    case catch ssl:peername(Socket) of
+			{ok, {Ip, Port}} ->
+			    xmlrpc:cbs_port(xmlrpc:cbs_ip(State, Ip), Port);
+			_ ->
+			    State
+		    end
+	    end;
+	_ ->
+	    State
+    end.
+
 
 parse_header(Socket, Timeout) -> parse_header(Socket, Timeout, #header{}).
 
@@ -88,15 +109,15 @@ parse_header(Socket, Timeout, Header) ->
 		{[$C,$o,$n,$t,$e,$n,$t,$-,_,$e,$n,$g,$t,$h,$:],
 		 ContentLength} ->
 		    case catch list_to_integer(ContentLength) of
-			N ->
+			N when integer(N) ->
 			    parse_header(Socket, Timeout,
 					 Header#header{content_length = N});
 			_ -> {status, 400}
 			  end;
-		{"Content-Type:", "text/xml"} ->
+		{"Content-Type:", Type="text/xml"++_} ->
 		    parse_header(Socket, Timeout,
-				 Header#header{content_type = "text/xml"});
-		{"Content-Type:", ContentType} -> {status, 415};
+				 Header#header{content_type = Type});
+		{"Content-Type:", _ContentType} -> {status, 415};
 		{"User-Agent:", UserAgent} ->
 		    parse_header(Socket, Timeout,
 				 Header#header{user_agent = UserAgent});
@@ -116,7 +137,8 @@ parse_header(Socket, Timeout, Header) ->
 split_header_field(HeaderField) -> split_header_field(HeaderField, []).
 
 split_header_field([], Name) -> {Name, ""};
-split_header_field([$ |Rest], Name) -> {lists:reverse(Name), Rest -- "\r\n"};
+split_header_field([$ |Rest], Name) -> {lists:reverse(Name),
+					lowercase(Rest) -- "\r\n"};
 split_header_field([C|Rest], Name) -> split_header_field(Rest, [C|Name]).
 
 handle_payload(Socket, Timeout, Handler, State,
@@ -162,7 +184,7 @@ eval_payload(Socket, Timeout, {M, F} = Handler, State, Connection, Payload) ->
 	    handler(Socket, Timeout, Handler, State);
 	{false, ResponsePayload} ->
 	    encode_send(Socket, 200, "Connection: close\r\n", ResponsePayload);
-	{true, NewTimeout, NewState, ResponsePayload} when
+	{true, _NewTimeout, _NewState, ResponsePayload} when
 	      Connection == close ->
 	    encode_send(Socket, 200, "Connection: close\r\n", ResponsePayload);
 	{true, NewTimeout, NewState, ResponsePayload} ->
@@ -192,6 +214,7 @@ send(Socket, StatusCode, ExtraHeader, Payload) ->
 	 reason_phrase(StatusCode), "\r\n",
 	 "Content-Length: ", integer_to_list(lists:flatlength(Payload)),
 	 "\r\n",
+	 "Content-Type: text/XML\r\n"
 	 "Server: Erlang/1.13\r\n",
 	 ExtraHeader, "\r\n",
 	 Payload],
@@ -204,3 +227,9 @@ reason_phrase(415) -> "Unsupported Media Type";
 reason_phrase(500) -> "Internal Server Error";
 reason_phrase(501) -> "Not Implemented";
 reason_phrase(505) -> "HTTP Version not supported".
+
+
+
+lowercase(Str) -> http_util:to_lower(Str).
+
+

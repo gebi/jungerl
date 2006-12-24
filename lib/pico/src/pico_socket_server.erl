@@ -22,7 +22,7 @@
 
 %% Internal imports (used by spawn)
 
--export([cold_start/4,  start_child/3]).
+-export([cold_start/4, start_child/3]).
 
 %% Fun = fun(Socket, Binary) -> Fun'
 
@@ -142,6 +142,6 @@ child_loop(Parent, Socket, Fun) ->
 print_exit(done) ->
     true;
 print_exit(normal) ->
-    trie;
+    true;
 print_exit(Why) ->
     io:format("child exited ~p~n", [Why]).

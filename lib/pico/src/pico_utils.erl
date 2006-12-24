@@ -83,23 +83,22 @@ is_alphanum(_) -> false.
 %%----------------------------------------------------------------------
 
 show(X) ->
-    [header(text),body("white"),"<pre>",
-     quote_lt(lists:flatten(io_lib:format("~p~n",[X]))),"</pre>"].
+    io_lib:format("~p~n",[X]).
 	   
 quote_lt([$<|T]) -> "&lt;" ++ quote_lt(T);
 quote_lt([H|T])  -> [H|quote_lt(T)];
 quote_lt([])     -> [].
 
-header(text) -> 
-    ["HTTP/1.0 200 Ok\r\n", powered_by(), content_type("text/html"),"\r\n"];
-header(html) -> 
-    ["HTTP/1.0 200 Ok\r\n", powered_by(), content_type("text/html"),"\r\n"];
-header(jpg)  -> 
-    ["HTTP/1.0 200 Ok\r\n", powered_by(), content_type("image/jpeg"),"\r\n"];
-header(gif)  -> 
-    ["HTTP/1.0 200 Ok\r\n", powered_by(), content_type("image/gif"),"\r\n"];
-header(binary)  -> 
-    ["HTTP/1.0 200 Ok\r\n", powered_by(), "\r\n"];
+mime(text) -> "text/plain";
+mime(html) -> "text/html";
+mime(jpg)  -> "image/jpeg";
+mime(gif)  -> "image/gif";
+mime(_)    -> unknown.
+
+header({ok,Type})  -> 
+    ["HTTP/1.0 200 Ok\r\n", powered_by(), content_type(mime(Type)), "\r\n"];
+header({error,Code,Resp})  -> 
+    ["HTTP/1.0 ", Code, "\r\n", powered_by(), content_type("text/plain"), "\r\n", Resp];
 header({redirect,To}) ->
     ["HTTP/1.0 302 Come and get it!\r\n",
      powered_by(), "Location: " ++ To ++ "\r\n\r\n"].
@@ -107,6 +106,7 @@ header({redirect,To}) ->
 powered_by() ->
     "X-Powered-By: Erlang (pico-11.0)\r\n".
 
+content_type(unknown) -> [];
 content_type(X) ->
     ["Content-Type: ", X, "\r\n"].
 
@@ -134,7 +134,7 @@ classify(FileName) ->
 	".htm" -> html;
 	".txt" -> text;
 	".TXT" -> text;
-	Other -> binary
+	_ -> binary
     end.
 
 content_length([{"content-length",Str}|T]) ->
@@ -158,7 +158,7 @@ parse_request(Str) ->
     {ok, Args} = regexp:split(Str, " "),
     case Args of
 	["POST", URI, Vsn] ->
-	    {post, parse_vsn(Vsn) ,parse_uri(URI)};
+	    {post, parse_vsn(Vsn), parse_uri(URI)};
 	["GET", URI, Vsn] ->
 	    {get, parse_vsn(Vsn), parse_uri(URI)};
 	_  -> 

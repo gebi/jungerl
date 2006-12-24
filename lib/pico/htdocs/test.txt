@@ -1,0 +1,6 @@
+The AXD 301 is a new, general-purpose, high-performance ATM switch
+from Ericsson that can be used in several positions in a network.
+In its initial release, the AXD 301 is scaleable from 10 Gbit/s—in one
+subrack—up to 160 Gbit/s. The AXD 301 supports every service category
+defined for ATM, including ABR. An advanced buffering mechanism allows
+services to be mixed without compromising quality.

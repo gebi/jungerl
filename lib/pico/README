@@ -1,28 +1,31 @@
 To test the system:
 
-    1) make
-    2) ./start_4999
-    3) point your browser at ./index.html
+	1) make
+	2) bin/start_4999    (jungerl's bin directory must also be in your PATH)
+	3) point your browser at http://localhost:4999/index.html
+
+	As specified in pico_test.erl, this serves files from the htdocs
+	subdirectory.
+
 
 Interface
 
-	pico:start(Port, Max Mod, [Arg1, Arg2]).
+	pico_http_server:start(Port, Max Mod, [Arg1, Arg2]).
 
-        Creates a process called pico_port_<Port>
+		Creates a process called pico_port_<Port>
         
-        pico:stop(Port, Reason) 
+	pico_http_server:stop(Port, Reason) 
 
 
 Callbacks
 	
 	Mod:start(Arg1, Arg2) -> State
-        Mod:handle(get|Post, State) -> {reply, Str, State'}
-                                       {redirect, Url, State'}
-        Mod:stop(Reason, State) -> State'
+	Mod:handle(get|post, State) -> {reply, Str, State'}
+								   {redirect, Url, State'}
+	Mod:stop(Reason, State) -> State'
 
-Test
-        Point browser to index.html
+	
+References
 
-
-
-
+	Joe's Erlang tutorial #2 explains a similar web server design.
+	http://www.sics.se/~joe/tutorials/web_server/web_server.html

@@ -154,15 +154,12 @@ collect_post_data(Socket,Bin,Buff,Len,Fun,Op,URI) ->
 
 default_form_handler(X, Socket) ->
     Str = io_lib:format("~p", [X]),
-    gen_tcp:send(Socket, [header(text),
-			  body("white"),
-			  "Request was <p><pre>", Str, "</pre>"]),
+    gen_tcp:send(Socket, [header({ok,html}),
+			  "<html> <body>Request was <p><pre>", Str, "</pre></body> </html>"]),
     gen_tcp:close(Socket).
 
 handler_error(X) ->
-    [header(text),
-     body("white"),
-     "Handler error\n", X].
+    [header({error,"500 Handler error",X})].
 
 
 scan_header([$\n|T], [$\r,$\n,$\r|L]) -> {yes, reverse(L), T};

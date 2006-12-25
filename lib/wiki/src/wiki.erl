@@ -9,7 +9,7 @@
 %%          Erlang wiki. Subsequently re-written many times by Joe Armstrong
 %%          and Luke Gorrie.
 %%          This version by Joe Armstrong.
-%%          Thanks to Luke and Robert Virding for many helpfull
+%%          Thanks to Luke and Robert Virding for many helpful
 %%          discussions clarifying the design.
 %%          This also makes use of the new pico_http_server which has
 %%          a much simplified interface.
@@ -19,11 +19,11 @@
 %%  
 %% Add the following to
 %%  /etc/httpd/conf/httpd.conf
-%%  RewriteEngine On
-%%  RewriteRule ^/wiki/(.*)$ http://127.0.0.1:5999/wiki/$1 [L,P]
+%%      RewriteEngine On
+%%      RewriteRule ^/wiki/(.*)$ http://127.0.0.1:5999/wiki/$1 [L,P]
 %%  Then things directed to locallost:80/wiki 
 %%  will be redirected to   localhost:5999/wiki
-%%  Thanks to  Petru Paler <ppetru@ppetru.net> for this tip
+%%  Thanks to Petru Paler <ppetru@ppetru.net> for this tip
 
       
 %% -compile(export_all).
@@ -119,7 +119,7 @@ event_handler({_,_,"/wiki/image/" ++ File,Args}, State) ->
     {get_file(File, Args), State+1};
 event_handler(Event, State) -> 
     io:format("Invalid request:~p~n",[Event]),
-    {show(invalid_request), State+1}.
+    {header({error,"400 Bad Request",show({invalid_request,Event})}), State+1}.
 
 %% stop_handler(Reason, State) -> State'
 
@@ -143,21 +143,12 @@ get_file(F,Args) ->
 	    %% io:format("Get_file: ~p ~p~n",[Full,Args]),
 	    case file:read_file(Full) of
 		{ok, Bin} ->
-		    case classify(F) of
-			html ->
-			    [header(html),Bin];
-			jpg ->
-			    [header(jpg),Bin];
-			gif ->
-			    [header(jpg),Bin];
-			_ ->
-			    show(illegal_request)
-		    end;
+		    [header({ok,classify(F)}), Bin];
 		_ ->
-		    show({no_such_file,F})
+		    header({error,"404 Not Found",show({no_such_file,F})})
 	    end;
 	false ->
-	    show(illegal_request)
+	    header({error,"400 Bad Request",show(illegal_request)})
     end.
 
 %% check that we are not trying to access a file
@@ -166,6 +157,9 @@ get_file(F,Args) ->
 legal(".." ++ _) -> false;
 legal([_|T])     -> legal(T);
 legal([])        -> true.
+
+notfound(Page) ->
+	header({error,"404 Not Found",show({no_such_page,Page})}).
 
 storePage([_,{"node",Page},{"password", Password},{"txt", Txt0}], From) ->
     Txt = zap_cr(urlencoded2str(Txt0)),
@@ -181,10 +175,10 @@ storePage([_,{"node",Page},{"password", Password},{"txt", Txt0}], From) ->
 		Password ->
 		    store_ok(Page, From, Txt, Wik);
 		_ ->
-		    show({invalid_password, shouldbe, Pwd, was, Password})
+		    header({error,"403 Forbidden",show({invalid_password, shouldbe, Pwd, was, Password})})
 	    end;
 	_ ->
-	    show({no_such_page,Page})
+	    notfound(Page)
    end.
 
 storeNewPage([_,{"node",Page},{"password", Password},
@@ -221,7 +215,7 @@ storeTagged([_,{"node",Page},{"tag", Tag},{"txt", Txt0}], From) ->
 	    Str2 = wiki_split:wiki2str(W2),
 	    store_ok(Page, From, Str2, Wik);
 	_ ->
-	    show({no_such_page,Page})
+	    notfound(Page)
    end.
 
 store_ok(Page, From, OldTxt,{wik001,Pwd,Email,Time,Who,OldTxt,Patches}) ->
@@ -250,7 +244,7 @@ showHistory([{"node", Page}], _) ->
 	    Links = reverse(mk_history_links(reverse(Patches), Page, 1)),
 	    template("History",background("info"), "", Links);
 	_ ->
-	    show({no_such_page, Page})
+	    notfound(Page)
     end.
 
 mk_history_links([{C,Time,Who}|T], Page, N) ->
@@ -288,7 +282,6 @@ createNewPage([{"node",Page}], From) ->
 		p(),
 		textarea("text", 25, 72,initial_page_content())])]).
 
-
 initial_page_content() -> "\nEnter your text here\n".
 
 showPage([{"node",Page}]) ->
@@ -303,7 +296,7 @@ showPage([{"node",Page}]) ->
 	    template(Page, body_pic(Pwd),banner(Page, Pwd),
 		     [top_header(Page),DeepStr,footer(Page,Pwd)]);
 	_ ->
-	    show({no_such_page, Page, fullname, File})
+	    header({error,"404 Not Found",show({no_such_page, Page, fullname, File})})
     end.
 
 top_header(Page) ->
@@ -400,7 +393,7 @@ showOldPage([{"node",Page},{"index", Nt}]) ->
 	    template(Page, old_pic(), "",
 		     [h1(Page),DeepStr,"<hr>",Form]);
 	_ ->
-	    show({no_such_page, Page})
+	    notfound(Page)
     end.
 
 take(0, _) -> [];
@@ -480,7 +473,7 @@ editPage(Page, Password, From) ->
 			 ])
 		end;
 	_ ->
-	    show({no_such_page,Page})
+	    notfound(Page)
     end.
 
 edit1(Page, Password, Content) ->
@@ -523,7 +516,7 @@ sendMeThePassword([{"node",Page},{"email",Email}|_], From) ->
 			  p("Incorrect email address")])
 	    end;
 	_ ->
-	    show({no_such_file,Page})
+	    notfound(Page)
     end.
 
 editTag([{"node",Page},{"tag",Tag}], From) ->
@@ -551,7 +544,7 @@ editTag([{"node",Page},{"tag",Tag}], From) ->
 			    p(),
 			    hr()])]);
 	Error ->
-	    show({no_such_page, Page})
+	    notfound(Page)
     end.
 
 quote_lt("&lt;" ++ T) ->
@@ -625,7 +618,7 @@ previewTagged([_,{"node",Page},{"tag",Tag},{"text", Txt0}], From) ->
 		      p(),hr(), 
 		      wiki_to_html:format_wiki(Page,{txt,10000,Txt},root())]);
 	false ->
-	    show({text_contains,'< or >', in_col_1_which_is_illegal})
+	    header({error,"400 Bad Request",show({text_contains,'< or >', in_col_1_which_is_illegal})})
     end.
 
 %% Flat text is *not* allowed to contain <
@@ -658,7 +651,7 @@ previewNewPage([_,{"node", Page},
 	      wiki_to_html:format_wiki(Page, Wik, root())]);
 previewNewPage([_,{"node",Page},{"password1",P1},{"password2",P2}|_],
 	       From) ->
-    show({passwords_differ,P1,P2}).
+    header({error,"403 Forbidden",show({passwords_differ,P1,P2})}).
 
 zap_cr([$\r,$\n|T]) -> [$\n|zap_cr(T)];
 zap_cr([H|T])       -> [H|zap_cr(T)];
@@ -750,10 +743,3 @@ bgcolor(C) ->
 
 background(F) ->
     ["<body background='/wiki/image/", F, ".gif'>\n"].
-
-
-
-
-
-
-

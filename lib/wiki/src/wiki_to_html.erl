@@ -48,9 +48,7 @@ pp(Other, F) ->
 open(Color, Tag, F, Stuff) ->
     ["\n<table width=\"90%\" cellpadding=20>\n<tr><td bgcolor=\"",
      Color, "\">\n", Stuff,
-     "<p>",F({editTag,Tag}),"</td></tr></table><p>\n"];
-open(Color, Args, F, Stuff) ->
-    show({bad_open_tag,Args}).
+     "<p>",F({editTag,Tag}),"</td></tr></table><p>\n"].
 
 is_file(File) ->
     case file:file_info(File) of
@@ -59,15 +57,3 @@ is_file(File) ->
         _ ->
             false
     end.
-
-
-
-
-
-
-
-
-
-
-
-

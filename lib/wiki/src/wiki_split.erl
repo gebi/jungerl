@@ -98,11 +98,3 @@ putRegion1(Tag, [H|T], New)            -> [H|putRegion1(Tag, T, New)].
 writeAppendRegion(Tag, Wik, Str) ->
     Str1 = getRegion(Tag, Wik),
     putRegion(Tag, Wik, Str ++ Str1).
-
-
-
-
-
-
-
-

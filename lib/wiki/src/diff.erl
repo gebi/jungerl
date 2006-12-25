@@ -89,4 +89,3 @@ str2lines([], Line, [], L) ->
     reverse(L);
 str2lines([], Line, C, L) ->
     reverse([{Line,reverse(C)}|L]).
-                                   

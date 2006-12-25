@@ -115,5 +115,3 @@ update(File, In, Out) ->
 	    %% doesn't exist
 	    true
     end.
-
-

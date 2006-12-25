@@ -5,7 +5,7 @@
 
 %% B = normal | locked | old
 template(Title,Background,Menu,Data) ->
-    [header(html),
+    [header({ok,html}),
      "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\">
 <HTML> 
 <HEAD> 
@@ -41,12 +41,3 @@ Data,"
 </table> 
 </body>
 </html>"].
-
-
-
-
-
-
-
-
-

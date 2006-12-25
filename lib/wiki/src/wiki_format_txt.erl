@@ -247,6 +247,3 @@ collect_wiki_link(S=[H|T], L) ->
     end;
 collect_wiki_link(T, L) ->
     {reverse(L), T}.
-
-
-

@@ -30,11 +30,11 @@ findallrefsto(Page) ->
     template("References", background("info"), "",
 	 ["<p>The following pages contain references to ",
 	  wiki_to_html:format_link(Page, Root),".",
-	  "<ul>",
+	  "\n<ul>",
 	  map(fun(F) -> 
-		      [wiki_to_html:format_link(F, Root),"<br>"] end, 
+		      ["\n<li>",wiki_to_html:format_link(F, Root)] end, 
 	      Spages),
-	  "</ul>"]). 
+	  "\n</ul>"]). 
 
 zombies() -> 
     All = wiki:ls(),
@@ -46,11 +46,11 @@ zombies() ->
     template("Zombies", background("info"), "", 
 	 [h1("Zombies"),
 	  p("These pages have no links to them."),
-	  "<ul>",
+	  "\n<ul>",
 	  map(fun(F) -> 
-		      [wiki_to_html:format_link(F, Root),"<br>"] end, 
+		      ["\n<li>",wiki_to_html:format_link(F, Root)] end, 
 	      NotReached),
-	  "</ul>"]).
+	  "\n</ul>"]).
 
     
 gc([H|T], Visited, Missing) ->
@@ -77,4 +77,3 @@ get_links([_|T], L) ->
     get_links(T, L);
 get_links([], L) ->
     L.
-

@@ -86,7 +86,7 @@ file_type(File) ->
 %%
 %%   returns a list of files in <Dir> where *.OutExtension is
 %%   "out of date" with respect to *.InExtension
-%%   in the sence of "make"
+%%   in the sense of "make"
 
 out_of_date(Dir, In, Out) ->
     case file:list_dir(Dir) of

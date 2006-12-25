@@ -22,27 +22,22 @@
 %%      RewriteEngine On
 %%      RewriteRule ^/wiki/(.*)$ http://127.0.0.1:5999/wiki/$1 [L,P]
 %%  Then things directed to locallost:80/wiki 
-%%  will be redirected to   localhost:5999/wiki
+%%  will be redirected to localhost:5999/wiki
 %%  Thanks to Petru Paler <ppetru@ppetru.net> for this tip
 
       
 %% -compile(export_all).
 
 -export([start_handler/1, event_handler/2, stop_handler/2]).
+-export([start/1, stop/1, start_handler/1, event_handler/2]).
+-export([ls/0, root/0, read_page/1, p/1, background/1, set_status/3]).
 
 -import(pico_utils, [h1/1, body/1, classify/1, header/1, show/1, 
 		     str2urlencoded/1, urlencoded2str/1]).
-
 -import(lists, [map/2,member/2, reverse/1, sort/1, flatten/1]).
-
 -import(wiki_templates, [template/4]).
 
--export([start/1, stop/1, start_handler/1, event_handler/2]).
-
--export([ls/0, root/0, read_page/1, p/1, background/1,set_status/3]).
-
-
-%% root() hardcodes the location of the depositry
+%% root() hardcodes the location of the depository
 %% you might need to change this
 
 root() -> os:getenv("WIKI_STORE").
@@ -53,7 +48,7 @@ root() -> os:getenv("WIKI_STORE").
 
 %% batch is for starting from a script
 start([APort,Root]) ->
-    io:format("Start:~p~n",[{APort,Root}]),
+    io:format("Start:~p~n", [{APort,Root}]),
     PortStr = atom_to_list(APort),
     os:putenv("WIKI_PORT", PortStr),
     os:putenv("WIKI_STORE", atom_to_list(Root)),
@@ -148,7 +143,7 @@ get_file(F,Args) ->
 		    header({error,"404 Not Found",show({no_such_file,F})})
 	    end;
 	false ->
-	    header({error,"400 Bad Request",show({illegal_request,F})})
+	    header({error,"403 Forbidden",show({illegal_request,F})})
     end.
 
 %% check that we are not trying to access a file
@@ -161,7 +156,7 @@ legal([])        -> true.
 notfound(Page) ->
 	header({error,"404 Not Found",show({no_such_page,Page})}).
 
-storePage([_,{"node",Page},{"password", Password},{"txt", Txt0}], From) ->
+storePage([_, {"node",Page}, {"password",Password}, {"txt",Txt0}], From) ->
     Txt = zap_cr(urlencoded2str(Txt0)),
     %% Check the password
     File = page2filename(Page),
@@ -181,8 +176,8 @@ storePage([_,{"node",Page},{"password", Password},{"txt", Txt0}], From) ->
 	    notfound(Page)
    end.
 
-storeNewPage([_,{"node",Page},{"password", Password},
-	      {"email", Email0}, {"txt", Txt0}], From) ->
+storeNewPage([_, {"node",Page}, {"password",Password},
+	      {"email",Email0}, {"txt",Txt0}], From) ->
     Txt = zap_cr(urlencoded2str(Txt0)),
     Email = urlencoded2str(Email0),
     %% Check the password
@@ -191,9 +186,9 @@ storeNewPage([_,{"node",Page},{"password", Password},
     Who = ident(From),
     B = term_to_binary({wik001,Password,Email,Time,Who,Txt,[]}),
     file:write_file(File, B),
-    showPage([{"node", Page}]).
+    showPage([{"node",Page}]).
 
-storeTagged([_,{"node",Page},{"tag", Tag},{"txt", Txt0}], From) ->
+storeTagged([_, {"node",Page}, {"tag",Tag}, {"txt",Txt0}], From) ->
     Txt = zap_cr(urlencoded2str(Txt0)),
     File = page2filename(Page),
     case file:read_file(File) of
@@ -207,7 +202,7 @@ storeTagged([_,{"node",Page},{"tag", Tag},{"txt", Txt0}], From) ->
 		     open ->
 			 wiki_split:putRegion(ITag, W, Txt);
 		     write_append ->
-			 Time = format_time({date(), time()}),
+			 Time = format_time({date(),time()}),
 			 wiki_split:putRegion(ITag, W, 
 					      "''" ++ Time ++ "''\n\n" ++
 					      Txt ++ "\n\n____\n" ++ Old)
@@ -218,31 +213,31 @@ storeTagged([_,{"node",Page},{"tag", Tag},{"txt", Txt0}], From) ->
 	    notfound(Page)
    end.
 
-store_ok(Page, From, OldTxt,{wik001,Pwd,Email,Time,Who,OldTxt,Patches}) ->
-    showPage([{"node", Page}]);
-store_ok(Page, From, NewTxt,{wik001,Pwd,Email,_Time,_Who,OldTxt,Patches}) ->
+store_ok(Page, From, OldTxt, {wik001,Pwd,Email,Time,Who,OldTxt,Patches}) ->
+    showPage([{"node",Page}]);
+store_ok(Page, From, NewTxt, {wik001,Pwd,Email,_Time,_Who,OldTxt,Patches}) ->
     Patch = diff:diff(NewTxt, OldTxt),
-    Time = {date(), time()},
+    Time = {date(),time()},
     Who = ident(from),
     Patches1 = [{Patch,Time,Who}|Patches],
-    Ds = {wik001,Pwd, Email,Time,Who,NewTxt,Patches1},
+    Ds = {wik001,Pwd,Email,Time,Who,NewTxt,Patches1},
     B = term_to_binary(Ds),
     File = page2filename(Page),
     file:write_file(File, B),
-    showPage([{"node", Page}]).
+    showPage([{"node",Page}]).
 
 ident(From) ->
     %% io:format("Ident=~p~n",[From]),
     "joe".
 
-showHistory([{"node", Page}], _) ->
+showHistory([{"node",Page}], _) ->
     File = page2filename(Page),
     case file:read_file(File) of
 	{ok, Bin} ->
 	    {wik001,Pwd,Email,_Time,_Who,OldTxt,Patches} = 
 		binary_to_term(Bin),
 	    Links = reverse(mk_history_links(reverse(Patches), Page, 1)),
-	    template("History",background("info"), "", Links);
+	    template("History", background("info"), "", Links);
 	_ ->
 	    notfound(Page)
     end.
@@ -280,7 +275,7 @@ createNewPage([{"node",Page}], From) ->
 		"Email:",
 		input("text","email",""), 
 		p(),
-		textarea("text", 25, 72,initial_page_content())])]).
+		textarea("text", 25, 72, initial_page_content())])]).
 
 initial_page_content() -> "\nEnter your text here\n".
 
@@ -289,12 +284,12 @@ showPage([{"node",Page}]) ->
     %% io:format("Reading:~p~n",[Page]),
     case file:read_file(File) of
 	{ok, Bin} ->
-	    {wik001, Pwd,_Email,_Time,_Who,TxtStr,_Patches} = 
+	    {wik001,Pwd,_Email,_Time,_Who,TxtStr,_Patches} = 
 		binary_to_term(Bin),
 	    Wik = wiki_split:str2wiki(TxtStr),
 	    DeepStr = wiki_to_html:format_wiki(Page, Wik, root()),
-	    template(Page, body_pic(Pwd),banner(Page, Pwd),
-		     [top_header(Page),DeepStr,footer(Page,Pwd)]);
+	    template(Page, body_pic(Pwd), banner(Page, Pwd),
+		     [top_header(Page), DeepStr, footer(Page,Pwd)]);
 	_ ->
 	    header({error,"404 Not Found",show({no_such_page, Page, fullname, File})})
     end.
@@ -304,8 +299,7 @@ top_header(Page) ->
     ["<h1><a href='/wiki/allRefsToMe?node=",Page,"'>",F1,"</a></h1>\n"].
 
 add_blanks_nicely([H1,H2|T]) ->
-    case {little_letter(H1),
-	 big_letter(H2)} of
+    case {little_letter(H1),big_letter(H2)} of
 	{true,true} ->
 	    [H1,$ ,H2|add_blanks_nicely(T)];
 	_ ->
@@ -327,27 +321,28 @@ allPages() ->
     template("All Pages", background("info"), "",
 	     [h1("All Pages"),
 	      p("This is a list of all pages known to the system."),
+         "<ul>\n",
 	      map(fun(I) ->
 			  F = filename:basename(I, ".wob"),
-			  [wiki_to_html:format_link(F, Root),"<br>"] end, 
-		  Files)]).
+			  ["<li>",wiki_to_html:format_link(F, Root),"\n"] end, Files),
+	      "</ul>\n"]).
 
 lastEdited() ->
     Files = sort(find:files(root(), "*.wob", false)),
     S = flatten(map(fun(I) ->
 				 "~" ++ filename:basename(I, ".wob") ++"\n\n"
 			 end, Files)),
-    V = reverse(sort(map(fun(I) -> {last_edited_time(I), I} end, Files))),
+    V = reverse(sort(map(fun(I) -> {last_edited_time(I),I} end, Files))),
     Groups = group_by_day(V),
     Root = root(),
     S1 = map(fun({{Year,Month,Day},Fx}) ->
-		     [p(),i2s(Year),"-",i2s(Month),"-",i2s(Day),"<p>",
-		      "<ul>",
+		     ["<h3>",i2s(Year),"-",i2s(Month),"-",i2s(Day),"</h3>\n",
+		      "<ul>\n",
 		      map(fun(F) -> 
 				  F1 = filename:basename(F, ".wob"),
 				  J = wiki_to_html:format_link(F1, Root),
-				  [J,"<br>"] end, Fx),
-		      "</ul>"]
+				  ["<li>", J, "\n"] end, Fx),
+		      "</ul>\n"]
 	     end, Groups),
     template("Last Edited", background("info"), "", 
 	     [h1("Last Edited"),
@@ -355,7 +350,7 @@ lastEdited() ->
 
 group_by_day([]) ->
     [];
-group_by_day([{{Day,Time}, File}|T]) ->
+group_by_day([{{Day,Time},File}|T]) ->
     {Stuff, T1} = collect_this_day(Day, T, [File]),
     T2 = group_by_day(T1),
     [Stuff|T2].
@@ -363,7 +358,7 @@ group_by_day([{{Day,Time}, File}|T]) ->
 collect_this_day(Day, [{{Day,Time},File}|T], L) ->
     collect_this_day(Day, T, [File|L]);
 collect_this_day(Day, T, L) ->
-    {{Day,reverse(L)}, T}.
+    {{Day,reverse(L)},T}.
 
 last_edited_time(File) ->
     case file:read_file(File) of
@@ -435,7 +430,7 @@ mk_link(X, Y) ->
     ["<a href=\"", X, "\">", Y, "</a>&nbsp;&nbsp;\n"].
 
 mk_image_link(X, Img) ->
-    ["<a href=\"", X, "\"><img border=0 src='/wiki/image/",Img,
+    ["<a href=\"", X, "\"><img border=0 src='/wiki/image/", Img,
      "'></a>&nbsp;&nbsp;\n"].
 
 editPage([{"node",N},{"password",P},_], From) ->
@@ -447,7 +442,7 @@ editPage(Page, Password, From) ->
     File = page2filename(Page),
     case file:read_file(File) of
 	{ok, Bin} ->
-	    {wik001, Pwd,_Email,_Time,_Who,TxtStr,_Patches} =
+	    {wik001,Pwd,_Email,_Time,_Who,TxtStr,_Patches} =
 		binary_to_term(Bin),
 	    case Pwd of 
 		"" ->
@@ -461,10 +456,8 @@ editPage(Page, Password, From) ->
 			  p("You have supplied an incorrect password"),
 			  p("To find out the the password fill in your "
 			    "email address and click on <i>Show password</i>. "
-			    " If you are "
-			    "the registered "
-			    "owner of this page then I will tell you "
-			    "the password."),
+			    " If you are the registered "
+			    "owner of this page then I will tell you the password."),
 			  form("POST", "/wiki/sendMeThePassword",
 			       [input("hidden", "node", Page),
 				"email address:",
@@ -526,7 +519,7 @@ editTag([{"node",Page},{"tag",Tag}], From) ->
 	    {wik001,Pwd,_Email,_Time,_Who,OldTxt,_Patches} = 
 		binary_to_term(Bin),
 	    Wik = wiki_split:str2wiki(OldTxt),
-	    {Type, Str} = wiki_split:getRegion(list_to_integer(Tag), Wik),
+	    {Type,Str} = wiki_split:getRegion(list_to_integer(Tag), Wik),
 	    Str1 = case Type of 
 		       open -> quote_lt(Str);
 		       write_append -> ""
@@ -562,17 +555,17 @@ i2s(I) -> integer_to_list(I).
 
 table(Color, X) ->
     ["<table width=\"100%\"><tr><td bgcolor=\"", Color, "\">\n",
-     X,"</td></tr></table>\n"].
+     X, "</td></tr></table>\n"].
 
 password_entry(Name, Size) ->
-    ["<INPUT TYPE=password name=", Name," SIZE=", i2s(Size),">\n"].
+    ["<INPUT TYPE=password name=", Name, " SIZE=", i2s(Size), ">\n"].
 
 form(Method, Action, Args) ->
-    ["<FORM METHOD=", Method," ACTION=\"", Action, "\">",
-     Args, "</form>\n"].
+    ["<FORM METHOD=", Method, " ACTION=\"", Action, "\">",
+     Args, "</FORM>\n"].
 
 input(Type, Name, Value) ->
-    ["<INPUT TYPE=",Type," Name=",Name," Value=\"", Value, "\">\n"].
+    ["<INPUT TYPE=", Type, " Name=", Name, " Value=\"", Value, "\">\n"].
 
 textarea(Name, Row, Cols, Txt) ->
      ["<textarea name=", Name, " rows=", i2s(Row),
@@ -598,7 +591,7 @@ previewPage([_,{"node",Page},{"password",Password},{"text",Txt0}], From) ->
 
 %% Preview Tagged
 %% Tagged stuff is inside comment and append regions
-%% We *dont* want any structure here
+%% We *don't* want any structure here
 
 previewTagged([_,{"node",Page},{"tag",Tag},{"text", Txt0}], From) ->
     Txt = zap_cr(Txt0),
@@ -631,11 +624,11 @@ legal_flat_text1("\n>" ++ _) -> false;
 legal_flat_text1([_|T])      -> legal_flat_text1(T);
 legal_flat_text1([])         -> true.
     
-previewNewPage([_,{"node", Page},
+previewNewPage([_, {"node",Page},
 		{"password1",Password},
 		{"password2",Password},
-		{"email", Email},
-		{"text", Txt0}], From) ->
+		{"email",Email},
+		{"text",Txt0}], From) ->
     Txt = zap_cr(Txt0),
     Wik = wiki_split:str2wiki(Txt),
     template("Preview", bgcolor("white"),"",

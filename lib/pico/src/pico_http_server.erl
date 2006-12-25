@@ -32,7 +32,7 @@ start(Port, Max, Mod, Args) ->
 			     [Port, Max, Mod, Args]),
 	    register(Name, Pid),
 	    true;
-	Pid ->
+	_Pid ->
 	    false
     end.
 
@@ -63,7 +63,7 @@ internal(Port, Max, Mod, Args) ->
     loop(Mod, State).
 
 
-%% This gets done *inside* the socket serevr
+%% This gets done *inside* the socket server
 %% It always sends back a reply to the socket and then terminates
 
 handle_request({Op, URI, Args, Socket}, Server) ->

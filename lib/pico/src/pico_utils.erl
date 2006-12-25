@@ -222,9 +222,3 @@ hex2dec($c) -> 12;
 hex2dec($d) -> 13;
 hex2dec($e) -> 14;
 hex2dec($f) -> 15.
-
-
-
-
-
-

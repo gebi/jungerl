@@ -42,7 +42,7 @@ start_raw_server(Port, Fun, Max, PacketLength) ->
 			     [Port, Fun, Max, PacketLength]),
 	    register(Name, Pid),
 	    true;
-	Pid ->
+	_Pid ->
 	    false
     end.
 
@@ -82,9 +82,9 @@ socket_loop(Listen, New, Active, Fun, Max) ->
 	{started, New} ->
 	    Active1 = [New|Active],
 	    possibly_start_another(false, Listen, Active1, Fun, Max);
-	{'EXIT', New, Why} ->
+	{'EXIT', New, _Why} ->
 	    possibly_start_another(false, Listen, Active, Fun, Max);
-	{'EXIT', Pid, Why} ->
+	{'EXIT', Pid, _Why} ->
 	    Active1 = lists:delete(Pid, Active),
 	    possibly_start_another(New, Listen, Active1, Fun, Max);
 	{children, From} ->
@@ -114,7 +114,7 @@ start_child(Parent, Listen, Fun) ->
 	    Parent ! {started, self()},		    % tell the controller
 	    inet:setopts(Socket, [{active, true}]), % before we activate socket
 	    child_loop(Parent, Socket, Fun);
-	Other ->
+	_Other ->
 	    exit(oops)
     end.
 

@@ -148,7 +148,7 @@ get_file(F,Args) ->
 		    header({error,"404 Not Found",show({no_such_file,F})})
 	    end;
 	false ->
-	    header({error,"400 Bad Request",show(illegal_request)})
+	    header({error,"400 Bad Request",show({illegal_request,F})})
     end.
 
 %% check that we are not trying to access a file
@@ -565,21 +565,21 @@ table(Color, X) ->
      X,"</td></tr></table>\n"].
 
 password_entry(Name, Size) ->
-    ["<INPUT TYPE=password name=", Name,"  SIZE=", i2s(Size),">\n"].
+    ["<INPUT TYPE=password name=", Name," SIZE=", i2s(Size),">\n"].
 
 form(Method, Action, Args) ->
     ["<FORM METHOD=", Method," ACTION=\"", Action, "\">",
      Args, "</form>\n"].
 
 input(Type, Name, Value) ->
-    ["<INPUT TYPE=",Type,"  Name=",Name," Value=\"", Value, "\">\n"].
+    ["<INPUT TYPE=",Type," Name=",Name," Value=\"", Value, "\">\n"].
 
 textarea(Name, Row, Cols, Txt) ->
      ["<textarea name=", Name, " rows=", i2s(Row),
       " cols=", i2s(Cols), " wrap=virtual>",
       Txt, "</textarea>\n"].
 
-previewPage([_,{"node",Page},{"password",Password},{"text", Txt0}], From) ->
+previewPage([_,{"node",Page},{"password",Password},{"text",Txt0}], From) ->
     Txt = zap_cr(Txt0),
     Wik = wiki_split:str2wiki(Txt),
     template("Preview",background("info"),"",
@@ -685,7 +685,7 @@ open_tmp_file(RootName, Suffix) ->
     open_tmp_file(10, RootName, Suffix).
  
 open_tmp_file(0, _, Suffix) ->
-    exit({cannot_open_a_temporay_file, Suffix});
+    exit({cannot_open_a_temporary_file, Suffix});
 open_tmp_file(N, RootName, Suffix) ->
     {_,_,M} = erlang:now(),
     FileName = RootName ++ "/" ++ integer_to_list(M) ++ Suffix,

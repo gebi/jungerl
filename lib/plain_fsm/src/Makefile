@@ -7,5 +7,5 @@ all: ../ebin/plain_fsm_xform.beam \
      ../ebin/fsm_example.beam
 
 clean:
-	-rm $(ERL_OBJECTS)
+	-rm -f $(ERL_OBJECTS)
 

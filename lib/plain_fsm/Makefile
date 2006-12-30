@@ -11,9 +11,9 @@ DOC_OPTS=[{title,"Welcome to Plain_FSM"}]
 
 all: all-subdirs
 
-# Commented out since the new edoc is not yet in jungerl. See the README
-#docs:
-	erl -noshell -pa $(EDOCDIR) -pz $(STOOLSDIR) -pz $(XMERLDIR) -run edoc_run application "'$(APPNAME)'" '"."' '$(DOC_OPTS)' -s erlang halt
+docs:
+	erl -noshell -pa $(EDOCDIR) -pz $(STOOLSDIR) -pz $(XMERLDIR) \
+		-run edoc_run application "'$(APPNAME)'" '"."' '$(DOC_OPTS)' -s erlang halt
 
 all-subdirs:
 	@for dir in $(SUBDIRS); do \
@@ -21,11 +21,7 @@ all-subdirs:
 	done
 
 clean:
-	$(MAKE) MAKETARGET="distclean" all-subdirs
+	$(MAKE) MAKETARGET="clean" all-subdirs
 
-distclean:
-	$(MAKE) MAKETARGET="distclean" all-subdirs
-
-realclean:
-	$(MAKE) MAKETARGET="realclean" all-subdirs
+realclean: clean
 	-rm -f $(DOCDIR)/*.html $(DOCDIR)/edoc-info $(DOCDIR)/stylesheet.css

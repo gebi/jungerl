@@ -6,8 +6,10 @@ To test the system:
 	   or
 	       erl -pa ebin -s pico_test start
 	3) point your browser at http://localhost:4999/index.html
+	   (N.B. unlike Apache there is no automatic redirection from a directory
+	   path to index file).
 
-	As specified in pico_test.erl, this serves files from the htdocs
+	As specified in pico_test.erl, files are served from the 'htdocs'
 	subdirectory.
 
 
@@ -18,9 +20,9 @@ Interface
 		Creates a process called pico_port_<Port>
 
 		Parameters:
-			Port - listen on this TCP/IP port
+			Port - listening TCP/IP port
 			Max - limits simultaneous connections
-			Mod - handler module (e.g. ?MODULE if in caller's module)
+			Mod - name of handler module (e.g. ?MODULE if in caller's module)
 			[...] - arguments to Mod:start()
         
 	pico_http_server:stop(Port, Reason) 
@@ -33,16 +35,18 @@ Callbacks
 	Mod:event_handler({get|post,Hostname,Uri,Args}, State) ->
 
 			{ [header({ok,html}), Response], State' }
-			'html' indicates the content type. 'text' and other types
-			can also be used, see pico_utils:mime().
+			Return a 200 OK status, with Response as content. 'html' indicates
+			content type; 'text' and other types are also valid,
+			see pico_utils:mime().
 
 		or  { [header({error,Code,Response})], State' }
-			where Response is a plain text user-visible error message.
-			Code is an HTTP response code, followed by a one line
-			explanation (see http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html)
+			Return error status, where Response is a plain text error message
+			returned to web client. Code is the HTTP status: three digit code,
+			followed by one line description
+			(see http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html).
 
 		or  { [header({redirect,Loc})], State' }
-			issues a 302 temporary redirection to a new URL, given by Loc.
+			issues a 302 temporary redirection to a new URL given by Loc.
 
 		Note: Hostname, Uri & Args are parsed from the GET/POST request.
 		e.g., if request is:
@@ -58,3 +62,6 @@ References
 
 	Joe's Erlang tutorial #2 explains a similar web server design.
 	http://www.sics.se/~joe/tutorials/web_server/web_server.html
+
+	The Jungerl project 'wiki' is a moderately complex application built
+	on the 'pico' server (see ../wiki).

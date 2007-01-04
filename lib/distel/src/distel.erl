@@ -73,15 +73,17 @@ gl_proxy(GL) ->
 
 %% ----------------------------------------------------------------------
 %%% reload all modules that are out of date
-%%% we check the compile time of the loaded beam and the beam on disk
+%%% compare the compile time of the loaded beam and the beam on disk
 reload_modules() ->
     T = fun(L) -> [X || X <- L, element(1,X)==time] end,
     Tm = fun(M) -> T(M:module_info(compile)) end,
     Tf = fun(F) -> {ok,{_,[{_,I}]}}=beam_lib:chunks(F,[compile_info]),T(I) end,
     Load = fun(M) -> c:l(M),M end,
     
-    [Load(M) || {M,F} <- code:all_loaded(), is_list(F), Tm(M)<Tf(F)].
+    [Load(M) || {M,F} <- code:all_loaded(), is_file(F), Tm(M)<Tf(F)].
 
+is_file(F) -> ok == element(1,file:read_file_info(F)).
+    
 %% ----------------------------------------------------------------------
 %% if c:l(Mod) doesn't work, we look for the beam file in 
 %% srcdir and srcdir/../ebin; add the first one that works to path and 

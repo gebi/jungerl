@@ -655,6 +655,23 @@ default.)"
   (apply #'erl-find-source
          (or (erl-read-call-mfa) (error "No call at point."))))
 
+(defun erl-find-mod (modstr)
+  "goto source code of mfa. mfa can be m, m:f or m:f/a.
+Similar to erl-find-source-under-point, but prompts user for mfa."
+  (interactive (list (read-string "Module: ")))
+  (let* ((mcolon (split-string modstr ":"))
+         (mslash (case (length mcolon)
+                   (1 nil)
+                   (2 (split-string (cadr mcolon) "/"))))
+         (mod (car mcolon))
+         (fun (if mslash 
+                  (car mslash)
+                nil))
+         (ari (if (eq 2 (length mslash))
+                  (string-to-number (cadr mslash))
+                nil)))
+    (apply #'erl-find-source (list mod fun ari))))
+
 (defun erl-find-source-unwind ()
   "Unwind back from uses of `erl-find-source-under-point'."
   (interactive)

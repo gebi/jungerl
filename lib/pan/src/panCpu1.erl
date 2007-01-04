@@ -45,9 +45,8 @@ out({FD, O} = FD_O, [{P, I, Ttot, In, Tgc, Gc}|R]) ->
 
 makem(no_file) -> [];
 makem(F) ->
-    panEts:new(panCpu1_tmp),
-    panScan:file(F, '', {cb, cb_perf, go, [panCpu1_tmp]}),
-    strip(summary(panCpu1_tmp)).
+    panScan:file(F, '', cb_perf),
+    strip(summary(cb_perf)).
 
 strip([]) -> [];
 strip([E|T]) when tuple(E), size(E) == 6 -> [E|strip(T)];
@@ -76,18 +75,18 @@ tail(Tab, Pid, [H|T]) ->
      end|tail(Tab, Pid, T)].
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 collapz(L) -> 
-    panEts:new(panCpu1, [{keypos, 2}]), 
+    panEts:new(?MODULE, [{keypos, 2}]), 
     keysortr(3, collapse(L)).
-collapse([]) -> ets_t2l(panCpu1);
+collapse([]) -> ets_t2l(?MODULE);
 collapse([Obj|R]) -> 
     case filt(Obj) of
-	true -> ets_ins(panCpu1, obj(Obj));
+	true -> ets_ins(?MODULE, obj(Obj));
 	_ -> ok
     end,
     collapse(R).
 
 obj({P, I, Tin, In, Tgc, Gc} = Obj) ->
-    case ets_lup(panCpu1, I) of
+    case ets_lup(?MODULE, I) of
 	[] -> 
 	    {P, I, add(Tin,Tgc), In, Tgc, Gc};
 	{N, I, Tin0, In0, Tgc0, Gc0}-> 

@@ -17,8 +17,13 @@ requires() -> [{flags, [garbage_collection,procs,running]}, {tps, []}].
 doc() -> "populates the cpu time table. "
 	     "not useful on its own. run from pan:perf".
 
-go([Msg, Line, Out, initial, Tab|_]) when atom(Tab) ->
-    go([Msg, Line, Out, #state{tab = Tab}]);
+%%% obsoleted 
+%%%go([Msg, Line, Out, initial, Tab|_]) when atom(Tab) ->
+%%%    go([Msg, Line, Out, #state{tab = Tab}]);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+go([Msg, Line, Out, initial|_]) ->
+    panEts:new(?MODULE),
+    go([Msg, Line, Out, #state{tab = ?MODULE}]);
 go([end_of_trace, Line, Out, State|_]) ->
     State;
 go([Msg, Line, Out, State|_]) ->

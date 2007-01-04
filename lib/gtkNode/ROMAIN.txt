@@ -1,0 +1,211 @@
+Hello,
+
+
+Maybe you have noticed my blog entry on gtkNode [1], and you 
+should have noticed the patch that I have already submitted [2].
+
+
+Here I send you a profound modification of gtkNode, concerning 
+the configuration and build process:
+
+- it makes use of GNU's Autoconf and Automake, and especially 
+makes use of the Autoconf macros for Erlang that will be soon 
+added to Autoconf [3]: simply execute the classical
+"configure; make; make install";
+
+- the configure script is well documented (thanks to my 
+Erlang-specific macros!): ./configure --help;
+
+- my Makefile.am files support out-of-tree building (which is a 
+recommended way of building Automake-based applications...), 
+i.e. one can do for instance:
+
+> > mkdir -p /tmp/gtknode-src
+> > cd /tmp/gtknode-src
+> > tar xvzf gtknode-0.1.tar.gz
+> > mkdir -p /tmp/gtknode-build
+> > ../gtknode-src/gtknode-0.1/configure
+> > make
+I.e., all generated files will be generated in the build tree, 
+not in the original tree. It makes it easier to clean up.
+
+- my Makefile.am files support installation (make install) and 
+archive building (make dist); notably, the attached 
+gtknode-0.1.tar.gz was produced by executing
+"configure ; make dist";
+
+- they also support the DESTDIR variable as a prefix for testing 
+installation. E.g. one can execute:
+> > configure
+> > make
+> > make install DESTDIR=/tmp/testinstall
+and all files are installed under /tmp/testinstall...
+
+- I have moved files and directories around to better respect 
+OTP's design principles [4], and Jungerl's directives [5]: all C 
+code goes into 'c_src' and only Erlang code stays in 'src', etc.
+
+- I have renamed 'gtkNode' into 'gtknode' in Erlang code, to make 
+it more similar to the other Erlang/OTP libraries (e.g., 
+'Jinterface' is named 'jinterface' in the code);
+
+- I have much simplified the code generator; notably, 1) I have 
+simplified generator.erl to not determine file names itself, but 
+to let it to the configuration/build environment, and 2) 
+generated file names do no more contain the GTK version number 
+(although I can easily revert that precise change if you 
+prefer);
+
+- examples have been moved into the 'doc' directory (although I 
+am not sure about this, and I still don't know to which 
+directory to install them on a 'make install');
+
+- I have slightly modified gtknode.erl to make use of 
+code:priv_dir/1 instead of manual directory building;
+
+- I have maybe forgotten something in this list... and I have not 
+yet updated the ChangeLog.
+
+I have also attached the erlang.m4 file that contains the 
+Autoconf macros that you would need to build that version if you 
+modify anything. To install those macros, see [3].
+
+
+My motivation for that refactoring was to be able to easily build 
+a (non-official for now) Debian package of gtkNode. Using GNU's 
+Autotools it is now trivial. And I hope that it would make it 
+easy to build gtkNode on Windows.
+I am waiting for your comments on that work, and your 
+aknowldegment before I create and publish a Debian package.
+
+I know this is a big refactoring, but I am willing to help you 
+integrate most of my modification if there is any problem.
+
+There are still interesting perspectives regarding packaging, 
+such as making gtkNode a real Erlang/OTP application (i.e. write 
+a .rel file, etc.).
+
+
+Best regards,
+
+
+[1]
+http://www.csg.is.titech.ac.jp/~lenglet/archives/2006/01/index.html#e2006-01-26T18_11_33.txt
+[2]
+http://sourceforge.net/tracker/index.php?func=detail&aid=1415302&group_id=73688&atid=538572
+[3]
+http://www.csg.is.titech.ac.jp/~lenglet/archives/2006/01/index.html#e2006-01-27T22_53_14.txt
+[4]
+http://erlang.se/doc/doc-5.4.12/doc/design_principles/applications.html#7.4
+[5]
+http://cvs.sourceforge.net/viewcvs.py/jungerl/jungerl/README?rev=1.7&view=auto
+
+Hi,
+
+> > p.s. what are you using this for? gtkNode, kerberos-slaves...
+> > or is it secret?
+
+I have published nothing about that yet, but I can tell you a 
+bit... I am developing a H.323 VoIP system in Erlang and based 
+on real-time Ethernet networks, as a demonstration of a method I 
+am defining for the design of open distributed management 
+systems. (H.323 gatekeepers and gateways form in fact a big 
+distributed management system...)
+
+I use of Kerberos/remctl to start slaves for monitoring. I am 
+using IDX Tsunami's ts_os_mon module, and traditionally they use 
+ssh. But ssh is not practical when monitoring more than a couple 
+of systems (have to distribute public keys, etc.)
+
+As for gtkNode, I shall be able to make demos in the future, and 
+a management console in GTK+ has more appeal than a TK-one.
+
+> >    alas, i'm not very proficient open-source guy... your blog
+> > was very nice though.
+
+I mentioned my blog only because this article was the occasion I 
+chose to register it on www.planeterlang.org...  ;-) 
+
+> >    but you need to be root to install this macro package? so
+> > no normal person could do it? (including me, unless i crack
+> > root on my work machine).
+
+For now, yes. But I have submitted the macros for inclusion into 
+Autoconf, and they accepted. We are making the copyright 
+transfer paperwork, so it could still take one week or two.
+
+You also have the possibility to simply put the macros directly 
+into the aclocal.m4 by hand:
+> > cat erlang.m4 >> aclocal.m4
+That is all! (and I should have done that myself before sending 
+the archive to you...)
+aclocal.m4 is simply a local copy of all the M4 macros used by 
+the configure.ac file, that can be distributed with the project. 
+aclocal.m4 is created by aclocal by (badly) recursively 
+analyzing configure.ac.
+But it does not include macros that are part of Autoconf itself 
+since Autoconf has its own system-wide macro cache.
+
+Anyway, in the meanwhile I have made a Debian package to make 
+installation of erlang.m4 trivial. (I am working on setting up a 
+personal archive for APT, and I am waiting for the copyright 
+transfer to be OK before publishing that package).
+
+>> > > environment, and 2) generated file names do no more contain
+>> > > the GTK version number (although I can easily revert that
+>> > > precise change if you prefer);
+> >
+> >    well, there is a reason for this (although a pretty bad
+> > one); at work i build the linux and the solaris versions on
+> > the same file system. of course, the have different GTK
+> > versions... i guess the out-of-tree build is The Right Thing
+> > (tm).
+
+Ok, so I guess that naming the binary executable "gtkNode-linux", 
+etc. was for the same reason.
+From a Debian packaging point of view, having binaries with 
+arch-dependent names was a bad thing also.
+
+>> > > - examples have been moved into the 'doc' directory
+>> > > (although I am not sure about this, and I still don't know
+>> > > to which directory to install them on a 'make install');
+> >
+> >    i think priv/examples is canonical.
+
+Ok, I will change this.
+And I will also make it configurable through ./configure options, 
+because on Debian they should go 
+into /usr/share/doc/gtknode/examples.
+
+> >    btw, have you seen erlmerge?
+> > http://www.trapexit.org/docs/howto/erlmerge.html seens like a
+> > good idea.
+
+I don't like the idea of mixing configuration and installation 
+concerns. For configuration nothing beats Autoconf, and for 
+installation nothing beats native packaging systems such as 
+Debian's or RPM, etc.
+Just compare erlmerge with Debian packaging: erlmerge does not 
+have meta-packages nor tasks, does not have "Suggests" or 
+"Recommends" dependencies (only "Depends" ones), does not have 
+disjunctions of dependencies (e.g. "mnesia | odbc"), 
+dependencies are only to specific versions of apps (e.g. it is 
+not possible to depend on "stdlib (>= 1.12.7)"), etc.
+
+And having programs making their own package management in 
+parallel to the native system's system ends up with a mess for 
+managing upgrades, with multiple versions of apps installed in 
+parallel by every application or user with its own package 
+system... Wait... but that's Windows?!  ;-) 
+Plugin-based apps such as Eclipse, and Jakarta Maven (the 
+equivalent of erlmerge for Java) or Pear (idem for PHP) have the 
+same problem...
+
+Also I don't see how to use erlmerge to manage the configuration 
+and building of multi-language projects such as gtkNode, which 
+need to build and install arch-specific binaries?!
+
+The ideal solution would be to enhance Automake to handle Erlang 
+files: .erl, .rel, .app, etc. But Automake seems much more 
+difficult to modify than Autoconf (which is all M4-based).
+Just for one reason: Automake is essentially one big Perl script.

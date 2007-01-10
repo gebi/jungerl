@@ -52,12 +52,15 @@
 -export([new/3, new/4, new/5, entry/1, add_comment/3,
 	 ehtml_entry/1, ehtml_entry/2, ehtml_entry/3,
 	 entries/1, entries/2, entries/3, ehtml_list/2,
-	 replace/4, id/1, head/1, text/1]).
+	 replace/4, id/1, head/1, text/1, clr_comments/1,
+	 clr_all/1
+	]).
 %% Run only once, at setup.
 -export([setup/0]).
 
 -import(lists, [map/2, foldl/3, foldr/3, keysort/2, reverse/1]).
 
+-include_lib("stdlib/include/qlc.hrl").
 -include("../include/wblog.hrl").
 
 %%% Mnesia Meta-Info table definition
@@ -157,8 +160,20 @@ replace(Id, User, Head, Text) ->
 		end
 	end,
     tVALUE(mnesia:transaction(F)).
-	       
-		    
+	
+%%% @doc Clear all wblog entries for specified user
+clr_all(User) ->       
+    L = qd(qlc:q([B || B <- mnesia:table(wblog),
+		       B#wblog.user == User])),
+    F = fun() -> 
+		lists:foreach(fun(X) -> mnesia:delete_object(X) end, L),
+		mnesia:delete({wblog_meta, User})
+	end,
+    mnesia:transaction(F).
+
+
+qd(Q) ->
+    mnesia:async_dirty(fun() -> qlc:eval(Q) end).		    
 
 %%% @doc Add a comment to the specified wblog entry.
 add_comment(Id, Text, Who) ->
@@ -170,6 +185,19 @@ add_comment(Id, Text, Who) ->
 		    [E] -> 
 			Cs = E#wblog.comments ++ [C],
 			mnesia:write(E#wblog{comments = Cs});
+		    _   -> 
+			mnesia:abort("wrong id")
+		end
+	end,
+    tVALUE(mnesia:transaction(F)).
+
+
+%%% @doc Clear all comments of the specified wblog entry.
+clr_comments(Id) ->
+    F = fun() ->
+		case entry_t(Id) of
+		    [E] -> 
+			mnesia:write(E#wblog{comments = []});
 		    _   -> 
 			mnesia:abort("wrong id")
 		end

@@ -860,7 +860,6 @@ parse_11_response(DataRecvd,
 
 handle_response(#request{from=From, stream_to=StreamTo, req_id=ReqId}, 
 		#state{save_response_to_file = true, 
-		       reqs = Reqs,
 		       http_status_code=SCode,
 		       tmp_file_name=TmpFilename,
 		       tmp_file_fd=Fd,
@@ -874,7 +873,6 @@ handle_response(#request{from=From, stream_to=StreamTo, req_id=ReqId},
 handle_response(#request{from=From, stream_to=StreamTo, req_id=ReqId},
 		#state{http_status_code=SCode, recvd_headers=RespHeaders,
 		       reply_buffer=RepBuf, transfer_encoding=TEnc,
-		       reqs = Reqs,
 		       chunks=Chunks, send_timer=ReqTimer}=State) ->
     Body = case TEnc of
 	       chunked ->
@@ -896,7 +894,7 @@ handle_response(#request{from=From, stream_to=StreamTo, req_id=ReqId},
 reset_state(State) ->
     State#state{status=get_header, rep_buf_size=0,content_length=undefined,
 		reply_buffer=[], chunks=[], recvd_headers=[], deleted_crlf=false,
-		http_status_code=undefined, chunk_size=0, transfer_encoding=undefined}.
+		http_status_code=undefined, chunk_size=undefined, transfer_encoding=undefined}.
 
 set_cur_request(#state{reqs = Reqs} = State) ->
     case queue:to_list(Reqs) of

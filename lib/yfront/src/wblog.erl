@@ -49,11 +49,14 @@
 %%%-------------------------------------------------------------------
 -module(wblog).
 
--export([new/3, new/4, new/5, entry/1, add_comment/3,
+-export([new/3, new/4, new/5, entry/1, 
+	 add_comment/3, add_comment/4,
 	 ehtml_entry/1, ehtml_entry/2, ehtml_entry/3,
-	 entries/1, entries/2, entries/3, ehtml_list/2,
+	 entries/1, entries/2, entries/3, 
+	 ehtml_list/2, ehtml_list/3,
 	 replace/4, id/1, head/1, text/1, clr_comments/1,
-	 clr_all/1
+	 clr_all/1, get_comments/1, 
+	 fmt_comments/2, fmt_comment/3
 	]).
 %% Run only once, at setup.
 -export([setup/0]).
@@ -177,13 +180,19 @@ qd(Q) ->
 
 %%% @doc Add a comment to the specified wblog entry.
 add_comment(Id, Text, Who) ->
-    C = #wblog_comment{text = Text,
-		       who  = Who,
-		       date = now_to_gregsec()},
+    add_comment(Id, Text, Who, false).
+
+%%% @doc Add a comment to the specified wblog entry.
+%%%      Indicate if it is the author who makes the comment.
+add_comment(Id, Text, Who, Author) ->
+    C = #wblog_comment{text   = Text,
+		       who    = Who,
+		       author = Author,
+		       date   = now_to_gregsec()},
     F = fun() ->
 		case entry_t(Id) of
 		    [E] -> 
-			Cs = E#wblog.comments ++ [C],
+			Cs = keysort(#wblog_comment.date, E#wblog.comments ++ [C]),
 			mnesia:write(E#wblog{comments = Cs});
 		    _   -> 
 			mnesia:abort("wrong id")
@@ -191,6 +200,16 @@ add_comment(Id, Text, Who) ->
 	end,
     tVALUE(mnesia:transaction(F)).
 
+%%% @doc Get the list of #wblog_comments{} records
+get_comments(Id) ->
+    F = fun() ->
+		case entry_t(Id) of
+		    [E] -> E#wblog.comments;
+		    _   -> mnesia:abort("wrong id")
+		end
+	end,
+    tVALUE(mnesia:transaction(F)).
+		    
 
 %%% @doc Clear all comments of the specified wblog entry.
 clr_comments(Id) ->
@@ -269,7 +288,7 @@ entry_t(Id) ->
 %%%      argument "?id=ID" (note: if the link contains a '?'
 %%%      character we will append '&amp;id=Id'). The 'date' tag is used for
 %%%      passing in CSS info for the Date information.
-ehtml_list(Ws, Opts) ->
+ehtml_list(Ws, Opts) when list(Opts) ->
     {table, opts(table, Opts),
      map(fun(W) ->
 		 {tr, opts(tr, Opts),
@@ -277,6 +296,29 @@ ehtml_list(Ws, Opts) ->
 		    [{span, opts(date, Opts), date2str(W#wblog.date)},
 		     {br, []},
 		     lnk(W#wblog.id, W#wblog.head, Opts)]}]}
+	 end, Ws)}.
+
+%%% @doc Produce a summary list.
+%%%      Works as {@link ehtml_list/2} but also takes a function
+%%%      Func(Id, Text) that can be used to create the anchor
+%%%      tag. Example:
+%%%      <pre>
+%%%  wblog:ehtml_list(Es, [{date, [{class, "wblog-date"}]}], sum_func())}.
+%%%  sum_fun() ->
+%%%    fun(Id, Text) ->
+%%%	    {a, [{href, "#"}, {title, "Link to entry"},
+%%%		 {class, "blog_link"}, {id, Id}], Text}
+%%%    end.
+%%%      </pre>
+%%% @end
+ehtml_list(Ws, Opts, Func) when list(Opts),function(Func) ->
+    {table, opts(table, Opts),
+     map(fun(W) ->
+		 {tr, opts(tr, Opts),
+		  [{td, opts(td, Opts), 
+		    [{span, opts(date, Opts), date2str(W#wblog.date)},
+		     {br, []},
+		     Func(W#wblog.id, W#wblog.head)]}]}
 	 end, Ws)}.
 
 %%% @doc Produces an EHTML structure, representing the specified entry.
@@ -329,14 +371,37 @@ ehtml_entry(E, Opts, Lang) when record(E,wblog),list(Opts),list(Lang) ->
 	{span, [{class, "wblog-add-comment"}], 
 	 comment(E#wblog.id, lang(add_comment, Lang, "add comment"), Opts)}]},
       maybe_comment(E, Lang)]}; 
+%%
+ehtml_entry(E, Func, Lang) when record(E,wblog),function(Func),list(Lang) ->
+    %% A calback is provided which is supposed to create the {a, Opts, Body} 
+    %% anhcor. It is expected to take two arguments F(tag, Id) , where Tag
+    %% is any of: prev | next | permalink | add_comment
+     {'div', [{class, "wblog-entry"}],
+     [{p, [{class, "wblog-head"}], {pre_html, E#wblog.head}},
+      {p, [{class, "wblog-body"}], {pre_html, E#wblog.text}},
+      {p, [],
+       [{span, [{class, "wblog-prev"}], 
+	 Func(prev, E#wblog.prev)},
+	{span, [{class, "wblog-next"}], 
+	 Func(next, E#wblog.next)},
+	{span, [{class, "wblog-permalink"}], 
+	 Func(permalink, E#wblog.id)},
+	{span, [{class, "wblog-add-comment"}], 
+	 Func(add_comment,E#wblog.id)}]},
+      maybe_comment(E, Lang)]}; 
+%%
 ehtml_entry(Id, Opts, Lang) -> 
     [E] = entry(Id),
     ehtml_entry(E, Opts, Lang).
 
-maybe_comment(E, Lang) when E#wblog.comments == [] ->
+maybe_comment(E, Lang) ->
+    {'div', [{id, "wblog-comment-box"}],
+     do_maybe_comment(E, Lang)}.
+
+do_maybe_comment(E, Lang) when E#wblog.comments == [] ->
     [{p, [{class, "wblog-comments"}], 
       {pre_html, "0 "++lang(plural_comments, Lang, "comments")}}];
-maybe_comment(E, Lang) ->
+do_maybe_comment(E, Lang) ->
     Len = length(E#wblog.comments),
     [{p, [{class, "wblog-comments"}], 
       {pre_html, i2l(Len)++" "++maybe_plural(Len, Lang)}},
@@ -345,16 +410,27 @@ maybe_comment(E, Lang) ->
 maybe_plural(1, Lang) -> lang(singular_comment, Lang, "comment");
 maybe_plural(_, Lang) -> lang(plural_comment, Lang, "comments").
 
-fmt_comments([H|T], Lang) ->
-    [{p, [],
-      [{'div', [{class, "wblog-comment-head"}],
-	{pre_html, date2str(H#wblog_comment.date)++
-	 " "++lang(by, Lang, "by")++": "++H#wblog_comment.who}},
-       {'div', [{class, "wblog-comment-body"}],
-	{pre_html, H#wblog_comment.text}}]} | fmt_comments(T, Lang)];
-fmt_comments([], _) ->
+
+%%% @doc Format a list of #weblog_comment{} entries into HTML
+fmt_comments(Cs, Lang) ->
+    fmt_comments(Cs, Lang, 1).
+
+fmt_comments([H|T], Lang, N) ->
+    [fmt_comment(H, Lang, N) | fmt_comments(T, Lang, N+1)];
+fmt_comments([], _, _) ->
     [].
 
+%%% @doc Format a #weblog_comment{} entry into HTML
+fmt_comment(H, Lang, N) ->
+    {'div', [{id, "wblog-comment"++integer_to_list(N)}],
+     [{'div', [{class, "wblog-comment-head"++author(H)}],
+       {pre_html, date2str(H#wblog_comment.date)++
+	" "++lang(by, Lang, "by")++": "++H#wblog_comment.who}},
+      {'div', [{class, "wblog-comment-body"++author(H)}],
+       {pre_html, H#wblog_comment.text}}]}.
+
+author(#wblog_comment{author = true}) -> " wblog-comment-author";
+author(_)                             -> "".
 
 %%% Store blog entry into the RSS feeder
 store_rss(false, _User, _Head, _Text, _Link) ->   % RSS not enabled

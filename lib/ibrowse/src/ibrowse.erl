@@ -157,7 +157,7 @@ set_dest(Host,Port,Opts) ->
 %% headerList() = [{header(), value()}]
 %% header() = atom() | string()
 %% value() = term()
-%% method() = get | post | head | options | put | delete | trace
+%% method() = get | post | head | options | put | delete | trace | mkcol | propfind | proppatch | lock | unlock | move | copy
 %% Status = string()
 %% ResponseHeaders = [respHeader()]
 %% respHeader() = {headerName(), headerValue()}

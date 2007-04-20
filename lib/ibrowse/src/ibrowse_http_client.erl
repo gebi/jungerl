@@ -571,7 +571,8 @@ cons_headers(Headers) ->
 cons_headers([], Acc) ->
     encode_headers(Acc);
 cons_headers([{basic_auth, {U,P}} | T], Acc) ->
-    cons_headers(T, [{"Authorization", ["Basic ", httpd_util:encode_base64(U++":"++P)]} | Acc]);
+    cons_headers(T, [{"Authorization",
+		      ["Basic ", ibrowse_lib:encode_base64(U++":"++P)]} | Acc]);
 cons_headers([{cookie, Cookie} | T], Acc) ->
     cons_headers(T, [{"Cookie", Cookie} | Acc]);
 cons_headers([{content_length, L} | T], Acc) ->

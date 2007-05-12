@@ -1,10 +1,11 @@
-<h3>What is new in the collection?</h3>
-<ul>
-  <li><a
- href="http://sourceforge.net/mailarchive/forum.php?forum_id=30262">Archive
-of the jungerl-commit mailinglist</a><br>
-  </li>
-</ul>
+<h3>Getting the source</h3>
+<p>
+  Enter the <a href="http://sourceforge.net/projects/jungerl">project page</a>
+and select the <q>Code</q> menu entry for anonymous cvs access.
+</p>
+<p>
+  The project does not maintain stable releases, so no tarballs are available.
+</p>
 <h3>Related links</h3>
 <ul>
   <li>Open source erlang at <a href="http://erlang.org/">erlang.org</a></li>
@@ -14,8 +15,8 @@ of the jungerl-commit mailinglist</a><br>
  href="http://sourceforge.net/softwaremap/trove_list.php?form_cat=264">sourceforge
 projects in erlang</a>.<br>
   </li>
+  <li>Other <a href="http://code.google.com/hosting/search?q=label:Erlang">erlang projects at google code hosting</a>.
   <li><a href="http://www.erlang-projects.org/">Erlang-projects.org</a></li>
-  <li>The <a href="http://www.bluetail.com/wiki/">erlang wiki.</a></li>
 </ul>
 <h3>How do I update this page?</h3>
 <ol>

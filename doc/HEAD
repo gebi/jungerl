@@ -1,8 +1,7 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html>
 <head>
-  <meta http-equiv="content-type"
- content="text/html; charset=ISO-8859-1">
+  <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
   <title>Jungerl - a dense and chaotic Jungle of Erlang code</title>
 
 <style TYPE="text/css">
@@ -54,7 +53,7 @@ style="width: 800px; height: 60px;">
  -- 
 <a href="http://sourceforge.net/projects/jungerl">project page</a>-- 
 <a href="http://jungerl.cvs.sourceforge.net/jungerl/">cvs browser</a>-- 
-<a href="http://www.bluetail.com/wiki/showPage?node=home">erlang wiki</a>--
+<a href="http://wiki.trapexit.org/index.php/Main_Page">erlang wiki</a>--
 
 </div>
 <hr>

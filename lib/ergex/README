@@ -1,0 +1,37 @@
+Here are two different regular-expression implementations. Both are
+written from scratch, unlike the other modules I've seen, which were
+derived from stdlib. And both are overly simple and minimal, with
+different tradeoffs:
+
+  * ergex_tree matches lists by tree recursion over the structure of the
+    regular-expression tree. This is essentially how the stdlib regexp
+    module works, only without its bug of looping on patterns like "a**",
+    but also without a lot of its features.
+
+  * ergex_deriv matches lists element by element, by taking the derivative
+    of the current regular expression with respect to the current element,
+    making the result the new current regular expression. At any point in
+    the list you can check if there's a match by asking if the current
+    regexp matches the empty string. This has the same pluses and minuses
+    as a DFA-based approach (and could be extended without too much work
+    to actually build DFAs).
+
+TO DO: lots, only I don't really want to write a serious regexp package --
+a POSIX-compliant tagged-DFA implementation apparently takes 3500 lines of
+Haskell. Think of this as a maybe educational and easy-to-hack substitute
+till a serious library does what you want.
+
+Also included is a simplistic regular-expression parser. It can build
+either of the above representations of the regexp, depending on which
+module name you pass to parse/2. E.g.:
+
+24> ergex_deriv:matches(ergex_parse:parse(ergex_deriv, "(b|bb)*"), "bbbbbbbb").
+true
+
+It might be nice to throw in another concrete syntax like Richard
+O'Keefe suggested on erlang-questions. (You could call the constructor
+functions here directly in the same style, but that's a bit lower-level
+than his example -- this would be a facade over that.)
+
+Darius Bacon
+http://accesscom.com/~darius

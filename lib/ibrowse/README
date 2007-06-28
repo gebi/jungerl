@@ -22,6 +22,9 @@ Comments to : Chandrashekhar.Mullaparthi@t-mobile.co.uk
 
 CONTRIBUTIONS & CHANGE HISTORY
 ==============================
+28-06-2007 - Added host_header option to enable connection to secure sites
+             via stunnel
+
 20-04-2007 - Geoff Cant sent a patch to remove URL encoding for digits in
              ibrowse_lib:url_encode/1.
              ibrowse had a dependency on the inets application because the 

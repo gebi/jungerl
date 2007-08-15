@@ -9,6 +9,21 @@
 %%%             {logger, {logger, start_link, []},
 %%%              permanent, 2000, worker, [logger]},
 %%%
+%%%    start_errlog() ->
+%%%        Opts = [{name, logger},
+%%%                {file, "./elog"},
+%%%                {type, wrap},
+%%%                {format, external},
+%%%                {force_size, true},
+%%%                {size, {1024*1024, 5}}], % 5 files
+%%%        gen_event:add_sup_handler(
+%%%          error_logger,
+%%%          {disk_log_h, logger},
+%%%          disk_log_h:init(fun logger:form_no_progress/1, Opts)).
+%%%    
+%%%    test() ->
+%%%        error_logger:error_msg("testing ~p\n", [self()]).
+%%%
 %%%           Initiate/deactivate system logging.
 %%%           Owns the error log.
 %%% Created : 13 Apr 1999 by Magnus Fr|berg <magnus@bluetail.com>
@@ -16,7 +31,10 @@
 %%% Modified: 04 Dec 2000 by Martin Bjorklund <mbj@bluetail.com>
 %%% Modified: 13 Nov 2003 by Martin Bjorklund <mbj@bluetail.com>
 %%%           Cleanup for jungerl.
+%%% Modified: 15 Aug 2007 by Martin Bjorklund <mbj@tail-f.com>
+%%%           Added example, minor cleanups.
 %%%----------------------------------------------------------------------
+
 -module(logger).
 -vsn("$Revision$ ").
 -author('magnus@bluetail.com').
@@ -53,32 +71,24 @@ init([]) ->
     set_system_error_logging(),
     Type = get_error_logger_mf_type(),
     Mf = get_error_logger_mf(),
-    add_error_logger_mf(Mf, Type),
+    ok = add_error_logger_mf(Mf, Type),
     {Name, Vsn} = init:script_id(),
     ?LOG("Starting system [~s-~s]\n", [Name, Vsn]),
     start_tell_started(),
     {ok, []}.
 
-%%----------------------------------------------------------------------
-%%----------------------------------------------------------------------
 handle_call(_Req, _, S) ->
     {reply, unknown_request, S}.
 
-%%----------------------------------------------------------------------
-%%----------------------------------------------------------------------
 handle_cast(_, S) ->
     {noreply, S}.
 
-%%----------------------------------------------------------------------
-%%----------------------------------------------------------------------
 handle_info({gen_event_EXIT, logger, Reason}, S) ->
     {stop, Reason, S};
 
 handle_info(_, S) ->
     {noreply, S}.
 
-%%----------------------------------------------------------------------
-%%----------------------------------------------------------------------
 terminate(_Reason, _S) ->
     delete_error_logger_mf(),
     ok.
@@ -107,7 +117,7 @@ tell_started() ->
 	{started, started} ->
 	    ?LOG("System started.\n", []);
 	_ ->
-	    timer:sleep(1000),
+	    timer:sleep(100),
 	    tell_started()
     end.
 
@@ -164,6 +174,12 @@ form_all(Event) ->
 	    {error_report, _GL, {Pid, Type, Report}} ->
 		[mk_hdr("ERROR REPORT", Type, Pid),
 		 io_lib:format("~p\n", [nobin(Report)])];
+	    %% tail-f specific debug messages
+	    {info_report, _GL, {_, debug, {Pid, Now, Level, Tag, MsgStr}}} ->
+		["*dbg* ", t2s(calendar:now_to_local_time(Now)), " ",
+		 pid_to_list(Pid), " ",
+		 integer_to_list(Level), "/", atom_to_list(Tag),
+		 "\n  ", MsgStr];
 	    {info_report, _GL, {Pid, Type, Report}} ->
 		[mk_hdr("INFO REPORT", Type, Pid),
 		 io_lib:format("~p\n", [nobin(Report)])];
@@ -199,7 +215,7 @@ pstr(undefined) -> "";
 pstr(T) -> io_lib:format("~p", [T]).
    
 
-nobin(B) when binary(B), size(B) > 32 ->
+nobin(B) when binary(B), size(B) > 1024 ->
     <<ShortBin:32/binary, _/binary>> = B,
     lists:flatten(io_lib:format("~p(~w)", [ShortBin, size(B)]));
 nobin(L) when list(L) ->

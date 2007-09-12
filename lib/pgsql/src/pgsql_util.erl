@@ -29,6 +29,9 @@
 -import(erlang, [md5/1]).
 -export([hexlist/2]).
 
+-record(desc, {column, name, type, format, size, mod, table}).
+
+
 %% Lookup key in a plist stored in process dictionary under 'options'.
 %% Default is returned if there is no value for Key in the plist.
 option(Key, Default) ->
@@ -157,27 +160,83 @@ coldescs(Bin, Descs) ->
 		 0 -> text; 
 		 1 -> binary 
 	     end,
-    Desc = {Name, Format, ColumnNumber, 
-	    TypeId, TypeSize, TypeMod, 
-	    TableOID},
+    Desc = #desc{name=Name,
+		 format=Format,
+		 column=ColumnNumber,
+		 type=TypeId,
+		 size=TypeSize,
+		 mod=TypeMod,
+		 table=TableOID},
     coldescs(Rest, [Desc|Descs]).
 
-datacoldescs(N, 
-	     <<Len:32/integer, Data:Len/binary, Rest/binary>>, 
-	     Descs) when N >= 0 ->
+datacoldescs(N, <<-1:32/signed-integer, Rest/binary>>, Descs) 
+  when N >= 0 ->
+    datacoldescs(N-1, Rest, [null|Descs]);
+datacoldescs(N, <<Len:32/integer, Data:Len/binary, Rest/binary>>, Descs) 
+  when N >= 0 ->
     datacoldescs(N-1, Rest, [Data|Descs]);
 datacoldescs(_N, _, Descs) ->
     lists:reverse(Descs).
 
 decode_descs(Cols) ->
-    decode_descs(Cols, []).
-decode_descs([], Descs) ->
-    {ok, lists:reverse(Descs)};
-decode_descs([Col|ColTail], Descs) ->
-    OidMap = get(oidmap),
-    {Name, Format, ColNumber, Oid, _, _, _} = Col,
-    OidName = dict:fetch(Oid, OidMap),
-    decode_descs(ColTail, [{Name, Format, ColNumber, OidName, [], [], []}|Descs]).
+    Cols2 = [Col#desc{type=decode_oid(Oid)} || #desc{type=Oid}=Col <- Cols],
+    {ok, Cols2}.
+
+
+decode_oid(Oid) ->
+    case Oid of
+	16 -> bool;
+	17 -> bytea;
+	18 -> char;
+	19 -> name;
+	20 -> int8;
+	21 -> int2;
+	22 -> int2vector;
+	23 -> int4;
+	24 -> regproc;
+	25 -> text;
+	26 -> oid;
+	27 -> tid;
+	28 -> xid;
+	29 -> cid;
+	30 -> oidvector;
+	71 -> pg_type;
+	75 -> pg_attribute;
+	81 -> pg_proc;
+	83 -> pg_class;
+	210 -> smgr;
+	600 -> point;
+	601 -> lseg;
+	602 -> path;
+	603 -> box;
+	604 -> polygon;
+	628 -> line;
+	700 -> float4;
+	701 -> float8;
+	702 -> abstime;
+	703 -> reltime;
+	704 -> tinterval;
+	705 -> unknown;
+	790 -> money;
+	829 -> macaddr;
+	869 -> inet;
+	650 -> cidr;
+	1033 -> aclitem;
+	1042 -> bpchar;
+	1043 -> varchar;
+	1082 -> date;
+	1083 -> time;
+	1114 -> timestamp;
+	1184 -> timestamptz;
+	1186 -> interval;
+	1266 -> timetz;
+	1560 -> bit;
+	1562 -> varbit;
+	1700 -> numeric;
+	Oid ->
+	    throw({unknown_oid, Oid})
+    end.
+
 
 decode_row(Types, Values) ->
     decode_row(Types, Values, []).
@@ -187,15 +246,38 @@ decode_row([Type|TypeTail], [Value|ValueTail], Out0) ->
     Out1 = decode_col(Type, Value),
     decode_row(TypeTail, ValueTail, [Out1|Out0]).
 
-decode_col({_, text, _, _, _, _, _}, Value) ->
+decode_col(_, null) ->
+    null;
+decode_col(#desc{format=text, type=Int}, Value) 
+  when Int =:= int2; Int =:= int4; Int =:= int8 ->
+    list_to_integer(binary_to_list(Value));
+decode_col(#desc{format=text, type=varchar}, Value) ->
     binary_to_list(Value);
-decode_col({_Name, _Format, _ColNumber, varchar, _Size, _Modifier, _TableOID}, Value) ->
-    binary_to_list(Value);
-decode_col({_Name, _Format, _ColNumber, int4, _Size, _Modifier, _TableOID}, Value) ->
-    <<Int4:32/integer>> = Value,
-    Int4;
-decode_col({_Name, _Format, _ColNumber, Oid, _Size, _Modifier, _TableOID}, Value) ->
-    {Oid, Value}.
+decode_col(#desc{format=text, type=Float}, Value) 
+  when Float =:= float4; Float =:= float8 ->
+    list_to_float(binary_to_list(Value));
+decode_col(#desc{format=text, type=bool}, Value) ->
+    case Value of 
+	<<"t">> -> true;
+	<<"f">> -> false
+    end;
+decode_col(#desc{format=text, type=date}, Value) ->
+    <<Year:4/binary, $-, Month:2/binary, $-, Day:2/binary>> = Value,
+    {b2i(Year), b2i(Month), b2i(Day)};
+decode_col(#desc{format=text, type=time}, Value) ->
+    <<Hour:2/binary, $:, Minute:2/binary, $:, Second:2/binary>> = Value,
+    {b2i(Hour), b2i(Minute), b2i(Second)};
+decode_col(#desc{format=text, type=timestamp}, Value) ->
+    <<Year:4/binary, _, Month:2/binary, _, Day:2/binary, $\s, 
+     Hour:2/binary, $:, Minute:2/binary, $:, Second:2/binary>> = Value,
+    {{b2i(Year), b2i(Month), b2i(Day)}, {b2i(Hour), b2i(Minute), b2i(Second)}};
+decode_col(#desc{format=text}, Value) ->
+    Value;
+decode_col(_, Value) ->
+    throw({unknown_format, Value}).
+
+b2i(Bin) ->
+    list_to_integer(binary_to_list(Bin)).
 
 errordesc(Bin) ->
     errordesc(Bin, []).

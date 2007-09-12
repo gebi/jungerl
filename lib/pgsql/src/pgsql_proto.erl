@@ -117,18 +117,18 @@ authenticate(Sock) ->
 		2 -> % Kerberos 5
 		    exit({nyi, auth_kerberos5});
 		3 -> % Plaintext password
-				Password = option(password, ""),
-				EncodedPass = encode_message(pass_plain, Password),
+		    Password = option(password, ""),
+		    EncodedPass = encode_message(pass_plain, Password),
 		    ok = send(Sock, EncodedPass),
 		    authenticate(Sock);
 		4 -> % Hashed password
 		    exit({nyi, auth_crypt});
 		5 -> % MD5 password
-				Password = option(password, ""),
-				User = option(user, ""),
-				EncodedPass = encode_message(pass_md5, {User, Password, Salt}),
-				ok = send(Sock, EncodedPass),
-				authenticate(Sock);
+		    Password = option(password, ""),
+		    User = option(user, ""),
+		    EncodedPass = encode_message(pass_md5, {User, Password, Salt}),
+		    ok = send(Sock, EncodedPass),
+		    authenticate(Sock);
 		_ ->
 		    exit({authentication, {unknown, AuthMethod}})
 	    end;
@@ -186,22 +186,6 @@ connected(Sock) ->
 	put(socket, Unwrapper)
     end,
 
-    %% Lookup oid to type names and store them in a dictionary under 
-    %% 'oidmap' in the process dictionary.
-    begin
-	Packet = encode_message(squery, "SELECT oid, typname FROM pg_type"),
-	ok = send(Sock, Packet),
-	{ok, [{"SELECT", _ColDesc, Rows}]} = process_squery([]),
-	Rows1 = lists:map(fun ([CodeS, NameS]) -> 
-				  Code = list_to_integer(CodeS),
-				  Name = list_to_atom(NameS),
-				  {Code, Name}
-			  end,
-			  Rows),
-	OidMap = dict:from_list(Rows1),
-	put(oidmap, OidMap)
-    end,
-    
     %% Ready to start marshalling between frontend and backend.
     idle(Sock, DriverPid).
 
@@ -341,8 +325,9 @@ idle(Sock, Pid) ->
 process_squery(Log) ->
     receive
 	{pgsql, {row_description, Cols}} ->
-	    {ok, Command, Rows} = process_squery_cols([]),
-	    process_squery([{Command, Cols, Rows}|Log]);
+	    {ok, Types} = pgsql_util:decode_descs(Cols),
+	    {ok, Command, Rows} = process_squery_cols(Types, []),
+	    process_squery([{Command, Types, Rows}|Log]);
 	{pgsql, {command_complete, Command}} ->
 	    process_squery([Command|Log]);
 	{pgsql, {ready_for_query, Status}} ->
@@ -352,10 +337,11 @@ process_squery(Log) ->
 	{pgsql, Any} ->
 	    process_squery(Log)
     end.
-process_squery_cols(Log) ->
+process_squery_cols(Types, Log) ->
     receive
 	{pgsql, {data_row, Row}} ->
-	    process_squery_cols([lists:map(fun binary_to_list/1, Row)|Log]);
+	    {ok, DecodedRow} = pgsql_util:decode_row(Types, Row),
+	    process_squery_cols(Types, [DecodedRow|Log]);
 	{pgsql, {command_complete, Command}} ->
 	    {ok, Command, lists:reverse(Log)}
     end.

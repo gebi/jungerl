@@ -231,7 +231,7 @@ idle(Sock, Pid) ->
 	%% simplistic version using the unnammed prepared statement and portal.
 	{equery, Ref, Pid, {Query, Params}} ->
 	    ParseP =    encode_message(parse, {"", Query, []}),
-	    BindP =     encode_message(bind,  {"", "", Params, [binary]}),
+	    BindP =     encode_message(bind,  {"", "", Params, [text]}),
 	    DescribeP = encode_message(describe, {portal, ""}), 
 	    ExecuteP =  encode_message(execute,  {"", 0}),
 	    SyncP =     encode_message(sync, []),
@@ -239,12 +239,7 @@ idle(Sock, Pid) ->
 
 	    {ok, Command, Desc, Status, Logs} = process_equery([]),
 
-	    OidMap = get(oidmap),
-	    NameTypes = lists:map(fun({Name, _Format, _ColNo, Oid, _, _, _}) ->
-					  {Name, dict:fetch(Oid, OidMap)}
-				  end,
-				  Desc),
-	    Pid ! {pgsql, Ref, {Command, Status, NameTypes, Logs}},
+	    Pid ! {pgsql, Ref, {Command, Status, Desc, Logs}},
 	    idle(Sock, Pid);
 	%% Prepare a statement, so it can be used for queries later on.
 	{prepare, Ref, Pid, {Name, Query}} ->
@@ -272,7 +267,7 @@ idle(Sock, Pid) ->
 	{execute, Ref, Pid, {Name, Params}} ->
 	    %%io:format("execute: ~p ~p ~n", [Name, Params]),
 	    begin % Issue first requests for the prepared statement.
-		BindP     = encode_message(bind, {"", Name, Params, [binary]}),
+		BindP     = encode_message(bind, {"", Name, Params, [text]}),
 		DescribeP = encode_message(describe, {portal, ""}),
 		ExecuteP  = encode_message(execute, {"", 0}),
 		FlushP    = encode_message(flush, []),

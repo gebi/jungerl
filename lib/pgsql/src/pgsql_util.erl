@@ -265,13 +265,15 @@ decode_col(#desc{format=text, type=date}, Value) ->
     <<Year:4/binary, $-, Month:2/binary, $-, Day:2/binary>> = Value,
     {b2i(Year), b2i(Month), b2i(Day)};
 decode_col(#desc{format=text, type=time}, Value) ->
-    <<Hour:2/binary, $:, Minute:2/binary, $:, Second:2/binary>> = Value,
+    <<Hour:2/binary, $:, Minute:2/binary, $:, Second:2/binary,_/binary>> = Value,
     {b2i(Hour), b2i(Minute), b2i(Second)};
 decode_col(#desc{format=text, type=timestamp}, Value) ->
     <<Year:4/binary, _, Month:2/binary, _, Day:2/binary, $\s, 
-     Hour:2/binary, $:, Minute:2/binary, $:, Second:2/binary>> = Value,
+     Hour:2/binary, $:, Minute:2/binary, $:, Second:2/binary,_/binary>> = Value,
     {{b2i(Year), b2i(Month), b2i(Day)}, {b2i(Hour), b2i(Minute), b2i(Second)}};
 decode_col(#desc{format=text}, Value) ->
+    Value;
+decode_col(#desc{format=binary}, Value) ->
     Value;
 decode_col(_, Value) ->
     throw({unknown_format, Value}).

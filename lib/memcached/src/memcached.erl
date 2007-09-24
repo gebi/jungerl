@@ -11,7 +11,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/2, mcset/3, mcset/5, mcget/2, mcquit/1]).
+-export([start_link/2, mcset/3, mcset/5, mcget/2, mcdelete/3, mcdelete/2, mcquit/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -36,38 +36,90 @@ start_link(Host, Port) ->
 %%--------------------------------------------------------------------
 
 mcset(Pid, Key, Bytes) ->
-    gen_server:call(Pid, {set, Key, Bytes}).
+    gen_server:call(Pid, {set, set, Key, 0, 0, Bytes}).
 
 %%--------------------------------------------------------------------
 %% Function: mcset(Pid, Key, Flags, Expire, Bytes) -> 
 %%
-%% Description: Assocates Bytes with Key, with flags, and a possible
+%% Description: Associates Bytes with Key, with flags, and a possible
 %% expiration date.
 %%--------------------------------------------------------------------
 
 mcset(Pid, Key, Flags, Expire, Bytes) ->
-    gen_server:call(Pid, {set, Key, Flags, Expire, Bytes}).
+    gen_server:call(Pid, {set, set, Key, Flags, Expire, Bytes}).
 
 %%--------------------------------------------------------------------
-%% Function: mcget(Pid, Key) -> 
+%% Function: mcadd(Pid, Key, Bytes) -> 
+%%
+%% Description: Associates Bytes with Key, but only if the server
+%% doesn't already have data associated with Key.
+%%
+%%--------------------------------------------------------------------
+
+mcadd(Pid, Key, Bytes) ->
+    gen_server:call(Pid, {add, add, Key, 0, 0, Bytes}).
+
+mcadd(Pid, Key, Flags, Expire, Bytes) ->
+    gen_server:call(Pid, {add, add, Key, Flags, Expire, Bytes}).
+
+%%--------------------------------------------------------------------
+%% Function: mcreplace(Pid, Key, Bytes) -> 
+%%
+%% Description: Associates Bytes with Key, but only if the server
+%% already has data associated with Key.
+%%
+%%--------------------------------------------------------------------
+
+mcreplace(Pid, Key, Bytes) ->
+    gen_server:call(Pid, {replace, replace, Key,  0, 0, Bytes}).
+
+mcreplace(Pid, Key, Flags, Expire, Bytes) ->
+    gen_server:call(Pid, {replace, replace, Key, Flags, Expire, Bytes}).
+
+
+%%--------------------------------------------------------------------
+%% Function: mcget(Pid, Key) -> {ok, Value}
 %%
 %% Description: Returns Bytes associated with Key.
 %%--------------------------------------------------------------------
 
 mcget(Pid, Key) when is_atom(Key) ->
-    io:format("Keys2 ~p ~n", [Key]),
-    gen_server:call(Pid, {get, [Key]});
+    {ok, [Res]} = gen_server:call(Pid, {get, [Key]}),
+    {ok, Res};
+
+%%--------------------------------------------------------------------
+%% Function: mcget(Pid, [key1, key2, ...]) -> {ok, [Values]}
+%%
+%% Description: Returns Bytes associated with Key.
+%%--------------------------------------------------------------------
+
 %% This could be a list like [foo, bar] or ["foo", "bar"]
 mcget(Pid, [Head|Tail]) when is_atom(Head) ->
     Keys = [Head] ++ Tail,
-    io:format("Keys1 ~p ~n", [Keys]),
     gen_server:call(Pid, {get, Keys});
 mcget(Pid, [Head|Tail]) when is_list(Head) ->
     Keys = [Head] ++ Tail,
-    io:format("Keys1 ~p ~n", [Keys]),
     gen_server:call(Pid, {get, Keys});
 mcget(Pid, Key) ->
     gen_server:call(Pid, {get, [Key]}).
+
+%%--------------------------------------------------------------------
+%% Function: mcdelete(Pid, Key, Time) -> 
+%%
+%% Description: Delete a key in memcached.
+%%--------------------------------------------------------------------
+mcdelete(Pid, Key, Time) ->
+    gen_server:call(Pid, {delete, Key, Time}).
+
+%%--------------------------------------------------------------------
+%% Function: mcdelete(Pid, Key) -> 
+%%
+%% Description: Delete a key in memcached - use default value of 0 for
+%% time.
+%% -------------------------------------------------------------------
+
+mcdelete(Pid, Key) ->
+    gen_server:call(Pid, {delete, Key, 0}).
 
 %%--------------------------------------------------------------------
 %% Function: mcquit(Pid) -> 
@@ -104,16 +156,13 @@ init([Host, Port]) ->
 handle_call({get, Keys}, _From, #state{sock = Sock} = S) ->
     Reply = process_get(Sock, Keys),
     {reply, Reply, S#state{sock = Sock}};
-handle_call({set, Key, Bytes}, _From, #state{sock = Sock} = S) ->
-    Reply = process_set(Sock, Key, 0, 0, Bytes),
+handle_call({set, Operation, Key, Flags, Expire, Bytes}, _From, #state{sock = Sock} = S) ->
+    Reply = process_set(Sock, Operation, Key, Flags, Expire, Bytes),
     {reply, Reply, S#state{sock = Sock}};
-handle_call({set, Key, Flags, Expire, Bytes}, _From, #state{sock = Sock} = S) ->
-    Reply = process_set(Sock, Key, Flags, Expire, Bytes),
-    {reply, Reply, S#state{sock = Sock}};
-handle_call({delete, Key}, _From, #state{sock = Sock} = S) ->
-    Reply = ok,
+handle_call({delete, Key, Time}, _From, #state{sock = Sock} = S) ->
+    Reply = process_delete(Sock, Key, Time),
     {reply, Reply, #state{sock = Sock} = S};
-handle_call(quit, _From, #state{sock = Sock} = S) ->
+handle_call(quit, _From, #state{sock = Sock} = _) ->
     gen_tcp:close(Sock),
     {reply, ok, {}}.
 
@@ -168,7 +217,7 @@ parse_responses(<<"END\r\n", _/binary>>, Acc) ->
 parse_responses(<<"\r\n", Data/binary>>, Acc) ->
     parse_responses(Data, Acc);
 parse_responses(<<"VALUE ", Data/binary>>, Acc) ->
-    {ok, [Key, Flags, Len], More} = io_lib:fread("~s ~u ~u\r\n", binary_to_list(Data)),
+    {ok, [_, _, Len], More} = io_lib:fread("~s ~u ~u\r\n", binary_to_list(Data)),
     <<Bytes:Len/binary, Rest/binary>> = list_to_binary(More),
     parse_responses(Rest, Acc ++ [binary_to_term(Bytes)]).
 
@@ -182,12 +231,13 @@ process_get(Sock, Keys) ->
     {ok, parse_responses(Data, [])}.
 
 %% Set set and handle the response.
-process_set(Sock, Key, Flags, Expire, Data) ->
+process_set(Sock, Operation, Key, Flags, Expire, Data) ->
+    Op = to_list(Operation),
     K = to_list(Key),
     Bytes = term_to_binary(Data),
     Len = size(Bytes),
     L = list_to_binary(
-	  io_lib:format("set ~s ~p ~p ~p", [K, Flags, Expire, Len])),
+	  io_lib:format("~s ~s ~p ~p ~p", [Op, K, Flags, Expire, Len])),
     Line = <<L/binary, "\r\n">>,
     ok = gen_tcp:send(Sock, Line),
     ok = gen_tcp:send(Sock, <<Bytes/binary, "\r\n">>),
@@ -198,6 +248,19 @@ process_set(Sock, Key, Flags, Expire, Data) ->
 	<<"NOT_STORED\r\n">> ->
 	    not_stored
     end.
+
+process_delete(Sock, Key, Time) ->
+    Line = list_to_binary(
+	     io_lib:format("delete ~s ~p\r\n", [to_list(Key), Time])),
+    ok = gen_tcp:send(Sock, Line),
+    {ok, Response} = gen_tcp:recv(Sock, 0),
+    case Response of
+	<<"DELETED\r\n">> ->
+	    ok;
+	<<"NOT_FOUND\r\n">> ->
+	    not_found
+    end.
+
 
 %% When oh when will we see this in Erlang proper.
 string_join(Items) ->

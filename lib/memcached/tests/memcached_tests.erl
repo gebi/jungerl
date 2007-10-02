@@ -9,6 +9,11 @@
 start() ->
     test().
 
+%% Generate lots of data to utilize for tests.
+generate_data() ->
+    lists:flatten([io_lib:format("~p", [X]) ||
+		      X <- lists:seq(1, 1000)]).
+
 get_server_pid() ->
     {ok, Pid} = memcached:start_link('localhost', 11211),
     Pid.
@@ -46,6 +51,13 @@ delete_test() ->
 
 deletefail_test() ->
     not_found = memcached:mcdelete(get_server_pid(), doesntexist).
+
+setbig_test() ->
+    memcached:mcset(get_server_pid(), big,
+		    generate_data()).
+getbig_test() ->
+    Data = generate_data(),
+    {ok, Data} = memcached:mcget(get_server_pid(), big).
 
 quit_test() ->
     memcached:mcquit(get_server_pid()).

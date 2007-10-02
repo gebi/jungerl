@@ -1,0 +1,10 @@
+2007-10-02  David N. Welton  <davidw@dedasys.com>
+
+	* tests/memcached_tests.erl (getbig_test): Added tests to check
+	for big data.
+
+2007-10-02  David N. Welton  <davidw@efoninc.com>
+
+	* src/memcached.erl (fetchmore): Added a function to deal with
+	large chunks of data coming back from the server.
+

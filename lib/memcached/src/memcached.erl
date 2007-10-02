@@ -211,24 +211,43 @@ to_list(Key) when is_atom(Key) ->
 to_list(Key) when is_list(Key) ->
     Key.
 
+%% parse_response helper to fetch data if there's a lot of it.
+fetchmore(Sock, Len, More) ->
+    %% Read what we need to grab the data.
+    {ok, <<Data/binary>>} = gen_tcp:recv(Sock, Len - size(More)),
+    Combined = <<More/binary, Data/binary>>,
+    if
+	size(Combined) < Len ->
+	    {Bytes, Rest} = fetchmore(Sock, Len, Combined);
+	true ->
+	    <<Bytes:Len/binary>> = Combined,
+	    %% Read anything left.
+	    {ok, <<"\r\n", Rest/binary>>} = gen_tcp:recv(Sock, 0)
+    end,
+    {Bytes, Rest}.
+
 %% Parse the get response.
-parse_responses(<<"END\r\n", _/binary>>, Acc) ->
+parse_responses(_, <<"END\r\n", _/binary>>, Acc) ->
     Acc;
-parse_responses(<<"\r\n", Data/binary>>, Acc) ->
-    parse_responses(Data, Acc);
-parse_responses(<<"VALUE ", Data/binary>>, Acc) ->
+parse_responses(Sock, <<"\r\n", Data/binary>>, Acc) ->
+    parse_responses(Sock, Data, Acc);
+parse_responses(Sock, <<"VALUE ", Data/binary>>, Acc) ->
     {ok, [_, _, Len], More} = io_lib:fread("~s ~u ~u\r\n", binary_to_list(Data)),
-    <<Bytes:Len/binary, Rest/binary>> = list_to_binary(More),
-    parse_responses(Rest, Acc ++ [binary_to_term(Bytes)]).
+    if
+	length(More) < Len ->
+	    %% If we didn't read all the data, fetch the rest.
+	    {Bytes, Rest} = fetchmore(Sock, Len, list_to_binary(More));
+	true ->
+	    <<Bytes:Len/binary, Rest/binary>> = list_to_binary(More)
+    end,
+    parse_responses(Sock, Rest, Acc ++ [binary_to_term(Bytes)]).
 
 %% Send get and handle the response.
 process_get(Sock, Keys) ->
-    io:format("Keys ~p ~n", [Keys]),
     KeyList = [to_list(X) || X <- Keys],
-    io:format("CHECK ~p ~n", [KeyList]),
     ok = gen_tcp:send(Sock, list_to_binary(["get ", string_join(KeyList), "\r\n"])),
     {ok, <<Data/binary>>} = gen_tcp:recv(Sock, 0),
-    {ok, parse_responses(Data, [])}.
+    {ok, parse_responses(Sock, Data, [])}.
 
 %% Set set and handle the response.
 process_set(Sock, Operation, Key, Flags, Expire, Data) ->

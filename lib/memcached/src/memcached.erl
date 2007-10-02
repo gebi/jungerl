@@ -222,7 +222,7 @@ fetchmore(Sock, Len, More) ->
 	true ->
 	    <<Bytes:Len/binary>> = Combined,
 	    %% Read anything left.
-	    {ok, <<"\r\n", Rest/binary>>} = gen_tcp:recv(Sock, 0)
+	    {ok, <<Rest/binary>>} = gen_tcp:recv(Sock, 0)
     end,
     {Bytes, Rest}.
 
@@ -234,7 +234,8 @@ parse_responses(Sock, <<"\r\n", Data/binary>>, Acc) ->
 parse_responses(Sock, <<"VALUE ", Data/binary>>, Acc) ->
     {ok, [_, _, Len], More} = io_lib:fread("~s ~u ~u\r\n", binary_to_list(Data)),
     if
-	length(More) < Len ->
+	%% 5 is size(<<"\r\nEND\r\n">>)
+	length(More) < Len + 7 ->
 	    %% If we didn't read all the data, fetch the rest.
 	    {Bytes, Rest} = fetchmore(Sock, Len, list_to_binary(More));
 	true ->

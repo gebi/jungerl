@@ -22,6 +22,10 @@ Comments to : Chandrashekhar.Mullaparthi@t-mobile.co.uk
 
 CONTRIBUTIONS & CHANGE HISTORY
 ==============================
+29-08-2007 - Bug report by Peter Kristensen(ptx _at_ daimi dot au dot dk). 
+             ibrowse crashes when the webserver returns just the Status line 
+             and nothing else.
+
 28-06-2007 - Added host_header option to enable connection to secure sites
              via stunnel
 

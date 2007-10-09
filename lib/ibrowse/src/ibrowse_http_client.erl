@@ -984,7 +984,7 @@ parse_header([H | T], Acc) ->
 parse_header([], _) ->
     invalid.
 
-scan_header([$\n|T], [$\r,$\n,$\r|L]) -> {yes, lists:reverse(L), T};
+scan_header([$\n|T], [$\r,$\n,$\r|L]) -> {yes, lists:reverse([$\n,$\r| L]), T};
 scan_header([H|T],  L)                -> scan_header(T, [H|L]);
 scan_header([], L)                    -> {no, L}.
 

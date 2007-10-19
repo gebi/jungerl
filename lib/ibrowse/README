@@ -22,6 +22,11 @@ Comments to : Chandrashekhar.Mullaparthi@t-mobile.co.uk
 
 CONTRIBUTIONS & CHANGE HISTORY
 ==============================
+17-10-2007 - Matthew Reilly (matthew dot reilly _at_ sipphone dot com) 
+             sent a bug report and a fix. If the chunk trailer spans two TCP 
+             packets, then ibrowse fails to recognise that the chunked transfer
+	     has ended.
+
 29-08-2007 - Bug report by Peter Kristensen(ptx _at_ daimi dot au dot dk). 
              ibrowse crashes when the webserver returns just the Status line 
              and nothing else.

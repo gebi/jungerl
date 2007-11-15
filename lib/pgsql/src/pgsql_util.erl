@@ -233,6 +233,7 @@ decode_oid(Oid) ->
 	1560 -> bit;
 	1562 -> varbit;
 	1700 -> numeric;
+	2278 -> void;
 	Oid ->
 	    throw({unknown_oid, Oid})
     end.

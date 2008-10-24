@@ -16,17 +16,17 @@
 
 handler({false, N}, {call, login, ["Slarti", "Bartfast"]}) ->
     {true, infinity, {true, N+1}, {response, ["ok"]}};
-handler({false, N}, {call, login, [_, _]}) ->
+handler({false, _N}, {call, login, [_, _]}) ->
     {false, {response, {fault, -1, "Invalid authentication"}}};
 handler({true, N}, {call, login, [_, _]}) ->
     {true, infinity, {true, N+1},
      {response, {fault, -2, "Already authenticated"}}};
-handler({true, N}, {call, logout, []}) ->
+handler({true, _N}, {call, logout, []}) ->
     {false, {response, ["ok"]}};
 handler({true, N}, {call, calc, [{struct, Elements}]}) ->
     {true, infinity, {true, N+1},
      {response, [{array, [N, {struct, calc(Elements)}]}]}};
-handler({false, N}, {call, calc, Params}) ->
+handler({false, _N}, {call, calc, _Params}) ->
     {false, {response, {fault, -3, "Not authenticated"}}};
 handler({Status, N}, Payload) ->
     FaultString = lists:flatten(io_lib:format("Unknown call: ~p", [Payload])),

@@ -139,7 +139,7 @@ start_session(Parent, {M, F, A}, ListenSocket) ->
 		    ?ERROR_LOG({M, F, Reason}),
 		    gen_tcp:close(Socket)
 	    end;
-	{error, Reason} ->
+	{error, _Reason} ->
 	    timer:sleep(5000),
 	    Parent ! start_session
     end.
@@ -151,6 +151,6 @@ system_continue(Parent, DebugInfo, State) ->
 
 %% Exported: system_terminate/3
 
-system_terminate(Reason, Parent, DebugInfo, State) ->
+system_terminate(Reason, _Parent, _DebugInfo, State) ->
     cleanup(State),
     exit(Reason).

@@ -1,7 +1,7 @@
 -module(test).
 -compile(export_all).
 
--include("../../xmerl/inc/xmerl.hrl").
+-include_lib("xmerl/include/xmerl.hrl").
 
 all() ->
     t10(),
@@ -28,8 +28,8 @@ t10() ->
 	xmlrpc:call("localhost", 4567, "/", {call, baz, []}),
     xmlrpc:stop(Pid).
 
-h10(State, {call, echo, Params}) -> {false, {response, [{array, Params}]}};
-h10(State, Payload) ->
+h10(_State, {call, echo, Params}) -> {false, {response, [{array, Params}]}};
+h10(_State, Payload) ->
     FaultString = lists:flatten(io_lib:format("~p", [Payload])),
     {false, {response, {fault, -1, FaultString}}}.
 
@@ -45,7 +45,7 @@ t20() ->
     {error, Socket, closed} = xmlrpc:call(Socket, "/", Payload, true, 60000),
     xmlrpc:stop(Pid).
 
-h20(State, {call, echo, Params}) -> {false, {response, [{array, Params}]}}.
+h20(_State, {call, echo, Params}) -> {false, {response, [{array, Params}]}}.
 
 %% Test: Keep-Alive handler <-> Non keep-alive client
 
@@ -94,7 +94,7 @@ t40() ->
 	xmlrpc:call(Socket2, "/", Payload, true, 60000),
     xmlrpc:stop(Pid).
 
-h40(N, {call, close, []}) -> {false, {response, ["ok"]}};
+h40(_N, {call, close, []}) -> {false, {response, ["ok"]}};
 h40(N, {call, echo, Params}) ->
     {true, 60000, N+1, {response, [{array, [N|Params]}]}};
 h40(N, Payload) ->
@@ -110,8 +110,8 @@ t50() ->
     "[[42, foo], {bar=45.5, baz=4711}]\norg.apache.xmlrpc.XmlRpcException: Unknown call: {call,foo,[]}\n" = os:cmd(Cmd),
     xmlrpc:stop(Pid).
 
-h50(State, {call, echo, Params}) -> {false, {response, [{array, Params}]}};
-h50(State, Payload) ->
+h50(_State, {call, echo, Params}) -> {false, {response, [{array, Params}]}};
+h50(_State, Payload) ->
     FaultString = lists:flatten(io_lib:format("Unknown call: ~p", [Payload])),
     {false, {response, {fault, -1, FaultString}}}.
 
@@ -127,7 +127,7 @@ t60() ->
 
 h60(N, {call, echo, Params}) ->
     {true, 60000, N+1, {response, [{array, [N|Params]}]}};
-h60(N, Payload) ->
+h60(_N, Payload) ->
     FaultString = lists:flatten(io_lib:format("Unknown call: ~p", [Payload])),
     {false, {response, {fault, -1, FaultString}}}.
 

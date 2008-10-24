@@ -1,7 +1,7 @@
 # Update the APACHE_XMLRPC_PATH variable to point at your Apache
 # XML-RPC installation. This is only necessary if you intend to
 # compile the Java clients.
-APACHE_XMLRPC_PATH=../../apache/xmlrpc/bin/xmlrpc-1.1.jar
+APACHE_XMLRPC_PATH=../test/xmlrpc-1.1.jar
 
 # Do not change anything below this line.
 ERLC=erlc

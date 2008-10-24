@@ -28,16 +28,17 @@
 -author('jocke@gleipnir.com').
 -export([payload/1]).
 
--include("xmerl.hrl").
+-include("log.hrl").
+-include_lib("xmerl/include/xmerl.hrl").
 
 payload(Payload) ->
-    case xmerl_scan:string(Payload) of
+    case catch xmerl_scan:string(Payload) of
+	{'EXIT', Reason} -> {error, Reason};
 	{E, _}  ->
 	    case catch decode_element(E) of
-		{'EXIT', Reason} -> exit(Reason);
+		{'EXIT', Reason} -> {error, Reason};
 		Result -> Result
-	    end;
-	{error, Reason} -> {error, Reason}
+	    end
     end.
 
 decode_element(#xmlElement{name = methodCall} = MethodCall)
@@ -141,10 +142,12 @@ decode(Double) when Double#xmlElement.name == double ->
     make_double(TextValue);
 decode(Date) when Date#xmlElement.name == 'dateTime.iso8601' ->
     TextValue = get_text_value(Date#xmlElement.content),
-    {date, ensure_iso8601_date(TextValue)};
+%    {date, ensure_iso8601_date(TextValue)}; % FIXME
+    {date, TextValue};
 decode(Base64) when Base64#xmlElement.name == base64 ->
     TextValue = get_text_value(Base64#xmlElement.content),
-    {base64, ensure_base64(TextValue)};
+%    {base64, ensure_base64(TextValue)}; % FIXME
+    {base64, TextValue};
 decode(Value) -> throw({error, {bad_value, Value}}).
 
 get_value(Content) ->
@@ -186,7 +189,7 @@ decode_values(Content) ->
 
 make_integer(Integer) ->
     case catch list_to_integer(Integer) of
-	{'EXIT', Reason} -> throw({error, {not_integer, Integer}});
+	{'EXIT', _Reason} -> throw({error, {not_integer, Integer}});
 	Value -> Value
     end.
 
@@ -196,14 +199,15 @@ make_double(Double) ->
 	Value -> Value
     end.
 
-ensure_iso8601_date(Date) ->
-    case xmlrpc_util:is_iso8601_date(Date) of
-	no -> throw({error, {not_iso8601_date, Date}});
-	yes -> Date
-    end.
-
-ensure_base64(Base64) ->
-    case xmlrpc_util:is_base64(Base64) of
-	no -> throw({error, {not_base64, Base64}});
-	yes -> Base64
-    end.
+% FIXME
+%ensure_iso8601_date(Date) ->
+%    case xmlrpc_util:is_iso8601_date(Date) of
+%	no -> throw({error, {not_iso8601_date, Date}});
+%	yes -> Date
+%    end.
+%
+%ensure_base64(Base64) ->
+%    case xmlrpc_util:is_base64(Base64) of
+%	no -> throw({error, {not_base64, Base64}});
+%	yes -> Base64
+%    end.

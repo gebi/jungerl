@@ -53,9 +53,9 @@ payload({response, {fault, Code, String}}) when integer(Code) ->
 	    {ok, EncodedPayload};
 	no -> {error, {bad_string, String}}
     end;
-payload({response, []} = Payload) ->
+payload({response, []}) ->
     {ok, ["<?xml version=\"1.0\"?><methodResponse></methodResponse>"]};
-payload({response, [Param]} = Payload) ->
+payload({response, [Param]}) ->
     case encode_params([Param]) of
 	{error, Reason} -> {error, Reason};
 	EncodedParam ->
@@ -93,15 +93,9 @@ encode(false) -> "<boolean>0</boolean>"; % duh!
 encode(Double) when float(Double) ->
     ["<double>", io_lib:format("~p", [Double]), "</double>"];
 encode({date, Date}) ->
-    case xmlrpc_util:is_iso8601_date(Date) of
-	yes -> ["<dateTime.iso8601>", Date, "</dateTime.iso8601>"];
-	no -> {error, {bad_date, Date}}
-    end;
+    ["<dateTime.iso8601>", Date, "</dateTime.iso8601>"];
 encode({base64, Base64}) ->
-    case xmlrpc_util:is_base64(Base64) of
-	yes -> ["<base64>", Base64, "</base64>"];
-	no -> {error, {bad_base64, Base64}}
-    end;
+    ["<base64>", Base64, "</base64>"];
 encode(Value) ->
     case xmlrpc_util:is_string(Value) of
 	yes -> escape_string(Value);
@@ -126,8 +120,8 @@ encode_members([{Name, Value}|Rest], Acc) when atom(Name) ->
 		      EncodedValue, "</value></member>"],
 	    encode_members(Rest, NewAcc)
     end;
-encode_members([{Name, Value}|Rest], Acc) -> {error, {invalid_name, Name}};
-encode_members(UnknownMember, Acc) ->
+encode_members([{Name, _Value}|_Rest], _Acc) -> {error, {invalid_name, Name}};
+encode_members(UnknownMember, _Acc) ->
     {error, {unknown_member, UnknownMember}}.
 
 encode_values(Array) -> encode_values(Array, []).
@@ -140,6 +134,5 @@ encode_values([Value|Rest], Acc) ->
 	    NewAcc = Acc++["<value>", EncodedValue, "</value>"],
 	    encode_values(Rest, NewAcc)
     end;
-encode_values([{Name, Value}|Rest], Acc) -> {error, {invalid_name, Name}};
-encode_values(UnknownMember, Acc) ->
+encode_values(UnknownMember, _Acc) ->
     {error, {unknown_member, UnknownMember}}.

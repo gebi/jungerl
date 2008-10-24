@@ -256,7 +256,7 @@ start_link(IP, Port, MaxSessions, Timeout, Handler, State) ->
     tcp_serv:start_link([Port, MaxSessions, OptionList, SessionHandler]).
 
 ip(all) -> [];
-ip(IP) when tuple(IP) -> {ip, IP}.
+ip(IP) when tuple(IP) -> [{ip, IP}].
 
 %% Exported: stop/1
 

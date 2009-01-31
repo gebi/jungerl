@@ -28,7 +28,7 @@ namespace Otp
 		private const int closing = 1;
 		private const int closed = 2;
 		
-		private int status;
+		private int status = closed;
 		private Bucket head;
 		private Bucket tail;
 		private int count;
@@ -43,20 +43,31 @@ namespace Otp
 		/*Create an empty queue */
 		public GenericQueue()
 		{
-			init();
-			status = open;
-		}
+            init();
+            status = open;
+        }
 		
 		/*Clear a queue */
 		public virtual void  flush()
 		{
+            close();
 			init();
+            status = open;
 		}
 		
 		public virtual void  close()
 		{
 			status = closing;
-		}
+            init();
+            try
+            {
+                System.Threading.Monitor.PulseAll(this);
+            }
+            catch
+            { 
+            }
+            status = closed;
+        }
 		
 		/*Add an object to the tail of the queue.
 		* @param o Object to insert in the queue
@@ -85,18 +96,13 @@ namespace Otp
 			}
 		}
 		
-		/*Retrieve an object from the head of the queue, or block until
-		* one arrives.
-		*
-		* @return  The object at the head of the queue.
-		*/
-		public virtual System.Object get()
-		{
+        private System.Object get(bool once)
+        {
 			lock(this)
 			{
 				System.Object o = null;
 				
-				while ((o = tryGet()) == null)
+				while ((o = tryGet()) == null && !once && status == open)
 				{
 					try
 					{
@@ -109,6 +115,15 @@ namespace Otp
 				}
 				return o;
 			}
+        }
+		/*Retrieve an object from the head of the queue, or block until
+		* one arrives.
+		*
+		* @return  The object at the head of the queue.
+		*/
+		public virtual System.Object get()
+		{
+            return get(false);
 		}
 		
 		/*Retrieve an object from the head of the queue, blocking until
@@ -122,9 +137,14 @@ namespace Otp
 		*/
 		public virtual System.Object get(long timeout)
 		{
+            if (timeout == -1)
+                return get(false);
+            else if (timeout == 0)
+                return get(true);
+
 			lock(this)
 			{
-				if (status == closed)
+				if (status != open)
 					return null;
 
 				long currentTime = SupportClass.currentTimeMillis();
@@ -133,7 +153,7 @@ namespace Otp
 				
 				while (true)
 				{
-					if ((o = tryGet()) != null)
+                    if (status != open || (o = tryGet()) != null)
 						return o;
 
 					currentTime = SupportClass.currentTimeMillis();

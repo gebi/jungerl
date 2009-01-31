@@ -53,6 +53,7 @@ namespace Otp
 		* connection failure
 		*/
 		protected Links links = null;
+        protected System.Collections.Hashtable monitors = null;
 		
 		/*
 		* Accept an incoming connection from a remote node. Used by {@link
@@ -69,6 +70,7 @@ namespace Otp
 		{
 			this.self = self;
 			this.links = new Links(25);
+            this.monitors = new System.Collections.Hashtable(49, (float)0.95);
 
 			thread = new System.Threading.Thread(new System.Threading.ThreadStart(Start));
 			thread.IsBackground = true;
@@ -88,6 +90,7 @@ namespace Otp
 		{
 			this.self = self;
 			this.links = new Links(25);
+            this.monitors = new System.Collections.Hashtable(49, (float)0.95);
 
 			thread = new System.Threading.Thread(new System.Threading.ThreadStart(Start));
 			thread.IsBackground = true;
@@ -101,6 +104,11 @@ namespace Otp
 			self.deliverError(this, e);
 			return ;
 		}
+
+        public new OtpPeer peer
+        {
+            get { return base.peer; }
+        }
 		
 		/*
 		* pass the message to the node for final delivery. Note that the
@@ -113,7 +121,7 @@ namespace Otp
 
 			switch (msg.type())
 			{
-				case OtpMsg.linkTag:
+				case OtpMsg.Tag.linkTag:
 					if (delivered)
 					{
 						links.addLink(msg.getRecipientPid(), msg.getSenderPid());
@@ -129,12 +137,30 @@ namespace Otp
 						}
 					break;
 
-				case OtpMsg.unlinkTag:
-				case OtpMsg.exitTag:
+                case OtpMsg.Tag.monitorPTag:
+                    if (delivered)
+                        monitors[msg.getSenderPid()] = msg.getMsg();
+                    else
+                        try
+                        {
+                            base.sendExit(msg.getRecipientPid(), msg.getSenderPid(), "noproc");
+                        }
+                        catch (System.IO.IOException)
+                        {
+                        }
+                    break;
+
+                case OtpMsg.Tag.demonitorPTag:
+                case OtpMsg.Tag.monitorPexitTag:
+                    monitors.Remove(msg.getSenderPid());
+                    break;
+
+                case OtpMsg.Tag.unlinkTag:
+                case OtpMsg.Tag.exitTag:
 					links.removeLink(msg.getRecipientPid(), msg.getSenderPid());
 					break;
 
-				case OtpMsg.exit2Tag:
+                case OtpMsg.Tag.exit2Tag:
 					break;
 			}
 			return ;
@@ -252,10 +278,10 @@ namespace Otp
 					{
 						int len = (int) (l.Length);
 						
-						 for (int i = 0; i < len; i++)
+    					for (int i = 0; i < len; i++)
 						{
 							// send exit "from" remote pids to local ones
-							self.deliver(new OtpMsg(OtpMsg.exitTag, l[i].remote(), l[i].local(), "noconnection"));
+							self.deliver(new OtpMsg(OtpMsg.Tag.exitTag, l[i].remote(), l[i].local(), "noconnection"));
 						}
 					}
 				}

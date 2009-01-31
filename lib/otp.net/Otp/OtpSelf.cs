@@ -80,7 +80,7 @@ namespace Otp
 			
 			System.Net.Sockets.TcpListener temp_tcplistener;
 			//UPGRADE_NOTE: This code will be optimized in the future;
-			temp_tcplistener = new System.Net.Sockets.TcpListener(System.Net.Dns.Resolve("localhost").AddressList[0], port);
+			temp_tcplistener = new System.Net.Sockets.TcpListener(System.Net.Dns.GetHostEntry("localhost").AddressList[0], port);
 			temp_tcplistener.Start();
 			sock = temp_tcplistener;
 			

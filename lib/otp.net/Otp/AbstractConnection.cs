@@ -53,41 +53,13 @@ namespace Otp
 
         static AbstractConnection()
         {
-            {
-                // trace this connection?
-                System.String trace = "0"; // value "0" to "4"
-                try
-                {
-                    if (trace != null)
-                        defaultLevel = System.Int32.Parse(trace);
-                }
-                catch (System.FormatException)
-                {
-                    defaultLevel = 0;
-                }
-                random = new System.Random();
-            }
+            random = new System.Random();
         }
         protected internal const int headerLen = 2048; // more than enough
         
         protected internal static readonly byte passThrough = 0x70;
         protected internal static readonly byte version = 0x83;
         
-        // Erlang message header tags
-        protected internal const int linkTag = 1;
-        protected internal const int sendTag = 2;
-        protected internal const int exitTag = 3;
-        protected internal const int unlinkTag = 4;
-        protected internal const int nodeLinkTag = 5;
-        protected internal const int regSendTag = 6;
-        protected internal const int groupLeaderTag = 7;
-        protected internal const int exit2Tag = 8;
-        
-        protected internal const int sendTTTag = 12;
-        protected internal const int exitTTTag = 13;
-        protected internal const int regSendTTTag = 16;
-        protected internal const int exit2TTTag = 18;
-
         // MD5 challenge messsage tags
         protected internal const int ChallengeReply = 'r';
         protected internal const int ChallengeAck = 'a';
@@ -107,43 +79,20 @@ namespace Otp
         protected internal System.Threading.Thread thread;
 
         // tracelevel constants
-        protected internal static int defaultLevel = 0;
-        protected internal static int sendThreshold = 1;
-        protected internal static int ctrlThreshold = 2;
-        protected internal static int handshakeThreshold = 3;
-        
-        protected internal int _traceLevel;
-        public int traceLevel
-        {
-            get
-            {
-                return _traceLevel;
-            }
-            /*
-            * <p> Set the trace level for this connection. Normally tracing is
-            * off by default unless System property OtpConnection.trace was
-            * set. </p>
-            *
-            * <p> The following levels are valid: 0 turns off tracing
-            * completely, 1 shows ordinary send and receive messages, 2 shows
-            * control messages such as link and unlink, 3 shows handshaking at
-            * connection setup, and 4 shows communication with Epmd. Each level
-            * includes the information shown by the lower ones. </p>
-            *
-            **/
-            set
-            {
-                int oldLevel = _traceLevel;
-            
-                // pin the value 
-                if (value < 0)
-                    _traceLevel = 0;
-                else if (value > 4)
-                    _traceLevel = 4;
-                else
-                    _traceLevel = value;
-            }
-        }
+
+        /*
+        * <p> Set the trace level for this connection. Normally tracing is
+        * off by default unless System property OtpConnection.trace was
+        * set. </p>
+        *
+        * <p> The following levels are valid: 0 turns off tracing
+        * completely, 1 shows ordinary send and receive messages, 2 shows
+        * control messages such as link and unlink, 3 shows handshaking at
+        * connection setup, and 4 shows communication with Epmd. Each level
+        * includes the information shown by the lower ones. </p>
+        *
+        **/
+        public static OtpTrace.Type traceLevel = OtpTrace.traceLevel;
 
         protected internal static System.Random random = null;
 
@@ -161,22 +110,24 @@ namespace Otp
             this.self = self;
             this.peer = new OtpPeer();
             this.socket = s;
-            
-            this.socket.NoDelay = true;
-            
-            this.traceLevel = defaultLevel;
 
-            if (traceLevel >= handshakeThreshold)
+            this.socket.NoDelay = true;
+            // Use keepalive timer
+            this.socket.Client.SetSocketOption(
+                System.Net.Sockets.SocketOptionLevel.Socket,
+                System.Net.Sockets.SocketOptionName.KeepAlive, true);
+            // Close socket gracefully
+            this.socket.Client.SetSocketOption(
+                System.Net.Sockets.SocketOptionLevel.Socket,
+                System.Net.Sockets.SocketOptionName.DontLinger, true);
+
+            //this.socket.ReceiveTimeout = 5000;
+
+            if (traceLevel >= OtpTrace.Type.handshakeThreshold)
             {
-                System.Console.Out.WriteLine("<- ACCEPT FROM ?");
-/*
-                System.Net.Sockets.Socket sock = s.Client;
-                //UPGRADE_TODO: Expression C#.net.Socket.getInetAddress could not be converted.;
-                //UPGRADE_TODO: Expression C#.net.Socket.getPort could not be converted.;
-                System.Console.Out.WriteLine("<- ACCEPT FROM " +
-                    IPAddress.Parse(((IPEndPoint)s.RemoteEndPoint).Address.ToString())+ ":" +
-                    ((IPEndPoint)s.RemoteEndPoint).Port.ToString());
-*/
+                OtpTrace.TraceEvent("<- ACCEPT FROM " + 
+                    System.Net.IPAddress.Parse(s.Client.RemoteEndPoint.ToString()).ToString() + ":" +
+                    (s.Client.RemoteEndPoint as System.Net.IPEndPoint).Port.ToString());
             }
             
             // get his info
@@ -208,7 +159,6 @@ namespace Otp
             this.socket = null;
             int port;
             
-            this.traceLevel = defaultLevel;
             //this.IsBackground = true;
             
             // now get a connection between the two...
@@ -263,7 +213,7 @@ namespace Otp
             
             // header info
             header.write_tuple_head(4);
-            header.write_long(regSendTag);
+            header.write_long((long)OtpMsg.Tag.regSendTag);
             header.write_any(from);
             if (sendCookie)
                 header.write_atom(self.cookie());
@@ -304,7 +254,7 @@ namespace Otp
             
             // header info
             header.write_tuple_head(3);
-            header.write_long(sendTag);
+            header.write_long((long)OtpMsg.Tag.sendTag);
             if (sendCookie)
                 header.write_atom(self.cookie());
             else
@@ -336,7 +286,7 @@ namespace Otp
                 header.write1(version);
                 
                 header.write_tuple_head(4);
-                header.write_long(regSendTag);
+                header.write_long((long)OtpMsg.Tag.regSendTag);
                 header.write_any(local.createPid()); // disposable pid
                 header.write_atom(cookie.atomValue()); // important: his cookie, not mine...
                 header.write_atom("auth");
@@ -407,7 +357,7 @@ namespace Otp
             
             // header
             header.write_tuple_head(3);
-            header.write_long(linkTag);
+            header.write_long((long)OtpMsg.Tag.linkTag);
             header.write_any(from);
             header.write_any(dest);
             
@@ -442,7 +392,7 @@ namespace Otp
             
             // header
             header.write_tuple_head(3);
-            header.write_long(unlinkTag);
+            header.write_long((long)OtpMsg.Tag.unlinkTag);
             header.write_any(from);
             header.write_any(dest);
             
@@ -455,7 +405,7 @@ namespace Otp
         /*used internally when "processes" terminate */
         protected internal virtual void  sendExit(Erlang.Pid from, Erlang.Pid dest, System.String reason)
         {
-            sendExit(exitTag, from, dest, reason);
+            sendExit((int)OtpMsg.Tag.exitTag, from, dest, reason);
         }
         
         /*
@@ -469,7 +419,7 @@ namespace Otp
         **/
         protected internal virtual void  sendExit2(Erlang.Pid from, Erlang.Pid dest, System.String reason)
         {
-            sendExit(exit2Tag, from, dest, reason);
+            sendExit((int)OtpMsg.Tag.exit2Tag, from, dest, reason);
         }
 
         private void  sendExit(int tag, Erlang.Pid from, Erlang.Pid dest, System.String reason)
@@ -523,7 +473,10 @@ namespace Otp
                     {
                         // read 4 bytes - get length of incoming packet
                         // socket.getInputStream().read(lbuf);
-                        readSock(socket, lbuf);
+                        int n;
+                        if ((n = readSock(socket, lbuf)) < lbuf.Length)
+                            throw new System.Exception("Read " + n + " out of " + lbuf.Length + " bytes!");
+
                         ibuf = new OtpInputStream(lbuf);
                         len = ibuf.read4BE();
                         
@@ -543,7 +496,10 @@ namespace Otp
                     // got a real message (maybe) - read len bytes
                     byte[] tmpbuf = new byte[len];
                     // i = socket.getInputStream().read(tmpbuf);
-                    readSock(socket, tmpbuf);
+                    int m = readSock(socket, tmpbuf);
+                    if (m < len)
+                        throw new System.Exception("Read " + m + " out of " + len + " bytes!");
+
                     ibuf = new OtpInputStream(tmpbuf);
                     
                     if (ibuf.read1() != passThrough)
@@ -559,7 +515,7 @@ namespace Otp
                     Erlang.Atom toName;
                     Erlang.Pid to;
                     Erlang.Pid from;
-                    int tag;
+                    Erlang.Ref eref;
                     
                     // decode the header
                     tmp = ibuf.read_any();
@@ -575,12 +531,12 @@ namespace Otp
                     }
                     
                     // lets see what kind of message this is
-                    tag = (int) ((Erlang.Long) (head.elementAt(0))).longValue();
+                    OtpMsg.Tag tag = (OtpMsg.Tag)((Erlang.Long)(head.elementAt(0))).longValue();
                     
                     switch (tag)
                     {
-                        case sendTag:
-                        case sendTTTag: 
+                        case OtpMsg.Tag.sendTag:
+                        case OtpMsg.Tag.sendTTTag: 
                             // { SEND, Cookie, ToPid, TraceToken }
                             if (!cookieOk)
                             {
@@ -607,18 +563,18 @@ namespace Otp
                                 cookieOk = true;
                             }
 
-                            if (traceLevel >= sendThreshold)
+                            if (traceLevel >= OtpTrace.Type.sendThreshold)
                             {
-                                System.Console.Out.WriteLine("<- " + headerType(head) + " " + head.ToString());
+                                OtpTrace.TraceEvent("<- " + headerType(head) + " " + head.ToString());
 
                                 /*show received payload too */
                                 long mark = ibuf.Position;
                                 traceobj = ibuf.read_any();
 
                                 if (traceobj != null)
-                                    System.Console.Out.WriteLine("   " + traceobj.ToString());
+                                    OtpTrace.TraceEvent("   " + traceobj.ToString());
                                 else
-                                    System.Console.Out.WriteLine("   (null)");
+                                    OtpTrace.TraceEvent("   (null)");
                                 ibuf.Seek(mark, System.IO.SeekOrigin.Begin);
                             }
 
@@ -627,8 +583,8 @@ namespace Otp
                             deliver(new OtpMsg(to, ibuf));
                             break;
 
-                        case regSendTag:
-                        case regSendTTTag:
+                        case OtpMsg.Tag.regSendTag:
+                        case OtpMsg.Tag.regSendTTTag:
                             // { REG_SEND, FromPid, Cookie, ToName, TraceToken }
                             if (!cookieOk)
                             {
@@ -654,19 +610,19 @@ namespace Otp
                                 }
                                 cookieOk = true;
                             }
-                            
-                            if (traceLevel >= sendThreshold)
+
+                            if (traceLevel >= OtpTrace.Type.sendThreshold)
                             {
-                                System.Console.Out.WriteLine("<- " + headerType(head) + " " + head.ToString());
+                                OtpTrace.TraceEvent("<- " + headerType(head) + " " + head.ToString());
                                 
                                 /*show received payload too */
                                 long mark = ibuf.Position;
                                 traceobj = ibuf.read_any();
 
                                 if (traceobj != null)
-                                    System.Console.Out.WriteLine("   " + traceobj.ToString());
+                                    OtpTrace.TraceEvent("   " + traceobj.ToString());
                                 else
-                                    System.Console.Out.WriteLine("   (null)");
+                                    OtpTrace.TraceEvent("   (null)");
                                 ibuf.Seek(mark, System.IO.SeekOrigin.Begin);
                             }
 
@@ -676,16 +632,16 @@ namespace Otp
                             deliver(new OtpMsg(from, toName.atomValue(), ibuf));
                             break;
 
-                        case exitTag:
-                        case exit2Tag:
+                        case OtpMsg.Tag.exitTag:
+                        case OtpMsg.Tag.exit2Tag:
                             // { EXIT2, FromPid, ToPid, Reason }
                             if (!(head.elementAt(3) is Erlang.Atom))
                             {
                                 goto receive_loop_brk;
                             }
-                            if (traceLevel >= ctrlThreshold)
+                            if (traceLevel >= OtpTrace.Type.ctrlThreshold)
                             {
-                                System.Console.Out.WriteLine("<- " + headerType(head) + " " + head.ToString());
+                                OtpTrace.TraceEvent("<- " + headerType(head) + " " + head.ToString());
                             }
                             
                             from = (Erlang.Pid) (head.elementAt(1));
@@ -695,17 +651,17 @@ namespace Otp
                             deliver(new OtpMsg(tag, from, to, reason));
                             break;
 
-                        case exitTTTag:
-                        case exit2TTTag:
+                        case OtpMsg.Tag.exitTTTag:
+                        case OtpMsg.Tag.exit2TTTag:
                             // { EXIT2, FromPid, ToPid, TraceToken, Reason }
                             // as above, but bifferent element number
                             if (!(head.elementAt(4) is Erlang.Atom))
                             {
                                 goto receive_loop_brk;
                             }
-                            if (traceLevel >= ctrlThreshold)
+                            if (traceLevel >= OtpTrace.Type.ctrlThreshold)
                             {
-                                System.Console.Out.WriteLine("<- " + headerType(head) + " " + head.ToString());
+                                OtpTrace.TraceEvent("<- " + headerType(head) + " " + head.ToString());
                             }
 
                             from = (Erlang.Pid) (head.elementAt(1));
@@ -715,12 +671,12 @@ namespace Otp
                             deliver(new OtpMsg(tag, from, to, reason));
                             break;
 
-                        case linkTag:
-                        case unlinkTag:
+                        case OtpMsg.Tag.linkTag:
+                        case OtpMsg.Tag.unlinkTag:
                             // { UNLINK, FromPid, ToPid}
-                            if (traceLevel >= ctrlThreshold)
+                            if (traceLevel >= OtpTrace.Type.ctrlThreshold)
                             {
-                                System.Console.Out.WriteLine("<- " + headerType(head) + " " + head.ToString());
+                                OtpTrace.TraceEvent("<- " + headerType(head) + " " + head.ToString());
                             }
                             
                             from = (Erlang.Pid) (head.elementAt(1));
@@ -730,18 +686,49 @@ namespace Otp
                             break;
 
                         // absolutely no idea what to do with these, so we ignore them...
-                        case groupLeaderTag:
-                        case nodeLinkTag:
+                        case OtpMsg.Tag.groupLeaderTag:
+                        case OtpMsg.Tag.nodeLinkTag:
                             // { NODELINK }
                             // (just show trace)
-                            if (traceLevel >= ctrlThreshold)
+                            if (traceLevel >= OtpTrace.Type.ctrlThreshold)
                             {
-                                System.Console.Out.WriteLine("<- " + headerType(head) + " " + head.ToString());
+                                OtpTrace.TraceEvent("<- " + headerType(head) + " " + head.ToString());
                             }
+                            break;
+
+                        case OtpMsg.Tag.monitorPTag:
+                            // {MONITOR_P, FromPid, ToProc, Ref}
+                        case OtpMsg.Tag.demonitorPTag:
+                            // {DEMONITOR_P, FromPid, ToProc, Ref}
+                            if (traceLevel >= OtpTrace.Type.ctrlThreshold)
+                            {
+                                OtpTrace.TraceEvent("<- " + headerType(head) + " " + head.ToString());
+                            }
+                            from = (Erlang.Pid)(head.elementAt(1));
+                            to = (Erlang.Pid)(head.elementAt(2));
+                            eref = (Erlang.Ref)(head.elementAt(3));
+                            deliver(new OtpMsg(tag, from, to, eref));
+                            break;
+
+                        case OtpMsg.Tag.monitorPexitTag:
+                            // {MONITOR_P_EXIT, FromPid, ToProc, Ref, Reason}
+                            if (traceLevel >= OtpTrace.Type.ctrlThreshold)
+                            {
+                                OtpTrace.TraceEvent("<- " + headerType(head) + " " + head.ToString());
+                            }
+                            from = (Erlang.Pid)(head.elementAt(1));
+                            to = (Erlang.Pid)(head.elementAt(2));
+                            eref = (Erlang.Ref)(head.elementAt(3));
+
+                            deliver(new OtpMsg(tag, from, to, eref, reason));
                             break;
 
                         default:
                             // garbage?
+                            if (traceLevel >= OtpTrace.Type.ctrlThreshold)
+                            {
+                                OtpTrace.TraceEvent("<- Unknown tag " + headerType(head) + " " + head.ToString());
+                            }
                             goto receive_loop_brk;
                     }
                 }
@@ -757,18 +744,19 @@ receive_loop_brk: ;
             {
                 deliver(e);
             }
-            catch (Erlang.DecodeException)
+            catch (Erlang.DecodeException e)
             {
-                deliver(new Erlang.Exit("Remote is sending garbage"));
+                OtpTrace.TraceEvent(e.ToString());
+                deliver(new Erlang.Exit("Remote is sending garbage: " + e.ToString()));
             }
-            catch (System.IO.IOException)
+            catch (System.Exception e)
             {
-                deliver(new Erlang.Exit("Remote has closed connection"));
+                deliver(new Erlang.Exit("Remote has closed connection: " + e.ToString()));
             }
             finally
             {
                 close();
-                System.Console.Out.WriteLine("exit connection "+System.Threading.Thread.CurrentThread.Name);
+                OtpTrace.TraceEvent("exit connection "+System.Threading.Thread.CurrentThread.Name);
             }
         }
 
@@ -785,15 +773,15 @@ receive_loop_brk: ;
                 {
                     if (socket != null)
                     {
-                        if (traceLevel >= ctrlThreshold)
+                        if (traceLevel >= OtpTrace.Type.ctrlThreshold)
                         {
-                            System.Console.Out.WriteLine("-> CLOSE");
+                            OtpTrace.TraceEvent("-> CLOSE");
                         }
                         socket.Close();
                         //thread.Interrupt();
                     }
                 }
-                catch (System.IO.IOException)
+                catch (System.Net.Sockets.SocketException)
                 {
                     /*ignore socket close errors */
                 }
@@ -821,7 +809,95 @@ receive_loop_brk: ;
         {
             return connected;
         }
-        
+
+        /*
+        * Send an RPC request to the remote Erlang node. This convenience
+        * function creates the following message and sends it to 'rex' on
+        * the remote node:
+        * 
+        * <pre>
+        * { self, { call, Mod, Fun, Args, user }}
+        * </pre>
+        *
+        * <p> Note that this method has unpredicatble results if the remote
+        * node is not an Erlang node. </p>
+        *
+        * @param mod the name of the Erlang module containing the function to be called.
+        * @param fun the name of the function to call.
+        * @param args a list of Erlang terms, to be used as arguments to the function.
+        *
+        * @exception C#.io.IOException if the connection is not active
+        * or a communication error occurs.
+        **/
+        public virtual void sendRPC(Erlang.Pid from, System.String mod, System.String fun, Erlang.List args)
+        {
+            Erlang.Object rpc = encodeRPC(from, mod, fun, args, new Erlang.Atom("user"));
+            sendBuf(from, "rex", new OtpOutputStream(rpc));
+        }
+
+        internal static Erlang.Tuple encodeRPC(
+            Erlang.Pid from, string mod, string fun, Erlang.List args, Erlang.Object gleader)
+        {
+            return encodeRPC(from, new Erlang.Atom(mod), new Erlang.Atom(fun), args, gleader);
+        }
+
+        internal static Erlang.Tuple encodeRPC(
+            Erlang.Pid from, Erlang.Atom mod, Erlang.Atom fun, Erlang.List args, Erlang.Object gleader)
+        {
+            /*{self, { call, Mod, Fun, Args, user}} */
+            return new Erlang.Tuple(
+                from,
+                new Erlang.Tuple(new Erlang.Atom("call"), mod, fun, args, gleader)
+            );
+        }
+
+        internal static Erlang.Object decodeRPC(Erlang.Object msg)
+        {
+            if (msg is Erlang.Tuple)
+            {
+                Erlang.Tuple t = (Erlang.Tuple)msg;
+                if (t.arity() == 2)
+                {
+                    Erlang.Atom rex = t[0] as Erlang.Atom;
+                    if (rex != null && rex.atomValue() == "rex")
+                        return t[1];
+                    // obs: second element
+                }
+            }
+            return null;
+        }
+
+        internal static string decodeIO(Erlang.Object msg)
+        {
+            if (msg is Erlang.Tuple)
+            {
+                Erlang.Tuple t = (Erlang.Tuple)msg;
+                if (t.arity() == 4)
+                {
+                    Erlang.Atom  ios = t[0] as Erlang.Atom;
+                    Erlang.Tuple data = t[3] as Erlang.Tuple;
+                    if (ios != null && ios.atomValue() == "io_request" && data != null)
+                    {
+                        if ((data[0] as Erlang.Atom).atomValue() == "put_chars")
+                        {
+                            if (data[1] is Erlang.String)
+                                return (data[1] as Erlang.String).stringValue();
+                            else if (data[1] is Erlang.Binary)
+                            {
+                                byte[] bin = (data[1] as Erlang.Binary).binaryValue();
+                                char[] s = new char[bin.Length];
+                                bin.CopyTo(s, 0);
+                                return new string(s);
+                            }
+                            else
+                                return data[1].ToString();
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
         // used by  send and send_reg (message types with payload)
         protected internal virtual void  do_send(OtpOutputStream header, OtpOutputStream payload)
         {
@@ -829,27 +905,32 @@ receive_loop_brk: ;
             {
                 try
                 {
-                    if (traceLevel >= sendThreshold)
+                    if (traceLevel >= OtpTrace.Type.sendThreshold)
                     {
                         // Need to decode header and output buffer to show trace message!
                         // First make OtpInputStream, then decode.
                         try
                         {
                             Erlang.Object h = (header.getOtpInputStream(5)).read_any();
-                            System.Console.Out.WriteLine("-> " + headerType(h) + " " + h.ToString());
+                            OtpTrace.TraceEvent("-> " + headerType(h) + " " + h.ToString());
                             
                             Erlang.Object o = (payload.getOtpInputStream(0)).read_any();
-                            System.Console.Out.WriteLine("   " + o.ToString());
+                            OtpTrace.TraceEvent("   " + o.ToString());
                             o = null;
                         }
                         catch (Erlang.DecodeException e)
                         {
-                            System.Console.Out.WriteLine("   " + "can't decode output buffer:" + e);
+                            OtpTrace.TraceEvent("   " + "can't decode output buffer:" + e);
                         }
                     }
                     
                     header.writeTo((System.IO.Stream) socket.GetStream());
                     payload.writeTo((System.IO.Stream) socket.GetStream());
+                }
+                catch (System.Net.Sockets.SocketException e)
+                {
+                    close();
+                    throw e;
                 }
                 catch (System.IO.IOException e)
                 {
@@ -866,19 +947,24 @@ receive_loop_brk: ;
             {
                 try
                 {
-                    if (traceLevel >= ctrlThreshold)
+                    if (traceLevel >= OtpTrace.Type.ctrlThreshold)
                     {
                         try
                         {
                             Erlang.Object h = (header.getOtpInputStream(5)).read_any();
-                            System.Console.Out.WriteLine("-> " + headerType(h) + " " + h);
+                            OtpTrace.TraceEvent("-> " + headerType(h) + " " + h);
                         }
                         catch (Erlang.DecodeException e)
                         {
-                            System.Console.Out.WriteLine("   " + "can't decode output buffer: " + e);
+                            OtpTrace.TraceEvent("   " + "can't decode output buffer: " + e);
                         }
                     }
                     header.writeTo((System.IO.Stream) socket.GetStream());
+                }
+                catch (System.Net.Sockets.SocketException e)
+                {
+                    close();
+                    throw e;
                 }
                 catch (System.IO.IOException e)
                 {
@@ -890,50 +976,59 @@ receive_loop_brk: ;
 
         protected internal virtual System.String headerType(Erlang.Object h)
         {
-            int tag = - 1;
+            OtpMsg.Tag tag = OtpMsg.Tag.undefined;
 
             if (h is Erlang.Tuple)
             {
-                tag = (int) (((Erlang.Long) (((Erlang.Tuple) h).elementAt(0))).longValue());
+                tag = (OtpMsg.Tag) (((Erlang.Long) (((Erlang.Tuple) h).elementAt(0))).longValue());
             }
 
             switch (tag)
             {
-                case linkTag:
+                case OtpMsg.Tag.linkTag:
                     return "LINK";
 
-                case sendTag:
+                case OtpMsg.Tag.sendTag:
                     return "SEND";
 
-                case exitTag:
+                case OtpMsg.Tag.exitTag:
                     return "EXIT";
 
-                case unlinkTag:
+                case OtpMsg.Tag.unlinkTag:
                     return "UNLINK";
 
-                case nodeLinkTag:
+                case OtpMsg.Tag.nodeLinkTag:
                     return "NODELINK";
 
-                case regSendTag:
+                case OtpMsg.Tag.regSendTag:
                     return "REG_SEND";
 
-                case groupLeaderTag:
+                case OtpMsg.Tag.groupLeaderTag:
                     return "GROUP_LEADER";
 
-                case exit2Tag:
+                case OtpMsg.Tag.exit2Tag:
                     return "EXIT2";
 
-                case sendTTTag:
+                case OtpMsg.Tag.sendTTTag:
                     return "SEND_TT";
 
-                case exitTTTag:
+                case OtpMsg.Tag.exitTTTag:
                     return "EXIT_TT";
 
-                case regSendTTTag:
+                case OtpMsg.Tag.regSendTTTag:
                     return "REG_SEND_TT";
 
-                case exit2TTTag:
+                case OtpMsg.Tag.exit2TTTag:
                     return "EXIT2_TT";
+
+                case OtpMsg.Tag.monitorPTag:
+                    return "MONITOR_P";
+
+                case OtpMsg.Tag.demonitorPTag:
+                    return "DEMONITOR_P";
+
+                case OtpMsg.Tag.monitorPexitTag:
+                    return "MONITOR_P_EXIT";
             }
             return "(unknown type)";
         }
@@ -946,22 +1041,26 @@ receive_loop_brk: ;
             int i;
             System.IO.Stream is_Renamed = null;
             
-            lock(this)
+            lock (this)
             {
                 if (s == null)
                 {
                     throw new System.IO.IOException("expected " + len + " bytes, socket was closed");
                 }
-                is_Renamed = (System.IO.Stream) s.GetStream();
+                is_Renamed = (System.IO.Stream)s.GetStream();
             }
-            
-            while (got < len)
+
+            while (got < len && is_Renamed.CanRead)
             {
                 i = is_Renamed.Read(b, got, len - got);
-                
+
                 if (i < 0)
                 {
-                    throw new System.IO.IOException("expected " + len + " bytes, got EOF after " + got + " bytes");
+                    throw new System.IO.IOException("Expected " + len + " bytes, got EOF after " + got + " bytes");
+                }
+                else if (i == 0)
+                {
+                    throw new System.IO.IOException("Remote connection closed");
                 }
                 else
                     got += i;
@@ -983,10 +1082,10 @@ receive_loop_brk: ;
                 cookieOk = true;
                 sendCookie = false;
             }
-            catch (System.IO.IOException ie)
+            catch (System.Net.Sockets.SocketException ie)
             {
                 close();
-                throw ie;
+                throw new System.IO.IOException(ie.ToString());
             }
             catch (OtpAuthException ae)
             {
@@ -999,8 +1098,8 @@ receive_loop_brk: ;
                 close();
                 throw new System.IO.IOException("Error accepting connection from " + nn);
             }
-            if (traceLevel >= handshakeThreshold)
-                System.Console.Out.WriteLine("<- MD5 ACCEPTED " + peer.host());
+            if (traceLevel >= OtpTrace.Type.handshakeThreshold)
+                OtpTrace.TraceEvent("<- MD5 ACCEPTED " + peer.host());
         }
         
         protected internal virtual void  doConnect(int port)
@@ -1012,8 +1111,8 @@ receive_loop_brk: ;
                 
                 Debug.WriteLine("-> MD5 CONNECT TO " + peer.host() + ": " + port);
                 
-                if (traceLevel >= handshakeThreshold)
-                    System.Console.Out.WriteLine("-> MD5 CONNECT TO " + peer.host() + ":" + port);
+                if (traceLevel >= OtpTrace.Type.handshakeThreshold)
+                    OtpTrace.TraceEvent("-> MD5 CONNECT TO " + peer.host() + ":" + port);
                 sendName(peer.distChoose, self.flags);
                 recvStatus();
                 int her_challenge = recvChallenge();
@@ -1029,11 +1128,11 @@ receive_loop_brk: ;
                 close();
                 throw ae;
             }
-            //catch (System.Exception)
-            //{
-            //    close();
-            //    throw new System.IO.IOException("Cannot connect to peer node");
-            //}
+            catch (System.Net.Sockets.SocketException e)
+            {
+                close();
+                throw new System.IO.IOException("Cannot connect to peer node: " + e.ToString());
+            }
         }
         
         // This is nooo good as a challenge,
@@ -1128,9 +1227,9 @@ receive_loop_brk: ;
             
             obuf.writeTo((System.IO.Stream) socket.GetStream());
             
-            if (traceLevel >= handshakeThreshold)
+            if (traceLevel >= OtpTrace.Type.handshakeThreshold)
             {
-                System.Console.Out.WriteLine("-> " + "HANDSHAKE sendName" + " flags=" + flags + " dist=" + dist + " local=" + self);
+                OtpTrace.TraceEvent("-> " + "HANDSHAKE sendName" + " flags=" + flags + " dist=" + dist + " local=" + self);
             }
         }
         
@@ -1160,9 +1259,9 @@ receive_loop_brk: ;
             
             obuf.writeTo((System.IO.Stream) socket.GetStream());
             
-            if (traceLevel >= handshakeThreshold)
+            if (traceLevel >= OtpTrace.Type.handshakeThreshold)
             {
-                System.Console.Out.WriteLine("-> " + "HANDSHAKE sendChallenge" + " flags=" + flags + " dist=" + dist + " challenge=" + challenge + " local=" + self);
+                OtpTrace.TraceEvent("-> " + "HANDSHAKE sendChallenge" + " flags=" + flags + " dist=" + dist + " challenge=" + challenge + " local=" + self);
             }
         }
         
@@ -1227,9 +1326,6 @@ receive_loop_brk: ;
                 {
                     throw new System.IO.IOException("Handshake failed - peer cannot handle extended pids and ports");
                 }
-
-
-
             }
             catch (Erlang.DecodeException)
             {
@@ -1242,10 +1338,9 @@ receive_loop_brk: ;
             peer._alive = hisname.Substring(0, (i) - (0));
             peer._host = hisname.Substring(i + 1, (hisname.Length) - (i + 1));
             
-            
-            if (traceLevel >= handshakeThreshold)
+            if (traceLevel >= OtpTrace.Type.handshakeThreshold)
             {
-                System.Console.Out.WriteLine("<- " + "HANDSHAKE" + " ntype=" + peer.ntype + " dist=" + peer._distHigh + " remote=" + peer);
+                OtpTrace.TraceEvent("<- " + "HANDSHAKE" + " ntype=" + peer.ntype + " dist=" + peer._distHigh + " remote=" + peer);
             }
         }
         
@@ -1282,9 +1377,9 @@ receive_loop_brk: ;
                 throw new System.IO.IOException("Handshake failed - not enough data");
             }
             
-            if (traceLevel >= handshakeThreshold)
+            if (traceLevel >= OtpTrace.Type.handshakeThreshold)
             {
-                System.Console.Out.WriteLine("<- " + "HANDSHAKE recvChallenge" + " from=" + peer._node + " challenge=" + challenge + " local=" + self);
+                OtpTrace.TraceEvent("<- " + "HANDSHAKE recvChallenge" + " from=" + peer._node + " challenge=" + challenge + " local=" + self);
             }
             
             return challenge;
@@ -1300,9 +1395,9 @@ receive_loop_brk: ;
             obuf.write(digest);
             obuf.writeTo((System.IO.Stream) socket.GetStream());
             
-            if (traceLevel >= handshakeThreshold)
+            if (traceLevel >= OtpTrace.Type.handshakeThreshold)
             {
-                System.Console.Out.WriteLine("-> " + "HANDSHAKE sendChallengeReply" + " challenge=" + challenge + " digest=" + hex(digest) + " local=" + self);
+                OtpTrace.TraceEvent("-> " + "HANDSHAKE sendChallengeReply" + " challenge=" + challenge + " digest=" + hex(digest) + " local=" + self);
             }
         }
         
@@ -1344,9 +1439,9 @@ receive_loop_brk: ;
                 throw new System.IO.IOException("Handshake failed - not enough data");
             }
             
-            if (traceLevel >= handshakeThreshold)
+            if (traceLevel >= OtpTrace.Type.handshakeThreshold)
             {
-                System.Console.Out.WriteLine("<- " + "HANDSHAKE recvChallengeReply" + " from=" + peer._node + " challenge=" + challenge + " digest=" + hex(her_digest) + " local=" + self);
+                OtpTrace.TraceEvent("<- " + "HANDSHAKE recvChallengeReply" + " from=" + peer._node + " challenge=" + challenge + " digest=" + hex(her_digest) + " local=" + self);
             }
             
             return challenge;
@@ -1362,9 +1457,9 @@ receive_loop_brk: ;
             
             obuf.writeTo((System.IO.Stream) socket.GetStream());
             
-            if (traceLevel >= handshakeThreshold)
+            if (traceLevel >= OtpTrace.Type.handshakeThreshold)
             {
-                System.Console.Out.WriteLine("-> " + "HANDSHAKE sendChallengeAck" + " digest=" + hex(digest) + " local=" + self);
+                OtpTrace.TraceEvent("-> " + "HANDSHAKE sendChallengeAck" + " digest=" + hex(digest) + " local=" + self);
             }
         }
         
@@ -1397,9 +1492,9 @@ receive_loop_brk: ;
                 throw new OtpAuthException("Peer authentication error.");
             }
             
-            if (traceLevel >= handshakeThreshold)
+            if (traceLevel >= OtpTrace.Type.handshakeThreshold)
             {
-                System.Console.Out.WriteLine("<- " + "HANDSHAKE recvChallengeAck" + " from=" + peer._node + " digest=" + hex(her_digest) + " local=" + self);
+                OtpTrace.TraceEvent("<- " + "HANDSHAKE recvChallengeAck" + " from=" + peer._node + " digest=" + hex(her_digest) + " local=" + self);
             }
         }
         
@@ -1425,15 +1520,15 @@ receive_loop_brk: ;
             
             obuf.writeTo((System.IO.Stream) socket.GetStream());
             
-            if (traceLevel >= handshakeThreshold)
+            if (traceLevel >= OtpTrace.Type.handshakeThreshold)
             {
-                System.Console.Out.WriteLine("-> " + "HANDSHAKE sendStatus" + " status=" + status + " local=" + self);
+                OtpTrace.TraceEvent("-> " + "HANDSHAKE sendStatus" + " status=" + status + " local=" + self);
             }
         }
         
         protected internal virtual void  recvStatus()
         {
-            
+
             try
             {
                 byte[] buf = read2BytePackage();
@@ -1449,7 +1544,7 @@ receive_loop_brk: ;
                 tmpChar = new char[tmpbuf.Length];
                 tmpbuf.CopyTo(tmpChar, 0);
                 System.String status = new System.String(tmpChar);
-                
+
                 if (status.CompareTo("ok") != 0)
                 {
                     throw new System.IO.IOException("Peer replied with status '" + status + "' instead of 'ok'");
@@ -1459,9 +1554,14 @@ receive_loop_brk: ;
             {
                 throw new System.IO.IOException("Handshake failed - not enough data");
             }
-            if (traceLevel >= handshakeThreshold)
+            catch (System.Net.Sockets.SocketException e)
             {
-                System.Console.Out.WriteLine("<- " + "HANDSHAKE recvStatus (ok)" + " local=" + self);
+                throw new System.IO.IOException("Peer dropped connection: " + e.ToString());
+            }
+
+            if (traceLevel >= OtpTrace.Type.handshakeThreshold)
+            {
+                OtpTrace.TraceEvent("<- " + "HANDSHAKE recvStatus (ok)" + " local=" + self);
             }
         }
 

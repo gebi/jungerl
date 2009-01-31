@@ -1,0 +1,346 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ClassDiagram MajorVersion="1" MinorVersion="1">
+  <Font Name="Tahoma" Size="9.75" />
+  <Class Name="Otp.AbstractConnection" Collapsed="true">
+    <Position X="1.75" Y="10.5" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>AbstractConnection.cs</FileName>
+      <HashCode>KEkAASFAQKMAAUEABEgIcAoABgQEAQEIIYUAEAgIQIU=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.AbstractNode" Collapsed="true">
+    <Position X="11" Y="9.5" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>AbstractNode.cs</FileName>
+      <HashCode>kQoBIBBAEABCAArEAEAAEAABAUBJAEBAgA4ABCCACAQ=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.GenericQueue" Collapsed="true">
+    <Position X="37.75" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>GenericQueue.cs</FileName>
+      <HashCode>AAQACAAAgAAAAAAABCAFQAAAAAAAAAIAAIgAAAAEAgA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Link" Collapsed="true">
+    <Position X="39.5" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Link.cs</FileName>
+      <HashCode>AhAAABAAAACAAAAAAAAAAAAEAAAAAAAAQAAAAAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Links" Collapsed="true">
+    <Position X="41.25" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Links.cs</FileName>
+      <HashCode>AAAgAAAAAAAAABAABAAAAAAAAAAIAAAECQCAAEAAIAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.OtpAuthException" Collapsed="true">
+    <Position X="7.5" Y="8" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>OtpAuthException.cs</FileName>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.OtpConnection">
+    <Position X="2.75" Y="11.75" Width="1.75" />
+    <TypeIdentifier>
+      <FileName>OtpConnection.cs</FileName>
+      <HashCode>AAgAAAAAAAEQQAEABABAAEAAAAAAAAAAIAAAECAABEc=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.OtpCookedConnection">
+    <Position X="0.5" Y="11.75" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>OtpCookedConnection.cs</FileName>
+      <HashCode>AAAAAAAAAAMAQAEAAAAAAAAEAAAIAAAAAIAAgCAABEA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.OtpEpmd" Collapsed="true">
+    <Position X="36" Y="1.5" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>OtpEpmd.cs</FileName>
+      <HashCode>EJAAAEAAEAAAAAIBAAQAAAEAMqAAAEAAAAAgACAAAAg=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.OtpException" Collapsed="true">
+    <Position X="4" Y="6.5" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>OtpException.cs</FileName>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.OtpExternal" Collapsed="true">
+    <Position X="37.75" Y="1.5" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>OtpExternal.cs</FileName>
+      <HashCode>AAAAAEhCAACBAAAQAgAABAAACAkAAHAAAAAAAAQAAIg=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.OtpInputStream" Collapsed="true">
+    <Position X="39.5" Y="1.5" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>OtpInputStream.cs</FileName>
+      <HashCode>GgAAiISACgAAQAEBIAAAIAAAgAAKABQMIAAAAgKBAwg=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.OtpLocalNode">
+    <Position X="13" Y="10.75" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>OtpLocalNode.cs</FileName>
+      <HashCode>AEAAAAggAAAAQAgAAAAAEAABEAAAIAoAgCIAABACIoA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.OtpMbox">
+    <Position X="17" Y="10.75" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>OtpMbox.cs</FileName>
+      <HashCode>AAAAAAAAAAEQQAEAgABAAABEAAAMBIAEIIAEECkABEU=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.OtpMsg" Collapsed="true">
+    <Position X="36" Y="2.5" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>OtpMsg.cs</FileName>
+      <HashCode>AAAAACIACAAAQDAAABAAAggAAAABAAAAAAAAAEBAACA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.OtpNode">
+    <Position X="10.5" Y="12.25" Width="2" />
+    <TypeIdentifier>
+      <FileName>OtpNode.cs</FileName>
+      <HashCode>QABAAAAAACUAAIAAAACBQABBAAAARBIAIIAABAgBAAA=</HashCode>
+    </TypeIdentifier>
+    <NestedTypes>
+      <Class Name="Otp.OtpNode.Mailboxes" Collapsed="true">
+        <TypeIdentifier>
+          <NewMemberFileName>OtpNode.cs</NewMemberFileName>
+        </TypeIdentifier>
+      </Class>
+      <Class Name="Otp.OtpNode.Acceptor" Collapsed="true">
+        <TypeIdentifier>
+          <NewMemberFileName>OtpNode.cs</NewMemberFileName>
+        </TypeIdentifier>
+      </Class>
+    </NestedTypes>
+  </Class>
+  <Class Name="Otp.OtpNodeStatus" Collapsed="true">
+    <Position X="37.75" Y="2.5" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>OtpNodeStatus.cs</FileName>
+      <HashCode>AEAAAAAgAAAAAAQAAAAAAAABEAAAAEAAAAAAAAAAAgA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.OtpOutputStream" Collapsed="true">
+    <Position X="39.5" Y="2.5" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>OtpOutputStream.cs</FileName>
+      <HashCode>AAAAAAgGKgioegAABIAAAQAIAAAIYAAABSCAIYYIABQ=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.OtpPeer">
+    <Position X="8.75" Y="10.75" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>OtpPeer.cs</FileName>
+      <HashCode>AAAAAAAAAAAAAAAAgAAAAAIAAAAAAAgAAAAAAAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.OtpSelf">
+    <Position X="15" Y="12.25" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>OtpSelf.cs</FileName>
+      <HashCode>AIAAAACAEAAAAAIAgAAAAAAAAAAAgAAAAAAAAAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.OtpSystem" Collapsed="true">
+    <Position X="41.25" Y="2.5" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>OtpSystem.cs</FileName>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAABAAgAAAAAAAAAAAAAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Test" Collapsed="true">
+    <Position X="37.75" Y="3.5" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Test.cs</FileName>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Erlang.Atom" Collapsed="true">
+    <Position X="8.75" Y="3.25" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\Atom.cs</FileName>
+      <HashCode>AAAAAEACAAAAgABEhgAACAAAAAAAAoAAACACAAIAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Erlang.Binary" Collapsed="true">
+    <Position X="13.25" Y="3.25" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\Binary.cs</FileName>
+      <HashCode>AIAAAEAAAAAIAAAEgKAAAAAAAAAAAIAAAAAAEIAAAAg=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Erlang.Boolean" Collapsed="true">
+    <Position X="8.75" Y="4.75" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\Boolean.cs</FileName>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Erlang.Byte" Collapsed="true">
+    <Position X="26.75" Y="4.75" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\Byte.cs</FileName>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Erlang.Char" Collapsed="true">
+    <Position X="31.25" Y="4.75" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\Char.cs</FileName>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Erlang.DecodeException" Collapsed="true">
+    <Position X="0.75" Y="9.5" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\DecodeException.cs</FileName>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Erlang.Double" Collapsed="true">
+    <Position X="4.25" Y="3.25" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\Double.cs</FileName>
+      <HashCode>AAAAAEAAAAAAAAAEgAAAAAAAAAAAAIAEAABAACAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Erlang.ErlangException" Collapsed="true">
+    <Position X="3" Y="8" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\ErlangException.cs</FileName>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Erlang.Exit" Collapsed="true">
+    <Position X="3" Y="9.5" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\Exit.cs</FileName>
+      <HashCode>AgAAAAAAAgAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Erlang.Int" Collapsed="true">
+    <Position X="24.5" Y="4.75" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\Int.cs</FileName>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Erlang.List" Collapsed="true">
+    <Position X="17.75" Y="3.25" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\List.cs</FileName>
+      <HashCode>AAAAAEAAAAAAABAEiABAAABAAgQAAIAAAAAAEAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Erlang.Long" Collapsed="true">
+    <Position X="25.5" Y="3.25" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\Long.cs</FileName>
+      <HashCode>AAAAAMAAAgAQAgAEgAAABAAAAAAAAIAAACAAAAAAAEA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Erlang.Object" Collapsed="true">
+    <Position X="17.75" Y="1.75" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\Object.cs</FileName>
+      <HashCode>AAAAAEAAAAAAAAAAAAAAAAAAAAAAAABAAAAAEAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Erlang.Pid" Collapsed="true">
+    <Position X="6.5" Y="3.25" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\Pid.cs</FileName>
+      <HashCode>AQoAAFAAAAAAAAAEgABAEAAAAEAAAICAAAAAAAAAAgA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Erlang.Port" Collapsed="true">
+    <Position X="11" Y="3.25" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\Port.cs</FileName>
+      <HashCode>AQIAAFAAAAAAAAAEgABAAAAAAEAAAIAAAAAAAAAAAgA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Erlang.RangeException" Collapsed="true">
+    <Position X="5.25" Y="9.5" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\RangeException.cs</FileName>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Erlang.Ref" Collapsed="true">
+    <Position X="15.5" Y="3.25" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\Ref.cs</FileName>
+      <HashCode>AQIAAFAAAAAAAAAEgAAAAAAAAEAAAIAAIIAAEAAAAgA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Erlang.Short" Collapsed="true">
+    <Position X="29" Y="4.75" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\Short.cs</FileName>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Erlang.String" Collapsed="true">
+    <Position X="33.5" Y="3.25" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\String.cs</FileName>
+      <HashCode>AAAAAEAAAAAAAAAkgAAAAAAAAAAAAKAAAAAAAAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Erlang.Tuple" Collapsed="true">
+    <Position X="2" Y="3.25" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\Tuple.cs</FileName>
+      <HashCode>AAAAAEAAAAAAABAEiABAAAAAAgQAAIAAAAAAEAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Erlang.UInt" Collapsed="true">
+    <Position X="20" Y="4.75" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\UInt.cs</FileName>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Otp.Erlang.UShort" Collapsed="true">
+    <Position X="22.25" Y="4.75" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\UShort.cs</FileName>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="BigInteger" Collapsed="true">
+    <Position X="36" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\BigInteger.cs</FileName>
+      <HashCode>EAECMIEkgAHQAgAE4AWLp4iCAkIAAJICYgwSAAAAJyA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="SupportClass" Collapsed="true">
+    <Position X="36" Y="3.5" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>SupportClass.cs</FileName>
+      <HashCode>AAAAQAAAAAAAAAAAAAAAAAAAACBAAAAAAAAAAAAAEAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Amir_Harel.Cloning.BaseObject" Collapsed="true">
+    <Position X="17.75" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <FileName>Erlang\CloneObject.cs</FileName>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABA=</HashCode>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" />
+  </Class>
+</ClassDiagram>

@@ -132,37 +132,60 @@ namespace Otp
 		{
 			return queue.getCount();
 		}
-		
-		/*
-		* Receive a message from a remote process. This method blocks
-		* until a valid message is received or an exception is raised.
-		*
-		* <p> If the remote node sends a message that cannot be decoded
-		* properly, the connection is closed and the method throws an
-		* exception.
-		*
-		* @return an object containing a single Erlang term.
-		*
-		* @exception C#.io.IOException if the connection is not active or
-		* a communication error occurs.
-		*
-		* @exception Erlang.Exit if an exit signal is
-		* received from a process on the peer node.
-		*
-		* @exception OtpAuthException if the remote node
-		* sends a message containing an invalid cookie.
-		**/
+
+        /*
+        * Receive an RPC reply from the remote Erlang node. This
+        * convenience function receives a message from the remote node, and
+        * expects it to have the following format:
+        * 
+        * <pre>
+        * {rex, Term}
+        * </pre>
+        *
+        * @return the second element of the tuple if the received message
+        * is a two-tuple, otherwise null. No further error checking is
+        * performed.
+        *
+        * @exception C#.io.IOException if the connection is not active or
+        * a communication error occurs.
+        *
+        * @exception Erlang.Exit if an exit signal is
+        * received from a process on the peer node.
+        *
+        * @exception OtpAuthException if the remote node
+        * sends a message containing an invalid cookie.
+        **/
+        public virtual Erlang.Object receiveRPC()
+        {
+
+            Erlang.Object msg = receive();
+            Debug.WriteLine("receiveRPC: " + msg.ToString());
+
+            return AbstractConnection.decodeRPC(msg);
+        }
+
+        /*
+        * Receive a message from a remote process. This method blocks
+        * until a valid message is received or an exception is raised.
+        *
+        * <p> If the remote node sends a message that cannot be decoded
+        * properly, the connection is closed and the method throws an
+        * exception.
+        *
+        * @return an object containing a single Erlang term.
+        *
+        * @exception C#.io.IOException if the connection is not active or
+        * a communication error occurs.
+        *
+        * @exception Erlang.Exit if an exit signal is
+        * received from a process on the peer node.
+        *
+        * @exception OtpAuthException if the remote node
+        * sends a message containing an invalid cookie.
+        **/
 		public virtual Erlang.Object receive()
 		{
-			try
-			{
-				return receiveMsg().getMsg();
-			}
-			catch (Erlang.DecodeException e)
-			{
-				close();
-				throw new System.IO.IOException(e.Message);
-			}
+            return receive(-1);
 		}
 		
 		/*
@@ -195,7 +218,8 @@ namespace Otp
 		{
 			try
 			{
-				return receiveMsg(timeout).getMsg();
+				OtpMsg msg = receiveMsg(timeout);
+                return msg == null ? null : msg.getMsg();
 			}
 			catch (Erlang.DecodeException e)
 			{
@@ -227,7 +251,7 @@ namespace Otp
 		**/
 		public virtual OtpInputStream receiveBuf()
 		{
-			return receiveMsg().getMsgBuf();
+			return receiveBuf(-1);
 		}
 		
 		
@@ -260,8 +284,9 @@ namespace Otp
 		**/
 		public virtual OtpInputStream receiveBuf(long timeout)
 		{
-			return receiveMsg(timeout).getMsgBuf();
-		}
+            OtpMsg str = receiveMsg(timeout);
+            return str != null ? str.getMsgBuf() : null;
+        }
 		
 		/*
 		* Receive a messge complete with sender and recipient information.
@@ -282,27 +307,8 @@ namespace Otp
 		**/
 		public virtual OtpMsg receiveMsg()
 		{
-			System.Object o = queue.get();
-			
-			if (o is OtpMsg)
-			{
-				return ((OtpMsg) o);
-			}
-			else if (o is System.IO.IOException)
-			{
-				throw (System.IO.IOException) o;
-			}
-			else if (o is Erlang.Exit)
-			{
-				throw (Erlang.Exit) o;
-			}
-			else if (o is OtpAuthException)
-			{
-				throw (OtpAuthException) o;
-			}
-			
-			return null;
-		}
+            return receiveMsg(-1);
+        }
 		
 		
 		/*
@@ -331,7 +337,7 @@ namespace Otp
 		**/
 		public virtual OtpMsg receiveMsg(long timeout)
 		{
-			System.Object o = queue.get(timeout);
+            System.Object o = timeout == -1 ? queue.get() : queue.get(timeout);
 			
 			if (o is OtpMsg)
 			{
@@ -438,87 +444,12 @@ namespace Otp
 		{
 			sendRPC(mod, fun, new Erlang.List(args));
 		}
-		
-		
-		/*
-		* Send an RPC request to the remote Erlang node. This convenience
-		* function creates the following message and sends it to 'rex' on
-		* the remote node:
-		* 
-		* <pre>
-		* { self, { call, Mod, Fun, Args, user }}
-		* </pre>
-		*
-		* <p> Note that this method has unpredicatble results if the remote
-		* node is not an Erlang node. </p>
-		*
-		* @param mod the name of the Erlang module containing the function to be called.
-		* @param fun the name of the function to call.
-		* @param args a list of Erlang terms, to be used as arguments to the function.
-		*
-		* @exception C#.io.IOException if the connection is not active
-		* or a communication error occurs.
-		**/
-		public virtual void  sendRPC(System.String mod, System.String fun, Erlang.List args)
-		{
-			Erlang.Object[] rpc = new Erlang.Object[2];
-			Erlang.Object[] call = new Erlang.Object[5];
-			
-			/*{self, { call, Mod, Fun, Args, user}} */
-			
-			call[0] = new Erlang.Atom("call");
-			call[1] = new Erlang.Atom(mod);
-			call[2] = new Erlang.Atom(fun);
-			call[3] = args;
-			call[4] = new Erlang.Atom("user");
-			
-			rpc[0] = this._self.pid();
-			rpc[1] = new Erlang.Tuple(call);
-			
-			send("rex", new Erlang.Tuple(rpc));
-		}
-		
-		
-		/*
-		* Receive an RPC reply from the remote Erlang node. This
-		* convenience function receives a message from the remote node, and
-		* expects it to have the following format:
-		* 
-		* <pre>
-		* {rex, Term}
-		* </pre>
-		*
-		* @return the second element of the tuple if the received message
-		* is a two-tuple, otherwise null. No further error checking is
-		* performed.
-		*
-		* @exception C#.io.IOException if the connection is not active or
-		* a communication error occurs.
-		*
-		* @exception Erlang.Exit if an exit signal is
-		* received from a process on the peer node.
-		*
-		* @exception OtpAuthException if the remote node
-		* sends a message containing an invalid cookie.
-		**/
-		public virtual Erlang.Object receiveRPC()
-		{
-			
-			Erlang.Object msg = receive();
-            Debug.WriteLine("receiveRPC: " + msg.ToString());
 
-			if (msg is Erlang.Tuple)
-			{
-				Erlang.Tuple t = (Erlang.Tuple) msg;
-				if (t.arity() == 2)
-					return t.elementAt(1);
-				// obs: second element
-			}
-			
-			return null;
-		}
-		
-		
+        public virtual void sendRPC(System.String mod, System.String fun, Erlang.List args)
+        {
+            sendRPC(_self.pid(), mod, fun, args);
+        }
+
 		/*
 		* Create a link between the local node and the specified process on
 		* the remote node. If the link is still active when the remote

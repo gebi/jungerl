@@ -17,76 +17,119 @@
 */
 namespace Otp
 {
-	/*
-	* <p> Provides a callback mechanism for receiving status change
-	* information about other nodes in the system. Register an instance
-	* of this class (or a subclass) with your {@link OtpNode OtpNode}
-	* when you wish to be notified about such status changes and other
-	* similar events.</p>
-	*
-	* <p> This class provides default handers that ignore all events.
-	* Applications are expected to extend this class in order to act on
-	* events that are deemed interesting. </p>
-	*
-	* <p> <b> Note that this class is likely to change in the near future
-	* </b></p>
-	**/
-	using System;
-	public class OtpNodeStatus
-	{
-		public OtpNodeStatus()
-		{
-		}
-		
-		/*
-		* Notify about remote node status changes.
-		*
-		* @param node the node whose status change is being indicated by
-		* this call.
-		*
-		* @param up true if the node has come up, false if it has gone
-		* down.
-		*
-		* @param info additional info that may be available, for example an
-		* exception that was raised causing the event in question (may be
-		* null).
-		*
-		**/
-		public virtual void  remoteStatus(System.String node, bool up, System.Object info)
-		{
-		}
-		
-		/*
-		* Notify about local node exceptions.
-		*
-		* @param node the node whose status change is being indicated by
-		* this call.
-		*
-		* @param up true if the node has come up, false if it has gone
-		* down.
-		*
-		* @param info additional info that may be available, for example an
-		* exception that was raised causing the event in question (may be
-		* null).
-		**/
-		public virtual void  localStatus(System.String node, bool up, System.Object info)
-		{
-		}
-		
-		/*
-		* Notify about failed connection attempts.
-		*
-		* @param node The name of the remote node
-		*
-		* @param incoming The direction of the connection attempt, i.e.
-		* true for incoming, false for outgoing.
-		*
-		* @param info additional info that may be available, for example an
-		* exception that was raised causing the event in question (may be
-		* null).
-		**/
-		public virtual void  connAttempt(System.String node, bool incoming, System.Object info)
-		{
-		}
-	}
+    using System;
+    /*
+    * <p> Provides a callback mechanism for receiving status change
+    * information about other nodes in the system. Register an instance
+    * of this class (or a subclass) with your {@link OtpNode OtpNode}
+    * when you wish to be notified about such status changes and other
+    * similar events.</p>
+    *
+    * <p> This class provides default handers that ignore all events.
+    * Applications are expected to resiter a delagate that would
+    * react on node status change events that are deemed interesting.</p>
+    *
+    * <p> <b> Note that this class is likely to change in the near future
+    * </b></p>
+    **/
+
+    public class OtpNodeStatus
+    {
+        public OtpNodeStatus()
+        {
+        }
+
+        public enum EventCategory { Local, Remote, ConnectionAttempt, Epmd };
+        public enum EventType { Down, Up, Incoming, Outgoing };
+
+        public delegate void ConnectionStatusDelegate(
+            System.String node, EventCategory type, EventType ev, System.Object info);
+
+        private ConnectionStatusDelegate onConnStatus;
+
+        public void registerStatusHandler(ConnectionStatusDelegate callback)
+        {
+            onConnStatus += callback;
+        }
+
+        public void unregisterStatusHandler(ConnectionStatusDelegate callback)
+        {
+            if (onConnStatus != null)
+                onConnStatus -= callback;
+        }
+
+        /*
+        * Notify about remote node status changes.
+        *
+        * @param node the node whose status change is being indicated by
+        * this call.
+        *
+        * @param up true if the node has come up, false if it has gone
+        * down.
+        *
+        * @param info additional info that may be available, for example an
+        * exception that was raised causing the event in question (may be
+        * null).
+        *
+        **/
+
+        public virtual void remoteStatus(System.String node, bool up, System.Object info)
+        {
+            if (onConnStatus != null)
+                onConnStatus(node, EventCategory.Remote, up ? EventType.Up : EventType.Down, info);
+        }
+
+        /*
+        * Notify about local node exceptions.
+        *
+        * @param node the node whose status change is being indicated by
+        * this call.
+        *
+        * @param up true if the node has come up, false if it has gone
+        * down.
+        *
+        * @param info additional info that may be available, for example an
+        * exception that was raised causing the event in question (may be
+        * null).
+        **/
+        public virtual void localStatus(System.String node, bool up, System.Object info)
+        {
+            if (onConnStatus != null)
+                onConnStatus(node, EventCategory.Local, up ? EventType.Up : EventType.Down, info);
+        }
+
+        /*
+        * Notify about failed connection attempts.
+        *
+        * @param node The name of the remote node
+        *
+        * @param incoming The direction of the connection attempt, i.e.
+        * true for incoming, false for outgoing.
+        *
+        * @param info additional info that may be available, for example an
+        * exception that was raised causing the event in question (may be
+        * null).
+        **/
+        public virtual void connAttempt(System.String node, bool incoming, System.Object info)
+        {
+            if (onConnStatus != null)
+                onConnStatus(node, EventCategory.ConnectionAttempt,
+                    incoming ? EventType.Incoming : EventType.Outgoing, info);
+        }
+
+        /*
+        * Notify about failed connection attempt to epmd.
+        *
+        * @param node The name of the local node
+        *
+        * @param info additional info that may be available, for example an
+        * exception that was raised causing the event in question (may be
+        * null).
+        **/
+        public virtual void epmdFailedConnAttempt(System.String node, System.Object info)
+        {
+            if (onConnStatus != null)
+                onConnStatus(node, EventCategory.Epmd, EventType.Down, info);
+        }
+    }
 }

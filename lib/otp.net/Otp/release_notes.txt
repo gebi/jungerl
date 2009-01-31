@@ -1,6 +1,23 @@
 Release notes
 -------------
 
+V 0.5, January 2009 / Serge Aleynikov
+-------------------------------------
+- More robust error handling
+- Added delegates for connection state changes
+- Support for pid monitors
+- Support for short node names
+- Optional disabling of local epmd registration and 
+  inhibiting creation of connection acceptor
+- Support for local processing of io_request's 
+- RPC API extended to supply the pid of a local io server mailbox.
+- Support for IEEE 754 double encoding/decoding 
+- Support for big-num decoding.
+- Otp.Erlang.Tuple and Otp.Erlang.List now take variable number
+  of parameters
+- Argument lists of OtpNode and OtpConnection constructors changed 
+  (some of these changes are not fully backward-compatible).
+
 V 0.3, September 2006 / Paul Shaffer
 ------------------------------------
 Some fixes and VS projects have been contributed by Paul, mainly to support R11B.

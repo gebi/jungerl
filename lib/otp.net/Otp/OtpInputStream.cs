@@ -188,16 +188,41 @@ namespace Otp
 			}
 			return (int)((((int) b[0] << 24) & 0xff000000) + (((int) b[1] << 16) & 0xff0000) + (((int) b[2] << 8) & 0xff00) + (((int) b[3]) & 0xff));
 		}
-		
-		/*
-		* Read a two byte little endian integer from the stream.
-		*
-		* @return the bytes read, converted from little endian to an
-		* integer.
-		* 
-		* @exception Erlang.DecodeException if the next byte cannot be
-		* read.
-		**/
+
+        /*
+        * Read an eight byte big endian integer from the stream.
+        *
+        * @return the bytes read, converted from big endian to an integer.
+        * 
+        * @exception Erlang.DecodeException if the next byte cannot be
+        * read.
+        **/
+        public System.UInt64 read8BE()
+        {
+            byte[] b = new byte[8];
+            try
+            {
+                base.Read(b, 0, b.Length);
+            }
+            catch (System.IO.IOException)
+            {
+                throw new Erlang.DecodeException("Cannot read from input stream");
+            }
+            System.UInt64 i1 = (System.UInt64)((((int)b[0] << 24) & 0xff000000) + (((int)b[1] << 16) & 0xff0000) + (((int)b[2] << 8) & 0xff00) + (((int)b[3]) & 0xff));
+            System.UInt64 i2 = (i1 << 32) & 0xffffffff00000000
+                             + (System.UInt64)((((int)b[4] << 24) & 0xff000000) + (((int)b[5] << 16) & 0xff0000) + (((int)b[6] << 8) & 0xff00) + (((int)b[7]) & 0xff));
+            return i2;
+        }
+
+        /*
+        * Read a two byte little endian integer from the stream.
+        *
+        * @return the bytes read, converted from little endian to an
+        * integer.
+        * 
+        * @exception Erlang.DecodeException if the next byte cannot be
+        * read.
+        **/
 		public virtual int read2LE()
 		{
 			byte[] b = new byte[2];
@@ -334,14 +359,15 @@ namespace Otp
 		* @exception Erlang.DecodeException if the next term in the
 		* stream is not a float.
 		**/
-		public virtual float read_float()
-		{
-			double d = this.read_double();
-			float f = (float) d;
-			if (System.Math.Abs(d - f) >= 1.0E-20)
-				throw new Erlang.DecodeException("Value cannot be represented as float: " + d);
-			return f;
-		}
+        public virtual float read_float()
+        {
+            double d = this.read_double();
+            float f = (float)d;
+            if (System.Math.Abs(d - f) >= 1.0E-20)
+                throw new Erlang.DecodeException("Value cannot be represented as float: " + d);
+            return f;
+        }
+
         /*
         * Read an Erlang float from the stream.
         *
@@ -356,44 +382,57 @@ namespace Otp
 			return getFloatOrDouble();
 		}
 
-		private double getFloatOrDouble()
-		{
-			
-			// parse the stream
-			int tag = this.read1();
-			if (tag == OtpExternal.versionTag)
-			{
-				tag = this.read1();
-			}
-			
-			if (tag != OtpExternal.floatTag)
-			{
-				throw new Erlang.DecodeException("Wrong tag encountered, expected " + OtpExternal.floatTag + ", got " + tag);
-			}
-			
-			// get the string
-			byte[] strbuf = new byte[31];
-			this.readN(strbuf);
-			
-            char[] tmpChar = new char[strbuf.Length];
-            strbuf.CopyTo(tmpChar, 0);
-            System.String str = new System.String(tmpChar);
-            //System.Diagnostics.Debug.WriteLine("getFloatOrDouble: str = " + str);
+        private double getFloatOrDouble()
+        {
 
+            // parse the stream
+            int tag = this.read1();
+            if (tag == OtpExternal.versionTag)
+            {
+                tag = this.read1();
+            }
+
+            byte[] strbuf;
             double parsedValue = 0.0;
 
-            try
+            if (tag == OtpExternal.floatTag)
             {
-                // Easier than the java version.
-                parsedValue = System.Double.Parse(str);
-            }
-            catch
-            {
-                throw new Erlang.DecodeException("Error parsing float format: '" + str + "'");
-            }
-            return parsedValue;
+                // get the string
+                strbuf = new byte[31];
+                this.readN(strbuf);
 
-		}
+                char[] tmpChar = new char[strbuf.Length];
+                strbuf.CopyTo(tmpChar, 0);
+                System.String str = new System.String(tmpChar);
+                //System.Diagnostics.Debug.WriteLine("getFloatOrDouble: str = " + str);
+
+                try
+                {
+                    // Easier than the java version.
+                    parsedValue = System.Double.Parse(str);
+                    return parsedValue;
+                }
+                catch
+                {
+                    throw new Erlang.DecodeException("Error parsing float format: '" + str + "'");
+                }
+            }
+            else if (tag == OtpExternal.newFloatTag)
+            {
+                byte[] data = new byte[8];
+                this.readN(data);
+                // IEEE 754 decoder
+                if (BitConverter.IsLittleEndian)
+                {
+                    Array.Reverse(data);
+                }
+                return BitConverter.ToDouble(data, 0);
+            }
+            else
+            {
+                throw new Erlang.DecodeException("Wrong tag encountered, expected " + OtpExternal.floatTag + ", got " + tag);
+            }
+        }
 		
 		/*
 		* Read one byte from the stream.
@@ -584,22 +623,28 @@ namespace Otp
 					
 				
 				
-				case OtpExternal.smallBigTag: 
+				case OtpExternal.smallBigTag: {
 					arity = this.read1();
-					
-					if (arity != 4)
-					{
-						throw new Erlang.DecodeException("Arity for smallBig must be 4, was " + arity);
-					}
-					
-					sign = this.read1();
-					
-					// obs! little endian here
-					val = this.read4LE();
-					val = (sign == 0?val:- val); // should deal with overflow
+                    sign  = this.read1();
+
+                    byte[] nb = new byte[arity];
+                    if (arity != this.readN(nb))
+                    {
+                        throw new Erlang.DecodeException("Cannot read from input stream. Expected smallBigTag arity " + arity);
+                    }
+                    if (arity > 8)
+                        throw new Erlang.DecodeException("Value too large for long type (arity=" + arity + ")");
+
+                    val = 0;
+                    for (int i = 0; i < arity; i++)
+                    {
+                         val |= (long)nb[i] << (i * 8);
+                    }
+
+					val = (sign == 0 ? val : -val); // should deal with overflow
 					
 					break;
-					
+				}
 				
 				
 				case OtpExternal.largeBigTag: default: 
@@ -933,7 +978,8 @@ namespace Otp
 					return new Erlang.Atom(this);
 
 				case OtpExternal.floatTag:
-					return new Erlang.Double(this);
+                case OtpExternal.newFloatTag:
+                    return new Erlang.Double(this);
 
 				case OtpExternal.refTag: case OtpExternal.newRefTag:
 					return new Erlang.Ref(this);

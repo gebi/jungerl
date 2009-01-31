@@ -50,94 +50,124 @@ namespace Otp
 
 	public class OtpMsg
 	{
-		public const int linkTag = 1;
-		public const int sendTag = 2;
-		public const int exitTag = 3;
-		public const int unlinkTag = 4;
-		/*public static final int nodeLinkTag =    5; */
-		public const int regSendTag = 6;
-		/*public static final int groupLeaderTag = 7; */
-		public const int exit2Tag = 8;
+        // Erlang message header tags
+        public enum Tag
+        {
+              undefined         = -1
+            , linkTag           = 1
+            , sendTag           = 2
+            , exitTag           = 3
+            , unlinkTag         = 4
+            , nodeLinkTag       = 5
+            , regSendTag        = 6
+            , groupLeaderTag    = 7
+            , exit2Tag          = 8
+
+            , sendTTTag         = 12
+            , exitTTTag         = 13
+            , regSendTTTag      = 16
+            , exit2TTTag        = 18
+
+            , monitorPTag       = 19
+            , demonitorPTag     = 20
+            , monitorPexitTag   = 21
+        };
 		
-		protected internal int tag; // what type of message is this (send, link, exit etc)
+		protected internal Tag tag; // what type of message is this (send, link, exit etc)
 		protected internal OtpInputStream paybuf;
 		protected internal Erlang.Object payload;
 		
 		protected internal Erlang.Pid from;
 		protected internal Erlang.Pid to;
+        protected internal Erlang.Ref eref;
 		protected internal System.String toName;
 
 		// send has receiver pid but no sender information 
 		internal OtpMsg(Erlang.Pid to, OtpInputStream paybuf)
+            : this(Tag.sendTag, (Erlang.Pid)null, to, (Erlang.Ref)null, (Erlang.Object)null, paybuf)
 		{
-			this.tag = sendTag;
-			this.from = null;
-			this.to = to;
-			this.toName = null;
-			this.paybuf = paybuf;
-			this.payload = null;
-		}
+        }
 		
 		// send has receiver pid but no sender information 
 		internal OtpMsg(Erlang.Pid to, Erlang.Object payload)
+            : this(Tag.sendTag, null, to, null, payload, null)
 		{
-			this.tag = sendTag;
-			this.from = null;
-			this.to = to;
-			this.toName = null;
-			this.paybuf = null;
-			this.payload = payload;
-		}
+        }
 		
 		// send_reg has sender pid and receiver name
-		internal OtpMsg(Erlang.Pid from, System.String toName, OtpInputStream paybuf)
+		internal OtpMsg(Erlang.Pid from, string toName, OtpInputStream paybuf)
+            : this(Tag.regSendTag, from, toName, (Erlang.Ref)null, (Erlang.Object)null, paybuf)
 		{
-			this.tag = regSendTag;
-			this.from = from;
-			this.toName = toName;
-			this.to = null;
-			this.paybuf = paybuf;
-			this.payload = null;
-		}
+        }
 		
 		// send_reg has sender pid and receiver name
-		internal OtpMsg(Erlang.Pid from, System.String toName, Erlang.Object payload)
+		internal OtpMsg(Erlang.Pid from, string toName, Erlang.Object payload)
+            : this(Tag.regSendTag, from, toName, (Erlang.Ref)null, payload, null)
 		{
-			this.tag = regSendTag;
-			this.from = from;
-			this.toName = toName;
-			this.to = null;
-			this.paybuf = null;
-			this.payload = payload;
-		}
+        }
 		
 		// exit (etc) has from, to, reason
-		internal OtpMsg(int tag, Erlang.Pid from, Erlang.Pid to, Erlang.Object reason)
+		internal OtpMsg(Tag tag, Erlang.Pid from, Erlang.Pid to, Erlang.Object reason)
+            : this(tag, from, to, null, reason, null)
 		{
-			this.tag = tag;
-			this.from = from;
-			this.to = to;
-			this.paybuf = null;
-			this.payload = reason;
-		}
+        }
 		
 		// special case when reason is an atom (i.e. most of the time) 
-		internal OtpMsg(int tag, Erlang.Pid from, Erlang.Pid to, System.String reason)
+        internal OtpMsg(Tag tag, Erlang.Pid from, Erlang.Pid to, System.String reason)
+            : this(tag, from, to, null, reason, null)
 		{
-			this.tag = tag;
-			this.from = from;
-			this.to = to;
-			this.paybuf = null;
-			this.payload = new Erlang.Atom(reason);
 		}
-		
-		// other message types (link, unlink)
-		internal OtpMsg(int tag, Erlang.Pid from, Erlang.Pid to)
+
+        // exit (etc) has from, to, reason
+        internal OtpMsg(Tag tag, Erlang.Pid from, Erlang.Pid to, Erlang.Ref eref, Erlang.Object reason)
+            : this(tag, from, to, eref, reason, null)
+        {
+        }
+
+        // special case when reason is an atom (i.e. most of the time) 
+        internal OtpMsg(Tag tag, Erlang.Pid from, string toName, Erlang.Ref eref, System.String reason)
+            : this(tag, from, toName, eref, reason, null)
+        {
+        }
+
+        private OtpMsg(Tag tag, Erlang.Pid from, Object /* Pid or string */ to, 
+            Erlang.Ref eref, Erlang.Object reason, OtpInputStream paybuf)
+        {
+            this.tag = tag;
+            this.from = from;
+            this.to = (Erlang.Pid)(to is Erlang.Pid ? to : null);
+            this.toName = (string)(to is string ? to : null);
+            this.paybuf = paybuf;
+            this.payload = reason;
+            this.eref = eref;
+        }
+
+        // special case when reason is an atom (i.e. most of the time) 
+        private OtpMsg(Tag tag, Erlang.Pid from, Object /* Pid or string */ to,
+            Erlang.Ref eref, System.String reason, OtpInputStream paybuf)
+        {
+            this.tag = tag;
+            this.from = from;
+            this.to = (Erlang.Pid)(to is Erlang.Pid ? to : null);
+            this.toName = (string)(to is string ? to : null);
+            this.paybuf = paybuf;
+            this.payload = new Erlang.Atom(reason);
+            this.eref = eref;
+        }
+
+        // other message types (link, unlink)
+		internal OtpMsg(Tag tag, Erlang.Pid from, Erlang.Pid to)
 		{
 			// convert TT-tags to equiv non-TT versions
-			if (tag > 10)
-				tag -= 10;
-			
+            switch (tag) 
+            {
+                case Tag.sendTTTag:     tag = Tag.sendTag; break;
+                case Tag.exitTTTag:     tag = Tag.exitTag; break;
+                case Tag.regSendTTTag:  tag = Tag.regSendTag; break;
+                case Tag.exit2TTTag:    tag = Tag.exit2Tag; break;
+                default: break;
+            }
+
 			this.tag = tag;
 			this.from = from;
 			this.to = to;
@@ -150,7 +180,7 @@ namespace Otp
 		* @return the serialized Erlang term contained in this message.
 		*
 		**/
-		internal virtual OtpInputStream getMsgBuf()
+		internal OtpInputStream getMsgBuf()
 		{
 			return paybuf;
 		}
@@ -186,7 +216,7 @@ namespace Otp
 		* {@link #getMsg getMsg()}. </li>
 		*</ul>
 		**/
-		public virtual int type()
+		public Tag type()
 		{
 			return tag;
 		}
@@ -206,7 +236,7 @@ namespace Otp
 		* @exception DecodeException if the byte stream could not be deserialized.
 		*
 		**/
-		public virtual Erlang.Object getMsg()
+		public Erlang.Object getMsg()
 		{
 			if (payload == null)
 			{
@@ -224,7 +254,7 @@ namespace Otp
 		*
 		* @return the name of the recipient, or null if the recipient was in fact a Pid.
 		**/
-		public virtual System.String getRecipientName()
+		public System.String getRecipientName()
 		{
 			return toName;
 		}
@@ -239,7 +269,7 @@ namespace Otp
 		*
 		* @return the Pid of the recipient, or null if the recipient was in fact a name.
 		**/
-		public virtual Erlang.Pid getRecipientPid()
+		public Erlang.Pid getRecipientPid()
 		{
 			return to;
 		}
@@ -253,7 +283,7 @@ namespace Otp
 		*
 		* @return the Pid of the recipient, or null if the recipient was in fact a name.
 		**/
-		public virtual System.Object getRecipient()
+		public System.Object getRecipient()
 		{
 			if (toName != null)
 				return toName;
@@ -270,7 +300,7 @@ namespace Otp
 		*
 		* @return the Pid of the sender, or null if it was not available.
 		**/
-		public virtual Erlang.Pid getSenderPid()
+		public Erlang.Pid getSenderPid()
 		{
 			return from;
 		}

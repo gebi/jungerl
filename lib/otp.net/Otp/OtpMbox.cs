@@ -77,7 +77,8 @@ namespace Otp
 		internal GenericQueue queue;
 		internal System.String name;
 		internal Links links;
-		
+        internal System.Collections.Hashtable monitors;
+
 		// package constructor: called by OtpNode:createMbox(name)
 		// to create a named mbox
 		internal OtpMbox(OtpNode home, Erlang.Pid self, System.String name)
@@ -87,6 +88,7 @@ namespace Otp
 			this.name = name;
 			this.queue = new GenericQueue();
 			this.links = new Links(10);
+            this.monitors = new System.Collections.Hashtable(49, (float)0.95);
 		}
 		
 		// package constructor: called by OtpNode:createMbox() 
@@ -94,6 +96,11 @@ namespace Otp
 		internal OtpMbox(OtpNode home, Erlang.Pid self):this(home, self, null)
 		{
 		}
+
+        public void flush()
+        {
+            this.queue.flush();
+        }
 
 		/*
 		* <p> Get the identifying {@link Pid pid} associated with
@@ -155,18 +162,7 @@ namespace Otp
 		**/
 		public virtual Erlang.Object receive()
 		{
-			try
-			{
-				return receiveMsg().getMsg();
-			}
-			catch (Erlang.Exit e)
-			{
-				throw e;
-			}
-			catch (System.Exception)
-			{
-			}
-			return null;
+			return receive(-1);
 		}
 		
 		/*
@@ -212,7 +208,7 @@ namespace Otp
 		**/
 		public virtual OtpInputStream receiveBuf()
 		{
-			return receiveMsg().getMsgBuf();
+            return receiveBuf(-1);
 		}
 		
 		/*
@@ -232,12 +228,9 @@ namespace Otp
 		**/
 		public virtual OtpInputStream receiveBuf(long timeout)
 		{
-			OtpMsg m = receiveMsg(timeout);
-			if (m != null)
-				return m.getMsgBuf();
-			
-			return null;
-		}
+            OtpMsg m = receiveMsg();
+            return m == null ? null : m.getMsgBuf();
+        }
 		
 		/*
 		* Block until a message arrives for this mailbox.
@@ -252,26 +245,7 @@ namespace Otp
 		**/
 		public virtual OtpMsg receiveMsg()
 		{
-			
-			OtpMsg m = (OtpMsg) (queue.get());
-
-			switch (m.type())
-			{
-				case OtpMsg.exitTag:
-				case OtpMsg.exit2Tag:
-					try
-					{
-						Erlang.Object o = m.getMsg();
-						throw new Erlang.Exit(o.ToString(), m.getSenderPid());
-					}
-					catch (Erlang.DecodeException)
-					{
-						throw new Erlang.Exit("unknown", m.getSenderPid());
-					}
-					goto default;
-				default:
-					return m;
-			}
+            return receiveMsg(-1);
 		}
 		
 		/*
@@ -291,15 +265,20 @@ namespace Otp
 		**/
 		public virtual OtpMsg receiveMsg(long timeout)
 		{
-			OtpMsg m = (OtpMsg) (queue.get(timeout));
+			OtpMsg m;
+            try {
+                m = (OtpMsg) queue.get(timeout);
+            } catch (System.Threading.ThreadInterruptedException) {
+                m = null;
+            }
 			
 			if (m == null)
 				return null;
 			
 			switch (m.type())
 			{
-				case OtpMsg.exitTag:
-				case OtpMsg.exit2Tag:
+				case OtpMsg.Tag.exitTag:
+                case OtpMsg.Tag.exit2Tag:
 					try
 					{
 						Erlang.Object o = m.getMsg();
@@ -309,7 +288,6 @@ namespace Otp
 					{
 						throw new Erlang.Exit("unknown", m.getSenderPid());
 					}
-					goto default;
 				default:
 					return m;
 			}
@@ -325,7 +303,7 @@ namespace Otp
 		* @param msg the body of the message to send.
 		*
 		**/
-		public virtual void  send(Erlang.Pid to, Erlang.Object msg)
+		public void send(Erlang.Pid to, Erlang.Object msg)
 		{
 			try
 			{
@@ -336,7 +314,7 @@ namespace Otp
 				}
 				else
 				{
-					OtpCookedConnection conn = home.getConnection(node);
+					OtpCookedConnection conn = home.connection(node);
 					if (conn == null)
 						return ;
 					conn.send(_self, to, msg);
@@ -356,7 +334,7 @@ namespace Otp
 		* @param msg the body of the message to send.
 		*
 		**/
-		public virtual void  send(System.String name, Erlang.Object msg)
+		public void send(System.String name, Erlang.Object msg)
 		{
 			home.deliver(new OtpMsg(_self, name, (Erlang.Object) (msg.clone())));
 		}
@@ -372,7 +350,7 @@ namespace Otp
 		* @param msg the body of the message to send.
 		*
 		**/
-		public virtual void  send(System.String name, System.String node, Erlang.Object msg)
+		public void send(System.String name, System.String node, Erlang.Object msg)
 		{
 			try
 			{
@@ -382,7 +360,7 @@ namespace Otp
 				}
 				else
 				{
-					OtpCookedConnection conn = home.getConnection(node);
+					OtpCookedConnection conn = home.connection(node);
 					if (conn == null)
 						return ;
 					conn.send(_self, name, msg);
@@ -392,18 +370,96 @@ namespace Otp
 			{
 			}
 		}
-		
-		/*
-		* <p> Send an exit signal to a remote {@link Pid pid}.
-		* This method does not cause any links to be broken, except
-		* indirectly if the remote {@link Pid pid} exits as a
-		* result of this exit signal. </p>
-		*
-		* @param to the {@link Pid pid} to which the exit signal
-		* should be sent.
-		*
-		* @param reason a string indicating the reason for the exit.
-		**/
+
+        public Erlang.Object rpcCall(string node, string mod, string fun, Erlang.List args)
+        {
+            return this.rpcCall(node, mod, fun, args, -1);
+        }
+
+        public Erlang.Object rpcCall(string node, string mod, string fun, Erlang.List args, int timeout)
+        {
+            return this.rpcCall(node, new Erlang.Atom(mod), new Erlang.Atom(fun), args, -1);
+        }
+
+        public Erlang.Object rpcCall(string node, Erlang.Atom mod, Erlang.Atom fun, Erlang.List args)
+        {
+            return this.rpcCall(node, mod, fun, args, -1);
+        }
+
+        public Erlang.Object rpcCall(string node, Erlang.Atom mod, Erlang.Atom fun, Erlang.List args, int timeout)
+        {
+            sendRPC(node, mod, fun, args);
+            return receiveRPC(timeout);
+        }
+
+        public void sendRPC(string node, string mod, string fun, Erlang.List args)
+        {
+            sendRPC(node, new Erlang.Atom(mod), new Erlang.Atom(fun), args);
+        }
+
+        public void sendRPC(string node, Erlang.Atom mod, Erlang.Atom fun, Erlang.List args)
+        {
+            sendRPC(node, mod, fun, args, _self /* new Erlang.Atom("user") */);
+        }
+
+        public void sendRPC(string node, string mod, string fun, Erlang.List args, Erlang.Pid ioServer)
+        {
+            sendRPC(node, new Erlang.Atom(mod), new Erlang.Atom(fun), args, ioServer);
+        }
+
+        public void sendRPC(string node, Erlang.Atom mod, Erlang.Atom fun, Erlang.List args, Erlang.Pid ioServer)
+        {
+            if (node.Equals(home.node()))
+            {
+                throw new System.ArgumentException("Cannot make rpc calls on local node!");
+            }
+            else
+            {
+                Erlang.Object msg = AbstractConnection.encodeRPC(_self, mod, fun, args, ioServer );
+
+                OtpCookedConnection conn = home.connection(node);
+                if (conn == null)
+                    throw new System.Exception("Cannot establish connection to node " + node);
+                conn.send(_self, "rex", msg);
+            }
+        }
+
+        public Erlang.Object receiveRPC(int timeout)
+        {
+            Erlang.Object result = receive(timeout);
+
+            if (result == null)
+                return result;
+            else
+            {
+                Erlang.Object rpcReply = AbstractConnection.decodeRPC(result);
+                return rpcReply == null ? result : rpcReply;
+            }
+        }
+
+        public string receiveIO(int timeout)
+        {
+            Erlang.Object result = receive(timeout);
+
+            if (result == null)
+                return null;
+            else
+            {
+                return AbstractConnection.decodeIO(result);
+            }
+        }
+
+        /*
+        * <p> Send an exit signal to a remote {@link Pid pid}.
+        * This method does not cause any links to be broken, except
+        * indirectly if the remote {@link Pid pid} exits as a
+        * result of this exit signal. </p>
+        *
+        * @param to the {@link Pid pid} to which the exit signal
+        * should be sent.
+        *
+        * @param reason a string indicating the reason for the exit.
+        **/
 		// it's called exit, but it sends exit2 
 		public virtual void  exit(Erlang.Pid to, System.String reason)
 		{
@@ -419,11 +475,11 @@ namespace Otp
 				System.String node = to.node();
 				if (node.Equals(home.node()))
 				{
-					home.deliver(new OtpMsg(OtpMsg.exitTag, _self, to, reason));
+					home.deliver(new OtpMsg(OtpMsg.Tag.exitTag, _self, to, reason));
 				}
 				else
 				{
-					OtpCookedConnection conn = home.getConnection(node);
+					OtpCookedConnection conn = home.connection(node);
 					if (conn == null)
 						return ;
 					switch (arity)
@@ -431,8 +487,6 @@ namespace Otp
 						case 1: 
 							conn.exit(_self, to, reason);
 							break;
-							
-						
 						
 						case 2: 
 							conn.exit2(_self, to, reason);
@@ -475,14 +529,14 @@ namespace Otp
 				System.String node = to.node();
 				if (node.Equals(home.node()))
 				{
-					if (!home.deliver(new OtpMsg(OtpMsg.linkTag, _self, to)))
+                    if (!home.deliver(new OtpMsg(OtpMsg.Tag.linkTag, _self, to)))
 					{
 						throw new Erlang.Exit("noproc", to);
 					}
 				}
 				else
 				{
-					OtpCookedConnection conn = home.getConnection(node);
+					OtpCookedConnection conn = home.connection(node);
 					if (conn != null)
 						conn.link(_self, to);
 					else
@@ -520,11 +574,11 @@ namespace Otp
 				System.String node = to.node();
 				if (node.Equals(home.node()))
 				{
-					home.deliver(new OtpMsg(OtpMsg.unlinkTag, _self, to));
+                    home.deliver(new OtpMsg(OtpMsg.Tag.unlinkTag, _self, to));
 				}
 				else
 				{
-					OtpCookedConnection conn = home.getConnection(node);
+					OtpCookedConnection conn = home.connection(node);
 					if (conn != null)
 						conn.unlink(_self, to);
 				}
@@ -602,7 +656,7 @@ namespace Otp
 		* called and exit signals will be sent. </p>
 		*
 		**/
-		public virtual void  close()
+		public void close()
 		{
 			home.closeMbox(this);
 		}
@@ -610,7 +664,7 @@ namespace Otp
 		~OtpMbox()
 		{
 			this.close();
-			queue.flush();
+			queue.close();
 		}
 		
 		/*
@@ -644,20 +698,33 @@ namespace Otp
 		{
 			switch (m.type())
 			{
-				case OtpMsg.linkTag: 
+                case OtpMsg.Tag.linkTag: 
 					links.addLink(_self, m.getSenderPid());
 					break;
 
-				case OtpMsg.unlinkTag:
+                case OtpMsg.Tag.unlinkTag:
 					links.removeLink(_self, m.getSenderPid());
 					break;
 
-				case OtpMsg.exitTag:
+                case OtpMsg.Tag.exitTag:
 					links.removeLink(_self, m.getSenderPid());
 					queue.put(m);
 					break;
 
-				case OtpMsg.exit2Tag: default:
+                case OtpMsg.Tag.monitorPTag:
+                    monitors[m.getSenderPid()] = m.getMsg();
+                    break;
+
+                case OtpMsg.Tag.demonitorPTag:
+                    monitors.Remove(m.getSenderPid());
+                    break;
+
+                case OtpMsg.Tag.monitorPexitTag:
+                    queue.put(m);
+                    break;
+
+                case OtpMsg.Tag.exit2Tag:
+                default:
 					queue.put(m);
 					break;
 			}

@@ -49,70 +49,87 @@ namespace Otp.Erlang
 		* Create a list of characters.
 		*
 		* @param str the characters from which to create the list.
-		**/
+		*
 		public List(System.String str)
 		{
-			int len = 0;
-			
-			if (str != null)
-				len = str.Length;
-			
-			if (len > 0)
-			{
-				this.elems = new Object[len];
-				
-				 for (int i = 0; i < len; i++)
-				{
-					this.elems[i] = new Char(str[i]);
-				}
-			}
+    		this.elems = new Object[] { new Erlang.String(str) };
 		}
 		
-		/*
 		* Create a list containing one element.
 		*
 		* @param elem the elememet to make the list from.
-		**/
+		*
 		public List(Object elem)
 		{
 			this.elems = new Object[1];
 			elems[0] = elem;
 		}
-		
+        */		
+        
 		/*
-		* Create a list from an array of arbitrary Erlang terms.
+        * Create a list from an array of arbitrary Erlang terms.
 		*
 		* @param elems the array of terms from which to create the list.
-		**/
-		public List(Object[] elems):this(elems, 0, elems.Length)
-		{
-		}
-		
+		* @param count the number of terms to insert.
+		*/
+        public List(Object[] elems): this(elems, 0, elems.Length)
+        {
+        }
+
 		/*
-		* Create a list from an array of arbitrary Erlang terms.
+        * Create a list from an array of arbitrary Erlang terms.
 		*
 		* @param elems the array of terms from which to create the list.
 		* @param start the offset of the first term to insert.
 		* @param count the number of terms to insert.
-		**/
-		public List(Object[] elems, int start, int count)
+		*/
+        public List(Object[] elems, int start, int count)
 		{
 			if ((elems != null) && (count > 0))
 			{
 				this.elems = new Object[count];
-				Array.Copy(elems, start, this.elems, 0, count);
-			}
+                Array.Copy(elems, 0, this.elems, start, count);
+            }
 		}
-		
-		/*
-		* Create a list from a stream containing an list encoded in Erlang
-		* external format.
-		*
-		* @param buf the stream containing the encoded list.
-		* 
-		* @exception DecodeException if the buffer does not
-		* contain a valid external representation of an Erlang list.
-		**/
+
+        /*
+        * Create a list from an array of arbitrary Erlang terms.
+        *
+        * @param elems the array of terms from which to create the list.
+        **/
+        public List(params System.Object[] elems)
+        {
+            if ((elems != null) && (elems.Length > 0))
+            {
+                this.elems = new Object[elems.Length];
+
+                for (int i=0; i < elems.Length; i++) 
+                {
+                    System.Object o = elems[i];
+                    if (o is int) this.elems[i] = new Int((int)o);
+                    else if (o is string) this.elems[i] = new String((string)o);
+                    else if (o is float) this.elems[i] = new Double((float)o);
+                    else if (o is double) this.elems[i] = new Double((double)o);
+                    else if (o is Erlang.Object) this.elems[i] = (o as Erlang.Object);
+                    //else if (o is BigInteger) this.elems[i] = (BigInteger)o;
+                    else if (o is uint) this.elems[i] = new UInt((int)o);
+                    else if (o is short) this.elems[i] = new Short((short)o);
+                    else if (o is ushort) this.elems[i] = new UShort((short)o);
+                    else
+                        throw new System.ArgumentException("Unknown type of element[" + i + "]: " + o.GetType().ToString());
+                }
+            }
+        }
+
+        /*
+        * Create a list from a stream containing an list encoded in Erlang
+        * external format.
+        *
+        * @param buf the stream containing the encoded list.
+        * 
+        * @exception DecodeException if the buffer does not
+        * contain a valid external representation of an Erlang list.
+        **/
 		public List(OtpInputStream buf)
 		{
 			this.elems = null;
@@ -138,7 +155,7 @@ namespace Otp.Erlang
 		*
 		* @return the number of elements contained in the list.
 		**/
-		public virtual int arity()
+		public int arity()
 		{
 			if (elems == null)
 				return 0;
@@ -155,7 +172,7 @@ namespace Otp.Erlang
 		* @return the requested element, of null if i is not a valid
 		* element index.
 		**/
-		public virtual Object elementAt(int i)
+		public Object elementAt(int i)
 		{
 			if ((i >= arity()) || (i < 0))
 				return null;
@@ -167,7 +184,7 @@ namespace Otp.Erlang
 		*
 		* @return an array containing all of the list's elements. 
 		**/
-		public virtual Object[] elements()
+		public Object[] elements()
 		{
 			if (arity() == 0)
 				return null;
@@ -178,7 +195,18 @@ namespace Otp.Erlang
 				return res;
 			}
 		}
-		
+
+        public Object this[int index]
+        {
+            get { return elementAt(index); }
+            set { this.elems[index] = value; }
+        }
+
+        public int Length
+        {
+            get { return this.elems.Length; }
+        }
+
 		/*
 		* Get the string representation of the list.
 		*

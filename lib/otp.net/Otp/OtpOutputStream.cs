@@ -363,7 +363,16 @@ namespace Otp
 		**/
 		public virtual void  write_double(double d)
 		{
-			double val;
+            this.write1(OtpExternal.newFloatTag);
+
+            byte[] data = BitConverter.GetBytes(d);
+            if (BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(data);
+            }
+            this.write(data);
+            /*
+            double val;
 			int exp = 0;
 			int sign = 0;
 			System.String str;
@@ -434,6 +443,7 @@ namespace Otp
 			int i3 = (int) (tmpBytes2.Length);
 			 for (; i3 < 31; i3++)
 				this.write1(0);
+            */
 		}
 		
 		
@@ -444,7 +454,7 @@ namespace Otp
 		**/
 		public virtual void  write_float(float f)
 		{
-			this.write_double(f);
+            this.write_double(f);
 		}
 		
 		/*

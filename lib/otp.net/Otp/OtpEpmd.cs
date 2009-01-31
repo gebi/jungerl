@@ -170,8 +170,8 @@ namespace Otp
 				// don't even wait for a response (is there one?) 
 				if (traceLevel >= traceThreshold)
 				{
-					System.Console.Out.WriteLine("-> UNPUBLISH " + node + " port=" + node.port());
-					System.Console.Out.WriteLine("<- OK (assumed)");
+					OtpTrace.TraceEvent("-> UNPUBLISH " + node + " port=" + node.port());
+					OtpTrace.TraceEvent("<- OK (assumed)");
 				}
 			}
 			catch (System.Exception)
@@ -225,7 +225,7 @@ namespace Otp
 				obuf.writeTo((System.IO.Stream) s.GetStream());
 				
 				if (traceLevel >= traceThreshold)
-					System.Console.Out.WriteLine("-> LOOKUP (r3) " + node);
+					OtpTrace.TraceEvent("-> LOOKUP (r3) " + node);
 				
 				// receive and decode reply
 				byte[] tmpbuf = new byte[100];
@@ -238,13 +238,13 @@ namespace Otp
 			catch (System.IO.IOException)
 			{
 				if (traceLevel >= traceThreshold)
-					System.Console.Out.WriteLine("<- (no response)");
+					OtpTrace.TraceEvent("<- (no response)");
 				throw new System.IO.IOException("Nameserver not responding on " + node.host() + " when looking up " + node.getAlive());
 			}
 			catch (Erlang.DecodeException)
 			{
 				if (traceLevel >= traceThreshold)
-					System.Console.Out.WriteLine("<- (invalid response)");
+					OtpTrace.TraceEvent("<- (invalid response)");
 				throw new System.IO.IOException("Nameserver not responding on " + node.host() + " when looking up " + node.getAlive());
 			}
 			finally
@@ -264,9 +264,9 @@ namespace Otp
 			if (traceLevel >= traceThreshold)
 			{
 				if (port == 0)
-					System.Console.Out.WriteLine("<- NOT FOUND");
+					OtpTrace.TraceEvent("<- NOT FOUND");
 				else
-					System.Console.Out.WriteLine("<- PORT " + port);
+					OtpTrace.TraceEvent("<- PORT " + port);
 			}
 			return port;
 		}
@@ -303,7 +303,7 @@ namespace Otp
 				obuf.writeTo((System.IO.Stream) s.GetStream());
 				
 				if (traceLevel >= traceThreshold)
-					System.Console.Out.WriteLine("-> LOOKUP (r4) " + node);
+					OtpTrace.TraceEvent("-> LOOKUP (r4) " + node);
 				
 				// receive and decode reply
 				// resptag[1], result[1], port[2], ntype[1], proto[1],
@@ -342,13 +342,13 @@ namespace Otp
 			catch (System.IO.IOException)
 			{
 				if (traceLevel >= traceThreshold)
-					System.Console.Out.WriteLine("<- (no response)");
+					OtpTrace.TraceEvent("<- (no response)");
 				throw new System.IO.IOException("Nameserver not responding on " + node.host() + " when looking up " + node.getAlive());
 			}
 			catch (Erlang.DecodeException)
 			{
 				if (traceLevel >= traceThreshold)
-					System.Console.Out.WriteLine("<- (invalid response)");
+					OtpTrace.TraceEvent("<- (invalid response)");
 				throw new System.IO.IOException("Nameserver not responding on " + node.host() + " when looking up " + node.getAlive());
 			}
 			finally
@@ -368,9 +368,9 @@ namespace Otp
 			if (traceLevel >= traceThreshold)
 			{
 				if (port == 0)
-					System.Console.Out.WriteLine("<- NOT FOUND");
+					OtpTrace.TraceEvent("<- NOT FOUND");
 				else
-					System.Console.Out.WriteLine("<- PORT " + port);
+					OtpTrace.TraceEvent("<- PORT " + port);
 			}
 			return port;
 		}
@@ -405,7 +405,7 @@ namespace Otp
 				// send request
 				obuf.writeTo((System.IO.Stream) s.GetStream());
 				if (traceLevel >= traceThreshold)
-					System.Console.Out.WriteLine("-> PUBLISH (r3) " + node + " port=" + node.port());
+					OtpTrace.TraceEvent("-> PUBLISH (r3) " + node + " port=" + node.port());
 				
 				byte[] tmpbuf = new byte[100];
 
@@ -416,7 +416,7 @@ namespace Otp
 					if (s != null)
 						s.Close();
 					if (traceLevel >= traceThreshold)
-						System.Console.Out.WriteLine("<- (no response)");
+						OtpTrace.TraceEvent("<- (no response)");
 					return null;
 				}
 				
@@ -426,7 +426,7 @@ namespace Otp
 				{
 					node._creation = ibuf.read2BE();
 					if (traceLevel >= traceThreshold)
-						System.Console.Out.WriteLine("<- OK");
+						OtpTrace.TraceEvent("<- OK");
 					return s; // success - don't close socket
 				}
 			}
@@ -436,7 +436,7 @@ namespace Otp
 				if (s != null)
 					s.Close();
 				if (traceLevel >= traceThreshold)
-					System.Console.Out.WriteLine("<- (no response)");
+					OtpTrace.TraceEvent("<- (no response)");
 				throw new System.IO.IOException("Nameserver not responding on " + node.host() + " when publishing " + node.getAlive());
 			}
 			catch (Erlang.DecodeException)
@@ -444,7 +444,7 @@ namespace Otp
 				if (s != null)
 					s.Close();
 				if (traceLevel >= traceThreshold)
-					System.Console.Out.WriteLine("<- (invalid response)");
+					OtpTrace.TraceEvent("<- (invalid response)");
 				throw new System.IO.IOException("Nameserver not responding on " + node.host() + " when publishing " + node.getAlive());
 			}
 			
@@ -463,6 +463,7 @@ namespace Otp
 		private static System.Net.Sockets.TcpClient r4_publish(OtpLocalNode node)
 		{
 			System.Net.Sockets.TcpClient s = null;
+            System.Exception error = null;
 			
 			try
 			{
@@ -500,7 +501,7 @@ namespace Otp
 				obuf.writeTo((System.IO.Stream) s.GetStream());
 				
 				if (traceLevel >= traceThreshold)
-					System.Console.Out.WriteLine("-> PUBLISH (r4) " + node + " port=" + node.port());
+					OtpTrace.TraceEvent("-> PUBLISH (r4) " + node + " port=" + node.port());
 				
 				// get reply
 				byte[] tmpbuf = new byte[100];
@@ -524,32 +525,46 @@ namespace Otp
 					{
 						node._creation = ibuf.read2BE();
 						if (traceLevel >= traceThreshold)
-							System.Console.Out.WriteLine("<- OK");
+							OtpTrace.TraceEvent("<- OK");
 						return s; // success
 					}
 				}
 			}
-			catch (System.IO.IOException)
-			{
-				// epmd closed the connection = fail
-				if (s != null)
-					s.Close();
-				if (traceLevel >= traceThreshold)
-					System.Console.Out.WriteLine("<- (no response)");
-				throw new System.IO.IOException("Nameserver not responding on " + node.host() + " when publishing " + node.getAlive());
-			}
-			catch (Erlang.DecodeException)
-			{
-				if (s != null)
-					s.Close();
-				if (traceLevel >= traceThreshold)
-					System.Console.Out.WriteLine("<- (invalid response)");
-				throw new System.IO.IOException("Nameserver not responding on " + node.host() + " when publishing " + node.getAlive());
-			}
-			
-			if (s != null)
-				s.Close();
-			return null;
+            catch (System.IO.IOException e)
+            {
+                error = e;
+            }
+            catch (Erlang.DecodeException e)
+            {
+                error = e;
+            }
+            catch (System.Net.Sockets.SocketException e)
+            {
+                error = e;
+            }
+
+            if (error == null)
+                return s;
+            else
+            {
+                // epmd closed the connection = fail
+                if (s != null)
+                    s.Close();
+                if (traceLevel >= traceThreshold)
+                    System.Console.Out.WriteLine("<- (no response)");
+
+                string err = "Nameserver not responding on " + node.host() + " when publishing " + node.getAlive();
+                node.epmdFailedConnAttempt(node.node(), err);
+
+                if (traceLevel >= traceThreshold)
+                    System.Console.Out.WriteLine("Failed to connect to empd daemon!");
+
+                if (!OtpLocalNode.ignoreLocalEpmdConnectErrors)
+                    throw new System.Exception(err);
+
+                node._creation = 0;
+                return null;
+            }
 		}
 	}
 }

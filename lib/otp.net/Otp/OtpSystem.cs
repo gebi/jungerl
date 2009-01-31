@@ -57,7 +57,7 @@ namespace Otp
                 }
             }
             //catch (NumberFormatException e)
-            catch (Exception e)
+            catch (Exception)
             {
                 /* Ignore ... */
             }

@@ -39,7 +39,7 @@ namespace Otp.Erlang
 		*
 		* @exception C#.lang.IllegalArgumentException if the array is
 		* empty (null).
-		**/
+		*
 		public Tuple(Object elem)
 		{
 			if (elem == null)
@@ -49,7 +49,7 @@ namespace Otp.Erlang
 			this.elems = new Object[1];
 			elems[0] = elem;
 		}
-		
+		*/
 		/*
 		* Create a tuple from an array of terms.
 		*
@@ -57,11 +57,11 @@ namespace Otp.Erlang
 		*
 		* @exception C#.lang.IllegalArgumentException if the array is
 		* empty (null) or contains null elements.
-		**/
+		*/
 		public Tuple(Object[] elems):this(elems, 0, elems.Length)
 		{
 		}
-		
+
 		/*
 		* Create a tuple from an array of terms.
 		*
@@ -71,7 +71,7 @@ namespace Otp.Erlang
 		*
 		* @exception C#.lang.IllegalArgumentException if the array is
 		* empty (null) or contains null elements.
-		**/
+		*/
 		public Tuple(Object[] elems, int start, int count)
 		{
 			if ((elems == null) || (count < 1))
@@ -94,9 +94,48 @@ namespace Otp.Erlang
 				}
 			}
 		}
-		
+
+        /*
+		* Create a tuple from an array of terms.
+		*
+		* @param elems the array of terms to create the tuple from.
+		* @param start the offset of the first term to insert.
+		* @param count the number of terms to insert.
+		*
+		* @exception C#.lang.IllegalArgumentException if the array is
+		* empty (null) or contains null elements.
+		**/
+		public Tuple(params System.Object[] elems)
+		{
+			if (elems == null)
+				elems = new Object[] {};
+			else
+			{
+				this.elems = new Object[elems.Length];
+                for (int i = 0; i < elems.Length; i++)
+				{
+					if (elems[i] == null)
+						throw new System.ArgumentException("Tuple element cannot be null (element" + i + ")");
+					else
+                    {
+                        System.Object o = elems[i];
+                        if (o is int) this.elems[i] = new Int((int)o);
+                        else if (o is string) this.elems[i] = new String((string)o);
+                        else if (o is float) this.elems[i] = new Double((float)o);
+                        else if (o is double) this.elems[i] = new Double((double)o);
+                        else if (o is Erlang.Object) this.elems[i] = (Erlang.Object)o;
+                        //else if (o is BigInteger) this.elems[i] = (BigInteger)o;
+                        else if (o is uint) this.elems[i] = new UInt((int)o);
+                        else if (o is short) this.elems[i] = new Short((short)o);
+                        else if (o is ushort) this.elems[i] = new UShort((short)o);
+                        else
+                            throw new System.ArgumentException("Unknown type of element[" + i + "]: " + o.GetType().ToString());
+                    }
+                }
+			}
+		}
 		/*
-		* Create a tuple from a stream containing an tuple encoded in Erlang
+        * Create a tuple from a stream containing an tuple encoded in Erlang
 		* external format.
 		*
 		* @param buf the stream containing the encoded tuple.
@@ -157,7 +196,12 @@ namespace Otp.Erlang
 			return res;
 		}
 		
-		
+		public Object this[int index]
+        {
+            get { return this.elems[index]; }
+            set { this.elems[index] = value; }
+        }
+
 		/*
 		* Get the string representation of the tuple.
 		*

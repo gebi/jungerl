@@ -37,8 +37,11 @@ namespace Otp
 		
 		/*The tag used for floating point numbers */
 		public const int floatTag = 99;
-		
-		/*The tag used for atoms */
+
+        /*The tag used for IEEE 754 double format */
+        public const int newFloatTag = 70;
+
+        /*The tag used for atoms */
 		public const int atomTag = 100;
 		
 		/*The tag used for old stype references */

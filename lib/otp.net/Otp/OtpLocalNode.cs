@@ -32,29 +32,35 @@ namespace Otp
 		
 		protected internal int _port;
 		protected internal System.Net.Sockets.TcpClient epmd;
-		
-		protected internal OtpLocalNode():base()
-		{
-			init();
-		}
-		
-		/*
-		* Create a node with the given name and the default cookie.
-		**/
-		protected internal OtpLocalNode(System.String node):base(node)
-		{
-			init();
-		}
-		
-		/*
-		* Create a node with the given name and cookie.
-		**/
-		protected internal OtpLocalNode(System.String node, System.String cookie):base(node, cookie)
-		{
-			init();
-		}
-		
-		private void  init()
+        public static bool ignoreLocalEpmdConnectErrors = false;
+        // handle status changes
+        protected OtpNodeStatus handler;
+
+        /*
+        * Create a node with the given name and the default cookie.
+        **/
+        protected internal OtpLocalNode(System.String node)
+            : base(node)
+        {
+            init();
+        }
+
+        /*
+        * Create a node with the given name and cookie.
+        **/
+        protected internal OtpLocalNode(System.String node, System.String cookie)
+            : base(node, cookie, false)
+        {
+            init();
+        }
+
+        protected internal OtpLocalNode(System.String node, System.String cookie, bool shortName)
+            : base(node, cookie, shortName)
+        {
+            init();
+        }
+
+        private void init()
 		{
 			serial = 0;
 			pidCount = 1;
@@ -63,14 +69,102 @@ namespace Otp
 			refId[0] = 1;
 			refId[1] = 0;
 			refId[2] = 0;
+            handler = new OtpNodeStatus();
 		}
-		
-		/*
-		* Get the port number used by this node.
-		*
-		* @return the port number this server node is accepting
-		* connections on.
-		**/
+
+        /*
+        * Register interest in certain system events. The {@link
+        * OtpNodeStatus OtpNodeStatus} handler object contains callback
+        * methods, that will be called when certain events occur. 
+        *
+        * @param handler the callback object to register. To clear the
+        * handler, specify null as the handler to use.
+        *
+        **/
+        public virtual void registerStatusHandler(OtpNodeStatus handler)
+        {
+            lock (this)
+            {
+                this.handler = handler;
+            }
+        }
+
+        public void registerStatusHandler(OtpNodeStatus.ConnectionStatusDelegate callback)
+        {
+            this.handler.registerStatusHandler(callback);
+        }
+
+        /*use these wrappers to call handler functions */
+        internal void remoteStatus(System.String node, bool up, System.Object info)
+        {
+            lock (this)
+            {
+                if (handler == null)
+                    return;
+                try
+                {
+                    handler.remoteStatus(node, up, info);
+                }
+                catch (System.Exception)
+                {
+                }
+            }
+        }
+
+        internal void localStatus(System.String node, bool up, System.Object info)
+        {
+            lock (this)
+            {
+                if (handler == null)
+                    return;
+                try
+                {
+                    handler.localStatus(node, up, info);
+                }
+                catch (System.Exception)
+                {
+                }
+            }
+        }
+
+        internal void connAttempt(System.String node, bool incoming, System.Object info)
+        {
+            lock (this)
+            {
+                if (handler == null)
+                    return;
+                try
+                {
+                    handler.connAttempt(node, incoming, info);
+                }
+                catch (System.Exception)
+                {
+                }
+            }
+        }
+
+        internal void epmdFailedConnAttempt(System.String node, System.Object info)
+        {
+            lock (this)
+            {
+                if (handler == null)
+                    return;
+                try
+                {
+                    handler.epmdFailedConnAttempt(node, info);
+                }
+                catch (System.Exception)
+                {
+                }
+            }
+        }
+
+        /*
+        * Get the port number used by this node.
+        *
+        * @return the port number this server node is accepting
+        * connections on.
+        **/
 		public virtual int port()
 		{
 			return this._port;
@@ -182,5 +276,5 @@ namespace Otp
 				return r;
 			}
 		}
-	}
+    }
 }

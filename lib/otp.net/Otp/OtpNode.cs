@@ -49,6 +49,7 @@ namespace Otp
 	public class OtpNode:OtpLocalNode
 	{
 		private bool initDone = false;
+        private int listenPort;
 		
 		// thread to manage incoming connections
 		private Acceptor acceptor = null;
@@ -58,9 +59,6 @@ namespace Otp
 		
 		// keep track of all mailboxes
 		internal Mailboxes mboxes = null;
-		
-		// handle status changes
-		internal OtpNodeStatus handler;
 		
 		/*
 		* <p> Create a node using the default cookie. The default
@@ -76,24 +74,59 @@ namespace Otp
 		* @exception IOException if communication could not be initialized.
 		*
 		**/
-		public OtpNode(System.String node):this(node, defaultCookie, 0)
-		{
-		}
-		
-		/*
-		* Create a node.
-		*
-		* @param node the name of this node.
-		*
-		* @param cookie the authorization cookie that will be used by this
-		* node when it communicates with other nodes.
-		*
-		* @exception IOException if communication could not be initialized.
-		*
-		**/
-		public OtpNode(System.String node, System.String cookie):this(node, cookie, 0)
-		{
-		}
+        public OtpNode(System.String node)
+            : this(node, true, defaultCookie, 0, false)
+        {
+        }
+
+        public OtpNode(System.String node, bool acceptConnections)
+            : this(node, acceptConnections, defaultCookie, 0, false)
+        {
+        }
+
+        public OtpNode(System.String node, bool acceptConnections, bool shortName)
+            : this(node, acceptConnections, defaultCookie, 0, shortName)
+        {
+        }
+
+        /*
+        * Create a node.
+        *
+        * @param node the name of this node.
+        *
+        * @param cookie the authorization cookie that will be used by this
+        * node when it communicates with other nodes.
+        *
+        * @exception IOException if communication could not be initialized.
+        *
+        **/
+        public OtpNode(System.String node, bool acceptConnections, System.String cookie)
+            : this(node, acceptConnections, cookie, 0, false)
+        {
+        }
+
+        /*
+        * Create a node.
+        *
+        * @param acceptConnections when true this node will register with epmd and 
+        * start listening for connections.
+        * 
+        * @param node the name of this node.
+        *
+        * @param cookie the authorization cookie that will be used by this
+        * node when it communicates with other nodes.
+        *
+        * @param shortName defines whether the node should use short or long names when 
+        * referencing other nodes.
+        *
+        * @exception IOException if communication could not be initialized.
+        *
+        **/
+
+        public OtpNode(bool acceptConnections, System.String node, System.String cookie, bool shortName)
+            : this(node, acceptConnections, cookie, 0, shortName)
+        {
+        }
 		
 		/*
 		* Create a node.
@@ -110,12 +143,13 @@ namespace Otp
 		* @exception IOException if communication could not be initialized.
 		*
 		**/
-		public OtpNode(System.String node, System.String cookie, int port):base(node, cookie)
-		{
-			init(port);
-		}
+        public OtpNode(System.String node, bool acceptConnections, System.String cookie, int port, bool shortName)
+            : base(node, cookie, shortName)
+        {
+            init(acceptConnections, port);
+        }
 
-		private void  init(int port)
+		private void  init(bool acceptConnections, int port)
 		{
 			lock(this)
 			{
@@ -123,21 +157,44 @@ namespace Otp
 				{
 					connections = new System.Collections.Hashtable(17, (float) 0.95);
 					mboxes = new Mailboxes(this);
-					acceptor = new Acceptor(this, port);
+                    if (acceptConnections)
+					    acceptor = new Acceptor(this, port);
+                    listenPort = port;
 					initDone = true;
 				}
 			}
 		}
 
-		/*
-		* Close the node. Unpublish the node from Epmd (preventing new
-		* connections) and close all existing connections.
-		**/
+        /*
+         * When a node instance is created is started with acceptConnections set to false
+         * then no incoming connections are accepted.  This method allows to begin
+         * accepting connections.
+         **/
+        public bool startConnectionAcceptor()
+        {
+            if (acceptor != null)
+                return true;
+            else if (!initDone)
+                return false;
+
+            lock (this)
+            {
+                if (acceptor != null)
+                    acceptor = new Acceptor(this, listenPort);
+            }
+            return true;
+        }
+
+        /*
+        * Close the node. Unpublish the node from Epmd (preventing new
+        * connections) and close all existing connections.
+        **/
 		public virtual void close()
 		{
 			lock(this)
 			{
-				acceptor.quit();
+                if (acceptor != null)
+				    acceptor.quit();
 				OtpCookedConnection conn;
 				System.Collections.IDictionaryEnumerator it = connections.GetEnumerator();
 
@@ -257,23 +314,6 @@ namespace Otp
 			if (m != null)
 				return m.self();
 			return null;
-		}
-		
-		/*
-		* Register interest in certain system events. The {@link
-		* OtpNodeStatus OtpNodeStatus} handler object contains callback
-		* methods, that will be called when certain events occur. 
-		*
-		* @param handler the callback object to register. To clear the
-		* handler, specify null as the handler to use.
-		*
-		**/
-		public virtual void  registerStatusHandler(OtpNodeStatus handler)
-		{
-			lock(this)
-			{
-				this.handler = handler;
-			}
 		}
 		
 		/*
@@ -401,9 +441,9 @@ namespace Otp
 			
 			try
 			{
-				int t = m.type();
+                OtpMsg.Tag t = m.type();
 				
-				if (t == OtpMsg.regSendTag)
+				if (t == OtpMsg.Tag.regSendTag)
 				{
 					System.String name = m.getRecipientName();
 					/*special case for netKernel requests */
@@ -443,7 +483,7 @@ namespace Otp
 		/*
 		* find or create a connection to the given node
 		*/
-		internal virtual OtpCookedConnection getConnection(System.String node)
+		public virtual OtpCookedConnection connection(System.String node)
 		{
 			OtpPeer peer = null;
 			OtpCookedConnection conn = null;
@@ -491,56 +531,6 @@ namespace Otp
 			if ((conn != null) && (conn.name != null))
 			{
 				connections.Remove(conn.name);
-			}
-		}
-		
-		
-		/*use these wrappers to call handler functions */
-		private void  remoteStatus(System.String node, bool up, System.Object info)
-		{
-			lock(this)
-			{
-				if (handler == null)
-					return ;
-				try
-				{
-					handler.remoteStatus(node, up, info);
-				}
-				catch (System.Exception)
-				{
-				}
-			}
-		}
-
-		private void  localStatus(System.String node, bool up, System.Object info)
-		{
-			lock(this)
-			{
-				if (handler == null)
-					return ;
-				try
-				{
-					handler.localStatus(node, up, info);
-				}
-				catch (System.Exception)
-				{
-				}
-			}
-		}
-
-		private void  connAttempt(System.String node, bool incoming, System.Object info)
-		{
-			lock(this)
-			{
-				if (handler == null)
-					return ;
-				try
-				{
-					handler.connAttempt(node, incoming, info);
-				}
-				catch (System.Exception)
-				{
-				}
 			}
 		}
 		
@@ -721,7 +711,7 @@ namespace Otp
 			{
 				InitBlock(a_node);
 
-				a_sock = new System.Net.Sockets.TcpListener(System.Net.Dns.Resolve("localhost").AddressList[0], port);
+				a_sock = new System.Net.Sockets.TcpListener(System.Net.Dns.GetHostEntry("localhost").AddressList[0], port);
 				a_sock.Start();
 				this.a_port = ((System.Net.IPEndPoint)a_sock.LocalEndpoint).Port;
 				a_node._port = this.a_port;

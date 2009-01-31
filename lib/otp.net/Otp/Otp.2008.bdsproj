@@ -1,0 +1,300 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<PersonalityInfo>
+		<Option>
+			<Option Name="Personality" Type="String">CSharp.Personality</Option>
+			<Option Name="GUID" Type="String">{71378BB0-72DB-4D89-97EA-E667752C9A7C}</Option>
+			<Option Name="ProjectType" Type="String">Application</Option>
+			<Option Name="Version" Type="String">1.0</Option>
+		</Option>
+	</PersonalityInfo>
+	<CSharp.Personality>
+		<Options>
+			<SelectedOptionSet Name="OptionsSet" Type="String">Debug  <SelectedOptionSet Name="OptionsSet" Type="String">Debug</SelectedOptionSet>
+			</SelectedOptionSet>
+			<OptionsSet Name="Debug">
+				<Options>
+					<Options Name="DebugInformation" Type="Boolean">True</Options>
+					<Options Name="Optimization" Type="Boolean">False</Options>
+					<Options Name="Incremental" Type="Boolean">False</Options>
+					<Options Name="Overflow" Type="Boolean">True</Options>
+					<Options Name="DocumentationFile" Type="String"></Options>
+					<Options Name="ivUnsafe" Type="Boolean">False</Options>
+					<Options Name="WarningAsError" Type="Boolean">False</Options>
+					<Options Name="Warning" Type="Integer">4</Options>
+					<Options Name="Defines" Type="String">TRACE;DEBUG</Options>
+					<Options Name="TargetName" Type="String"></Options>
+					<Options Name="TargetType" Type="String">Console</Options>
+					<Options Name="BaseAddress" Type="String">285212672</Options>
+					<Options Name="OutputDirectory" Type="String">bin\</Options>
+					<Options Name="DefaultNamespace" Type="String">Otp.Net</Options>
+					<Options Name="Main" Type="String"></Options>
+					<Options Name="RunParams" Type="String">wolf</Options>
+					<Options Name="HostApplication" Type="String"></Options>
+					<Options Name="Launcher" Type="String"></Options>
+					<Options Name="UseLauncher" Type="Boolean">False</Options>
+					<Options Name="DebugCWD" Type="String"></Options>
+					<Options Name="RemotePath" Type="String"></Options>
+					<Options Name="RemoteHost" Type="String"></Options>
+					<Options Name="RemoteLauncher" Type="String"></Options>
+					<Options Name="RemoteDebug" Type="Boolean">False</Options>
+					<Options Name="AspNetUseHostServer" Type="Boolean">False</Options>
+					<Options Name="AspNetLaunchBrowser" Type="Boolean">False</Options>
+					<Options Name="AspNetStartPage" Type="String"></Options>
+					<Options Name="AspNetHostServer" Type="String">IIS</Options>
+					<Options Name="AspNetCassiniVirtualDirectory" Type="String"></Options>
+					<Options Name="AspNetIISVirtualDirectory" Type="String"></Options>
+					<Options Name="AspNetHTTPAddress" Type="String"></Options>
+					<Options Name="ApplicationIcon" Type="String"></Options>
+					<Options Name="BuildInOutput" Type="Boolean">True</Options>
+					<Options Name="RemoteCWD" Type="String"></Options>
+				</Options>
+			</OptionsSet>
+			<OptionsSet Name="Release">
+				<Options>
+					<Options Name="DebugInformation" Type="Boolean">False</Options>
+					<Options Name="Optimization" Type="Boolean">True</Options>
+					<Options Name="Incremental" Type="Boolean">False</Options>
+					<Options Name="Overflow" Type="Boolean">False</Options>
+					<Options Name="DocumentationFile" Type="String"></Options>
+					<Options Name="ivUnsafe" Type="Boolean">False</Options>
+					<Options Name="WarningAsError" Type="Boolean">False</Options>
+					<Options Name="Warning" Type="Integer">4</Options>
+					<Options Name="Defines" Type="String">TRACE</Options>
+					<Options Name="TargetName" Type="String"></Options>
+					<Options Name="TargetType" Type="String">Console</Options>
+					<Options Name="BaseAddress" Type="String">285212672</Options>
+					<Options Name="OutputDirectory" Type="String">C:\Documents and Settings\vladum\Mina dokument\Visual Studio Projects\Otp.Net\bin\</Options>
+					<Options Name="DefaultNamespace" Type="String">Otp.Net</Options>
+					<Options Name="Main" Type="String"></Options>
+					<Options Name="RunParams" Type="String"></Options>
+					<Options Name="HostApplication" Type="String"></Options>
+					<Options Name="Launcher" Type="String"></Options>
+					<Options Name="UseLauncher" Type="Boolean">False</Options>
+					<Options Name="DebugCWD" Type="String"></Options>
+					<Options Name="RemotePath" Type="String"></Options>
+					<Options Name="RemoteHost" Type="String"></Options>
+					<Options Name="RemoteLauncher" Type="String"></Options>
+					<Options Name="RemoteDebug" Type="Boolean">False</Options>
+					<Options Name="AspNetUseHostServer" Type="Boolean">False</Options>
+					<Options Name="AspNetLaunchBrowser" Type="Boolean">False</Options>
+					<Options Name="AspNetStartPage" Type="String"></Options>
+					<Options Name="AspNetHostServer" Type="String">IIS</Options>
+					<Options Name="AspNetCassiniVirtualDirectory" Type="String"></Options>
+					<Options Name="AspNetIISVirtualDirectory" Type="String"></Options>
+					<Options Name="AspNetHTTPAddress" Type="String"></Options>
+					<Options Name="ApplicationIcon" Type="String"></Options>
+					<Options Name="BuildInOutput" Type="Boolean">True</Options>
+					<Options Name="RemoteCWD" Type="String"></Options>
+				</Options>
+			</OptionsSet>
+		</Options>
+      
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <FileList>
+      <File FileName="c:\windows\microsoft.net\framework\v1.1.4322\System.dll" ContainerId="DotNetAssemblyCompiler" ModuleName="System" AssemblyName="System" Version="1.0.5000.0"/>
+      <File FileName="c:\windows\microsoft.net\framework\v1.1.4322\System.Data.dll" ContainerId="DotNetAssemblyCompiler" ModuleName="System.Data" AssemblyName="System.Data" Version="1.0.5000.0"/>
+      <File FileName="c:\windows\microsoft.net\framework\v1.1.4322\System.XML.dll" ContainerId="DotNetAssemblyCompiler" ModuleName="System.XML" AssemblyName="System.Xml" Version="1.0.5000.0"/>
+      <File FileName="AbstractConnection.cs" ContainerId="CSharpCompiler" ModuleName="AbstractConnection"/>
+      <File FileName="AbstractNode.cs" ContainerId="CSharpCompiler" ModuleName="AbstractNode"/>
+      <File FileName="AssemblyInfo.cs" ContainerId="CSharpCompiler" ModuleName="AssemblyInfo"/>
+      <File FileName="Link.cs" ContainerId="CSharpCompiler" ModuleName="Link"/>
+      <File FileName="Links.cs" ContainerId="CSharpCompiler" ModuleName="Links"/>
+      <File FileName="OtpAuthException.cs" ContainerId="CSharpCompiler" ModuleName="OtpAuthException"/>
+      <File FileName="OtpConnection.cs" ContainerId="CSharpCompiler" ModuleName="OtpConnection"/>
+      <File FileName="OtpCookedConnection.cs" ContainerId="CSharpCompiler" ModuleName="OtpCookedConnection"/>
+      <File FileName="OtpEpmd.cs" ContainerId="CSharpCompiler" ModuleName="OtpEpmd"/>
+      <File FileName="OtpException.cs" ContainerId="CSharpCompiler" ModuleName="OtpException"/>
+      <File FileName="OtpExternal.cs" ContainerId="CSharpCompiler" ModuleName="OtpExternal"/>
+      <File FileName="OtpInputStream.cs" ContainerId="CSharpCompiler" ModuleName="OtpInputStream"/>
+      <File FileName="OtpLocalNode.cs" ContainerId="CSharpCompiler" ModuleName="OtpLocalNode"/>
+      <File FileName="OtpMbox.cs" ContainerId="CSharpCompiler" ModuleName="OtpMbox"/>
+      <File FileName="OtpMsg.cs" ContainerId="CSharpCompiler" ModuleName="OtpMsg"/>
+      <File FileName="OtpNode.cs" ContainerId="CSharpCompiler" ModuleName="OtpNode"/>
+      <File FileName="OtpNodeStatus.cs" ContainerId="CSharpCompiler" ModuleName="OtpNodeStatus"/>
+      <File FileName="OtpOutputStream.cs" ContainerId="CSharpCompiler" ModuleName="OtpOutputStream"/>
+      <File FileName="OtpPeer.cs" ContainerId="CSharpCompiler" ModuleName="OtpPeer"/>
+      <File FileName="OtpSelf.cs" ContainerId="CSharpCompiler" ModuleName="OtpSelf"/>
+      <File FileName="OtpServer.cs" ContainerId="CSharpCompiler" ModuleName="OtpServer"/>
+      <File FileName="SupportClass.cs" ContainerId="CSharpCompiler" ModuleName="SupportClass"/>
+      <File FileName="Erlang\Atom.cs" ContainerId="CSharpCompiler" ModuleName="Atom"/>
+      <File FileName="Erlang\Binary.cs" ContainerId="CSharpCompiler" ModuleName="Binary"/>
+      <File FileName="Erlang\Boolean.cs" ContainerId="CSharpCompiler" ModuleName="Boolean"/>
+      <File FileName="Erlang\Byte.cs" ContainerId="CSharpCompiler" ModuleName="Byte"/>
+      <File FileName="Erlang\Char.cs" ContainerId="CSharpCompiler" ModuleName="Char"/>
+      <File FileName="Erlang\DecodeException.cs" ContainerId="CSharpCompiler" ModuleName="DecodeException"/>
+      <File FileName="Erlang\Double.cs" ContainerId="CSharpCompiler" ModuleName="Double"/>
+      <File FileName="Erlang\ErlangException.cs" ContainerId="CSharpCompiler" ModuleName="ErlangException"/>
+      <File FileName="Erlang\Exit.cs" ContainerId="CSharpCompiler" ModuleName="Exit"/>
+      <File FileName="Erlang\Int.cs" ContainerId="CSharpCompiler" ModuleName="Int"/>
+      <File FileName="Erlang\List.cs" ContainerId="CSharpCompiler" ModuleName="List"/>
+      <File FileName="Erlang\Long.cs" ContainerId="CSharpCompiler" ModuleName="Long"/>
+      <File FileName="Erlang\Object.cs" ContainerId="CSharpCompiler" ModuleName="Object"/>
+      <File FileName="Erlang\Pid.cs" ContainerId="CSharpCompiler" ModuleName="Pid"/>
+      <File FileName="Erlang\Port.cs" ContainerId="CSharpCompiler" ModuleName="Port"/>
+      <File FileName="Erlang\RangeException.cs" ContainerId="CSharpCompiler" ModuleName="RangeException"/>
+      <File FileName="Erlang\Ref.cs" ContainerId="CSharpCompiler" ModuleName="Ref"/>
+      <File FileName="Erlang\Short.cs" ContainerId="CSharpCompiler" ModuleName="Short"/>
+      <File FileName="Erlang\String.cs" ContainerId="CSharpCompiler" ModuleName="String"/>
+      <File FileName="Erlang\Tuple.cs" ContainerId="CSharpCompiler" ModuleName="Tuple"/>
+      <File FileName="Erlang\UInt.cs" ContainerId="CSharpCompiler" ModuleName="UInt"/>
+      <File FileName="Erlang\UShort.cs" ContainerId="CSharpCompiler" ModuleName="UShort"/>
+      <File FileName="Test.cs" ContainerId="CSharpCompiler" ModuleName="Test"/>
+      <File FileName="GenericQueue.cs" ContainerId="CSharpCompiler" ModuleName="GenericQueue"/>
+      <File FileName="Erlang\CloneObject.cs" ContainerId="CSharpCompiler" ModuleName="CloneObject"/>
+      <File FileName="Erlang\BigInteger.cs" ContainerId="CSharpCompiler" ModuleName="BigInteger"/>
+    </FileList>
+  </CSharp.Personality>
+	<ImportData>
+		<CSharpProjectOptions ApplicationIcon="" AssemblyKeyContainerName="" AssemblyName="Otp.Net" AssemblyOriginatorKeyFile="" DefaultClientScript="JScript" DefaultHTMLPageLayout="Grid" DefaultTargetSchema="IE50" DelaySign="false" OutputType="Exe" RootNamespace="Otp.Net" StartupObject=""/>
+		<CSharpLocalOptions Name="Debug" AllowUnsafeBlocks="false" BaseAddress="285212672" CheckForOverflowUnderflow="false" ConfigurationOverrideFile="" DefineConstants="DEBUG;TRACE" DocumentationFile="" DebugSymbols="true" FileAlignment="4096" IncrementalBuild="true" Optimize="false" OutputPath="C:\Documents and Settings\vladum\Mina dokument\Visual Studio Projects\Otp.Net\bin\Debug\" RegisterForComInterop="false" RemoveIntegerChecks="false" TreatWarningsAsErrors="false" WarningLevel="4"/>
+		<CSharpLocalOptions Name="Release" AllowUnsafeBlocks="false" BaseAddress="285212672" CheckForOverflowUnderflow="false" ConfigurationOverrideFile="" DefineConstants="TRACE" DocumentationFile="" DebugSymbols="false" FileAlignment="4096" IncrementalBuild="false" Optimize="true" OutputPath="C:\Documents and Settings\vladum\Mina dokument\Visual Studio Projects\Otp.Net\bin\" RegisterForComInterop="false" RemoveIntegerChecks="false" TreatWarningsAsErrors="false" WarningLevel="4"/>
+	</ImportData>
+</BorlandProject>

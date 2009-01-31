@@ -12,7 +12,7 @@
 	 approxMatch/2,search/2,substrings/2,present/1,
 	 'and'/1,'or'/1,'not'/1,modify/3, mod_add/2, mod_delete/2,
 	 mod_replace/2, add/3, delete/2, modify_dn/5,parse_dn/1,
-	 parse_ldap_url/1]).
+	 parse_ldap_url/1,sasl_bind/1,sasl_bind/2]).
 
 -import(lists,[concat/1]).
 
@@ -22,6 +22,7 @@
 -define(LDAP_VERSION, 3).
 -define(LDAP_PORT, 389).
 -define(LDAPS_PORT, 636).
+-define(LDAP_SERVICE, "ldap").
 
 -record(eldap, {version = ?LDAP_VERSION,
 		host,                % Host running LDAP server
@@ -36,6 +37,11 @@
 		use_tls = false      % LDAP/LDAPS
 	       }).
 
+-record(sasl_props, {
+	  mechanism,				% SASL mechanism (GSSAPI)
+	  esasl					% esasl reference
+	  }).
+	  
 %%% For debug purposes
 %%-define(PRINT(S, A), io:fwrite("~w(~w): " ++ S, [?MODULE,?LINE|A])).
 -define(PRINT(S, A), true).
@@ -93,6 +99,34 @@ controlling_process(Handle, Pid) when pid(Handle),pid(Pid)  ->
 %%% --------------------------------------------------------------------
 simple_bind(Handle, Dn, Passwd) when pid(Handle)  ->
     send(Handle, {simple_bind, Dn, Passwd}),
+    recv(Handle).
+
+%%% --------------------------------------------------------------------
+%%% sasl_bind(Handle [,Opts] )
+%%% --------------------
+%%% Authenticate ourselves to the Directory 
+%%% using SASL authentication.
+%%%
+%%% Valid Opts are:      Where:
+%%%
+%%%    {mech, Mech}        - Mech is the SASL mechanism (default "GSSAPI"). 
+%%%    {authid, Authid}    - Authid is the authentication ID (default "").
+%%%    {authid, Authzid}   - Authzid is the authorization ID (default "").
+%%%    {realm, Realm}      - Realm is the realm of authentication ID
+%%%                          (default "")
+%%%
+%%%  Returns: ok | {error, Error}
+%%% --------------------------------------------------------------------
+sasl_bind(Handle) when pid(Handle)  ->
+    sasl_bind(Handle, []).
+
+sasl_bind(Handle, Options) when pid(Handle)  ->
+    Defaults = [{mech, "GSSAPI"},
+		{authid, ""},
+		{authzid, ""},
+		{realm, ""}],
+    Options1 = lists:keymerge(1, Options, Defaults),
+    send(Handle, {sasl_bind, Options1}),
     recv(Handle).
 
 %%% --------------------------------------------------------------------
@@ -326,7 +360,7 @@ parse_args([{port, Port}|T], Cpid, Data) when integer(Port) ->
 parse_args([{timeout, Timeout}|T], Cpid, Data) when integer(Timeout),Timeout>0 ->
     parse_args(T, Cpid, Data#eldap{timeout = Timeout});
 parse_args([{anon_auth, true}|T], Cpid, Data) ->
-    parse_args(T, Cpid, Data#eldap{anon_auth = false});
+    parse_args(T, Cpid, Data#eldap{anon_auth = true});
 parse_args([{anon_auth, _}|T], Cpid, Data) ->
     parse_args(T, Cpid, Data);
 parse_args([{ssl, true}|T], Cpid, Data) ->
@@ -402,6 +436,11 @@ loop(Cpid, Data) ->
 	    send(From,Res),
 	    loop(Cpid, NewData);
 
+	{From, {sasl_bind, Options}} ->
+	    {Res,NewData} = do_sasl_bind(Data, Options),
+	    send(From,Res),
+	    loop(Cpid, NewData);
+
 	{From, {cnt_proc, NewCpid}} ->
 	    unlink(Cpid),
 	    send(From,ok),
@@ -467,6 +506,84 @@ exec_simple_bind_reply(Data, {ok,Msg}) when
 	Other -> {error, Other}
     end;
 exec_simple_bind_reply(_, Error) ->
+    {error, Error}.
+
+do_sasl_bind(Data, Options) ->
+    case catch do_the_sasl_bind(Data, Options) of
+	{ok,NewData} -> {ok,NewData};
+	{error,Emsg} -> {{error,Emsg},Data};
+	Else         -> {{error,Else},Data}
+    end.
+
+do_the_sasl_bind(Data, Options1) ->
+    Host = Data#eldap.host,
+
+    {value, {mech, Mech}} = lists:keysearch(mech, 1, Options1),
+    Ccname =
+	case lists:keysearch(ccname, 1, Options1) of
+	    {value, {ccname, Ccname1}} ->
+		Ccname1;
+	    _ ->
+		""
+	end,
+
+    {ok, Pid} = esasl:start_link("", Ccname),
+    {ok, Ref} = esasl:client_start(Pid, Mech, ?LDAP_SERVICE, Host),
+    Set_prop = fun(E) -> 
+		       {value, {E, Value}} = lists:keysearch(E, 1, Options1),
+		       esasl:property_set(Ref, E, Value)
+	       end,
+
+    lists:foreach(Set_prop, [authid, authzid, realm]),
+
+    Sasl = #sasl_props{mechanism=Mech,
+		       esasl=Ref},
+    Res = exec_sasl_bind(Data, Sasl),
+    esasl:finish(Ref),
+    esasl:stop(Pid),
+    Res.
+
+exec_sasl_bind(Data, Sasl) ->
+    exec_sasl_bind(Data, Sasl, <<>>).
+
+exec_sasl_bind(Data, Sasl, Input) ->
+    Ref = Sasl#sasl_props.esasl,
+
+    case esasl:step(Ref, Input) of
+	{error, Reason} ->
+	    {error, Reason};
+	{ok, Rsp} ->
+	    send_sasl_bind(Data, Sasl, Rsp);
+	{needsmore, Rsp} ->
+	    send_sasl_bind(Data, Sasl, Rsp)
+    end.
+
+send_sasl_bind(Data, Sasl, Rsp) ->
+    Mechanism = Sasl#sasl_props.mechanism,
+    Creds = #'SaslCredentials'{mechanism = Mechanism,
+			       credentials = binary_to_list(Rsp)},
+    Req = #'BindRequest'{version        = Data#eldap.version,
+			 name           = Data#eldap.binddn,  
+			 authentication = {sasl, Creds}},
+    log2(Data, "bind request = ~p~n", [Req]),
+    Reply = request(Data#eldap.fd, Data, Data#eldap.id, {bindRequest, Req}),
+    log2(Data, "bind reply = ~p~n", [Reply]),    
+    exec_sasl_bind_reply(Data, Sasl, Reply).
+
+exec_sasl_bind_reply(Data, Sasl, {ok,Msg}) when 
+  Msg#'LDAPMessage'.messageID == Data#eldap.id ->
+    case Msg#'LDAPMessage'.protocolOp of
+	{bindResponse, Result} ->
+	    case Result#'BindResponse'.resultCode of
+		success -> {ok,Data};
+		saslBindInProgress ->
+		    Rsp = Result#'BindResponse'.serverSaslCreds,
+		    exec_sasl_bind(Data, Sasl, list_to_binary(Rsp));
+		Error   -> {error, Error}
+	    end;
+	Other -> {error, Other}
+    end;
+exec_sasl_bind_reply(_, _, Error) ->
     {error, Error}.
 
 

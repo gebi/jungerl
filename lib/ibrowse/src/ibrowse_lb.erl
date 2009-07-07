@@ -7,7 +7,7 @@
 %%%-------------------------------------------------------------------
 -module(ibrowse_lb).
 
--vsn('$Id: ibrowse_lb.erl,v 1.2 2009/07/01 22:43:19 chandrusf Exp $ ').
+-vsn('$Id: ibrowse_lb.erl,v 1.3 2009/07/07 22:30:58 chandrusf Exp $ ').
 -author(chandru).
 -behaviour(gen_server).
 %%--------------------------------------------------------------------
@@ -151,7 +151,13 @@ handle_info({'EXIT', Pid, _Reason},
     ets:match_delete(Tid, {{'_', Pid}, '_'}),
     {noreply, State#state{num_cur_sessions = Cur - 1}};
 
-handle_info({trace, Bool}, State) ->
+handle_info({trace, Bool}, #state{ets_tid = Tid} = State) ->
+    ets:foldl(fun({{_, Pid}, _}, Acc) when is_pid(Pid) ->
+		      catch Pid ! {trace, Bool},
+		      Acc;
+		 (_, Acc) ->
+		      Acc
+	      end, undefined, Tid),
     put(my_trace_flag, Bool),
     {noreply, State};
 

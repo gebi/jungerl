@@ -57,7 +57,7 @@
 %% driver isn't actually used.</p>
 
 -module(ibrowse).
--vsn('$Id: ibrowse.erl,v 1.9 2009/07/07 22:30:58 chandrusf Exp $ ').
+-vsn('$Id: ibrowse.erl,v 1.10 2009/07/08 11:05:45 chandrusf Exp $ ').
 
 -behaviour(gen_server).
 %%--------------------------------------------------------------------
@@ -372,10 +372,11 @@ do_send_req(Conn_Pid, Parsed_url, Headers, Method, Body, Options, Timeout) ->
 	    Ret
     end.
 
-ensure_bin(L) when is_list(L) ->
-    list_to_binary(L);
-ensure_bin(B) when is_binary(B) ->
-    B.
+ensure_bin(L) when is_list(L)                     -> list_to_binary(L);
+ensure_bin(B) when is_binary(B)                   -> B;
+ensure_bin(Fun) when is_function(Fun)             -> Fun;
+ensure_bin({Fun}) when is_function(Fun)           -> Fun;
+ensure_bin({Fun, _} = Body) when is_function(Fun) -> Body.
 
 %% @doc Creates a HTTP client process to the specified Host:Port which
 %% is not part of the load balancing pool. This is useful in cases

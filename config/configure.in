@@ -51,7 +51,7 @@ case "$target_os" in
 	;;
       linux*)
 	AC_DEFINE(LINUX,,LINUX)
-	LD_SHARED="ld -shared"
+	LD_SHARED="$CC -shared"
 	;;
       *bsd*)
 	AC_DEFINE(BSD,,BSD)

@@ -4,7 +4,7 @@
 %%% Created : 14 Oct 2003 by Chandrashekhar Mullaparthi <chandrashekhar.mullaparthi@t-mobile.co.uk>
 
 -module(ibrowse_test).
--vsn('$Id: ibrowse_test.erl,v 1.5 2009/07/07 22:30:58 chandrusf Exp $ ').
+-vsn('$Id: ibrowse_test.erl,v 1.6 2009/07/29 18:03:21 chandrusf Exp $ ').
 -export([
 	 load_test/3,
 	 send_reqs_1/3,
@@ -231,6 +231,7 @@ unit_tests(Options) ->
 	{'DOWN', Ref, _, _, Info} ->
 	    io:format("Test process crashed: ~p~n", [Info])
     after 60000 ->
+	    exit(Pid, kill),
 	    io:format("Timed out waiting for tests to complete~n", [])
     end.
 
@@ -301,6 +302,9 @@ wait_for_resp(Pid) ->
     receive
 	{async_result, Pid, Res} ->
 	    Res;
+	{async_result, Other_pid, _} ->
+	    io:format("~p: Waiting for result from ~p: got from ~p~n", [self(), Pid, Other_pid]),
+	    wait_for_resp(Pid);
 	{'DOWN', _, _, Pid, Reason} ->
 	    {'EXIT', Reason};
 	{'DOWN', _, _, _, _} ->

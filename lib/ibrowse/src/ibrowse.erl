@@ -7,7 +7,7 @@
 %%%-------------------------------------------------------------------
 %% @author Chandrashekhar Mullaparthi <chandrashekhar dot mullaparthi at gmail dot com>
 %% @copyright 2005-2009 Chandrashekhar Mullaparthi
-%% @version 1.5.1
+%% @version 1.5.2
 %% @doc The ibrowse application implements an HTTP 1.1 client. This
 %% module implements the API of the HTTP client. There is one named
 %% process called 'ibrowse' which assists in load balancing and maintaining configuration. There is one load balancing process per unique webserver. There is
@@ -57,7 +57,7 @@
 %% driver isn't actually used.</p>
 
 -module(ibrowse).
--vsn('$Id: ibrowse.erl,v 1.10 2009/07/08 11:05:45 chandrusf Exp $ ').
+-vsn('$Id: ibrowse.erl,v 1.11 2009/09/06 20:04:02 chandrusf Exp $ ').
 
 -behaviour(gen_server).
 %%--------------------------------------------------------------------
@@ -98,6 +98,7 @@
 	 trace_on/2,
 	 trace_off/2,
 	 all_trace_off/0,
+	 show_dest_status/0,
 	 show_dest_status/2
 	]).
 
@@ -227,6 +228,10 @@ send_req(Url, Headers, Method, Body) ->
 %% </li>
 %% </ul>
 %% 
+%% <li> The <code>socket_options</code> option can be used to set
+%% specific options on the socket. The <code>{active, true | false | once}</code> 
+%% and <code>{packet_type, Packet_type}</code> will be filtered out by ibrowse.  </li>
+%%
 %% @spec send_req(Url::string(), Headers::headerList(), Method::method(), Body::body(), Options::optionList()) -> response()
 %% optionList() = [option()]
 %% option() = {max_sessions, integer()}        |
@@ -252,6 +257,7 @@ send_req(Url, Headers, Method, Body) ->
 %%          {host_header, string()}            |
 %%          {inactivity_timeout, integer()}    |
 %%          {connect_timeout, integer()}       |
+%%          {socket_options, Sock_opts}        |
 %%          {transfer_encoding, {chunked, ChunkSize}}
 %%
 %% stream_to() = process() | {process(), once}
@@ -259,6 +265,8 @@ send_req(Url, Headers, Method, Body) ->
 %% username() = string()
 %% password() = string()
 %% SSLOpt = term()
+%% Sock_opts = [Sock_opt]
+%% Sock_opt = term()
 %% ChunkSize = integer()
 %% srtf() = boolean() | filename()
 %% filename() = string()
@@ -480,6 +488,44 @@ all_trace_off() ->
     ibrowse ! all_trace_off,
     ok.
 
+show_dest_status() ->
+    Dests = lists:filter(fun({lb_pid, {Host, Port}, _}) when is_list(Host),
+							     is_integer(Port) ->
+				 true;
+			    (_) ->
+				 false
+			 end, ets:tab2list(ibrowse_lb)),
+    All_ets = ets:all(),
+    io:format("~-40.40s | ~-5.5s | ~-10.10s | ~s~n",
+	      ["Server:port", "ETS", "Num conns", "LB Pid"]),
+    io:format("~80.80.=s~n", [""]),
+    lists:foreach(fun({lb_pid, {Host, Port}, Lb_pid}) ->
+			  case lists:dropwhile(
+				 fun(Tid) ->
+					 ets:info(Tid, owner) /= Lb_pid
+				 end, All_ets) of
+			      [] ->
+				  io:format("~40.40s | ~-5.5s | ~-5.5s | ~s~n",
+					    [Host ++ ":" ++ integer_to_list(Port),
+					     "",
+					     "",
+					     io_lib:format("~p", [Lb_pid])]
+					   );
+			      [Tid | _] ->
+				  catch (
+				    begin
+					Size = ets:info(Tid, size),
+					io:format("~40.40s | ~-5.5s | ~-5.5s | ~s~n",
+						  [Host ++ ":" ++ integer_to_list(Port),
+						   integer_to_list(Tid),
+						   integer_to_list(Size),
+						   io_lib:format("~p", [Lb_pid])]
+						 )
+				    end
+				   )
+				  end
+		  end, Dests).
+					  
 %% @doc Shows some internal information about load balancing to a
 %% specified Host:Port. Info about workers spawned using
 %% spawn_worker_process/2 or spawn_link_worker_process/2 is not

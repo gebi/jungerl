@@ -6,7 +6,7 @@
 %%% Created : 11 Oct 2003 by Chandrashekhar Mullaparthi <chandrashekhar.mullaparthi@t-mobile.co.uk>
 %%%-------------------------------------------------------------------
 -module(ibrowse_http_client).
--vsn('$Id: ibrowse_http_client.erl,v 1.21 2009/07/29 18:03:21 chandrusf Exp $ ').
+-vsn('$Id: ibrowse_http_client.erl,v 1.22 2009/09/06 20:04:02 chandrusf Exp $ ').
 
 -behaviour(gen_server).
 %%--------------------------------------------------------------------
@@ -52,6 +52,7 @@
 
 -record(request, {url, method, options, from,
 		  stream_to, caller_controls_socket = false, 
+		  caller_socket_options = [],
 		  req_id,
 		  stream_chunk_size,
 		  save_response_to_file = false, 
@@ -412,14 +413,30 @@ handle_sock_closed(#state{reply_buffer = Buf, reqs = Reqs, http_status_code = SC
 	    State
     end.
 
-do_connect(Host, Port, _Options, #state{is_ssl=true, ssl_options=SSLOptions}, Timeout) ->
+do_connect(Host, Port, Options, #state{is_ssl=true, ssl_options=SSLOptions}, Timeout) ->
+    Caller_socket_options = get_value(socket_options, Options, []),
+    Other_sock_options = filter_sock_options(SSLOptions ++ Caller_socket_options),
     ssl:connect(Host, Port,
-		[binary, {nodelay, true}, {active, false} | SSLOptions],
+		[binary, {nodelay, true}, {active, false} | Other_sock_options],
 		Timeout);
-do_connect(Host, Port, _Options, _State, Timeout) ->
+do_connect(Host, Port, Options, _State, Timeout) ->
+    Caller_socket_options = get_value(socket_options, Options, []),
+    Other_sock_options = filter_sock_options(Caller_socket_options),
     gen_tcp:connect(Host, Port,
-		    [binary, {nodelay, true}, {active, false}],
+		    [binary, {nodelay, true}, {active, false} | Other_sock_options],
 		    Timeout).
+
+%% We don't want the caller to specify certain options
+filter_sock_options(Opts) ->
+    lists:filter(fun({active, _}) ->
+			 false;
+		    ({packet, _}) ->
+			 false;
+		    (list) ->
+			 false;
+		    (_) ->
+			 true
+		 end, Opts).
 
 do_send(Req, #state{socket = Sock, is_ssl = true})  ->  ssl:send(Sock, Req);
 do_send(Req, #state{socket = Sock, is_ssl = false}) ->  gen_tcp:send(Sock, Req).
@@ -461,6 +478,7 @@ active_once(#state{cur_req = #request{caller_controls_socket = true}}) ->
 active_once(#state{socket = Socket, is_ssl = Is_ssl}) ->
     do_setopts(Socket, [{active, once}], Is_ssl).
 
+do_setopts(_Sock, [],   _)    ->  ok;
 do_setopts(Sock, Opts, true)  ->  ssl:setopts(Sock, Opts);
 do_setopts(Sock, Opts, false) ->  inet:setopts(Sock, Opts).
 
@@ -517,9 +535,12 @@ send_req_1(From,
 		port    = Port,
 		path    = RelPath} = Url,
 	   Headers, Method, Body, Options, Timeout,
-	   #state{status = Status} = State) ->
+	   #state{status = Status,
+		  socket = Socket,
+		  is_ssl = Is_ssl} = State) ->
     ReqId = make_req_id(),
     Resp_format = get_value(response_format, Options, list),
+    Caller_socket_options = get_value(socket_options, Options, []),
     {StreamTo, Caller_controls_socket} =
 	case get_value(stream_to, Options, undefined) of
 	    {Caller, once} when is_pid(Caller) or
@@ -540,6 +561,7 @@ send_req_1(From,
 		      method                 = Method,
 		      stream_to              = StreamTo,
 		      caller_controls_socket = Caller_controls_socket,
+		      caller_socket_options  = Caller_socket_options,
 		      options                = Options,
 		      req_id                 = ReqId,
 		      save_response_to_file  = SaveResponseToFile,
@@ -547,7 +569,7 @@ send_req_1(From,
 		      response_format        = Resp_format,
 		      from                   = From},
     State_1 = State#state{reqs=queue:in(NewReq, State#state.reqs)},
-    Headers_1 = add_auth_headers(Url, Options, Headers, State),
+    Headers_1 = add_auth_headers(Url, Options, Headers, State_1),
     HostHeaderValue = case lists:keysearch(host_header, 1, Options) of
 			  false ->
 			      case Port of
@@ -559,7 +581,7 @@ send_req_1(From,
 		      end,
     {Req, Body_1} = make_request(Method,
 				 [{"Host", HostHeaderValue} | Headers_1],
-				 AbsPath, RelPath, Body, Options, State#state.use_proxy),
+				 AbsPath, RelPath, Body, Options, State_1#state.use_proxy),
     case get(my_trace_flag) of
 	true ->
 	    %%Avoid the binary operations if trace is not on...
@@ -569,12 +591,13 @@ send_req_1(From,
 		     "--- Request End ---~n", [NReq]);
 	_ -> ok
     end,
-    case do_send(Req, State) of
+    do_setopts(Socket, Caller_socket_options, Is_ssl),
+    case do_send(Req, State_1) of
 	ok ->
-	    case do_send_body(Body_1, State) of
+	    case do_send_body(Body_1, State_1) of
 		ok ->
 		    State_2 = inc_pipeline_counter(State_1),
-		    active_once(State_1),
+		    active_once(State_2),
 		    Ref = case Timeout of
 			      infinity ->
 				  undefined;

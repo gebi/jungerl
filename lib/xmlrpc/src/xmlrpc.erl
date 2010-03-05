@@ -183,8 +183,9 @@ parse_header(Socket, Timeout, Header) ->
 	    {error, missing_content_length};
 	{ok, "\r\n"} -> {ok, Header};
 	{ok, HeaderField} ->
-	    case string:tokens(HeaderField, " \r\n") of
-		["Content-Length:", ContentLength] ->
+		[HeaderName,HeaderValue|_] = string:tokens(HeaderField, " \r\n"),
+		case [string:to_lower(HeaderName), HeaderValue] of
+		["content-length:", ContentLength] ->
 		    case catch list_to_integer(ContentLength) of
 			Value when integer(Value) ->
 			    parse_header(Socket, Timeout,
@@ -192,7 +193,7 @@ parse_header(Socket, Timeout, Header) ->
 						       Value});
 			_ -> {error, {invalid_content_length, ContentLength}}
 		    end;
-		["Connection:", "close"] ->
+		["connection:", "close"] ->
 		    parse_header(Socket, Timeout,
 				 Header#header{connection = close});
 		_ ->

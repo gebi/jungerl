@@ -7,11 +7,8 @@ TUNCTL = ../priv/tunctl
 
 all: $(TUN_DRV_SO) $(TUNCTL)
 
-$(TUN_DRV_SO): tun_drv.o
-	ld -G -o $@ $<
-
-tun_drv.o: tun_drv.c
-	$(CC) $(CFLAGS) -o $@ -c -fpic $(ERL_INCLUDE) $<
+$(TUN_DRV_SO): tun_drv.c
+	$(CC) $(CFLAGS) -o $@ -shared -fpic $(ERL_INCLUDE) $<
 
 $(TUNCTL): tunctl.c
 	$(CC) $(CFLAGS) -o $@ $<

@@ -168,7 +168,18 @@ create_spec({{IP1,IP2,IP3,IP4}, Port}) when is_integer(IP1),
 					    is_integer(IP4),
 					    is_integer(Port) ->
     f("inet:~p.~p.~p.~p:~p",
-      [IP1, IP2, IP3, IP4, Port]).
+      [IP1, IP2, IP3, IP4, Port]);
+create_spec({{IP1,IP2,IP3,IP4,IP5,IP6,IP7,IP8}, Port}) when is_integer(IP1),
+							    is_integer(IP2),
+							    is_integer(IP3),
+							    is_integer(IP4),
+							    is_integer(IP5),
+							    is_integer(IP6),
+							    is_integer(IP7),
+							    is_integer(IP8),
+							    is_integer(Port) ->
+    f("inet6:~.16b:~.16b:~.16b:~.16b:~.16b:~.16b:~.16b:~.16b:~p",
+      [IP1, IP2, IP3, IP4, IP5, IP6, IP7, IP8, Port]).
 
 
 f(F, A) -> lists:flatten(io_lib:format(F,A)).

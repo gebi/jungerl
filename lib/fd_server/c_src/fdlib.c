@@ -192,50 +192,64 @@ int send_fd(fd, sock_fd)
 /*
  * Parse an address specification and fill in a sockaddr_in accordingly.
  * The address should be on the form:
- *   [a.d.re.ss|hostname]:{portnumber|servicename}
+ *   [{inet|inet6}:][a.d.re.ss|hostname:]{portnumber|servicename}
+ *
+ * The following table summarizes the interpretation:
+ *
+ *     str                  family    addr      port   comment
+ *    -----------------------------------------------------------
+ *     "123"                AF_INET   0.0.0.0   123
+ *     ":123"               AF_INET   0.0.0.0   123
+ *     "inet:123"           AF_INET   0.0.0.0   123
+ *     "inet::123"          AF_INET   0.0.0.0   123
+ *     "inet6:123"          AF_INET6  0.0.0.0   123
+ *     "inet6::123"         AF_INET6  0.0.0.0   123
+ *     "0.0.0.0:123"        AF_INET   0.0.0.0   123
+ *     "localhost:123"      AF_INET   127.0.0.1 123
+ *     "inet6::::123"       AF_INET6  ::        123    ipv6 any
+ *     "inet6:::1:123"      AF_INET6  ::1       123    ipv6 loopback
+ *     "inet:0.0.0.0:123"   AF_INET   0.0.0.0   123
+ *     "inet:localhost:123" AF_INET   127.0.0.1 123
+ *
+ * A service name can be specified instead of a port number.
  */
-int fd_parse_addr(struct sockaddr_in *addr, char *str)
+int fd_parse_addr(struct sockaddr_storage *addr, char *str)
 {
-    int port = 0;
-    char *cp;
-    struct hostent *hp;
-    struct servent *se;
+    struct addrinfo hints;
+    struct addrinfo *res;
+    char *bindipstr, *portstr;
+    int family;
 
-    if ((cp = strrchr(str, (int)':')) != NULL)
-        *cp++ = '\0';
-    if (cp) {
-        if (!isdigit((int)cp[0])) {
-            if ((se = getservbyname(cp, "tcp")) != NULL) {
-                port = ntohs(se->s_port);
-	    } else {
-		/* fprintf(stderr, "unknown port %s\n", cp); */
-		return -1;
-	    }
-        } else {
-            port = atoi(cp);
-        }
+    family = AF_INET; /* default unless specified */
+    if (strncmp("inet6:", str, strlen("inet6:")) == 0) {
+	family = AF_INET6;
+	str += strlen("inet6:");
+    } else if (strncmp("inet:", str, strlen("inet:")) == 0) {
+	family = AF_INET;
+	str += strlen("inet:");
     }
-    if (port < 0 || port > 0xffff) {
-	/* fprintf(stderr, "bad port number %d\n", port); */
-        return -1;
+
+    if ((portstr = strrchr(str, (int)':')) != NULL)
+	*portstr++ = '\0';
+    else {
+	portstr = str;
+	str = "";
     }
-    
-    bzero(addr, sizeof(*addr));
-    addr->sin_family = AF_INET;
-    addr->sin_port = htons(port);
-    if (*str == '\000') {
-	addr->sin_addr.s_addr = INADDR_ANY;
+
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_flags = AI_ADDRCONFIG | AI_PASSIVE;
+    hints.ai_family = family;
+    hints.ai_socktype = 0;
+    hints.ai_protocol = 0;
+
+    bindipstr = *str == '\0'? NULL: str;
+    if (getaddrinfo(bindipstr, portstr, &hints, &res) != 0) {
+	return -1;
     } else {
-	if ((addr->sin_addr.s_addr = inet_addr(str)) == INADDR_NONE) {
-	    if ((hp = gethostbyname(str)) == NULL) {
-		/*fprintf(stderr, "\"%s\" unknown host or address!\n", str);*/
-		return -1;
-	    } else {
-		bcopy(hp->h_addr_list[0], &addr->sin_addr.s_addr,hp->h_length);
-	    }
-	}
+	memmove(addr, res->ai_addr, res->ai_addrlen);
+	freeaddrinfo(res);
+	return 0;
     }
-    return 0;
 }
 
 

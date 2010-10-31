@@ -127,10 +127,17 @@ static void loop(fd)
 		r = bind(s, (struct sockaddr *)&addr,
 			 sizeof(struct sockaddr_in));
 		break;
+#ifdef HAVE_GETADDRINFO /* if we have the getaddrinfo function, we have ipv6 */
 	    case AF_INET6:
-		r = bind(s, (struct sockaddr *)&addr,
-			 sizeof(struct sockaddr_in6));
+                {
+                    int on = 1;
+                    setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY,
+                               (void *)&on, sizeof(on));
+                    r = bind(s, (struct sockaddr *)&addr,
+                             sizeof(struct sockaddr_in6));
+                }
 		break;
+#endif /* HAVE_GETADDRINFO */
 	}
 	/* seteuid(getuid()); */
 

@@ -215,43 +215,97 @@ int send_fd(fd, sock_fd)
  */
 int fd_parse_addr(struct sockaddr_storage *addr, char *str)
 {
-    struct addrinfo hints;
-    struct addrinfo *res;
-    char *bindipstr, *portstr;
     int family;
 
     family = AF_INET; /* default unless specified */
     if (strncmp("inet6:", str, strlen("inet6:")) == 0) {
+#ifdef HAVE_GETADDRINFO
 	family = AF_INET6;
 	str += strlen("inet6:");
+#else
+        return -1;
+#endif /* HAVE_GETADDRINFO */
     } else if (strncmp("inet:", str, strlen("inet:")) == 0) {
 	family = AF_INET;
 	str += strlen("inet:");
     }
 
-    if ((portstr = strrchr(str, (int)':')) != NULL)
-	*portstr++ = '\0';
-    else {
-	portstr = str;
-	str = "";
-    }
+#ifdef HAVE_GETADDRINFO
+    {
+        struct addrinfo hints;
+        struct addrinfo *res;
+        char *bindipstr, *portstr;
 
-    memset(&hints, 0, sizeof(struct addrinfo));
-    hints.ai_flags = AI_ADDRCONFIG | AI_PASSIVE;
-    hints.ai_family = family;
-    hints.ai_socktype = 0;
-    hints.ai_protocol = 0;
+        if ((portstr = strrchr(str, (int)':')) != NULL)
+            *portstr++ = '\0';
+        else {
+            portstr = str;
+            str = "";
+        }
 
-    bindipstr = *str == '\0'? NULL: str;
-    if (getaddrinfo(bindipstr, portstr, &hints, &res) != 0) {
-	return -1;
-    } else {
-	memmove(addr, res->ai_addr, res->ai_addrlen);
-	freeaddrinfo(res);
-	return 0;
+        memset(&hints, 0, sizeof(struct addrinfo));
+        hints.ai_flags = AI_ADDRCONFIG | AI_PASSIVE;
+        hints.ai_family = family;
+        hints.ai_socktype = 0;
+        hints.ai_protocol = 0;
+
+        bindipstr = *str == '\0'? NULL: str;
+        if (getaddrinfo(bindipstr, portstr, &hints, &res) != 0) {
+            return -1;
+        } else {
+            memmove(addr, res->ai_addr, res->ai_addrlen);
+            freeaddrinfo(res);
+            return 0;
+        }
     }
+#else /* HAVE_GETADDRINFO */
+    return fd_parse_addr_ipv4(addr, str);
+#endif /* HAVE_GETADDRINFO */
 }
 
+int fd_parse_addr_ipv4(struct sockaddr_in *addr, char *str)
+{
+    int port = 0;
+    char *cp;
+    struct hostent *hp;
+    struct servent *se;
+
+    if ((cp = strrchr(str, (int)':')) != NULL)
+        *cp++ = '\0';
+    if (cp) {
+        if (!isdigit((int)cp[0])) {
+            if ((se = getservbyname(cp, "tcp")) != NULL) {
+                port = ntohs(se->s_port);
+	    } else {
+		/* fprintf(stderr, "unknown port %s\n", cp); */
+		return -1;
+	    }
+        } else {
+            port = atoi(cp);
+        }
+    }
+    if (port < 0 || port > 0xffff) {
+	/* fprintf(stderr, "bad port number %d\n", port); */
+        return -1;
+    }
+
+    bzero(addr, sizeof(*addr));
+    addr->sin_family = AF_INET;
+    addr->sin_port = htons(port);
+    if (*str == '\000') {
+	addr->sin_addr.s_addr = INADDR_ANY;
+    } else {
+	if ((addr->sin_addr.s_addr = inet_addr(str)) == INADDR_NONE) {
+	    if ((hp = gethostbyname(str)) == NULL) {
+		/*fprintf(stderr, "\"%s\" unknown host or address!\n", str);*/
+		return -1;
+	    } else {
+		bcopy(hp->h_addr_list[0], &addr->sin_addr.s_addr,hp->h_length);
+	    }
+	}
+    }
+    return 0;
+}
 
 
 #ifdef DYNAMIC_DRIVER

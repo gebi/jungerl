@@ -111,6 +111,12 @@ AC_CHECK_FUNC(connect, ,
             AC_MSG_ERROR(Function 'socket' not found.), $NSL_LIBS)])
 AC_SUBST(SOCKET_LIBS)
 
+AC_CHECK_FUNC(getaddrinfo,
+	[AC_DEFINE(HAVE_GETADDRINFO, 1,
+		[Define to 1 if you have the 'getaddrinfo' function.])],
+	[AC_CHECK_LIB(socket, getaddrinfo,
+		[AC_DEFINE(HAVE_GETADDRINFO, 1, [Define to 1 if you have the 'getaddrinfo' function.])])])
+
 dnl
 dnl The "gd1_drv" driver for libgd 1.8.4 requires the following:
 dnl	libgd version 1 (as a shared library!), libpng, libjpeg, libXpm

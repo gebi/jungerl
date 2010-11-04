@@ -92,7 +92,7 @@ static ErlDrvData start(ErlDrvPort port, char *buf)
 	instance = (ErlDrvPort) -1;
 	return (ErlDrvData) -1;
     }
-    fdsrv = (ErlDrvEvent) s;
+    fdsrv = (ErlDrvEvent)(long)s;
     /* Have Erlang select on fdsrv */
     driver_select(port, fdsrv, DO_READ, 1);
 
@@ -118,7 +118,7 @@ static void fd_is_ready(ErlDrvData drv_data, ErlDrvEvent event)
     recv_fd(port, &received_fd, fdsrv);
     
     if (received_fd < 0) {
-	close((int)fdsrv);
+	close((int)(long)fdsrv);
 	driver_select(port, fdsrv, DO_READ, 0);
 	reply_err(port);
     }
@@ -137,7 +137,7 @@ static void stop(ErlDrvData drv_data)
     driver_select(instance, fdsrv, DO_READ, 0);
 
     /* cleanup */
-    close((int) fdsrv);
+    close((int)(long)fdsrv);
     instance = (ErlDrvPort) -1;
 }
 
@@ -199,7 +199,7 @@ static void recv_fd(ErlDrvPort port, int* fd, ErlDrvEvent sock_fd)
     msg.msg_iov = iov;
     msg.msg_iovlen = 1;
 
-    if ((res = recvmsg((int)sock_fd, &msg, 0)) < 0) {
+    if ((res = recvmsg((int)(long)sock_fd, &msg, 0)) < 0) {
 	reply_err_errno(port);
 	goto error;
     }

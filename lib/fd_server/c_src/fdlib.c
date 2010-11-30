@@ -110,7 +110,7 @@ int fd_listen_path(ErlDrvPort port, char* path)
 int fd_accept_path(ErlDrvPort port, int s, char* path)
 {
     int c;
-    int len = 0;
+    unsigned len = 0;
 
     /* Need to make this non blocking .. */
 

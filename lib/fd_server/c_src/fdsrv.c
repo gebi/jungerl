@@ -46,7 +46,7 @@ extern int errno;
  */
 
 static void report_error(msg)
-    char *msg;
+    const char *msg;
 {
     unsigned char c;
     

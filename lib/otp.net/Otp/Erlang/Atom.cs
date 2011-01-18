@@ -75,7 +75,7 @@ namespace Otp.Erlang
 		**/
 		public Atom(bool t)
 		{
-			this.atom = t.ToString();
+			this.atom = t ? "true" : "false";
 		}
 		
 		/*

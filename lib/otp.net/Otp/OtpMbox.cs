@@ -399,7 +399,7 @@ namespace Otp
 
         public void sendRPC(string node, Erlang.Atom mod, Erlang.Atom fun, Erlang.List args)
         {
-            sendRPC(node, mod, fun, args, _self /* new Erlang.Atom("user") */);
+            sendRPC(node, mod, fun, args, new Erlang.Atom("user"));
         }
 
         public void sendRPC(string node, string mod, string fun, Erlang.List args, Erlang.Pid ioServer)
@@ -407,16 +407,41 @@ namespace Otp
             sendRPC(node, new Erlang.Atom(mod), new Erlang.Atom(fun), args, ioServer);
         }
 
-        public void sendRPC(string node, Erlang.Atom mod, Erlang.Atom fun, Erlang.List args, Erlang.Pid ioServer)
+        /// <summary>
+        /// Send RPC call to a given node.
+        /// </summary>
+        /// <param name="node"></param>
+        /// <param name="mod"></param>
+        /// <param name="fun"></param>
+        /// <param name="args"></param>
+        /// <param name="ioServer">Either a PID or an Atom containing registered I/O server's name.</param>
+        public void sendRPC(string node, Erlang.Atom mod, Erlang.Atom fun, Erlang.List args, Erlang.Object ioServer)
         {
             if (node.Equals(home.node()))
-            {
                 throw new System.ArgumentException("Cannot make rpc calls on local node!");
-            }
             else
             {
                 Erlang.Object msg = AbstractConnection.encodeRPC(_self, mod, fun, args, ioServer );
 
+                OtpCookedConnection conn = home.connection(node);
+                if (conn == null)
+                    throw new System.Exception("Cannot establish connection to node " + node);
+                conn.send(_self, "rex", msg);
+            }
+        }
+
+        public void sendRPCcast(string node, Erlang.Atom mod, Erlang.Atom fun, Erlang.List args)
+        {
+            sendRPCcast(node, mod, fun, args, new Erlang.Atom("user"));
+        }
+
+        public void sendRPCcast(string node, Erlang.Atom mod, Erlang.Atom fun, Erlang.List args, Erlang.Object ioServer)
+        {
+            if (node.Equals(home.node()))
+                throw new System.ArgumentException("Cannot make rpc cast on local node!");
+            else
+            {
+                Erlang.Object msg = AbstractConnection.encodeRPCcast(_self, mod, fun, args, ioServer);
                 OtpCookedConnection conn = home.connection(node);
                 if (conn == null)
                     throw new System.Exception("Cannot establish connection to node " + node);

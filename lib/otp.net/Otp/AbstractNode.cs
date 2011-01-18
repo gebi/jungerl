@@ -60,6 +60,13 @@ namespace Otp
             //ntype = NTYPE_R6;
             //flags = dFlagExtendedReferences | dFlagExtendedPidsPorts;
         }
+
+        public static string CookieFileName() {
+            return System.Environment.GetEnvironmentVariable("HOME")
+                        + System.IO.Path.DirectorySeparatorChar
+                        + ".erlang.cookie";
+        }
+
         static AbstractNode()
         {
             {
@@ -83,9 +90,7 @@ namespace Otp
 
                 if (defaultCookie == null)
                 {
-                    System.String dotCookieFilename = System.Environment.GetEnvironmentVariable("HOME")
-                        + System.IO.Path.DirectorySeparatorChar
-                        + ".erlang.cookie";
+                    System.String dotCookieFilename = CookieFileName();
                     System.IO.StreamReader br = null;
                     try
                     {

@@ -72,6 +72,7 @@ namespace Otp
         protected internal OtpPeer peer; // who are we connected to
         protected internal OtpLocalNode self; // this nodes id
         internal System.String name; // local name of this connection
+        protected string auth_cookie;
 
         protected internal bool cookieOk = false; // already checked the cookie for this connection
         protected internal bool sendCookie = true; // Send cookies in messages?
@@ -110,6 +111,7 @@ namespace Otp
             this.self = self;
             this.peer = new OtpPeer();
             this.socket = s;
+            this.auth_cookie = self.cookie();
 
             this.socket.NoDelay = true;
             // Use keepalive timer
@@ -153,16 +155,27 @@ namespace Otp
         * @exception OtpAuthException if handshake resulted in an authentication error.
         */
         protected internal AbstractConnection(OtpLocalNode self, OtpPeer other)
+            : this(self, other, self.cookie())
+        {
+        }
+
+        /*
+        * Intiate and open a connection to a remote node.
+        *
+        * @exception C#.io.IOException if it was not possible to connect to the peer.
+        * @exception OtpAuthException if handshake resulted in an authentication error.
+        */
+        protected internal AbstractConnection(OtpLocalNode self, OtpPeer other, string cookie)
         {
             this.peer = other;
             this.self = self;
             this.socket = null;
-            int port;
+            this.auth_cookie = cookie;
             
             //this.IsBackground = true;
             
             // now get a connection between the two...
-            port = OtpEpmd.lookupPort(peer);
+            int port = OtpEpmd.lookupPort(peer);
             
             // now find highest common dist value
             if ((peer._proto != self._proto) || (self._distHigh < peer._distLow) || (self._distLow > peer._distHigh))
@@ -216,7 +229,7 @@ namespace Otp
             header.write_long((long)OtpMsg.Tag.regSendTag);
             header.write_any(from);
             if (sendCookie)
-                header.write_atom(self.cookie());
+                header.write_atom(auth_cookie);
             else
                 header.write_atom("");
             header.write_atom(dest);
@@ -256,7 +269,7 @@ namespace Otp
             header.write_tuple_head(3);
             header.write_long((long)OtpMsg.Tag.sendTag);
             if (sendCookie)
-                header.write_atom(self.cookie());
+                header.write_atom(auth_cookie);
             else
                 header.write_atom("");
             header.write_any(dest);
@@ -548,7 +561,7 @@ namespace Otp
                                 cookie = (Erlang.Atom) head.elementAt(1);
                                 if (sendCookie)
                                 {
-                                    if (!cookie.atomValue().Equals(self.cookie()))
+                                    if (!cookie.atomValue().Equals(auth_cookie))
                                     {
                                         cookieError(self, cookie);
                                     }
@@ -596,7 +609,7 @@ namespace Otp
                                 cookie = (Erlang.Atom) head.elementAt(2);
                                 if (sendCookie)
                                 {
-                                    if (!cookie.atomValue().Equals(self.cookie()))
+                                    if (!cookie.atomValue().Equals(auth_cookie))
                                     {
                                         cookieError(self, cookie);
                                     }
@@ -835,20 +848,61 @@ receive_loop_brk: ;
             sendBuf(from, "rex", new OtpOutputStream(rpc));
         }
 
+        /*
+        * Send an RPC cast request to the remote Erlang node. This convenience
+        * function creates the following message and sends it to 'rex' on
+        * the remote node:
+        * 
+        * <pre>
+        * { self, { cast, Mod, Fun, Args, user }}
+        * </pre>
+        *
+        * No reply is delivered back
+        * <p> Note that this method has unpredicatble results if the remote
+        * node is not an Erlang node. </p>
+        *
+        * @param mod the name of the Erlang module containing the function to be called.
+        * @param fun the name of the function to call.
+        * @param args a list of Erlang terms, to be used as arguments to the function.
+        *
+        * @exception C#.io.IOException if the connection is not active
+        * or a communication error occurs.
+        **/
+        public virtual void sendRPCcast(Erlang.Pid from, string mod, string fun, Erlang.List args)
+        {
+            Erlang.Object rpc = encodeRPCcast(from, mod, fun, args, new Erlang.Atom("user"));
+            sendBuf(from, "rex", new OtpOutputStream(rpc));
+        }
+
         internal static Erlang.Tuple encodeRPC(
             Erlang.Pid from, string mod, string fun, Erlang.List args, Erlang.Object gleader)
         {
             return encodeRPC(from, new Erlang.Atom(mod), new Erlang.Atom(fun), args, gleader);
         }
 
+        internal static Erlang.Tuple encodeRPCcast(
+            Erlang.Pid from, string mod, string fun, Erlang.List args, Erlang.Object gleader)
+        {
+            return encodeRPCcast(from, new Erlang.Atom(mod), new Erlang.Atom(fun), args, gleader);
+        }
+
         internal static Erlang.Tuple encodeRPC(
             Erlang.Pid from, Erlang.Atom mod, Erlang.Atom fun, Erlang.List args, Erlang.Object gleader)
         {
-            /*{self, { call, Mod, Fun, Args, user}} */
+            /*{self, { cast, Mod, Fun, Args, user}} */
             return new Erlang.Tuple(
                 from,
                 new Erlang.Tuple(new Erlang.Atom("call"), mod, fun, args, gleader)
             );
+        }
+
+        internal static Erlang.Tuple encodeRPCcast(
+            Erlang.Pid from, Erlang.Atom mod, Erlang.Atom fun, Erlang.List args, Erlang.Object gleader)
+        {
+            /*{'$gen_cast', { cast, Mod, Fun, Args, user}} */
+            return new Erlang.Tuple(
+                    new Erlang.Atom("$gen_cast"), 
+                    new Erlang.Tuple(new Erlang.Atom("cast"), mod, fun, args, gleader));
         }
 
         internal static Erlang.Object decodeRPC(Erlang.Object msg)
@@ -1076,7 +1130,7 @@ receive_loop_brk: ;
                 int our_challenge = genChallenge();
                 sendChallenge(peer.distChoose, self.flags, our_challenge);
                 int her_challenge = recvChallengeReply(our_challenge);
-                byte[] our_digest = genDigest(her_challenge, self.cookie());
+                byte[] our_digest = genDigest(her_challenge, auth_cookie);
                 sendChallengeAck(our_digest);
                 connected = true;
                 cookieOk = true;
@@ -1116,7 +1170,7 @@ receive_loop_brk: ;
                 sendName(peer.distChoose, self.flags);
                 recvStatus();
                 int her_challenge = recvChallenge();
-                byte[] our_digest = genDigest(her_challenge, self.cookie());
+                byte[] our_digest = genDigest(her_challenge, auth_cookie);
                 int our_challenge = genChallenge();
                 sendChallengeReply(our_challenge, our_digest);
                 recvChallengeAck(our_challenge);
@@ -1428,7 +1482,7 @@ receive_loop_brk: ;
                 }
                 challenge = ibuf.read4BE();
                 ibuf.readN(her_digest);
-                byte[] our_digest = genDigest(our_challenge, self.cookie());
+                byte[] our_digest = genDigest(our_challenge, auth_cookie);
                 if (!digests_equals(her_digest, our_digest))
                 {
                     throw new OtpAuthException("Peer authentication error.");
@@ -1477,7 +1531,7 @@ receive_loop_brk: ;
                     throw new System.IO.IOException("Handshake protocol error");
                 }
                 ibuf.readN(her_digest);
-                byte[] our_digest = genDigest(our_challenge, self.cookie());
+                byte[] our_digest = genDigest(our_challenge, auth_cookie);
                 if (!digests_equals(her_digest, our_digest))
                 {
                     throw new OtpAuthException("Peer authentication error.");

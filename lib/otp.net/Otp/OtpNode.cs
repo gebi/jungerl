@@ -479,11 +479,18 @@ namespace Otp
 			remoteStatus(conn.name, false, e);
 		}
 		
+		/*
+		* find or create a connection to the given node using specified cookie
+		*/
+        public virtual OtpCookedConnection connection(System.String node)
+        {
+            return connection(node, null);
+        }
 		
 		/*
 		* find or create a connection to the given node
 		*/
-		public virtual OtpCookedConnection connection(System.String node)
+		public virtual OtpCookedConnection connection(System.String node, string cookie)
 		{
 			OtpPeer peer = null;
 			OtpCookedConnection conn = null;
@@ -503,7 +510,7 @@ namespace Otp
 					{
 						try
 						{
-							conn = new OtpCookedConnection(this, peer);
+							conn = new OtpCookedConnection(this, peer, cookie);
 							addConnection(conn);
 						}
 						catch (System.Exception e)

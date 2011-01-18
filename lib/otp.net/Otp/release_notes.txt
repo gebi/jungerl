@@ -1,6 +1,11 @@
 Release notes
 -------------
 
+V 0.6, January 2011 / Serge Aleynikov
+-------------------------------------
+- Added support for RPC cast
+- Implemented some bug fixes
+
 V 0.5, January 2009 / Serge Aleynikov
 -------------------------------------
 - More robust error handling

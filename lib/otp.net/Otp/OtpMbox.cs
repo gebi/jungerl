@@ -284,7 +284,7 @@ namespace Otp
 						Erlang.Object o = m.getMsg();
 						throw new Erlang.Exit(o.ToString(), m.getSenderPid());
 					}
-					catch (Erlang.DecodeException)
+					catch (Erlang.Exception)
 					{
 						throw new Erlang.Exit("unknown", m.getSenderPid());
 					}

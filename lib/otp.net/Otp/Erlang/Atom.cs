@@ -44,9 +44,9 @@ namespace Otp.Erlang
 		**/
 		public Atom(System.String atom)
 		{
-			if (atom == null || atom.Length < 1)
+			if (atom == null)
 			{
-				throw new System.ArgumentException("Atom must be non-empty");
+				throw new System.ArgumentException("Atom must not be null!");
 			}
 			
 			if (atom.Length > maxAtomLength)
@@ -71,14 +71,6 @@ namespace Otp.Erlang
 		}
 		
 		/*
-		* Create an atom whose value is "true" or "false".
-		**/
-		public Atom(bool t)
-		{
-			this.atom = t ? "true" : "false";
-		}
-		
-		/*
 		* Get the actual string contained in this object.
 		* 
 		* @return the raw string contained in this object, without regard
@@ -89,20 +81,6 @@ namespace Otp.Erlang
 		public virtual System.String atomValue()
 		{
 			return atom;
-		}
-		
-		/*
-		* The boolean value of this atom.
-		*
-		* @return the value of this atom expressed as a boolean value. If
-		* the atom consists of the characters "true" (independent of case)
-		* the value will be true. For any other values, the value will be
-		* false.
-		*
-		**/
-		public virtual bool booleanValue()
-		{
-			return System.Boolean.Parse(atomValue());
 		}
 		
 		/*

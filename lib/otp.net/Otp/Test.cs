@@ -6,6 +6,8 @@ namespace Otp
 	{
 		static public void Main(String[] args)
 		{
+            Erlang.Object obj = Erlang.Object.Format("{a, b, 10, 2.0}");
+
 			OtpTrace.TraceEvent("Otp test...");
 
 			if (args.Length < 1)

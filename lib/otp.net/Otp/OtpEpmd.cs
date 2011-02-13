@@ -241,7 +241,7 @@ namespace Otp
 					OtpTrace.TraceEvent("<- (no response)");
 				throw new System.IO.IOException("Nameserver not responding on " + node.host() + " when looking up " + node.getAlive());
 			}
-			catch (Erlang.DecodeException)
+			catch (Erlang.Exception)
 			{
 				if (traceLevel >= traceThreshold)
 					OtpTrace.TraceEvent("<- (invalid response)");
@@ -345,7 +345,7 @@ namespace Otp
 					OtpTrace.TraceEvent("<- (no response)");
 				throw new System.IO.IOException("Nameserver not responding on " + node.host() + " when looking up " + node.getAlive());
 			}
-			catch (Erlang.DecodeException)
+			catch (Erlang.Exception)
 			{
 				if (traceLevel >= traceThreshold)
 					OtpTrace.TraceEvent("<- (invalid response)");
@@ -439,7 +439,7 @@ namespace Otp
 					OtpTrace.TraceEvent("<- (no response)");
 				throw new System.IO.IOException("Nameserver not responding on " + node.host() + " when publishing " + node.getAlive());
 			}
-			catch (Erlang.DecodeException)
+			catch (Erlang.Exception)
 			{
 				if (s != null)
 					s.Close();
@@ -534,7 +534,7 @@ namespace Otp
             {
                 error = e;
             }
-            catch (Erlang.DecodeException e)
+            catch (Erlang.Exception e)
             {
                 error = e;
             }

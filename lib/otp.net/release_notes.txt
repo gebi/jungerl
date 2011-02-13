@@ -1,6 +1,13 @@
 Release notes
 -------------
 
+V 0.7, February 2011 / Serge Aleynikov
+--------------------------------------
+- Added pattern matching feature:
+    Erlang.Object.match(Erlang.Object, Erlang.VarBind)
+- Added compilation of an Erlang term from a string:
+    Erlang.Object term = Erlang.Object.Format("{test, 1, ~w, [2,3,4]}", 'a')
+
 V 0.6, January 2011 / Serge Aleynikov
 -------------------------------------
 - Added support for RPC cast

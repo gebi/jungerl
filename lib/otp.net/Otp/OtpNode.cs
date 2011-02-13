@@ -486,7 +486,7 @@ namespace Otp
         {
             return connection(node, null);
         }
-		
+
 		/*
 		* find or create a connection to the given node
 		*/

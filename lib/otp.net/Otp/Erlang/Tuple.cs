@@ -13,7 +13,8 @@
 * Portions created by Ericsson are Copyright 1999, Ericsson Utvecklings
 * AB. All Rights Reserved.''
 * 
- * Converted from Java to C# by Vlad Dumitrescu (vlad_Dumitrescu@hotmail.com)
+* Converted from Java to C# by Vlad Dumitrescu (vlad_Dumitrescu@hotmail.com)
+* Contribution: Serge Aleynikov (added pattern matching)
 */
 namespace Otp.Erlang
 {
@@ -288,5 +289,45 @@ namespace Otp.Erlang
 			elems.CopyTo(newTuple.elems, 0);
 			return newTuple;
 		}
+
+        public override bool subst(ref Object a_term, VarBind binding)
+        {
+            System.Collections.Generic.List<Erlang.Object> result =
+                new System.Collections.Generic.List<Erlang.Object>();
+            bool changed = false;
+
+            foreach (Erlang.Object term in this.elems)
+            {
+                Erlang.Object obj = null;
+                if (term.subst(ref obj, binding))
+                    result.Add(obj);
+                else
+                {
+                    changed = true;
+                    result.Add(term);
+                }
+            }
+
+            if (!changed)
+                return false;
+
+            a_term = new Erlang.Tuple(result.ToArray());
+            return true;
+        }
+
+        public override bool match(Erlang.Object pattern, VarBind binding)
+        {
+            if (pattern is Erlang.Var)
+                pattern.match(this, binding);
+            else if (!(pattern is Erlang.Tuple))
+                return false;
+            Erlang.Tuple tup = pattern as Erlang.Tuple;
+            if (arity() != tup.arity())
+                return false;
+            for (int i = 0; i < arity(); ++i)
+                if (!elems[i].match(tup[i], binding))
+                    return false;
+            return true;
+        }
 	}
 }

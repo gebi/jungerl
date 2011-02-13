@@ -41,6 +41,9 @@
   <ItemGroup>
     <Compile Include="AbstractConnection.cs" />
     <Compile Include="AbstractNode.cs" />
+    <Compile Include="Erlang\Format.cs" />
+    <Compile Include="Erlang\VarBind.cs" />
+    <Compile Include="Erlang\Var.cs" />
     <Compile Include="OtpTrace.cs" />
     <Compile Include="Erlang\Atom.cs" />
     <Compile Include="Erlang\BigInteger.cs" />
@@ -49,7 +52,7 @@
     <Compile Include="Erlang\Byte.cs" />
     <Compile Include="Erlang\Char.cs" />
     <Compile Include="Erlang\CloneObject.cs" />
-    <Compile Include="Erlang\DecodeException.cs" />
+    <Compile Include="Erlang\Exception.cs" />
     <Compile Include="Erlang\Double.cs" />
     <Compile Include="Erlang\ErlangException.cs" />
     <Compile Include="Erlang\Exit.cs" />
@@ -59,7 +62,6 @@
     <Compile Include="Erlang\Object.cs" />
     <Compile Include="Erlang\Pid.cs" />
     <Compile Include="Erlang\Port.cs" />
-    <Compile Include="Erlang\RangeException.cs" />
     <Compile Include="Erlang\Ref.cs" />
     <Compile Include="Erlang\Short.cs" />
     <Compile Include="Erlang\String.cs" />

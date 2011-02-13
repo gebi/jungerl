@@ -757,7 +757,7 @@ receive_loop_brk: ;
             {
                 deliver(e);
             }
-            catch (Erlang.DecodeException e)
+            catch (Erlang.Exception e)
             {
                 OtpTrace.TraceEvent(e.ToString());
                 deliver(new Erlang.Exit("Remote is sending garbage: " + e.ToString()));
@@ -972,7 +972,7 @@ receive_loop_brk: ;
                             OtpTrace.TraceEvent("   " + o.ToString());
                             o = null;
                         }
-                        catch (Erlang.DecodeException e)
+                        catch (Erlang.Exception e)
                         {
                             OtpTrace.TraceEvent("   " + "can't decode output buffer:" + e);
                         }
@@ -1008,7 +1008,7 @@ receive_loop_brk: ;
                             Erlang.Object h = (header.getOtpInputStream(5)).read_any();
                             OtpTrace.TraceEvent("-> " + headerType(h) + " " + h);
                         }
-                        catch (Erlang.DecodeException e)
+                        catch (Erlang.Exception e)
                         {
                             OtpTrace.TraceEvent("   " + "can't decode output buffer: " + e);
                         }
@@ -1381,7 +1381,7 @@ receive_loop_brk: ;
                     throw new System.IO.IOException("Handshake failed - peer cannot handle extended pids and ports");
                 }
             }
-            catch (Erlang.DecodeException)
+            catch (Erlang.Exception)
             {
                 throw new System.IO.IOException("Handshake failed - not enough data");
             }
@@ -1426,7 +1426,7 @@ receive_loop_brk: ;
                 peer._alive = hisname.Substring(0, (i) - (0));
                 peer._host = hisname.Substring(i + 1, (hisname.Length) - (i + 1));
             }
-            catch (Erlang.DecodeException)
+            catch (Erlang.Exception)
             {
                 throw new System.IO.IOException("Handshake failed - not enough data");
             }
@@ -1488,7 +1488,7 @@ receive_loop_brk: ;
                     throw new OtpAuthException("Peer authentication error.");
                 }
             }
-            catch (Erlang.DecodeException)
+            catch (Erlang.Exception)
             {
                 throw new System.IO.IOException("Handshake failed - not enough data");
             }
@@ -1537,7 +1537,7 @@ receive_loop_brk: ;
                     throw new OtpAuthException("Peer authentication error.");
                 }
             }
-            catch (Erlang.DecodeException)
+            catch (Erlang.Exception)
             {
                 throw new System.IO.IOException("Handshake failed - not enough data");
             }
@@ -1604,7 +1604,7 @@ receive_loop_brk: ;
                     throw new System.IO.IOException("Peer replied with status '" + status + "' instead of 'ok'");
                 }
             }
-            catch (Erlang.DecodeException)
+            catch (Erlang.Exception)
             {
                 throw new System.IO.IOException("Handshake failed - not enough data");
             }

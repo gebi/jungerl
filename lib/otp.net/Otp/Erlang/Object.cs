@@ -26,6 +26,20 @@ namespace Otp.Erlang
 	[Serializable]
     public abstract class Object : Amir_Harel.Cloning.BaseObject
 	{
+        public static Erlang.Object Format(
+            string fmt, params object[] args)
+        {
+            int pos = 0, argc = 0;
+            return Formatter.create(fmt.ToCharArray(), ref pos, ref argc, args);
+        }
+
+        public T Cast<T>() where T: Erlang.Object
+        {
+            if (!(this is T))
+                throw new CastException();
+            return (T)(this);
+        }
+
 		/*
 		* Convert the object according to the rules of the Erlang external
 		* format. This is mainly used for sending Erlang terms in messages,
@@ -56,6 +70,16 @@ namespace Otp.Erlang
 			return buf.read_any();
 		}
 		
+        public virtual bool subst(ref Erlang.Object term, Erlang.VarBind binding)
+        {
+            return false;
+        }
+
+        public virtual bool match(Erlang.Object pattern, Erlang.VarBind binding)
+        {
+            return (pattern is Erlang.Var) ? pattern.match(this, binding) : this.Equals(pattern);
+        }
+
 		/*
 		* Determine if two Erlang objects are equal. In general, Erlang
 		* objects are equal if the components they consist of are equal.
@@ -78,5 +102,20 @@ namespace Otp.Erlang
 				throw new System.ApplicationException(e.ToString());
 			}
 		}
+
+        public long     longValue()     { return this.Cast<Long>().longValue(); }
+        public int      intValue()      { return this.Cast<Long>().intValue(); }
+        public short    shortValue()    { return this.Cast<Long>().shortValue(); }
+        public double   doubleValue()   { return this.Cast<Double>().doubleValue(); }
+        public string   atomValue()     { return this.Cast<Atom>().atomValue(); }
+        public string   stringValue()   { return this.Cast<String>().stringValue(); }
+        public char     charValue()     { return this.Cast<Char>().charValue(); }
+        public bool     boolValue()     { return this.Cast<Boolean>().booleanValue(); }
+        public byte[]   binaryValue()   { return this.Cast<Binary>().binaryValue(); }
+        public Pid      pidValue()      { return this.Cast<Pid>().pidValue(); }
+        public Port     portValue()     { return this.Cast<Port>().portValue(); }
+        public Ref      refValue()      { return this.Cast<Ref>().refValue(); }
+        public Tuple    tupleValue()    { return this.Cast<Tuple>().tupleValue(); }
+        public List     listValue()     { return this.Cast<List>().listValue(); }
 	}
 }

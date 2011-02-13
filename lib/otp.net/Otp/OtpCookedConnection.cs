@@ -86,7 +86,21 @@ namespace Otp
 		* @exception OtpAuthException if handshake resulted in an authentication error.
 		*/
 		// package scope
-		internal OtpCookedConnection(OtpNode self, OtpPeer other):base(self, other)
+        internal OtpCookedConnection(OtpNode self, OtpPeer other)
+            : this(self, other, self.cookie())
+        {
+        }
+
+        /*
+		* Intiate and open a connection to a remote node.
+		*
+		* @exception C#.io.IOException if it was not possible to connect to the peer.
+		*
+		* @exception OtpAuthException if handshake resulted in an authentication error.
+		*/
+		// package scope
+		internal OtpCookedConnection(OtpNode self, OtpPeer other, string cookie)
+            : base(self, other, cookie)
 		{
 			this.self = self;
 			this.links = new Links(25);

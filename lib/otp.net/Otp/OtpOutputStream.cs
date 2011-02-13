@@ -333,7 +333,7 @@ namespace Otp
 		**/
 		public virtual void  write_boolean(bool b)
 		{
-			this.write_atom(b.ToString());
+			this.write_atom((b ? Erlang.Boolean.s_true : Erlang.Boolean.s_false).atomValue());
 		}
 		
 		/*

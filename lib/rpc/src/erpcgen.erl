@@ -1,4 +1,4 @@
-%% Copyright (c) 2000 Sendmail, Inc.  All rights reserved.
+%% Copyright (c) 2000, 2001 Sendmail, Inc.  All rights reserved.
 %%
 %% Compile xdr files into erlang modules
 %%
@@ -250,6 +250,9 @@ gen_xdr_base(Fd, Base, Spec, Type) ->
     gen_map_elem(get(map_elem), Fd),
     gen_io_list_len(get(io_list_len), Fd),
     gen_enc_align(get(enc_align), Fd),
+    gen_enc_random(get(enc_random), Fd),
+    gen_enc_random_bytes(get(enc_random_bytes), Fd),
+    gen_enc_random_string(get(enc_random_string), Fd),
     gen_align(get(align), Fd).
 
 
@@ -274,11 +277,11 @@ gen_io_list_len(true, Fd) ->
 	      "io_list_len([H|T], N) ->\n"
 	      "  if\n"
 	      "    H >= 0, H =< 255 -> io_list_len(T, N+1);\n"
-	      "    list(H) -> io_list_len(T, io_list_len(H,N));\n"
-	      "    binary(H) -> io_list_len(T, size(H) + N);\n"
+	      "    is_list(H) -> io_list_len(T, io_list_len(H,N));\n"
+	      "    is_binary(H) -> io_list_len(T, size(H) + N);\n"
 	      "    true -> exit({xdr, opaque})\n"
 	      "  end;\n"
-	      "io_list_len(H, N) when binary(H) ->\n"
+	      "io_list_len(H, N) when is_binary(H) ->\n"
 	      "  size(H) + N;\n"
 	      "io_list_len([], N) ->\n"
 	      "N.\n", []);
@@ -297,6 +300,32 @@ gen_enc_align(true, Fd) ->
 	      "  end.\n", []);
 gen_enc_align(_, _Fd) ->
     ok.
+
+gen_enc_random(true, Fd) ->
+    io:format(Fd,
+              "\nenc_random(Roof,Offset) ->\n"
+              "    random:uniform(Roof) + Offset.\n",[]);
+gen_enc_random(_, _Fd) ->
+    ok.
+
+gen_enc_random_bytes(true, Fd) ->
+    io:format(Fd, 
+              "\nenc_random_bytes(Len) ->\n"
+              "       [<<(random:uniform(256) - 1):8/unsigned>> || _H <- lists:seq(1,Len)] ++\n"
+              "       [enc_align(Len)]. \n"
+              ,[]);
+gen_enc_random_bytes(_,_Fd) ->
+    ok.
+
+gen_enc_random_string(true, Fd) ->
+    io:format(Fd,
+              "\nenc_random_string(Len) ->\n"
+              "       [<<(random:uniform(93) + 31):8/unsigned>> || _H <- lists:seq(1,Len)] ++\n"
+              "       [enc_align(Len)]. \n"
+              ,[]);
+gen_enc_random_string(_,_Fd) ->
+    ok.
+
 
 gen_align(true, Fd) ->
     io:format(Fd,
@@ -686,6 +715,21 @@ trans_struct_elems([], _, _) -> [].
 %% Check union elements
 %% The Tag is translated as Tag -> {Tag,Value} 
 %%
+%% by Rui Xie
+%% 1. Firstly change the restriction of Id to {Tag,Id} pair. Same Id can be existed in one union but should be distinct under one tag.
+%% 2. Add specical case of multi case for one definition.
+%% 3. Add void case for union.
+%% Example:
+%% union Trace_MgtTrace_t switch (Trace_MgtCause_t type)
+%%{
+%%  case TRACE_FIRST_RECORD :
+%%  case TRACE_LAST_RECORD :
+%%  case TRACE_EMERGENCY_CALL_END:
+%%    Trace_firstAndlastRecordParams_t firstAndlastRecord;
+%%  case  TRACE_CN_INVOKE_TRACE : 
+%%    Trace_CnInvokeParams_t	cnInvTrace;
+%%}
+
 trans_union_elems([{Tag,Line,{Id,_,Type}} | Elems],Tags,Ids,Vals,Env,Disc) ->
     Tag1 = trans_tag(Tag),
     case member(Tag1, Tags) of
@@ -695,10 +739,35 @@ trans_union_elems([{Tag,Line,{Id,_,Type}} | Elems],Tags,Ids,Vals,Env,Disc) ->
     Ids1 = 
 	if Id == [] -> Ids;
 	    true ->
-		case member(Id, Ids) of
-		    true -> error(Line, "union id ~s multiply defined", [Id]),
+		case member({Tag1,Id}, Ids) of
+		    true -> error(Line, "union id ~s multiply defined", [{Tag1,Id}]),
 			    Ids;
-		    false -> [Id | Ids]
+		    false -> [{Tag1,Id} | Ids]
+		end
+	end,
+    Type1 = trans_type(Type, Env),
+    Tag2 = {_,Val} = trans_tag_type(Tag1, Line, Env, Disc),
+    Vals1 = case member(Val, Vals) of
+		true -> error(Line, "case ~w multiply defined", [Val]), Vals;
+		false -> [Val | Vals]
+	    end,
+    [{ Tag2, {Id, Type1}} | 
+     trans_union_elems(Elems, [Tag|Tags], Ids1, Vals1, Env, Disc)];
+	 
+trans_union_elems([{Tag,Line} | Elems],Tags,Ids,Vals,Env,Disc) ->
+    Tag1 = trans_tag(Tag),
+    case member(Tag1, Tags) of
+		true -> error(Line, "union tag ~w multiply defined", [Tag1]);
+		false -> true
+    end,
+	{Id,Type} = gets_union_elems_id(Elems),
+    Ids1 = 
+	if Id == [] -> Ids;
+	    true ->
+		case member({Tag1,Id}, Ids) of
+		    true -> error(Line, "union id ~s multiply defined", [{Tag1,Id}]),
+			    Ids;
+		    false -> [{Tag1,Id} | Ids]
 		end
 	end,
     Type1 = trans_type(Type, Env),
@@ -710,6 +779,19 @@ trans_union_elems([{Tag,Line,{Id,_,Type}} | Elems],Tags,Ids,Vals,Env,Disc) ->
     [{ Tag2, {Id, Type1}} | 
      trans_union_elems(Elems, [Tag|Tags], Ids1, Vals1, Env, Disc)];
 trans_union_elems([], _, _, _, _,_) -> [].
+
+gets_union_elems_id([{Tag,Line,{Id,_,Type}} | Elems]) ->
+%%        io:format("Debug: ~p, ~p, ~p, ~p~n",[Tag,Line,Id,Type]),
+%%	{Id1,Type1}=
+%%		if Id == [] -> error(Line, "union definition is incorrect!"),
+%%                                {Id,Type};
+%%			true -> {Id,Type}
+%%		end,
+%%	{Id1,Type1};
+	{Id,Type};
+gets_union_elems_id([{Tag,Line} | Elems]) ->
+	gets_union_elems_id(Elems).
+
 
 trans_tag({identifier,_,Id}) -> Id;
 trans_tag({integer,_,Value}) -> Value;
@@ -763,17 +845,47 @@ trans_disc_type(T, Line, Env) ->
 %% i.e exactly one of each identifier
 %%     exactly one of each value
 %%
-trans_enum(Enums, Env) ->
-    trans_enums(Enums, Env, []).
+%% Add special case for enums:
+%% enum t_enum {
+%%  T_ENUM_0 = 0,
+%%  T_ENUM_1,
+%%  T_ENUM_2
+%%};
+%% Add context dependence. 
+%% ValueInit means the current initial value based on previous enum item value.
 
-trans_enums([{Tag,Line,Value} | Es], Env, Ids) ->
+trans_enum(Enums, Env) ->
+    trans_enums(Enums, Env, [],{integer,"hello",0}).
+
+trans_enums([{Tag,Line,Value} | Es], Env, Ids, ValueInit) ->
     V = trans_value(Value, Env),
     case member(Tag, Ids) of
 	true -> error(Line, "enumeration ~s multiply defined", [Tag]);
 	false -> true
     end,
-    [{Tag,V} | trans_enums(Es, Env, [Tag|Ids])];
-trans_enums([], _, _) -> [].
+    [{Tag,V} | trans_enums(Es, Env, [Tag|Ids],{integer,"hello",V+1})];
+trans_enums([{Tag,Line} | Es], Env, Ids, ValueInit) ->
+    %Value={integer,"hello",ValueInit},
+%%    Value=ValueInit,
+%%    io:format("Enter 2 col enum fun.~n"),
+    V = trans_value(ValueInit, Env),
+    case member(Tag, Ids) of
+	true -> error(Line, "enumeration ~s multiply defined", [Tag]);
+	false -> true
+    end,
+    [{Tag,V} | trans_enums(Es, Env, [Tag|Ids], {integer,"hello",V+1})];
+
+%%trans_enums([{Tag,Line} | Es], Env, Ids, Value) ->
+%%    V = trans_value(Value, Env),
+%%io:format("Enter 4 parameter trans_enums.~n"),
+%%    case member(Tag, Ids) of
+%%	true -> error(Line, "enumeration ~s multiply defined", [Tag]);
+%%	false -> true
+%%    end,
+%%PV=V+1,
+%%   [{Tag,V} | trans_enums(Es, Env, [Tag|Ids], {integer,"hello",PV})];
+
+trans_enums([], _, _, _) -> [].
 
 
 trans_value({integer,_,Value}, Env) -> Value;

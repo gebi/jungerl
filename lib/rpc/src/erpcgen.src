@@ -64,8 +64,8 @@ fi
 
 noxinfile=`echo $infile | sed 's;.x$;;'`
 
-if [ ! -f $noxinfile.x ]; then
-	echo "Sorry, file $noxinfile.x does not exist"
+if [ ! -f $xfile ]; then
+	echo "Sorry, file $xfile does not exist"
 	exit 1
 fi
 
@@ -82,7 +82,7 @@ esac
 
 noxoutfile=`echo $outfile | sed 's;.x$;;'`
 
-%ERL% -pa $lib_path -noshell \
+%ERL% -boot $erpcgen_boot -pa $lib_path -noshell \
 	-s erpcgen start -s erlang halt -- \
 	-infile $noxinfile -outfile $noxoutfile -options $optarg
 

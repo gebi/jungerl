@@ -51,7 +51,7 @@ static void report_error(msg)
     unsigned char c;
     
     if (!msg)
-	msg = sys_errlist[errno];
+	msg = strerror(errno);
     if (strlen(msg) > 255)
 	c = 255;
     else
@@ -66,7 +66,8 @@ static void loop(fd)
 {
     int i, r, s;
     char buf[256];
-    struct sockaddr_in addr;
+    struct sockaddr_storage addr;
+    int family;
 
     for(;;) {
 	/*
@@ -92,13 +93,14 @@ static void loop(fd)
 	    report_error("Couldn't parse address");
 	    continue;
 	}
+	family = ((struct sockaddr_in *)&addr)->sin_family;
 
 	/*
 	 * Create the socket to be passed.
 	 */
 	if (buf[0] == 0) {
 	    /* tcp */
-	    if ((s = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+	    if ((s = socket(family, SOCK_STREAM, 0)) < 0) {
 	        /* perror("socket"); */
 	        report_error((char *)NULL);
 		continue;
@@ -108,7 +110,7 @@ static void loop(fd)
 	}
 	else {
 	    /* udp */
-	    if ((s = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+	    if ((s = socket(family, SOCK_DGRAM, 0)) < 0) {
 	        /* perror("socket"); */
 	        report_error((char *)NULL);
 		continue;
@@ -119,7 +121,24 @@ static void loop(fd)
 	 * Bind it according to spec.
 	 */
 	/*seteuid(saved_euid);*/  /* flip euid, XXX doesn't work on Solaris */
-	r = bind(s, (struct sockaddr *)&addr, sizeof(addr));
+	switch (family)
+	{
+	    case AF_INET:
+		r = bind(s, (struct sockaddr *)&addr,
+			 sizeof(struct sockaddr_in));
+		break;
+#ifdef HAVE_GETADDRINFO /* if we have the getaddrinfo function, we have ipv6 */
+	    case AF_INET6:
+                {
+                    int on = 1;
+                    setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY,
+                               (void *)&on, sizeof(on));
+                    r = bind(s, (struct sockaddr *)&addr,
+                             sizeof(struct sockaddr_in6));
+                }
+		break;
+#endif /* HAVE_GETADDRINFO */
+	}
 	/* seteuid(getuid()); */
 
 	if (r < 0) {

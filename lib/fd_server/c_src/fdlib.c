@@ -192,9 +192,78 @@ int send_fd(fd, sock_fd)
 /*
  * Parse an address specification and fill in a sockaddr_in accordingly.
  * The address should be on the form:
- *   [a.d.re.ss|hostname]:{portnumber|servicename}
+ *   [{inet|inet6}:][a.d.re.ss|hostname:]{portnumber|servicename}
+ *
+ * The following table summarizes the interpretation:
+ *
+ *     str                  family    addr      port   comment
+ *    -----------------------------------------------------------
+ *     "123"                AF_INET   0.0.0.0   123
+ *     ":123"               AF_INET   0.0.0.0   123
+ *     "inet:123"           AF_INET   0.0.0.0   123
+ *     "inet::123"          AF_INET   0.0.0.0   123
+ *     "inet6:123"          AF_INET6  0.0.0.0   123
+ *     "inet6::123"         AF_INET6  0.0.0.0   123
+ *     "0.0.0.0:123"        AF_INET   0.0.0.0   123
+ *     "localhost:123"      AF_INET   127.0.0.1 123
+ *     "inet6::::123"       AF_INET6  ::        123    ipv6 any
+ *     "inet6:::1:123"      AF_INET6  ::1       123    ipv6 loopback
+ *     "inet:0.0.0.0:123"   AF_INET   0.0.0.0   123
+ *     "inet:localhost:123" AF_INET   127.0.0.1 123
+ *
+ * A service name can be specified instead of a port number.
  */
-int fd_parse_addr(struct sockaddr_in *addr, char *str)
+int fd_parse_addr(struct sockaddr_storage *addr, char *str)
+{
+    int family;
+
+    family = AF_INET; /* default unless specified */
+    if (strncmp("inet6:", str, strlen("inet6:")) == 0) {
+#ifdef HAVE_GETADDRINFO
+	family = AF_INET6;
+	str += strlen("inet6:");
+#else
+        return -1;
+#endif /* HAVE_GETADDRINFO */
+    } else if (strncmp("inet:", str, strlen("inet:")) == 0) {
+	family = AF_INET;
+	str += strlen("inet:");
+    }
+
+#ifdef HAVE_GETADDRINFO
+    {
+        struct addrinfo hints;
+        struct addrinfo *res;
+        char *bindipstr, *portstr;
+
+        if ((portstr = strrchr(str, (int)':')) != NULL)
+            *portstr++ = '\0';
+        else {
+            portstr = str;
+            str = "";
+        }
+
+        memset(&hints, 0, sizeof(struct addrinfo));
+        hints.ai_flags = AI_ADDRCONFIG | AI_PASSIVE;
+        hints.ai_family = family;
+        hints.ai_socktype = 0;
+        hints.ai_protocol = 0;
+
+        bindipstr = *str == '\0'? NULL: str;
+        if (getaddrinfo(bindipstr, portstr, &hints, &res) != 0) {
+            return -1;
+        } else {
+            memmove(addr, res->ai_addr, res->ai_addrlen);
+            freeaddrinfo(res);
+            return 0;
+        }
+    }
+#else /* HAVE_GETADDRINFO */
+    return fd_parse_addr_ipv4(addr, str);
+#endif /* HAVE_GETADDRINFO */
+}
+
+int fd_parse_addr_ipv4(struct sockaddr_in *addr, char *str)
 {
     int port = 0;
     char *cp;
@@ -219,7 +288,7 @@ int fd_parse_addr(struct sockaddr_in *addr, char *str)
 	/* fprintf(stderr, "bad port number %d\n", port); */
         return -1;
     }
-    
+
     bzero(addr, sizeof(*addr));
     addr->sin_family = AF_INET;
     addr->sin_port = htons(port);
@@ -237,7 +306,6 @@ int fd_parse_addr(struct sockaddr_in *addr, char *str)
     }
     return 0;
 }
-
 
 
 #ifdef DYNAMIC_DRIVER

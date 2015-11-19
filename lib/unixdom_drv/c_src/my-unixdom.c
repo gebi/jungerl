@@ -16,16 +16,24 @@ null(void)
     printf("Hello, world!  This is null()\r\n");
 }
 
+#define IS_SERVER   1
+#define IS_ABSTRACT 2
+#define IS_NULLTERM 4
+
 int
-my_open(char *path, int is_server)
+my_open(char *path, int flags)
 {
     struct stat		sb;
     struct sockaddr_un	sin;
+    size_t		sin_len;
     int			s;
     int			res;
+    int			is_server = !!(flags & IS_SERVER);
+    int			is_abstract = !!(flags & IS_ABSTRACT);
+    int			is_nullterm = !!(flags & IS_NULLTERM);
     
     /* Race condition exists, but is better than nothing */
-    if (is_server && stat(path, &sb) == 0) {
+    if (is_server && !is_abstract && stat(path, &sb) == 0) {
 	errno = EEXIST;
 	return -1;
     }
@@ -33,16 +41,35 @@ my_open(char *path, int is_server)
 	return -1;
     }
 
+    memset(&sin, 0, sizeof(sin));
     sin.sun_family = AF_UNIX;
-    strcpy(sin.sun_path, path);
+    /* Path to abstract unix domain contains \0 in first position. */
+    /* TODO abstract path doesn't need to be null terminated! */
+    if (is_abstract) {
+	sin.sun_path[0] = '\0';
+	strncpy(sin.sun_path+1, path, sizeof(sin.sun_path)-1);
+    } else {
+	strncpy(sin.sun_path, path, sizeof(sin.sun_path));
+    }
+
+    if (is_nullterm) {
+	if (is_abstract)
+	    sin_len = sizeof(sin) - sizeof(sin.sun_path)
+		+ strlen(sin.sun_path+1) + 1;
+	else
+	    sin_len = sizeof(sin) - sizeof(sin.sun_path)
+		+ strlen(sin.sun_path);
+    } else
+	sin_len = sizeof(sin);
+
 #if	defined(SUN_LEN) && (! (defined(solaris) || defined(linux)))
     sin.sun_len = SUN_LEN(&sin);
 #endif	/* SUN_LEN */
 
     if (is_server) {
-	res = bind(s, (struct sockaddr *) &sin, sizeof(sin));
+	res = bind(s, (struct sockaddr *) &sin, sin_len);
     } else {
-	res = connect(s,  (struct sockaddr *) &sin, sizeof(sin));
+	res = connect(s,  (struct sockaddr *) &sin, sin_len);
     }
     if (res < 0) {
 	return -1;

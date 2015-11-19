@@ -3,6 +3,6 @@
   {vsn,"0.3"},
   {id,""},
   {modules,[ucs,ucs_app,ucs_data,ucs_data_build]},
-  {applications, []},
+  {applications, [kernel, stdlib]},
   {mod, {ucs_app, []}}
  ]}.

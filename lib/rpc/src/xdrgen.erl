@@ -50,6 +50,7 @@ mkblock(Es) ->                  {block,0,Es}.
 mkmodule(M) ->                  {attribute,0,module,M}.
 mkexport(F,A) ->                {attribute,0,export,[{F,A}]}.
 mkfunction(Name,Arity,CL) ->    {function,0,Name,Arity,CL}.
+mkstring(X) -> 			{string,0,X}.
 
 mkbin(Elems) ->                 {bin, 0, Elems}.
 mkbinelem(Expr, Sz, Types) ->   {bin_element, 0, Expr, Sz, Types}.
@@ -111,32 +112,64 @@ encode({type,Id,Type}, Fs0) ->
 
 %% <<V:32>>
 enc_prim_type(int, V, R) ->
-    {mkbin([mkbinelem(V, mkint(32), default)]), R};
+    put(enc_random, true),
+    case V of
+	{_,_,'{}'} ->
+%%io:format("{} found.~n"),
+		{mkbin([mkbinelem(mkcall(enc_random,[mkint(65535),mkint(0)]),mkint(32), default)]),R};
+  
+	_ ->
+		{mkbin([mkbinelem(V, mkint(32), default)]), R}
+    end;
 enc_prim_type(unsigned_int, V, R) ->
     enc_prim_type(int, V, R);
 %% <<V:64>>
 enc_prim_type(hyper, V, R) ->
-    {mkbin([mkbinelem(V, mkint(64), default)]), R};
+    put(enc_random, true),
+    case V of
+          {_,_,'{}'} ->
+		{mkbin([mkbinelem(mkcall(enc_random,[mkint(65535),mkint(0)]),mkint(64), default)]),R};
+          _ ->
+    		{mkbin([mkbinelem(V, mkint(64), default)]), R}
+    end;
 enc_prim_type(unsigned_hyper, V, R) ->
     enc_prim_type(hyper, V, R);
 %% <<V:32/float>>
 enc_prim_type(float, V, R) ->
-    {mkbin([mkbinelem(V, mkint(32), [float])]), R};
+    put(enc_random, true),
+    case V of
+          {_,_,'{}'} ->
+                {mkbin([mkbinelem(mkcall(enc_random,[mkint(65535),mkint(0)]),mkint(32), [float])]),R};
+	  _ ->
+                {mkbin([mkbinelem(V, mkint(32), [float])]), R}
+    end;
 %% <<V:64/float>>
 enc_prim_type(double, V, R) ->
-    {mkbin([mkbinelem(V, mkint(64), [float])]), R};
+    put(enc_random, true),
+    case V of
+          {_,_,'{}'} ->
+                {mkbin([mkbinelem(mkcall(enc_random,[mkint(65535),mkint(0)]),mkint(64), [float])]),R};
+          _ ->
+    		{mkbin([mkbinelem(V, mkint(64), [float])]), R}
+    end;
 
 %% if V == true -> <<1:32>>;
 %%    V == false -> <<0:32>>;
 %% end
 enc_prim_type(bool, V, R) ->
-    {mkif([mkclause([],
-		   [mkop('==', V, mkatom(true))],
-		   [mkbin([mkbinelem(mkint(1), mkint(32), default)])]),
-	   mkclause([],
-		    [mkop('==', V, mkatom(false))],
-		    [mkbin([mkbinelem(mkint(0), mkint(32), default)])])]),
-     R};
+    put(enc_random, true),
+    case V of
+          {_,_,'{}'} ->
+                {mkbin([mkbinelem(mkcall(enc_random,[mkint(2),mkint(-1)]),mkint(32), default)]),R};
+          _ ->
+    		{mkif([mkclause([],
+			   [mkop('==', V, mkatom(true))],
+			   [mkbin([mkbinelem(mkint(1), mkint(32), default)])]),
+	  		 mkclause([],
+		    	[mkop('==', V, mkatom(false))],
+		    	[mkbin([mkbinelem(mkint(0), mkint(32), default)])])]),
+     		R}
+    end;
 
 %% case io_list_len(V) of
 %%   N -> V;  % when N rem 4 == 0
@@ -145,18 +178,33 @@ enc_prim_type(bool, V, R) ->
 %% end
 enc_prim_type({array, N, opaque}, V, R) ->
     put(io_list_len, true),
-    Ret = if (N rem 4) == 0 -> V;
-	     true ->
-		  mklist([V, enc_align(N)])
-	  end,
-    {mkcase(mkcall(io_list_len, [V]),
-	    [mkclause([mkint(N)],
-		      [],
-		      [Ret]),
-	     mkclause([mkvar('_')],
-		      [],
-		      [mkexitlimit()])]),
-     R};
+    put(enc_align, true),
+    put(enc_random_bytes, true),
+    {Sz, R1} = genvar(R),
+%%    Ret = if (N rem 4) == 0 -> V;
+%%	    true ->
+%%		  mklist([V, enc_align(N)])
+%%	  end,
+%% By ruix 2012-06-20
+    case V of 
+        {_,_,'{}'} ->
+              {mkcall(enc_random_bytes, [mkint(N)]), R1};
+        _ ->
+	Ret = mklist([V, mkcall(enc_align,[Sz])]),
+	{mkblock([mkmatch(Sz, 
+			mkcall(io_list_len,
+			[V])),
+		mkcase(Sz, 
+			[mkclause([mkint(N)],
+				[],
+				[Ret]),
+			mkclause([mkvar('_')],
+				[],
+				[mkexitlimit()])
+			])
+		]),
+	R1}
+    end;
 
 %% If Max /= infinity:
 %% begin
@@ -174,18 +222,37 @@ enc_prim_type({array, N, opaque}, V, R) ->
 enc_prim_type({varray, Max, opaque}, V, R) ->
     put(enc_align, true),
     put(io_list_len, true),
+    put(enc_random, true),
+    put(enc_random_bytes, true),
+    put(enc_random_string, true),
     {Sz, R1} = genvar(R),
+    {Sz1, R2} = genvar(R1),
+    case V of
+         {_,_,'{}'} ->
+               if Max == infinity ->
+                      Ret1 = mkmatch(Sz1,mkcall(enc_random, [mkint(1024),mkint(0)]));
+		  true ->
+                      Ret1 = mkmatch(Sz1, mkint(Max))
+               end,
+               LL0 = mkbin([mkbinelem(Sz1, mkint(32), [unsigned])]),
+               %LL1 = mkcall(enc_random_bytes,[Sz1]),
+               LL1 = mkcall(enc_random_string,[Sz1]),
+               {mkblock([Ret1, mklist([LL0, LL1])]), R2};
+         _ ->
+               
     Ret = mklist([mkbin([mkbinelem(Sz, mkint(32), [unsigned])]),
 		  V,
 		  mkcall(enc_align, [Sz])]),
+%%io:format("enc_prim_type, varray, Ret:~p~n",[Ret]),
     if Max == infinity -> 
 	    {mkblock([mkmatch(Sz, mkcall(io_list_len, [V])),
-		      Ret]), R1};
+		      Ret]), R2};
        true ->
 	    {mkblock([mkmatch(Sz, mkcall(io_list_len, [V])),
 		      mkif([mkclause([], [mkop('=<', Sz, mkint(Max))], [Ret]),
 			    mkclause([], [mkatom(true)], [mkexitlimit()])])]),
-	     R1}
+	     R2}
+    end
     end;
 enc_prim_type({varray,Max,string}, V, R) ->
     enc_prim_type({varray, Max, opaque}, V, R).
@@ -219,13 +286,30 @@ enc_type({type,Id}, V, R) ->
 %%   TagN -> Valn
 %% end
 %%
+%% Rui Xie 2012-06-26
 enc_type({enum,Nums},V,R) ->
+    {L, R1} = genvar(R),
+    {V0, R2} = genvar(R1),
+              ETags = foldr(fun({Tag,Val},Tags) -> 
+                                 ETag =
+                                      if integer(Tag) -> mkint(Tag);
+                                         true -> mkatom(Tag)
+                                      end,
+                            [ETag|Tags] end, [], Nums),
+              CL0 = mkmatch(L,mklist(ETags)),
+              CL1 = mkcall(lists,nth,[mkcall(enc_random,[mkcall(erlang,length,[L]),mkint(0)]),L]), 
+              CL2 = mkmatch(V0,CL1),
+ 
+              CL3 = mkmatch(V0,V),
+
     CL = map(
-	   fun({Tag,Val}) ->
-		   mkclause([mkatom(Tag)],[],
-			    [mkbin([mkbinelem(mkint(Val),mkint(32), default)])])
-	   end, Nums),
-    {mkcase(V, CL), R};
+               fun({Tag,Val}) ->
+	            mkclause([mkatom(Tag)],[],
+		    [mkbin([mkbinelem(mkint(Val),mkint(32), default)])])
+	       end, Nums),
+    CL4 = mkcase(V, [mkclause([mkvar('{}')],[],[CL0,CL2]), mkclause([mkvar('_')],[],[CL3])]),
+     
+    {mkblock([CL4, mkcase(V0, CL)]), R2};
     
 %%
 %% array:
@@ -240,13 +324,20 @@ enc_type({array,N,Type}, V, R) ->
     {V1,R1} = genvar(R),
     {E1,R2} = enc_type(Type,V1,R1),
     CL = [mkclause([V1], [], [E1])],
-    E3 = mkcall(lists, map, [mkfun(CL), V]),
-    E4 = mkif([mkclause([],
+    
+    case V of 
+         {_,_,'{}'} ->
+                E3 = mkcall(lists, map, [mkfun(CL), mkcall(lists, duplicate, [mkint(N), {var,0,'{}'}])]),
+		{ E3, R2};
+	_ ->
+    		E3 = mkcall(lists, map, [mkfun(CL), V]),
+    		E4 = mkif([mkclause([],
 			[mkop('==',
 			      mkcall(length,[V]),
 			      mkint(N))],
 			[ E3 ])]),
-    { E4, R2};
+    		{ E4, R2}
+    end;
 %%
 %% varaible array
 %%
@@ -275,9 +366,25 @@ enc_type({varray,Max,string}, V, R) ->
 %% end
 %%
 enc_type({varray,Max,Type}, V, R0) ->
+    put(enc_random, true),
     {V1, R1} = genvar(R0),
     {Len, R2} = genvar(R1),
-    {E1, R3} = enc_type(Type,V1,R2),
+    {Len1, R3} = genvar(R2),
+    case V of
+         {_,_,'{}'} ->
+              if Max == infinity ->
+                    Ret1 = mkmatch(Len1,mkcall(enc_random,[mkint(1024),mkint(0)]));
+                 true ->
+                    Ret1 = mkmatch(Len1,mkint(Max))
+              end, 
+              LL = mkcall(lists, duplicate,[Len1,{var,0,'{}'}]),
+              {E1, R4} = enc_type(Type,mkvar('{}'),R3),
+              CL = [mkclause([V1], [], [E1])],
+              E2 = mkcall(lists, map, [mkfun(CL), LL]),
+              E3 = mkbin([mkbinelem(Len1, mkint(32), [unsigned])]),
+              {mkblock([Ret1,mklist([E3,E2])]), R4};
+         _ ->
+    {E1, R4} = enc_type(Type,V1,R3),
     Match = mkmatch(Len, mkcall(length, [V])),
     E2 = mkbin([mkbinelem(Len, mkint(32), [unsigned])]),
     CL = [mkclause([V1], [], [E1])],
@@ -294,7 +401,8 @@ enc_type({varray,Max,Type}, V, R0) ->
 					 [mkatom(true)],
 					 [mkexitlimit()])])])
 	 end,
-    {E4, R3};
+    {E4, R4}
+    end;
 
 %% structures are encoded recursively for each member as:
 %%
@@ -303,6 +411,10 @@ enc_type({varray,Max,Type}, V, R0) ->
 %%      [enc_T1(E1), enc_T2(E2), ..., enc_T3(E3)]
 %% end
 %%
+%% Add default case for encode struct. 
+%% Default case is empty input. for incorrect input,it will fail.
+%% 
+%% Rui Xie 2012-06-26
 enc_type({struct, Elems}, V, R) ->
     {EL,VL,R1} = foldr(
 		   fun({Id,T}, {Enc0, VL, RR0}) ->
@@ -310,7 +422,16 @@ enc_type({struct, Elems}, V, R) ->
 			   {Enc1,RR2} = enc_type(T, VV, RR1),
 			   {mkcons(Enc1,Enc0), [VV|VL], RR2}
 		   end, {mknil(),[],R}, Elems),
-    { mkcase(V, [mkclause([mktuple(VL)], [], [EL])]), R1};
+	CL1 = mkclause([mktuple(VL)],[],[EL]),
+{EL1,VL1,R1} = foldr(
+                   fun({Id,T}, {Enc0, VL, RR0}) ->
+                           {VV1,RR1} = genvar(RR0),
+			   VV=mkvar('{}'),
+                           {Enc1,RR2} = enc_type(T, VV, RR1),
+                           {mkcons(Enc1,Enc0), [VV|VL], RR2}
+                   end, {mknil(),[],R}, Elems),
+	CL2 = mkclause([mkvar('{}')],[],[EL1]),
+    { mkcase(V, [CL1,CL2]), R1};
 
 %%
 %% union are encoded recursively for each arm as:
@@ -325,11 +446,31 @@ enc_type({struct, Elems}, V, R) ->
 %%     end]
 %% end.
 %%
+%% Add default function for encode union.
+%% Rui Xie 2012-06-26
 enc_type({union, {{DId,DT}, Elems}}, V, R) ->
+    put(enc_random,true),
     {V0,R1} = genvar(R),
     {V1,R2} = genvar(R1),
-    {DEnc,R3} = enc_type(DT, V0, R2),
-    {CL1,R4} = foldr(
+    {V2,R3} = genvar(R2),
+    {L,R4} = genvar(R3),
+%First to get all enum list for this union.
+    ETags = foldr(fun({{Tag,_},_}, Tags) -> TAG =
+                                            if integer(Tag) -> mkint(Tag);
+                                               true -> mkatom(Tag)
+                                            end,
+            [TAG | Tags] end, [], Elems),
+    %LL = [mkvar('[')] ++ [mkvar(X) || X <- ETags] ++ [mkvar(']')],
+    LL = mklist(ETags),
+%io:format("~p\n",[LL]), 
+
+   %CLL0 = mkmatch(L, LL), 
+   %CLL1 = mkcall(lists,nth,[mkcall(enc_random,[mkcall(erlang,length,[L]),mkint(0)]),L]),
+   %CLL2 = mkcase(V, [mkclause([mkvar('{}')],[],[mkmatch(V2,mktuple([CLL1,mkvar('{}')]))]), mkclause([mkvar('_')],[],[mkmatch(V2,V)])]),
+ 
+% normal case 
+    {DEnc,R5} = enc_type(DT, V0, R4),
+    {CL1,R6} = foldr(
 		 fun ({{default,_},{_,T}}, {CL0, R0}) ->
 			 {Enc,RR} = enc_type(T, V1, R0),
 			 {[mkclause([mkvar('_')],[],[Enc]) | CL0], RR};
@@ -341,11 +482,38 @@ enc_type({union, {{DId,DT}, Elems}}, V, R) ->
 				 true -> mkatom(Tag)
 			     end,
 			 {[mkclause([ETag],[],[Enc]) | CL0], RR}
-		 end, {[],R3}, Elems),
+		 end, {[],R5}, Elems),
     Case1 = mkcase(V0, CL1),
-    CL2 = [mkclause([mktuple([V0, V1])],
-		    [], [mklist([DEnc, Case1])])],
-    { mkcase(V, CL2), R4};
+    CL2 = mkclause([mktuple([V0, V1])], [], [mklist([DEnc, Case1])]),
+    %CL3 = mkcase(V, CL2),
+
+% {} case   
+    {DEnc1,R7} = enc_type(DT, V2, R6),
+    {CL11,R8} = foldr(
+                 fun ({{default,_},{_,T}}, {CL0, R0}) ->
+                         {Enc,RR} = enc_type(T, mkvar('{}'), R0),
+                         {[mkclause([mkvar('_')],[],[Enc]) | CL0], RR};
+                     ({{Tag,Val},{Uid,T}}, {CL0, R0}) ->
+                         {Enc,RR} = enc_type(T, mkvar('{}'), R0),
+                         ETag =
+                             if
+                                 integer(Tag) -> mkint(Tag);
+                                 true -> mkatom(Tag)
+                             end,
+                         {[mkclause([ETag],[],[Enc]) | CL0], RR}
+                 end, {[],R7}, Elems),
+    Case11 = mkcase(V2, CL11),
+    CL21 = mklist([DEnc1, Case11]),
+
+    CLL0 = mkmatch(L, LL),
+    CLL1 = mkcall(lists,nth,[mkcall(enc_random,[mkcall(erlang,length,[L]),mkint(0)]),L]),
+    
+    CL31 = mkmatch(V2, CLL1),
+    %CL4 = mkmatch(V2,V0),
+
+    CLL2 = mkcase(V, [mkclause([mkvar('{}')],[],[CL31,CL21]), CL2]),
+
+    {mkblock([CLL0,CLL2]), R8};
 %%
 %% void is used to mark that data is not present !!!
 %%
@@ -519,7 +687,7 @@ dec_compound({type,Id}, I_Bin, I_Off, R)  ->
 dec_compound({enum,Nums}, I_Bin, I_Off, R0) ->
     {Enum,R1} = genvar(R0),
     Match = mkmatch(mkbin([mkbinoff(I_Off),
-			   mkbinelem(Enum, mkint(32), default),
+			   mkbinelem(Enum, mkint(32), [signed]),
 			   mkbintail()]),
 		    I_Bin),
     CL = map(
@@ -1017,6 +1185,18 @@ svc_call_rs(Name,Proc,Args,Ret,ProgId,Serv,Ver,Bin,Off,R0) ->
 		 mkclause([mkvar('Else')], [], [mkvar('Else')])]),
     mkclause([mkint(Proc)], [], reverse(DL) ++ [E1]).
 
+%% Generate random data.
+%% List all related functions here for referrence. 
+enc_random(Roof,Offset) ->
+    random:uniform(Roof) + Offset.
+
+enc_random_bytes(Len) ->
+    [<<(random:uniform(256) - 1):8/unsigned>> || _H <- lists:seq(1,Len)] ++
+    [enc_align(Len)].
+
+enc_random_string(Len) ->
+    [<<(random:uniform(10) + 47):8/unsigned>> || _H <- lists:seq(1,Len)] ++
+    [enc_align(Len)].
 
 enc_align(Len) ->
   case Len rem 4 of

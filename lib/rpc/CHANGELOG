@@ -1,3 +1,7 @@
+1.1 - 120730 - beta1 - Rui Xie, Alcatel-Lucent, Inc:
+	- fix xdr parsing of enum, union
+	- add feature random encoding for XDR encoding/decoding.
+
 1.1 - 010903 - release - Martin Björklund, Alteon WebSystems:
 
 - timeout fix.  the timeout specified is now RPC timeout, as it's

@@ -1,4 +1,4 @@
-%% Copyright (c) 2000 Sendmail, Inc.  All rights reserved.
+%% Copyright (c) 2000, 2001 Sendmail, Inc.  All rights reserved.
 %%
 %% XDR + RPC grammar file
 %%
@@ -106,6 +106,10 @@ enum_decls -> identifier '=' value ',' enum_decls :
 	[{val('$1'), line('$1'), '$3'} | '$5'].
 enum_decls -> identifier '=' value :
 	[{val('$1'), line('$1'), '$3'}].
+enum_decls -> identifier ',' enum_decls : 
+	[{val('$1'), line('$1')} | '$3'].
+enum_decls -> identifier :
+	[{val('$1'), line('$1')}].
 
 struct_type_spec -> 'struct' struct_body : {struct, line('$1'), '$2'}.
 
@@ -123,6 +127,8 @@ union_body -> 'switch' '(' declaration ')' '{' case_decls default_decl '}' :
 
 case_decls -> 'case' value ':' declaration ';' case_decls :
 	[{'$2', line('$1'), '$4'} | '$6'].
+case_decls -> 'case' value ':' case_decls :
+	[{'$2', line('$1')} | '$4'].
 case_decls -> 'case' value ':' declaration ';' :
 	[{'$2', line('$1'), '$4'}].
 

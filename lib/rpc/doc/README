@@ -106,14 +106,23 @@ callback module of behaviour 'rpc_server'. This means that a RPC CALL
 maps to a gen_server:call (see rpc/stack.erl for an example), or
 directly to a call to a user-defined module (see API.txt for more details).
 
+5. Usage of random encoding function
+------------------------
 
-5. Examples
+The generated <X>_xdr.erl file is used to encode/decode the XDR defined
+data structure. Each data structure has it's encode/decode function. 
+To use the random encoding function, just need pass "{}" to encode function.
+	As in the test case for test.x,
+		call encode function as enc_t_primitive_struct({})
+		
+		
+6. Examples
 -----------
 
 There are some working examples in the examples/ directory.
 
 
-6. TODO
+7. TODO
 --------
 
 *  The only supported authentication methods are AUTH_NULL and
@@ -138,5 +147,5 @@ There are some working examples in the examples/ directory.
 
 *  strings should be represented as lists, not binaries.
 
-7. HAVE FUN
+8. HAVE FUN
 -----------

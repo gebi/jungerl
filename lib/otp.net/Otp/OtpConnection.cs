@@ -221,7 +221,7 @@ namespace Otp
 				OtpMsg msg = receiveMsg(timeout);
                 return msg == null ? null : msg.getMsg();
 			}
-			catch (Erlang.DecodeException e)
+			catch (Erlang.Exception e)
 			{
 				close();
 				throw new System.IO.IOException(e.Message);

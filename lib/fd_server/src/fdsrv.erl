@@ -16,7 +16,8 @@
 -export([start_driver/1]).
 
 %% gen_server callbacks
--export([init/1, handle_call/3, handle_info/2, terminate/2, code_change/3]).
+-export([init/1, handle_call/3, handle_info/2, handle_cast/2,
+         terminate/2, code_change/3]).
 
 -record(state, {dport, sport}).
 
@@ -94,7 +95,7 @@ driver_check(Error) -> Error.
 %%----------------------------------------------------------------------
 %%----------------------------------------------------------------------
 
-handle_call({bind_socket, Type, Spec}, From, State) ->
+handle_call({bind_socket, Type, Spec}, _From, State) ->
     #state{dport = DPort, sport = SPort} = State,
     case lists:member(Type, [tcp, udp]) of
 	true ->
@@ -104,21 +105,25 @@ handle_call({bind_socket, Type, Spec}, From, State) ->
 	    {reply, {error, "Bad socket type"}, State}
     end;
 
-handle_call(stop, From, State) ->
+handle_call(stop, _From, State) ->
     {stop, normal, ok, State}.
 
+%%----------------------------------------------------------------------
+%%----------------------------------------------------------------------
+handle_cast(_,  State) ->
+    {noreply, State}.
 %%----------------------------------------------------------------------
 %%----------------------------------------------------------------------
 handle_info({'EXIT', _, Reason}, State) ->
     {stop, Reason, State};
 
-handle_info({Port, {data, [1|Str]}}, State) ->
+handle_info({_Port, {data, [1|Str]}}, State) ->
     error_logger:format("fdsrv: ~s~n", [Str]),
     {noreply, State}.
 
 %%----------------------------------------------------------------------
 %%----------------------------------------------------------------------
-terminate(Reason, State) ->
+terminate(_Reason, State) ->
     #state{dport = DPort, sport = SPort} = State,
     DPort ! {self(), close},
     SPort ! {self(), close}.
@@ -155,15 +160,29 @@ no_nl([10|T]) ->
 no_nl(L) ->
     lists:reverse(L).
 
-create_spec(Port) when integer(Port) ->
+create_spec(Port) when is_integer(Port) ->
     [$:|integer_to_list(Port)];
-create_spec({{IP1,IP2,IP3,IP4}, Port}) when integer(IP1),
-					    integer(IP2),
-					    integer(IP3),
-					    integer(IP4),
-					    integer(Port) ->
-    lists:flatten(io_lib:format("~p.~p.~p.~p:~p",
-				[IP1, IP2, IP3, IP4, Port])).
+create_spec({{IP1,IP2,IP3,IP4}, Port}) when is_integer(IP1),
+					    is_integer(IP2),
+					    is_integer(IP3),
+					    is_integer(IP4),
+					    is_integer(Port) ->
+    f("inet:~p.~p.~p.~p:~p",
+      [IP1, IP2, IP3, IP4, Port]);
+create_spec({{IP1,IP2,IP3,IP4,IP5,IP6,IP7,IP8}, Port}) when is_integer(IP1),
+							    is_integer(IP2),
+							    is_integer(IP3),
+							    is_integer(IP4),
+							    is_integer(IP5),
+							    is_integer(IP6),
+							    is_integer(IP7),
+							    is_integer(IP8),
+							    is_integer(Port) ->
+    f("inet6:~.16b:~.16b:~.16b:~.16b:~.16b:~.16b:~.16b:~.16b:~p",
+      [IP1, IP2, IP3, IP4, IP5, IP6, IP7, IP8, Port]).
+
+
+f(F, A) -> lists:flatten(io_lib:format(F,A)).
 
 %%
 %%

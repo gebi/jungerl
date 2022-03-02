@@ -17,102 +17,102 @@
 */
 namespace Otp.Erlang
 {
-	using System;
-	
-	/*
-	* Provides a C# representation of Erlang strings. 
-	**/
-	[Serializable]
-    public class String:Erlang.Object
-	{
-		private System.String str;
-		
-		/*
-		* Create an Erlang string from the given string.
-		**/
-		public String(System.String str)
-		{
-			this.str = str;
-		}
-		
-		/*
-		* Create an Erlang string from a stream containing a string encoded in
-		* Erlang external format.
-		*
-		* @param buf the stream containing the encoded string.
-		* 
-		* @exception DecodeException if the buffer does not
-		* contain a valid external representation of an Erlang string.
-		**/
-		public String(OtpInputStream buf)
-		{
-			str = buf.read_string();
-		}
-		
-		/*
-		* Get the actual string contained in this object.
-		*
-		* @return the raw string contained in this object, without regard
-		* to Erlang quoting rules.
-		* 
-		* @see #toString
-		**/
-		public virtual System.String stringValue()
-		{
-			return str;
-		}
-		
-		/*
-		* Get the printable version of the string contained in this object.
-		*
-		* @return the string contained in this object, quoted.
-		* 
-		* @see #stringValue
-		**/
-		public override System.String ToString()
-		{
-			return "\"" + str + "\"";
-		}
-		
-		/*
-		* Convert this string to the equivalent Erlang external representation.
-		*
-		* @param buf an output stream to which the encoded string should be
-		* written.
-		**/
-		public override void  encode(OtpOutputStream buf)
-		{
-			buf.write_string(str);
-		}
-		
-		/*
-		* Determine if two strings are equal. They are equal if they
-		* represent the same sequence of characters. This method can be
-		* used to compare Strings with each other and with
-		* Strings.
-		*
-		* @param o the String or String to compare to.
-		*
-		* @return true if the strings consist of the same sequence of
-		* characters, false otherwise. 
-		**/
-		public override bool Equals(System.Object o)
-		{
-			if (o is System.String)
-			{
-				return this.str.CompareTo((System.String) o) == 0;
-			}
-			else if (o is String)
-			{
-				return this.str.CompareTo(((String) o).str) == 0;
-			}
-			
-			return false;
-		}
+    using System;
 
-		public override int GetHashCode()
-		{
-			return 1;
-		}
-	}
+    /*
+    * Provides a C# representation of Erlang strings. 
+    **/
+    [Serializable]
+    public class String : Erlang.Object
+    {
+        private System.String str;
+
+        /*
+        * Create an Erlang string from the given string.
+        **/
+        public String(System.String str)
+        {
+            this.str = str;
+        }
+
+        /*
+        * Create an Erlang string from a stream containing a string encoded in
+        * Erlang external format.
+        *
+        * @param buf the stream containing the encoded string.
+        * 
+        * @exception DecodeException if the buffer does not
+        * contain a valid external representation of an Erlang string.
+        **/
+        public String(OtpInputStream buf)
+        {
+            str = buf.read_string();
+        }
+
+        /*
+        * Get the actual string contained in this object.
+        *
+        * @return the raw string contained in this object, without regard
+        * to Erlang quoting rules.
+        * 
+        * @see #toString
+        **/
+        public virtual System.String stringValue()
+        {
+            return str;
+        }
+
+        /*
+        * Get the printable version of the string contained in this object.
+        *
+        * @return the string contained in this object, quoted.
+        * 
+        * @see #stringValue
+        **/
+        public override System.String ToString()
+        {
+            return "\"" + str + "\"";
+        }
+
+        /*
+        * Convert this string to the equivalent Erlang external representation.
+        *
+        * @param buf an output stream to which the encoded string should be
+        * written.
+        **/
+        public override void encode(OtpOutputStream buf)
+        {
+            buf.write_string(str);
+        }
+
+        /*
+        * Determine if two strings are equal. They are equal if they
+        * represent the same sequence of characters. This method can be
+        * used to compare Strings with each other and with
+        * Strings.
+        *
+        * @param o the String or String to compare to.
+        *
+        * @return true if the strings consist of the same sequence of
+        * characters, false otherwise. 
+        **/
+        public override bool Equals(System.Object o)
+        {
+            if (o is System.String)
+            {
+                return this.str.CompareTo((System.String)o) == 0;
+            }
+            else if (o is String)
+            {
+                return this.str.CompareTo(((String)o).str) == 0;
+            }
+
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return 1;
+        }
+    }
 }

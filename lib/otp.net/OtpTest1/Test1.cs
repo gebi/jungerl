@@ -3,50 +3,55 @@ using System.Collections.Generic;
 using System.Text;
 using Otp;
 
-namespace OtpTest1
+namespace Otp
 {
     class Test1
     {
 		static public void Main(String[] args)
-		{
-			System.Console.Out.WriteLine("Otp test...");
+        {
+            {
+                Erlang.Object obj1 = Erlang.Object.Format("{a, b, 10, 2.0}");
+                Erlang.Object obj2 = Erlang.Object.Format("{a, [b, 1, 2.0, \"abc\"], {1, 2}}");
+            }
+
+            System.Console.Out.WriteLine("Otp test...");
 
             string cookie = OtpNode.defaultCookie;
 
             AbstractConnection.traceLevel = OtpTrace.Type.sendThreshold;
 
-			if (args.Length < 1)
-			{
-				System.Console.Out.WriteLine(
-                    "Usage: {0} nodename [cookie] [-notrace]\n"+
-                    "    nodename  - is the name of the remote Erlang node\n"+
-                    "    cookie    - is the optional cookie string to use\n"+
-                    "    -notrace  - disable debug trace\n", 
+            if (args.Length < 1)
+            {
+                System.Console.Out.WriteLine(
+                    "Usage: {0} nodename [cookie] [-notrace]\n" +
+                    "    nodename  - is the name of the remote Erlang node\n" +
+                    "    cookie    - is the optional cookie string to use\n" +
+                    "    -notrace  - disable debug trace\n",
                     Environment.GetCommandLineArgs()[0]);
-				return;
+                return;
             }
             else if (args.Length > 1)
             {
                 cookie = args[1].ToString();
             }
 
-            for (int i=0; i < args.Length; i++)
+            for (int i = 0; i < args.Length; i++)
                 if (args[i].Equals("-notrace"))
                 {
                     AbstractConnection.traceLevel = OtpTrace.Type.defaultLevel;
                     break;
                 }
 
-    
-			String host = System.Net.Dns.GetHostName();
-			String remote = (args[0].IndexOf('@') < 0) ? args[0]+"@"+host : args[0];
+
+            String host = System.Net.Dns.GetHostName();
+            String remote = (args[0].IndexOf('@') < 0) ? args[0] + "@" + host : args[0];
 
             OtpNode node = new OtpNode(false, Environment.UserName + "123@" + host, cookie, true);
 
-			System.Console.Out.WriteLine("This node is called {0} and is using cookie='{1}'.",
-				node.node(), node.cookie());
-			
-            bool ok=node.ping(remote, 1000);
+            System.Console.Out.WriteLine("This node is called {0} and is using cookie='{1}'.",
+                node.node(), node.cookie());
+
+            bool ok = node.ping(remote, 1000);
 
             if (!ok)
             {
@@ -58,13 +63,13 @@ namespace OtpTest1
             remote = node.connection(remote).peer.node();
 
             if (remote != null)
-				System.Console.Out.WriteLine("   successfully pinged node "+remote+"\n");
-			else
-				System.Console.Out.WriteLine("   could not ping node "+remote+"\n");
+                System.Console.Out.WriteLine("   successfully pinged node " + remote + "\n");
+            else
+                System.Console.Out.WriteLine("   could not ping node " + remote + "\n");
 
-			OtpMbox mbox = null;
+            OtpMbox mbox = null;
 
-			try
+            try
             {
                 mbox = node.createMbox();
 
@@ -76,7 +81,7 @@ namespace OtpTest1
 
                 {
                     Otp.Erlang.Object reply = mbox.rpcCall(
-                        remote, "global", "register_name", 
+                        remote, "global", "register_name",
                         new Otp.Erlang.List(new Otp.Erlang.Atom("me"), mbox.self()));
 
                     System.Console.Out.WriteLine("<= [REPLY2]:" + (reply == null ? "null" : reply.ToString()));
@@ -113,16 +118,16 @@ namespace OtpTest1
                 }
 
             }
-			catch (System.Exception e)
-			{
+            catch (System.Exception e)
+            {
                 System.Console.Out.WriteLine("Error: " + e.ToString());
-			}
-			finally
-			{
-				node.closeMbox(mbox);
-			}
+            }
+            finally
+            {
+                node.closeMbox(mbox);
+            }
 
-			node.close();
-		}
+            node.close();
+        }
 	}
 }

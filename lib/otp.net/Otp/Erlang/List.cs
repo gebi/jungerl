@@ -13,7 +13,8 @@
 * Portions created by Ericsson are Copyright 1999, Ericsson Utvecklings
 * AB. All Rights Reserved.''
 * 
- * Converted from Java to C# by Vlad Dumitrescu (vlad_Dumitrescu@hotmail.com)
+* Converted from Java to C# by Vlad Dumitrescu (vlad_Dumitrescu@hotmail.com)
+* Contribution: Serge Aleynikov (added pattern matching)
 */
 namespace Otp.Erlang
 {
@@ -157,10 +158,7 @@ namespace Otp.Erlang
 		**/
 		public int arity()
 		{
-			if (elems == null)
-				return 0;
-			else
-				return elems.Length;
+			return (elems == null) ? 0 : elems.Length;
 		}
 		
 		/*
@@ -299,5 +297,45 @@ namespace Otp.Erlang
 			elems.CopyTo(newList.elems, 0);
 			return newList;
 		}
-	}
+        
+        public override bool subst(ref Erlang.Object a_term, VarBind binding)
+        {
+            System.Collections.Generic.List<Erlang.Object> result =
+                new System.Collections.Generic.List<Erlang.Object>();
+            bool changed = false;
+
+            foreach (Erlang.Object term in this.elems)
+            {
+                Erlang.Object obj = null;
+                if (term.subst(ref obj, binding))
+                    result.Add(obj);
+                else
+                {
+                    changed = true;
+                    result.Add(term);
+                }
+            }
+
+            if (!changed)
+                return false;
+
+            a_term = new Erlang.List(result.ToArray());
+            return true;
+        }
+
+        public override bool match(Erlang.Object pattern, VarBind binding)
+        {
+            if (pattern is Erlang.Var)
+                pattern.match(this, binding);
+            else if (!(pattern is Erlang.List))
+                return false;
+            Erlang.List tup = pattern as Erlang.List;
+            if (arity() != tup.arity())
+                return false;
+            for (int i = 0; i < arity(); ++i)
+                if (!elems[i].match(tup[i], binding))
+                    return false;
+            return true;
+        }
+    }
 }

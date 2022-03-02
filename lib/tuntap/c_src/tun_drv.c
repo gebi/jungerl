@@ -14,6 +14,7 @@
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <assert.h>
+#include <string.h>
 
 #include <linux/if_tun.h>
 

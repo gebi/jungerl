@@ -15,5 +15,11 @@ AB. All Rights Reserved.
 
 Converted from Java to C# by Vlad Dumitrescu (vlad_Dumitrescu@hotmail.com)
 Contributors: 
-  - Paul Shaffer, 
+  - Paul Shaffer,
   - Serge Aleynikov (saleyn@gmail.com)
+      * Many bug fixes
+      * Added sedning/receving RPC cast/call
+      * Added pattern matching
+      * Added variable binding
+      * Added term parsing
+      * Added unit tests

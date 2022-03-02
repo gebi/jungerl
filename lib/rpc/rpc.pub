@@ -5,6 +5,7 @@
 {author, "Scott Fritchie", "scott@sendmail.com", "000815"}.
 {author, "Jim Larson", "jim@sendmail.com", "000815"}.
 {author, "Martin Bjorklund", "mbj@bluetail.com", "001110"}.
+{author, "Rui Xie", "rui.xie@anansimobile.org", "120730"
 {keywords, ["ONC/RPC", "stub generator", "XDR", "RPC", "portmapper"]}.
 {needs, []}.
 {abstract,"This is a stub generator for the ONC/RPC protocol.  Given a
